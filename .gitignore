@@ -1,0 +1,60 @@
+# =============================================================
+#  SECRETS & RUNTIME DATA  —  never commit these
+# =============================================================
+
+# One-time-pad keystreams = raw cryptographic key material.
+*.pad
+keystream_*
+
+# Local chat history / runtime state.
+wiltkey_history.json
+
+# Android release signing (none in repo yet — keep it that way).
+**/key.properties
+*.jks
+*.keystore
+
+# Env / secret files.
+.env
+*.env
+.env.*
+
+# Internal working notes (stale; the real docs live on the website,
+# and Before_Release.md contains deployment details). Un-ignore
+# specific files here if you decide to publish them.
+documentation/
+
+# =============================================================
+#  BUILD ARTIFACTS
+# =============================================================
+
+# Go relay binaries (build from source instead).
+wiltkey_server/wiltkey-relay
+*.exe
+
+# Flutter / Dart.
+**/build/
+**/.dart_tool/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/.pub-cache/
+**/.pub/
+**/ios/Flutter/ephemeral/
+**/android/app/debug/
+**/android/app/profile/
+**/android/app/release/
+**/.last_build_id
+
+# =============================================================
+#  LOGS / OS / EDITOR / TOOLING
+# =============================================================
+*.log
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+*.iml
+.claude/
+
+# Duplicate font sources kept outside the client (app uses wiltkey_client/assets/fonts/).
+/assets/

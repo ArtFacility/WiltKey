@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  wiltkey-relay:
+    build: .
+    container_name: wiltkey_blind_relay
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+      - REDIS_ADDR=redis:6379
+    depends_on:
+      - redis
+    restart: unless-stopped
+    networks:
+      - wiltkey-net
+
+  redis:
+    image: redis:alpine
+    container_name: wiltkey_redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    networks:
+      - wiltkey-net
+
+networks:
+  wiltkey-net:
+    driver: bridge

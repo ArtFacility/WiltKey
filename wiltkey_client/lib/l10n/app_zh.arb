@@ -1,0 +1,616 @@
+{
+  "navChats": "聊天",
+  "navPair": "配对",
+  "navSettings": "设置",
+  "nukedTitle": "设备已重置",
+  "nukedExplanation": "此设备上的所有消息和密钥已删除。安全数据库已被清空。",
+  "nukedResetButton": "创建新身份",
+  "commonCancel": "取消",
+  "commonClose": "关闭",
+  "commonSave": "保存",
+  "commonBack": "返回",
+  "commonContinue": "继续",
+  "commonFinish": "完成",
+  "onboardingWelcomeTitle": "欢迎使用 Wiltkey",
+  "onboardingWelcomeDescription": "Wiltkey 是一款私人加密通讯工具。我们不保存任何元数据、日志或服务器历史。消息在本地加密，若检测 to 截屏会自动销毁。",
+  "onboardingWelcomeNoHistory": "无服务器历史记录，无恢复密钥。",
+  "onboardingIntelTitle": "安全信息",
+  "onboardingLanguageDescription": "选择你的首选语言以继续。你可以随时在设置中更改。",
+  "onboardingFactLanguageTitle": "语言设置",
+  "onboardingFactLanguageBody": "选择你的首选语言以继续。你可以随时在设置中更改。你的选择会保存在本地。",
+  "onboardingThemeTitle": "选择你的主题",
+  "onboardingThemeDescription": "在下方选择一个主题。你之后可以在设置中随时更改。",
+  "onboardingProfileTitle": "你的身份",
+  "onboardingProfileUsernameLabel": "用户名",
+  "onboardingProfileUsernameHint": "输入用户名",
+  "onboardingProfileCodenameLabel": "连接码（5 位字母/数字）",
+  "onboardingProfileCodenameExplanation": "此代码在配对时共享，用以连接附近的朋友。",
+  "onboardingProfileUsernameError": "请设置用户名。",
+  "onboardingProfileCodenameError": "连接码必须恰好为 5 个字符。",
+  "onboardingAvatarTitle": "像素头像",
+  "onboardingAvatarBrushColor": "画笔颜色",
+  "onboardingAvatarRandom": "随机",
+  "onboardingAvatarClear": "清除",
+  "onboardingPinTitle": "解锁密码 PIN",
+  "onboardingPinExplanation": "设置 PIN 码（4-6 位数字）来保护你的聊天记录。每次打开应用时，你都需要输入此密码。如果你忘记了它，消息将无法恢复。",
+  "onboardingPinEnter": "输入 PIN 码",
+  "onboardingPinConfirm": "确认 PIN 码",
+  "onboardingPinLengthError": "PIN 码必须为 4 至 6 位数字。",
+  "onboardingPinMatchError": "两次输入的 PIN 码不一致。",
+  "onboardingSetupFailed": "设置失败: {error}",
+  "@onboardingSetupFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "onboardingFactMetadataTitle": "元数据问题",
+  "onboardingFactMetadataBody": "大多数聊天软件会加密消息内容，但仍会追踪你的联系人、聊天时间以及频率。Wiltkey 不会记录任何元数据、服务器端 data 或连接信息。",
+  "onboardingFactThemeTitle": "选择你的主题",
+  "onboardingFactThemeBody": "主题仅影响视觉外观。每个主题都遵循相同的安全标准。你可以随时在设置中切换主题。",
+  "onboardingFactOtpTitle": "完美保密",
+  "onboardingFactOtpBody": "Wiltkey 使用一次性密码本 (OTP) 加密。密钥与消息大小完全一致、完全随机且永不重复使用。这从数学上实现了完美保密，没有密钥任何人都无法解密消息。",
+  "onboardingFactLimitsTitle": "连接限制",
+  "onboardingFactLimitsBody": "聊天容量限制旨在鼓励建立有意义且慎重的人际关系。限制容量可确保对话目的明确，且植根于真实的现实连接。",
+  "onboardingFactKdfTitle": "安全哈希",
+  "onboardingFactKdfBody": "普通的 PIN 码 in 几毫秒内就可以被暴力破解。Wiltkey 会通过强化函数处理你的 PIN 码，让针对本地数据库的暴力破解变得根本不可能。",
+  "settingsTitle": "设置",
+  "settingsTabProfile": "个人资料",
+  "settingsTabNetwork": "网络",
+  "settingsTabAlerts": "通知",
+  "settingsSavedIndicator": "已保存",
+  "settingsProfileSectionAppearance": "外观",
+  "settingsProfileSectionAvatar": "像素头像",
+  "settingsProfileSectionProfile": "个人资料设置",
+  "settingsProfileBrushColor": "画笔颜色",
+  "settingsProfileChipIdenticon": "标识头像",
+  "settingsProfileChipClear": "清除",
+  "settingsProfileChipRandom": "随机",
+  "avatarEditButton": "编辑头像",
+  "groupCreateEditIcon": "编辑图标",
+  "settingsProfileUsername": "用户名",
+  "settingsProfileBleNick": "简短昵称（5 个字符）",
+  "settingsProfileKeyhash": "账户 ID",
+  "settingsProfileKeyhashCopied": "账户 ID 已复制到剪贴板",
+  "settingsProfileChangePinButton": "修改 PIN 码",
+  "settingsProfileResetIdentityButton": "重置账户",
+  "settingsResetConfirmTitle": "重置身份？",
+  "settingsResetConfirmBody": "这将永久删除所有消息、联系人并生成新身份。此操作无法撤销。",
+  "settingsResetConfirmCancel": "取消",
+  "settingsResetConfirmReset": "重置",
+  "settingsChangePinTitle": "修改 PIN 码",
+  "settingsChangePinOldPin": "输入当前 PIN 码",
+  "settingsChangePinNewPin": "输入新 PIN 码 (4-6 位数字)",
+  "settingsChangePinConfirmPin": "确认新 PIN 码",
+  "settingsChangePinEmptyFieldsError": "请填写所有字段。",
+  "settingsChangePinLengthError": "新 PIN 码必须为 4 至 6 位数字。",
+  "settingsChangePinMatchError": "两次输入的新 PIN 码不一致。",
+  "settingsChangePinUpdatedSnackBar": "PIN 码已更新。",
+  "settingsChangePinIncorrectError": "当前 PIN 码不正确。",
+  "settingsNetworkRoutingTitle": "网络设置",
+  "settingsNetworkDevRelayToggle": "使用本地开发服务器",
+  "settingsNetworkDevRelayUrlLabel": "开发服务器 URL",
+  "settingsNetworkDevRelayDescription": "启用此选项将覆盖生产服务器，并将消息路由到本地开发服务器。",
+  "settingsNetworkActiveGateway": "当前服务器 URL",
+  "settingsNetworkDiagnostics": "诊断",
+  "settingsNetworkDebugButton": "打开调试控制台",
+  "settingsDebugButtonsToggle": "调试按钮",
+  "settingsDebugButtonsDescription": "在聊天列表和聊天内显示终端控制台按钮。",
+  "settingsDebugTitle": "调试控制台",
+  "settingsAlertsBackgroundNotifications": "后台消息通知",
+  "settingsAlertsExplanation": "通知仅会显示 '你收到一条消息'。在输入 PIN 码解锁应用前，消息在设备上保持加密状态。",
+  "settingsTextSizeLabel": "聊天文字大小",
+  "settingsTextSizePreview": "你的消息会是这个样子。",
+  "settingsLanguageLabel": "语言",
+  "settingsLanguageSystem": "跟随系统",
+  "settingsLanguageEnglish": "English",
+  "settingsLanguageHungarian": "Magyar (匈牙利语)",
+  "settingsLanguagePolish": "Polski (波兰语)",
+  "settingsLanguageGerman": "Deutsch (德语)",
+  "settingsLanguageFrench": "Français (法语)",
+  "settingsLanguageSwedish": "Svenska (瑞典语)",
+  "settingsLanguageChinese": "中文",
+  "notificationModeOff": "关闭",
+  "notificationModeOffDesc": "无后台检查。只有打开应用时才能收到消息。",
+  "notificationModeLowPower": "低功耗",
+  "notificationModeLowPowerDesc": "每隔约 10 分钟检查一次新消息。省电模式。",
+  "notificationModeInstant": "即时通知",
+  "notificationModeInstantDesc": "在后台保持安全连接以获取即时通知。会显示一条常驻通知，且较为耗电。",
+  "notificationNewMessageBody": "你收到一条消息",
+  "notificationSecureLinkActive": "安全链路已激活",
+  "chatsLockedSubtitle": "已锁定 · 需当面配对以解锁",
+  "chatsMemberCount": "{count} 个成员",
+  "@chatsMemberCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "chatsSubtitle": "{totalCount} 个联系人 · {lockedCount} 个已锁定",
+  "@chatsSubtitle": {
+    "placeholders": {
+      "totalCount": {
+        "type": "int"
+      },
+      "lockedCount": {
+        "type": "int"
+      }
+    }
+  },
+  "chatsTitle": "聊天",
+  "chatsPopupPair": "配对设备",
+  "chatsPopupCreateGroup": "创建群组",
+  "chatsPopupJoinGroup": "加入群组",
+  "chatsSearchHint": "搜索",
+  "chatsEmptyNoMatches": "无匹配项",
+  "chatsEmptyNoChats": "暂无聊天",
+  "chatsEmptyPairInstruction": "当面与朋友配对以开始聊天。",
+  "chatsEmptyPairButton": "配对设备",
+  "chatsRowMeRemaining": "我剩余 {remaining} · 对方剩余 {theirRemaining}",
+  "@chatsRowMeRemaining": {
+    "placeholders": {
+      "remaining": {
+        "type": "String"
+      },
+      "theirRemaining": {
+        "type": "String"
+      }
+    }
+  },
+  "chatsRowGroupRemaining": "{remaining} / {max}",
+  "@chatsRowGroupRemaining": {
+    "placeholders": {
+      "remaining": {
+        "type": "String"
+      },
+      "max": {
+        "type": "String"
+      }
+    }
+  },
+  "pinMaxAttemptsExceeded": "输入错误次数过多。设备已抹除。",
+  "pinAccessDenied": "PIN 码不正确。还剩 {attempts} 次机会。",
+  "@pinAccessDenied": {
+    "placeholders": {
+      "attempts": {
+        "type": "int"
+      }
+    }
+  },
+  "pinMinLengthError": "PIN 码至少需要 4 位数字。",
+  "pinPurgeConfirmTitle": "重置设备？",
+  "pinPurgeConfirmBody": "忘记 PIN 码了？这将永久删除所有消息并重置账户。此操作无法撤销。",
+  "pinPurgeConfirmButton": "重置设备",
+  "pinLockedTitle": "已锁定",
+  "pinLockedSubtitle": "输入 PIN 码以解锁",
+  "pinUnlockButton": "解锁",
+  "pinUseFingerprintButton": "使用指纹",
+  "settingsBiometricToggle": "指纹解锁",
+  "settingsBiometricDescription": "用指纹代替 PIN 解锁。闲置 4 小时后仍需输入 PIN。",
+  "settingsBiometricFailedSnackBar": "无法启用指纹解锁。",
+  "pinForgotButton": "忘记 PIN 码？重置设备",
+  "pairTitle": "配对设备",
+  "pairRequestDialogTitle": "配对请求",
+  "pairRequestDialogBody": "{peerName} 想要与你配对。\n\n聊天容量: {size}。\n\n是否接受安全配对？",
+  "@pairRequestDialogBody": {
+    "placeholders": {
+      "peerName": {
+        "type": "String"
+      },
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "pairRequestReject": "拒绝",
+  "pairRequestAccept": "接受",
+  "pairPingStatusPinging": "测试中...",
+  "pairPingStatusLatency": "延迟: {latency}ms",
+  "@pairPingStatusLatency": {
+    "placeholders": {
+      "latency": {
+        "type": "String"
+      }
+    }
+  },
+  "pairPingStatusFailed": "失败",
+  "pairPingStatusTest": "测试连接",
+  "pairDeviceNameLabel": "你的设备名称",
+  "pairDeviceNameHint": "输入名称",
+  "pairDiscoverableTitle": "允许附近的人发现我",
+  "pairDiscoverableSubtitle": "允许附近的朋友找到你",
+  "pairNearbyDevicesTitle": "附近的设备",
+  "pairNearbyDevicesInstruction": "将两台设备靠近以连接。",
+  "pairDirectSyncFormRelayLabel": "服务器 URL",
+  "pairDirectSyncFormSyncButton": "连接设备",
+  "pairSyncingConnecting": "正在连接...",
+  "pairSyncingGeneratingKey": "正在生成安全密钥 ({size})",
+  "@pairSyncingGeneratingKey": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "pairSyncingSeedLabel": "密钥: {seed}",
+  "@pairSyncingSeedLabel": {
+    "placeholders": {
+      "seed": {
+        "type": "String"
+      }
+    }
+  },
+  "pairSyncingPercentComplete": "已完成 {percent}%",
+  "@pairSyncingPercentComplete": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "pairSuccessConnectionSecured": "连接成功",
+  "pairSuccessGroupBody": "已加入群组 \"{groupName}\"。安全密钥已在你的设备上本地生成。",
+  "@pairSuccessGroupBody": {
+    "placeholders": {
+      "groupName": {
+        "type": "String"
+      }
+    }
+  },
+  "pairSuccessOneOnOneBody": "安全密钥已交换并在你的设备上生成。已与 {title} 连接，聊天容量为 {label}。",
+  "@pairSuccessOneOnOneBody": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "pairSuccessReturnButton": "前往聊天",
+  "chatDetailsTitle": "聊天详情",
+  "chatDetailsSubtitleWithNick": "昵称: {nick} · {type}",
+  "@chatDetailsSubtitleWithNick": {
+    "placeholders": {
+      "nick": {
+        "type": "String"
+      },
+      "type": {
+        "type": "String"
+      }
+    }
+  },
+  "chatDetailsOfficialRelay": "官方中继",
+  "chatDetailsPrivateNode": "私有节点",
+  "chatDetailsHeaderMeRemaining": "我剩余 {remaining} · 对方剩余 {theirRemaining}",
+  "@chatDetailsHeaderMeRemaining": {
+    "placeholders": {
+      "remaining": {
+        "type": "String"
+      },
+      "theirRemaining": {
+        "type": "String"
+      }
+    }
+  },
+  "chatDetailsSectionProfile": "个人资料",
+  "chatDetailsProfileExplanation": "头像和昵称会在连接时自动同步。如果需要，你也可以现在手动同步。",
+  "chatDetailsProfileSyncButton": "同步个人资料",
+  "chatDetailsProfileSnackBar": "个人资料已发送。",
+  "chatDetailsSectionPermissions": "权限设置",
+  "chatDetailsPermissionsPhotos": "允许分享照片",
+  "chatDetailsPermissionsEmojis": "自定义表情",
+  "chatDetailsPermissionsEmojisAvailable": "可用",
+  "chatDetailsPermissionsEmojisNeedsSize": "需要更大的聊天容量",
+  "chatDetailsSectionMetadata": "元数据空间",
+  "chatDetailsMetadataExplanation": "此聊天从总共 {max} 的空间中分配了 {budget} 用于设置、头像和自定义表情。",
+  "@chatDetailsMetadataExplanation": {
+    "placeholders": {
+      "budget": {
+        "type": "String"
+      },
+      "max": {
+        "type": "String"
+      }
+    }
+  },
+  "chatDetailsSectionLanes": "安全通道",
+  "chatDetailsLanesMySend": "我的发送容量",
+  "chatDetailsLanesPeerSend": "对方的发送容量",
+  "chatDetailsLanesBorrowed": "借用的空间",
+  "chatDetailsLanesCapacityLeft": "我的剩余容量",
+  "chatDetailsLanesExplanation": "If you run low on chat capacity, you can borrow unused space from your peer. This can also happen automatically so you can keep chatting.",
+  "chatDetailsLanesBorrowButton": "申请聊天空间",
+  "chatDetailsLanesSnackBar": "申请已发送给对方。",
+  "chatDetailsSectionEmojis": "自定义表情",
+  "chatDetailsEmojisExplanation": "在你的消息中使用 :名称: 格式来发送这些自定义表情。",
+  "chatDetailsEmojisExplanationDisabled": "当前聊天容量太小，无法使用自定义表情。请使用更大的聊天容量配对以启用该功能。",
+  "chatDetailsEmojisCreate": "创建",
+  "chatDetailsSectionDestructive": "危险设置",
+  "chatDetailsNukeButton": "销毁聊天（双方）",
+  "chatDetailsDeleteEmojiTitle": "删除表情？",
+  "chatDetailsDeleteEmojiBody": "此自定义表情将被永久删除。是否继续？",
+  "chatDetailsDeleteEmojiDelete": "删除",
+  "chatDetailsAddEmojiSnackBar": "已添加 :{name}:",
+  "@chatDetailsAddEmojiSnackBar": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "chatImageTooLargeSnackBar": "图片体积 ({cost}) 超出当前剩余容量 ({charge})。",
+  "@chatImageTooLargeSnackBar": {
+    "placeholders": {
+      "cost": {
+        "type": "String"
+      },
+      "charge": {
+        "type": "String"
+      }
+    }
+  },
+  "chatImageExceedsMaxSizeSnackBar": "图片过大，无法发送。",
+  "chatTapForDetails": "轻触查看详情",
+  "chatEncrypting": "加密中…",
+  "chatScreenshotDetected": "检测到截屏",
+  "chatScreenshotExplanation": "检测到截屏。为安全起见，你现在可以抹除密钥和所有消息。",
+  "chatScreenshotWipeButton": "立刻抹除消息 and 密钥",
+  "chatScreenshotIgnoreButton": "忽略警告",
+  "chatSimulateScreenshotButton": "模拟截屏",
+  "chatCostIndicator": "容量消耗: {cost}",
+  "@chatCostIndicator": {
+    "placeholders": {
+      "cost": {
+        "type": "String"
+      }
+    }
+  },
+  "groupCreateTitle": "创建群组",
+  "groupCreatePixelArtIcon": "群组头像",
+  "groupCreateRandomIcon": "生成",
+  "groupCreateClearIcon": "清除",
+  "groupCreateNameLabel": "群组名称",
+  "groupCreateNameEmptyValidator": "请输入群组名称",
+  "groupCreateNameLengthValidator": "最多 24 个字符",
+  "groupCreatePoliciesSection": "群组策略设置",
+  "groupCreatePolicyPadSize": "群聊容量",
+  "groupCreatePolicyLaneSize": "每位成员发送容量",
+  "groupCreatePolicyMaxMembersLabel": "最大成员数限制",
+  "groupCreatePolicyMaxMembersValue": "最多 {count} 人",
+  "@groupCreatePolicyMaxMembersValue": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "groupCreatePolicyAllowImages": "允许分享照片",
+  "groupCreatePolicyAllowImagesSub": "允许成员发送照片",
+  "groupCreatePolicyPayloadSize": "最大消息大小",
+  "groupCreateButton": "创建群组",
+  "groupCreateFailedSnackBar": "创建群组失败: {error}",
+  "@groupCreateFailedSnackBar": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "pairSyncingAwaitingApproval": "正在等待对方接受...",
+  "pairSyncingCoordinating": "正在配置密钥交换...",
+  "pairSyncingStep1": "正在建立安全链路...",
+  "pairSyncingStep2": "正在生成安全种子...",
+  "pairSyncingStep3": "正在交换公钥... {seed}",
+  "@pairSyncingStep3": {
+    "placeholders": {
+      "seed": {
+        "type": "String"
+      }
+    }
+  },
+  "pairSyncingStep4": "正在生成安全聊天密钥...",
+  "pairSyncingStep5": "正在校验密钥完整性...",
+  "pairSyncingStep6": "安全设置成功完成。",
+  "chatRemainingLabel": "剩余 {bytes}",
+  "@chatRemainingLabel": {
+    "placeholders": {
+      "bytes": {
+        "type": "String"
+      }
+    }
+  },
+  "chatLockedLabel": "已锁定 · 需当面配对以继续",
+  "chatMessageHint": "消息",
+  "chatVoiceComingSoon": "语音消息即将推出。",
+  "chatDetailsDeleteConfirmTitle": "删除聊天？",
+  "chatDetailsDeleteConfirmBody": "这将永久删除此联系人的所有消息和加密密钥。此操作无法撤销。",
+  "chatDetailsDeleteConfirmButton": "删除聊天",
+  "chatsActionArchive": "归档",
+  "chatsActionNuke": "删除聊天与密钥",
+  "chatsActionDelete": "删除",
+  "chatsArchivedBadge": "已归档",
+  "chatsArchivedSubtitle": "已归档 · 只读",
+  "chatsArchiveConfirmTitle": "归档聊天？",
+  "chatsArchiveConfirmBody": "这将通过删除此聊天的一次性密钥本来释放空间。你的消息仍可阅读，但聊天将变为只读——你将无法再在其中收发消息。",
+  "chatsArchiveConfirmButton": "归档",
+  "chatsActionPin": "置顶",
+  "chatsActionUnpin": "取消置顶",
+  "chatsFilterAll": "全部",
+  "chatsFilterDirect": "私聊",
+  "chatsFilterGroups": "群组",
+  "chatsSectionArchived": "已归档",
+  "groupTapForDetails": "轻触查看详情 · 房主: {hostName}",
+  "@groupTapForDetails": {
+    "placeholders": {
+      "hostName": {
+        "type": "String"
+      }
+    }
+  },
+  "groupEmptySlots": "还有 {count} 个空余通道可用",
+  "@groupEmptySlots": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "groupHost": "房主",
+  "groupMember": "成员",
+  "groupDepleted": "容量已耗尽",
+  "groupSyncingFromMember": "正在从 {name} 同步群组详情和消息...",
+  "@groupSyncingFromMember": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "groupInviteMember": "邀请成员",
+  "groupLeaveGroup": "退出群组",
+  "groupRemoveMember": "移除成员",
+  "groupRemoveMemberTitle": "移除成员？",
+  "groupRemoveMemberBody": "确定将 {name} 移出群组？这将作废他们的配对密钥。",
+  "@groupRemoveMemberBody": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "groupLeaveGroupTitle": "退出群组？",
+  "groupLeaveGroupBody": "确定退出此群组？这将删除你本地的密钥和历史记录。",
+  "groupSyncStepText": "同步",
+  "groupDecryptingImage": "正在解密图片...",
+  "groupTapToRevealImage": "轻触以显示图片",
+  "groupImageSize": "大小: {size}",
+  "@groupImageSize": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "groupImageFailedToLoad": "图片加载失败",
+  "groupScreenshotWipeButton": "立刻擦除所有密钥",
+  "groupRefillGranted": "通道充能成功。",
+  "groupRefillFailed": "充能失败: {error}",
+  "@groupRefillFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "groupLaneDepleted": "通道容量已尽",
+  "groupLaneDepletedExplanation": "请向群组房主申请充能。",
+  "groupRefillRequestSent": "充能申请已传送至房主。",
+  "groupRequestRefill": "申请充能",
+  "groupExceedsSizeLimit": "超出大小限制 ({size} B)",
+  "@groupExceedsSizeLimit": {
+    "placeholders": {
+      "size": {
+        "type": "int"
+      }
+    }
+  },
+  "groupDetailsTitle": "群组详情",
+  "groupDetailsSharedPadHost": "共享空间 · 房主: {hostName}",
+  "@groupDetailsSharedPadHost": {
+    "placeholders": {
+      "hostName": {
+        "type": "String"
+      }
+    }
+  },
+  "groupDetailsSectionEditPolicies": "群组策略",
+  "groupDetailsSavePoliciesButton": "保存策略",
+  "groupDetailsSavePoliciesSnackBar": "群组策略已保存。",
+  "groupDetailsSectionEmojis": "自定义表情",
+  "groupDetailsSectionMetadata": "元数据空间",
+  "groupDetailsMetadataExplanation": "共享空间的第 0 号通道保留了 1 MB 用于群组元数据——群头像、成员名单和自定义表情都存放在这里。",
+  "groupDetailsSectionSync": "群组同步",
+  "groupDetailsSyncExplanation": "向房主请求最新的群详情、策略和成员列表。",
+  "groupDetailsSyncButton": "同步详情",
+  "groupDetailsSyncSnackBar": "已向房主请求更新。",
+  "groupDetailsSectionDestructive": "危险设置",
+  "groupDetailsLeaveButton": "退出群组",
+  "groupDetailsNukeButton": "删除群组",
+  "groupDetailsDeleteConfirmTitle": "删除群组？",
+  "groupDetailsDeleteConfirmBody": "这将永久解散群组，并清除所有成员的聊天历史和加密密钥。此操作不可逆。",
+  "groupDetailsDeleteConfirmButton": "解散群组",
+  "chatImageCompressionTitle": "压缩图片",
+  "chatImageCompressionOriginal": "原图: {size}",
+  "@chatImageCompressionOriginal": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "chatImageCompressionEstimated": "预计大小: {size}",
+  "@chatImageCompressionEstimated": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "chatImageCompressionEstimatedWithSaving": "预计大小: {size} (节省约 {saving})",
+  "@chatImageCompressionEstimatedWithSaving": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      },
+      "saving": {
+        "type": "String"
+      }
+    }
+  },
+  "chatImageCompressionCost": "容量消耗: ~{cost}",
+  "@chatImageCompressionCost": {
+    "placeholders": {
+      "cost": {
+        "type": "String"
+      }
+    }
+  },
+  "chatImageCompressionExplanation": "转换为 WebP 格式，最大 2000px。",
+  "chatImageCompressionLowSize": "高压缩率",
+  "chatImageCompressionHighSize": "高画质",
+  "chatImageCompressionMaxQuality": "最高画质",
+  "chatImageCompressionPercentQuality": "质量: {percent}%",
+  "@chatImageCompressionPercentQuality": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "chatImageCompressionSendHidden": "发送隐藏图（轻触显示）",
+  "chatImageCompressionSendButton": "发送",
+  "groupGrantRefill": "批准充能",
+  "groupLaneLocked": "已锁定 · 字节已耗尽",
+  "groupMembersTitle": "群组成员",
+  "groupMembersExplanation": "所有成员共享按通道划分的群聊空间。消息通过服务器发送。",
+  "pairChatSize": "聊天容量",
+  "chatSystemConnected": "已连接。聊天会话已加密。",
+  "chatSystemJoinedGroup": "已加入群组 \"{groupName}\"。安全连接已建立。",
+  "@chatSystemJoinedGroup": {
+    "placeholders": {
+      "groupName": {
+        "type": "String"
+      }
+    }
+  },
+  "themeCyberpunkName": "霓虹网格",
+  "themeCyberpunkDesc": "经典原版。黑曜石色配荧光青，终端风格。",
+  "themeGardenName": "暮色花园",
+  "themeGardenDesc": "温和的泥土色调与温暖的亚麻材质，用花瓣点缀你的额度。",
+  "themePaperinkName": "纸与墨",
+  "themePaperinkDesc": "温润的和纸，浓淡相宜的墨色，朱红印章。"
+}

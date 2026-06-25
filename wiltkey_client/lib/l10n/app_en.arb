@@ -1,0 +1,616 @@
+{
+  "navChats": "Chats",
+  "navPair": "Pair",
+  "navSettings": "Settings",
+  "nukedTitle": "Device Reset",
+  "nukedExplanation": "All messages and keys have been deleted from this device. The secure database has been cleared.",
+  "nukedResetButton": "Create New Identity",
+  "commonCancel": "Cancel",
+  "commonClose": "Close",
+  "commonSave": "Save",
+  "commonBack": "Back",
+  "commonContinue": "Continue",
+  "commonFinish": "Finish",
+  "onboardingWelcomeTitle": "Welcome to Wiltkey",
+  "onboardingWelcomeDescription": "Wiltkey is a private messenger that doesn't save metadata, logs, or server history. Messages are encrypted locally and self-destruct if a screenshot is taken.",
+  "onboardingWelcomeNoHistory": "No server history. No recovery keys.",
+  "onboardingIntelTitle": "Security Info",
+  "onboardingLanguageDescription": "Choose your preferred language to continue. You can change this at any time in Settings.",
+  "onboardingFactLanguageTitle": "Language setup",
+  "onboardingFactLanguageBody": "Select your preferred language to continue. You can change this at any time in Settings. Your preference is saved locally.",
+  "onboardingThemeTitle": "Choose your theme",
+  "onboardingThemeDescription": "Choose a theme below. You can change this later in Settings.",
+  "onboardingProfileTitle": "Your Identity",
+  "onboardingProfileUsernameLabel": "Username",
+  "onboardingProfileUsernameHint": "Enter username",
+  "onboardingProfileCodenameLabel": "Connection code (5 letters/numbers)",
+  "onboardingProfileCodenameExplanation": "This code is shared during pairing to connect with nearby friends.",
+  "onboardingProfileUsernameError": "Please set a username.",
+  "onboardingProfileCodenameError": "Connection code must be exactly 5 characters.",
+  "onboardingAvatarTitle": "Pixel Avatar",
+  "onboardingAvatarBrushColor": "Brush color",
+  "onboardingAvatarRandom": "Random",
+  "onboardingAvatarClear": "Clear",
+  "onboardingPinTitle": "Passcode PIN",
+  "onboardingPinExplanation": "Set a PIN (4–6 digits) to protect your chats. You will need to enter this PIN every time you open the app. If you forget this PIN, your messages cannot be recovered.",
+  "onboardingPinEnter": "Enter PIN",
+  "onboardingPinConfirm": "Confirm PIN",
+  "onboardingPinLengthError": "PIN must be between 4 and 6 digits.",
+  "onboardingPinMatchError": "PINs do not match.",
+  "onboardingSetupFailed": "Setup failed: {error}",
+  "@onboardingSetupFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "onboardingFactMetadataTitle": "THE METADATA PROBLEM",
+  "onboardingFactMetadataBody": "Most chat apps encrypt message content but still track who you talk to, when, and how often. Wiltkey does not log any metadata, server-side data, or connections.",
+  "onboardingFactThemeTitle": "CHOOSE YOUR THEME",
+  "onboardingFactThemeBody": "Themes are cosmetic. The same security standards apply to every theme. You can switch themes at any time in Settings.",
+  "onboardingFactOtpTitle": "PERFECT SECRECY",
+  "onboardingFactOtpBody": "Wiltkey uses One-Time Pads (OTP) where keys match the message size, are completely random, and are never reused. This provides mathematical perfect secrecy, making messages impossible to decrypt without the keys.",
+  "onboardingFactLimitsTitle": "CONNECTION LIMITS",
+  "onboardingFactLimitsBody": "Chat capacity limits are designed to encourage meaningful, deliberate relationships. Restricting capacity ensures conversations are purposeful and grounded in real-world connections.",
+  "onboardingFactKdfTitle": "SECURITY HASHING",
+  "onboardingFactKdfBody": "A standard PIN can be brute-forced in milliseconds. Wiltkey processes your PIN through a hardening function, making brute-force attacks on the local database impossible.",
+  "settingsTitle": "Settings",
+  "settingsTabProfile": "Profile",
+  "settingsTabNetwork": "Network",
+  "settingsTabAlerts": "Notifications",
+  "settingsSavedIndicator": "Saved",
+  "settingsProfileSectionAppearance": "Appearance",
+  "settingsProfileSectionAvatar": "Pixel Art Avatar",
+  "settingsProfileSectionProfile": "Profile Settings",
+  "settingsProfileBrushColor": "Brush color",
+  "settingsProfileChipIdenticon": "Identicon",
+  "settingsProfileChipClear": "Clear",
+  "settingsProfileChipRandom": "Random",
+  "avatarEditButton": "Edit avatar",
+  "groupCreateEditIcon": "Edit icon",
+  "settingsProfileUsername": "Username",
+  "settingsProfileBleNick": "Short Nickname (5 chars)",
+  "settingsProfileKeyhash": "Account ID",
+  "settingsProfileKeyhashCopied": "Account ID copied to clipboard",
+  "settingsProfileChangePinButton": "Change PIN",
+  "settingsProfileResetIdentityButton": "Reset Account",
+  "settingsResetConfirmTitle": "Reset identity?",
+  "settingsResetConfirmBody": "This will permanently delete all messages, contacts, and generate a new identity. This action cannot be undone.",
+  "settingsResetConfirmCancel": "Cancel",
+  "settingsResetConfirmReset": "Reset",
+  "settingsChangePinTitle": "Change PIN",
+  "settingsChangePinOldPin": "Enter current PIN",
+  "settingsChangePinNewPin": "Enter new PIN (4–6 digits)",
+  "settingsChangePinConfirmPin": "Confirm new PIN",
+  "settingsChangePinEmptyFieldsError": "Please fill out all fields.",
+  "settingsChangePinLengthError": "New PIN must be 4 to 6 digits.",
+  "settingsChangePinMatchError": "New PINs do not match.",
+  "settingsChangePinUpdatedSnackBar": "PIN updated.",
+  "settingsChangePinIncorrectError": "Current PIN is incorrect.",
+  "settingsNetworkRoutingTitle": "Network Settings",
+  "settingsNetworkDevRelayToggle": "Use local developer server",
+  "settingsNetworkDevRelayUrlLabel": "Developer Server URL",
+  "settingsNetworkDevRelayDescription": "Enabling this overrides the production server and routes messages through a local server.",
+  "settingsNetworkActiveGateway": "Current Server URL",
+  "settingsNetworkDiagnostics": "Diagnostics",
+  "settingsNetworkDebugButton": "Open debug console",
+  "settingsDebugButtonsToggle": "Debugger buttons",
+  "settingsDebugButtonsDescription": "Show the terminal console button on the chats list and inside chats.",
+  "settingsDebugTitle": "Debug console",
+  "settingsAlertsBackgroundNotifications": "Background Notifications",
+  "settingsAlertsExplanation": "Notifications will only show 'You have a message'. Your messages remain encrypted until you unlock the app.",
+  "settingsTextSizeLabel": "Chat text size",
+  "settingsTextSizePreview": "This is how your messages will look.",
+  "settingsLanguageLabel": "Language",
+  "settingsLanguageSystem": "System Language",
+  "settingsLanguageEnglish": "English",
+  "settingsLanguageHungarian": "Magyar (Hungarian)",
+  "settingsLanguagePolish": "Polski (Polish)",
+  "settingsLanguageGerman": "Deutsch (German)",
+  "settingsLanguageFrench": "Français (French)",
+  "settingsLanguageSwedish": "Svenska (Swedish)",
+  "settingsLanguageChinese": "中文 (Chinese)",
+  "notificationModeOff": "Off",
+  "notificationModeOffDesc": "No background checks. You only see messages when you open the app.",
+  "notificationModeLowPower": "Low Power",
+  "notificationModeLowPowerDesc": "Checks for new messages about every 10 minutes. Easy on the battery.",
+  "notificationModeInstant": "Instant",
+  "notificationModeInstantDesc": "Keeps a secure link active in the background for instant alerts. Shows an ongoing notification and uses more battery.",
+  "notificationNewMessageBody": "You got a message",
+  "notificationSecureLinkActive": "Secure link active",
+  "chatsLockedSubtitle": "Locked · pair in person to unlock",
+  "chatsMemberCount": "{count} members",
+  "@chatsMemberCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "chatsSubtitle": "{totalCount} {totalCount, plural, =1{contact} other{contacts}} · {lockedCount} locked",
+  "@chatsSubtitle": {
+    "placeholders": {
+      "totalCount": {
+        "type": "int"
+      },
+      "lockedCount": {
+        "type": "int"
+      }
+    }
+  },
+  "chatsTitle": "Chats",
+  "chatsPopupPair": "Pair a device",
+  "chatsPopupCreateGroup": "Create group",
+  "chatsPopupJoinGroup": "Join group",
+  "chatsSearchHint": "Search",
+  "chatsEmptyNoMatches": "No matches",
+  "chatsEmptyNoChats": "No chats yet",
+  "chatsEmptyPairInstruction": "Pair a device in person to start chatting.",
+  "chatsEmptyPairButton": "Pair a device",
+  "chatsRowMeRemaining": "ME {remaining} · PEER {theirRemaining}",
+  "@chatsRowMeRemaining": {
+    "placeholders": {
+      "remaining": {
+        "type": "String"
+      },
+      "theirRemaining": {
+        "type": "String"
+      }
+    }
+  },
+  "chatsRowGroupRemaining": "{remaining} / {max}",
+  "@chatsRowGroupRemaining": {
+    "placeholders": {
+      "remaining": {
+        "type": "String"
+      },
+      "max": {
+        "type": "String"
+      }
+    }
+  },
+  "pinMaxAttemptsExceeded": "Too many incorrect attempts. Device wiped.",
+  "pinAccessDenied": "Incorrect PIN. {attempts} attempts remaining.",
+  "@pinAccessDenied": {
+    "placeholders": {
+      "attempts": {
+        "type": "int"
+      }
+    }
+  },
+  "pinMinLengthError": "PIN must be at least 4 digits.",
+  "pinPurgeConfirmTitle": "Reset device?",
+  "pinPurgeConfirmBody": "Forget your PIN? This will permanently delete all messages and reset your account. This action cannot be undone.",
+  "pinPurgeConfirmButton": "Reset Device",
+  "pinLockedTitle": "Locked",
+  "pinLockedSubtitle": "Enter PIN to unlock",
+  "pinUnlockButton": "Unlock",
+  "pinUseFingerprintButton": "Use fingerprint",
+  "settingsBiometricToggle": "Fingerprint unlock",
+  "settingsBiometricDescription": "Use your fingerprint to unlock instead of the PIN. The PIN is still required after 4 hours of inactivity.",
+  "settingsBiometricFailedSnackBar": "Couldn't enable fingerprint unlock.",
+  "pinForgotButton": "Forgot PIN? Reset Device",
+  "pairTitle": "Pair Devices",
+  "pairRequestDialogTitle": "Pairing Request",
+  "pairRequestDialogBody": "{peerName} wants to pair.\n\nChat size: {size}.\n\nAccept secure pairing?",
+  "@pairRequestDialogBody": {
+    "placeholders": {
+      "peerName": {
+        "type": "String"
+      },
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "pairRequestReject": "Reject",
+  "pairRequestAccept": "Accept",
+  "pairPingStatusPinging": "Testing...",
+  "pairPingStatusLatency": "Latency: {latency}ms",
+  "@pairPingStatusLatency": {
+    "placeholders": {
+      "latency": {
+        "type": "String"
+      }
+    }
+  },
+  "pairPingStatusFailed": "Failed",
+  "pairPingStatusTest": "Test Connection",
+  "pairDeviceNameLabel": "Your Device Name",
+  "pairDeviceNameHint": "Enter name",
+  "pairDiscoverableTitle": "Make device discoverable",
+  "pairDiscoverableSubtitle": "Allow nearby friends to find you",
+  "pairNearbyDevicesTitle": "Nearby Devices",
+  "pairNearbyDevicesInstruction": "Hold devices next to each other to connect.",
+  "pairDirectSyncFormRelayLabel": "Server URL",
+  "pairDirectSyncFormSyncButton": "Connect Devices",
+  "pairSyncingConnecting": "Connecting...",
+  "pairSyncingGeneratingKey": "Generating secure key ({size})",
+  "@pairSyncingGeneratingKey": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "pairSyncingSeedLabel": "Key: {seed}",
+  "@pairSyncingSeedLabel": {
+    "placeholders": {
+      "seed": {
+        "type": "String"
+      }
+    }
+  },
+  "pairSyncingPercentComplete": "{percent}% complete",
+  "@pairSyncingPercentComplete": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "pairSuccessConnectionSecured": "Successfully Connected",
+  "pairSuccessGroupBody": "Joined group \"{groupName}\". Secure keys generated locally on your device.",
+  "@pairSuccessGroupBody": {
+    "placeholders": {
+      "groupName": {
+        "type": "String"
+      }
+    }
+  },
+  "pairSuccessOneOnOneBody": "Secure keys exchanged and generated on your device. Connected to {title} with a {label} chat capacity.",
+  "@pairSuccessOneOnOneBody": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "pairSuccessReturnButton": "Go to Chats",
+  "chatDetailsTitle": "Chat details",
+  "chatDetailsSubtitleWithNick": "Nick: {nick} · {type}",
+  "@chatDetailsSubtitleWithNick": {
+    "placeholders": {
+      "nick": {
+        "type": "String"
+      },
+      "type": {
+        "type": "String"
+      }
+    }
+  },
+  "chatDetailsOfficialRelay": "Official relay",
+  "chatDetailsPrivateNode": "Private node",
+  "chatDetailsHeaderMeRemaining": "ME {remaining} · PEER {theirRemaining}",
+  "@chatDetailsHeaderMeRemaining": {
+    "placeholders": {
+      "remaining": {
+        "type": "String"
+      },
+      "theirRemaining": {
+        "type": "String"
+      }
+    }
+  },
+  "chatDetailsSectionProfile": "Profile",
+  "chatDetailsProfileExplanation": "Avatars and nicknames sync automatically when you connect. You can manually sync yours now if needed.",
+  "chatDetailsProfileSyncButton": "Sync Profile",
+  "chatDetailsProfileSnackBar": "Profile sent.",
+  "chatDetailsSectionPermissions": "Permissions",
+  "chatDetailsPermissionsPhotos": "Allow sharing photos",
+  "chatDetailsPermissionsEmojis": "Custom emojis",
+  "chatDetailsPermissionsEmojisAvailable": "Available",
+  "chatDetailsPermissionsEmojisNeedsSize": "Requires larger chat",
+  "chatDetailsSectionMetadata": "Metadata Space",
+  "chatDetailsMetadataExplanation": "This chat allocates {budget} of the {max} space for settings, profile pictures, and custom emojis.",
+  "@chatDetailsMetadataExplanation": {
+    "placeholders": {
+      "budget": {
+        "type": "String"
+      },
+      "max": {
+        "type": "String"
+      }
+    }
+  },
+  "chatDetailsSectionLanes": "Secure Lanes",
+  "chatDetailsLanesMySend": "My send capacity",
+  "chatDetailsLanesPeerSend": "Peer send capacity",
+  "chatDetailsLanesBorrowed": "Borrowed space",
+  "chatDetailsLanesCapacityLeft": "My remaining capacity",
+  "chatDetailsLanesExplanation": "If you run low on chat capacity, you can borrow unused space from your peer. This can also happen automatically so you can keep chatting.",
+  "chatDetailsLanesBorrowButton": "Request chat space",
+  "chatDetailsLanesSnackBar": "Request sent to peer.",
+  "chatDetailsSectionEmojis": "Custom emojis",
+  "chatDetailsEmojisExplanation": "Use these custom emojis in your messages with the :name: format.",
+  "chatDetailsEmojisExplanationDisabled": "This chat capacity is too small for custom emojis. Connect with more capacity to enable them.",
+  "chatDetailsEmojisCreate": "Create",
+  "chatDetailsSectionDestructive": "Dangerous Settings",
+  "chatDetailsNukeButton": "Nuke Chat (Both Sides)",
+  "chatDetailsDeleteEmojiTitle": "Delete emoji?",
+  "chatDetailsDeleteEmojiBody": "This custom emoji will be permanently deleted. Do you want to proceed?",
+  "chatDetailsDeleteEmojiDelete": "Delete",
+  "chatDetailsAddEmojiSnackBar": "Added :{name}:",
+  "@chatDetailsAddEmojiSnackBar": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "chatImageTooLargeSnackBar": "Image too large ({cost}) for remaining space ({charge}).",
+  "@chatImageTooLargeSnackBar": {
+    "placeholders": {
+      "cost": {
+        "type": "String"
+      },
+      "charge": {
+        "type": "String"
+      }
+    }
+  },
+  "chatImageExceedsMaxSizeSnackBar": "Image too large to send.",
+  "chatTapForDetails": "Tap for details",
+  "chatEncrypting": "Encrypting…",
+  "chatScreenshotDetected": "Screenshot Detected",
+  "chatScreenshotExplanation": "A screenshot was detected. For your security, you can wipe your keys and messages now.",
+  "chatScreenshotWipeButton": "Wipe messages and keys",
+  "chatScreenshotIgnoreButton": "Ignore warning",
+  "chatSimulateScreenshotButton": "Simulate screenshot",
+  "chatCostIndicator": "Cost: {cost}",
+  "@chatCostIndicator": {
+    "placeholders": {
+      "cost": {
+        "type": "String"
+      }
+    }
+  },
+  "groupCreateTitle": "Create Group",
+  "groupCreatePixelArtIcon": "Group Icon",
+  "groupCreateRandomIcon": "Generate",
+  "groupCreateClearIcon": "Clear",
+  "groupCreateNameLabel": "Group name",
+  "groupCreateNameEmptyValidator": "Enter a group name",
+  "groupCreateNameLengthValidator": "Maximum 24 characters",
+  "groupCreatePoliciesSection": "Group Policy Settings",
+  "groupCreatePolicyPadSize": "Group Chat Size",
+  "groupCreatePolicyLaneSize": "Capacity per member",
+  "groupCreatePolicyMaxMembersLabel": "Max member capacity",
+  "groupCreatePolicyMaxMembersValue": "{count} members max",
+  "@groupCreatePolicyMaxMembersValue": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "groupCreatePolicyAllowImages": "Allow sharing photos",
+  "groupCreatePolicyAllowImagesSub": "Allow members to send photos",
+  "groupCreatePolicyPayloadSize": "Max message size",
+  "groupCreateButton": "Create Group",
+  "groupCreateFailedSnackBar": "Failed to create group: {error}",
+  "@groupCreateFailedSnackBar": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "pairSyncingAwaitingApproval": "Waiting for friend to accept...",
+  "pairSyncingCoordinating": "Setting up key exchange...",
+  "pairSyncingStep1": "Establishing secure link...",
+  "pairSyncingStep2": "Generating security seed...",
+  "pairSyncingStep3": "Exchanging public keys... {seed}",
+  "@pairSyncingStep3": {
+    "placeholders": {
+      "seed": {
+        "type": "String"
+      }
+    }
+  },
+  "pairSyncingStep4": "Generating secure chat keys...",
+  "pairSyncingStep5": "Verifying key integrity...",
+  "pairSyncingStep6": "Secure setup completed successfully.",
+  "chatRemainingLabel": "{bytes} remaining",
+  "@chatRemainingLabel": {
+    "placeholders": {
+      "bytes": {
+        "type": "String"
+      }
+    }
+  },
+  "chatLockedLabel": "Locked · pair in person to continue",
+  "chatMessageHint": "Message",
+  "chatVoiceComingSoon": "Voice messages are coming soon.",
+  "chatDetailsDeleteConfirmTitle": "Delete chat?",
+  "chatDetailsDeleteConfirmBody": "This will permanently delete all messages and encryption keys for this contact. This cannot be undone.",
+  "chatDetailsDeleteConfirmButton": "Delete Chat",
+  "chatsActionArchive": "Archive",
+  "chatsActionNuke": "Nuke chat",
+  "chatsActionDelete": "Delete",
+  "chatsArchivedBadge": "Archived",
+  "chatsArchivedSubtitle": "Archived · read-only",
+  "chatsArchiveConfirmTitle": "Archive chat?",
+  "chatsArchiveConfirmBody": "This frees up space by deleting this chat's one-time pad. Your messages stay readable, but the chat becomes read-only — you can't send or receive in it again.",
+  "chatsArchiveConfirmButton": "Archive",
+  "chatsActionPin": "Pin",
+  "chatsActionUnpin": "Unpin",
+  "chatsFilterAll": "All",
+  "chatsFilterDirect": "Direct",
+  "chatsFilterGroups": "Groups",
+  "chatsSectionArchived": "Archived",
+  "groupTapForDetails": "Tap for details · Host: {hostName}",
+  "@groupTapForDetails": {
+    "placeholders": {
+      "hostName": {
+        "type": "String"
+      }
+    }
+  },
+  "groupEmptySlots": "{count} empty lane {count, plural, =1{slot} other{slots}} available",
+  "@groupEmptySlots": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "groupHost": "Host",
+  "groupMember": "Member",
+  "groupDepleted": "Depleted",
+  "groupSyncingFromMember": "Syncing details and messages from {name}...",
+  "@groupSyncingFromMember": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "groupInviteMember": "Invite member",
+  "groupLeaveGroup": "Leave group",
+  "groupRemoveMember": "Remove member",
+  "groupRemoveMemberTitle": "Remove member?",
+  "groupRemoveMemberBody": "Remove {name} from the group? This drains their pairwise key.",
+  "@groupRemoveMemberBody": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "groupLeaveGroupTitle": "Leave group?",
+  "groupLeaveGroupBody": "Leave this group? Wipes local pairwise keys and logs.",
+  "groupSyncStepText": "Sync",
+  "groupDecryptingImage": "Decrypting image...",
+  "groupTapToRevealImage": "Tap to reveal image",
+  "groupImageSize": "Size: {size}",
+  "@groupImageSize": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "groupImageFailedToLoad": "Image failed to load",
+  "groupScreenshotWipeButton": "Wipe all keys now",
+  "groupRefillGranted": "Lane refill granted successfully.",
+  "groupRefillFailed": "Failed to grant refill: {error}",
+  "@groupRefillFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "groupLaneDepleted": "Lane depleted",
+  "groupLaneDepletedExplanation": "Request byte refill from the group host.",
+  "groupRefillRequestSent": "Refill request transmitted to host.",
+  "groupRequestRefill": "Request refill",
+  "groupExceedsSizeLimit": "Exceeds size limit ({size} B)",
+  "@groupExceedsSizeLimit": {
+    "placeholders": {
+      "size": {
+        "type": "int"
+      }
+    }
+  },
+  "groupDetailsTitle": "Group details",
+  "groupDetailsSharedPadHost": "Shared pad · Host: {hostName}",
+  "@groupDetailsSharedPadHost": {
+    "placeholders": {
+      "hostName": {
+        "type": "String"
+      }
+    }
+  },
+  "groupDetailsSectionEditPolicies": "Group Policies",
+  "groupDetailsSavePoliciesButton": "Save Policies",
+  "groupDetailsSavePoliciesSnackBar": "Group policies saved.",
+  "groupDetailsSectionEmojis": "Custom Emojis",
+  "groupDetailsSectionMetadata": "Metadata Space",
+  "groupDetailsMetadataExplanation": "Slot 0 of the shared pad reserves 1 MB for group metadata — the group icon, member roster, and custom emojis live here.",
+  "groupDetailsSectionSync": "Group Sync",
+  "groupDetailsSyncExplanation": "Request the latest group details, policies, and member lists from the host.",
+  "groupDetailsSyncButton": "Sync Details",
+  "groupDetailsSyncSnackBar": "Requested group update from host.",
+  "groupDetailsSectionDestructive": "Dangerous Settings",
+  "groupDetailsLeaveButton": "Leave Group",
+  "groupDetailsNukeButton": "Delete Group",
+  "groupDetailsDeleteConfirmTitle": "Delete group?",
+  "groupDetailsDeleteConfirmBody": "This will permanently delete this group and wipe all chat history and keys for all members. This cannot be undone.",
+  "groupDetailsDeleteConfirmButton": "Delete Group",
+  "chatImageCompressionTitle": "Compress image",
+  "chatImageCompressionOriginal": "Original: {size}",
+  "@chatImageCompressionOriginal": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "chatImageCompressionEstimated": "Estimated: {size}",
+  "@chatImageCompressionEstimated": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "chatImageCompressionEstimatedWithSaving": "Estimated: {size} (saving ~{saving})",
+  "@chatImageCompressionEstimatedWithSaving": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      },
+      "saving": {
+        "type": "String"
+      }
+    }
+  },
+  "chatImageCompressionCost": "Charge cost: ~{cost}",
+  "@chatImageCompressionCost": {
+    "placeholders": {
+      "cost": {
+        "type": "String"
+      }
+    }
+  },
+  "chatImageCompressionExplanation": "Converted to WebP, max 2000px.",
+  "chatImageCompressionLowSize": "Low size",
+  "chatImageCompressionHighSize": "High",
+  "chatImageCompressionMaxQuality": "Max quality",
+  "chatImageCompressionPercentQuality": "{percent}% quality",
+  "@chatImageCompressionPercentQuality": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "chatImageCompressionSendHidden": "Send hidden (tap to reveal)",
+  "chatImageCompressionSendButton": "Send",
+  "groupGrantRefill": "Grant refill",
+  "groupLaneLocked": "Locked · out of bytes",
+  "groupMembersTitle": "Group Members",
+  "groupMembersExplanation": "All members share one chat size split into lanes. Messages are sent through the server.",
+  "pairChatSize": "Chat Size",
+  "chatSystemConnected": "Connected. Chat session secure.",
+  "chatSystemJoinedGroup": "Joined group \"{groupName}\". Connections secure.",
+  "@chatSystemJoinedGroup": {
+    "placeholders": {
+      "groupName": {
+        "type": "String"
+      }
+    }
+  },
+  "themeCyberpunkName": "Neon Grid",
+  "themeCyberpunkDesc": "The original. Obsidian, glowing cyan, terminal type.",
+  "themeGardenName": "Dusk Garden",
+  "themeGardenDesc": "Soft soil tones, warm linen, petals for your budget.",
+  "themePaperinkName": "Paper & Ink",
+  "themePaperinkDesc": "Warm washi paper, sumi ink dilutions, vermilion hanko seal."
+}
