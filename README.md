@@ -76,7 +76,7 @@ If you want the real, animated explanation of how the pad, the lanes, the borrow
 - 🌐 **Architecture, explained with animations:** [wiltkey.org/architecture.html](https://wiltkey.org/architecture.html)
 - 📚 **Developer docs portal** (searchable, per-feature): [wiltkey.org/docs/](https://wiltkey.org/docs/)
 
-The short version: a Flutter client (`wiltkey_client/`) talks to a small Go relay (`wiltkey_server/`). Identity is a local Ed25519 keypair. Messages are one-time-pad XOR; the per-chat metadata channel (avatars, custom emojis, settings) rides a separate AES-encrypted lane. Nothing sensitive is ever written to disk in plaintext.
+The short version: a Flutter client (`wiltkey_client/`) talks to a small Go relay (`wiltkey_server/`). Identity is a local Ed25519 keypair. Messages *and* custom emojis ride the one-time pad (XOR keystream, spending pad budget). A small, separate AES-encrypted metadata channel — keyed per-contact — handles profile/permission sync (name, avatar, image permission) and archive signals, so that stuff keeps working even while a pad is being torn down. Nothing sensitive is ever written to disk in plaintext.
 
 ### Building it yourself
 
