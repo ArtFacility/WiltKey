@@ -141,6 +141,8 @@
   "settingsBiometricFailedSnackBar": "Nem sikerült bekapcsolni az ujjlenyomatos feloldást.",
   "pinForgotButton": "Elfelejtetted a PIN-kódot? Adatok Törlése",
   "pairTitle": "Eszközök párosítása",
+  "pairRescanTooltip": "Keresés frissítése",
+  "pairDoNotExitWarning": "Hagyd nyitva a WiltKey-t – ne válts appot és ne lépj ki, amíg a párosítás MINDKÉT eszközön be nem fejeződött.",
   "pairRequestDialogTitle": "Párosítási kérelem",
   "pairRequestDialogBody": "{peerName} párosítani szeretne.\n\nCsevegés mérete: {size}.\n\nElfogadod a biztonságos párosítást?",
   "pairRequestReject": "Elutasítás",

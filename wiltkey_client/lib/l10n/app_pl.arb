@@ -141,6 +141,8 @@
   "settingsBiometricFailedSnackBar": "Nie udało się włączyć odblokowania odciskiem palca.",
   "pinForgotButton": "Nie pamiętasz PIN-u? Resetuj urządzenie",
   "pairTitle": "Parowanie urządzeń",
+  "pairRescanTooltip": "Odśwież skanowanie",
+  "pairDoNotExitWarning": "Nie zamykaj WiltKey — nie przełączaj aplikacji ani nie wychodź, dopóki parowanie nie zakończy się na OBU urządzeniach.",
   "pairRequestDialogTitle": "Zaproszenie do parowania",
   "pairRequestDialogBody": "{peerName} chce się sparować.\n\nRozmiar czatu: {size}.\n\nAkceptujesz bezpieczne parowanie?",
   "pairRequestReject": "Odrzuć",

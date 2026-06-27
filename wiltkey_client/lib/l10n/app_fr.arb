@@ -141,6 +141,8 @@
   "settingsBiometricFailedSnackBar": "Impossible d'activer le déverrouillage par empreinte.",
   "pinForgotButton": "PIN oublié ? Réinitialiser l'appareil",
   "pairTitle": "Jumeler les appareils",
+  "pairRescanTooltip": "Actualiser la recherche",
+  "pairDoNotExitWarning": "Garde WiltKey ouvert — ne change pas d'application et ne quitte pas avant que le jumelage soit terminé sur les DEUX appareils.",
   "pairRequestDialogTitle": "Demande de jumelage",
   "pairRequestDialogBody": "{peerName} veut se jumeler.\n\nTaille du chat: {size}.\n\nAccepter le jumelage sécurisé ?",
   "pairRequestReject": "Refuser",

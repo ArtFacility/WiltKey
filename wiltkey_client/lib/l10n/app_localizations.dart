@@ -960,6 +960,18 @@ abstract class AppLocalizations {
   /// **'Pair Devices'**
   String get pairTitle;
 
+  /// No description provided for @pairRescanTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh scan'**
+  String get pairRescanTooltip;
+
+  /// No description provided for @pairDoNotExitWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep WiltKey open — don\'t switch apps or exit until pairing has finished on BOTH devices.'**
+  String get pairDoNotExitWarning;
+
   /// No description provided for @pairRequestDialogTitle.
   ///
   /// In en, this message translates to:

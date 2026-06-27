@@ -5,6 +5,7 @@ import 'package:wiltkey_client/l10n/app_localizations.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../../../core/state.dart';
 import '../../../core/auth/biometric_auth.dart';
+import '../../../core/debug_clipboard.dart';
 import '../../../core/notifications/notification_service.dart';
 import '../../../core/pixel_art_avatar.dart';
 import '../../../core/pixel_art_editor.dart';
@@ -1143,13 +1144,18 @@ class _SettingsScreenState extends State<SettingsScreen>
                           ),
                         ],
                       ),
-                      IconButton(
-                        icon: Icon(
-                          Icons.close,
-                          color: t.textSecondary,
-                          size: 20,
-                        ),
-                        onPressed: () => Navigator.pop(context),
+                      Row(
+                        children: [
+                          CopyDebugLogButton(logs: AppState.debugLogs),
+                          IconButton(
+                            icon: Icon(
+                              Icons.close,
+                              color: t.textSecondary,
+                              size: 20,
+                            ),
+                            onPressed: () => Navigator.pop(context),
+                          ),
+                        ],
                       ),
                     ],
                   ),

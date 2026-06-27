@@ -492,6 +492,13 @@ class AppLocalizationsFr extends AppLocalizations {
   String get pairTitle => 'Jumeler les appareils';
 
   @override
+  String get pairRescanTooltip => 'Actualiser la recherche';
+
+  @override
+  String get pairDoNotExitWarning =>
+      'Garde WiltKey ouvert — ne change pas d\'application et ne quitte pas avant que le jumelage soit terminé sur les DEUX appareils.';
+
+  @override
   String get pairRequestDialogTitle => 'Demande de jumelage';
 
   @override

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/state.dart';
+import '../../../../core/debug_clipboard.dart';
 import '../../../../core/theme/wk.dart';
 
 class DebugConsoleSheet extends StatelessWidget {
@@ -31,6 +32,9 @@ class DebugConsoleSheet extends StatelessWidget {
               ),
               Row(
                 children: [
+                  // Copy the full log buffer so testers can paste it straight
+                  // into a bug report.
+                  CopyDebugLogButton(logs: AppState.debugLogs),
                   IconButton(
                     icon: Icon(Icons.delete_outline, color: t.danger, size: 20),
                     onPressed: () {

@@ -136,17 +136,28 @@ extension AppStateLifecycle on AppState {
       }
     }
 
+    // This session is gone — drop its pairing stamp so a future re-pair under the
+    // same keyHash starts clean (the stale-nuke guard keys off this stamp).
+    await _persistence.clearPairingTime(contactKeyHash);
+
     if (receivedFromPeer) {
       // Send ACK_NUKE to unblock our queue on the server
       log('Sending ACK_NUKE to unblock queue');
       WebSocketClient().sendWSMessage({'type': 'ACK_NUKE'});
     } else if (!isGroup) {
-      // Send NUKE_RECIPIENT to vaporize the other side (for 1-on-1 chats only)
+      // Send NUKE_RECIPIENT to vaporize the other side (for 1-on-1 chats only).
+      // The envelope carries the issuance time so the recipient can reject this
+      // nuke if it arrives after they've re-paired under the same keyHash (a
+      // stale nuke that lingered on the relay's 7-day queue). Older clients that
+      // ignore the envelope still wipe as before.
       log('Sending NUKE_RECIPIENT to recipient: $contactKeyHash');
       WebSocketClient().sendWSMessage({
         'type': 'NUKE_RECIPIENT',
         'recipient_id': contactKeyHash,
-        'nuke_envelope': 'VAPORIZE',
+        'nuke_envelope': jsonEncode({
+          'cmd': 'VAPORIZE',
+          'ts': DateTime.now().millisecondsSinceEpoch,
+        }),
       });
     }
 
@@ -461,6 +472,12 @@ extension AppStateLifecycle on AppState {
         masterKeyHex: masterKeyHex,
       );
     }
+    // Stamp this pairing session so a stale `nuke` issued before it can be
+    // rejected later (see the nuke branch in [_dispatchIncoming]).
+    await _persistence.setPairingTime(
+      keyHash,
+      DateTime.now().millisecondsSinceEpoch,
+    );
     notifyListeners();
     _persistence.saveState(this);
   }

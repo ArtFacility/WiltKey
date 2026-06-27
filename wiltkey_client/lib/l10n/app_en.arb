@@ -192,6 +192,8 @@
   "settingsBiometricFailedSnackBar": "Couldn't enable fingerprint unlock.",
   "pinForgotButton": "Forgot PIN? Reset Device",
   "pairTitle": "Pair Devices",
+  "pairRescanTooltip": "Refresh scan",
+  "pairDoNotExitWarning": "Keep WiltKey open — don't switch apps or exit until pairing has finished on BOTH devices.",
   "pairRequestDialogTitle": "Pairing Request",
   "pairRequestDialogBody": "{peerName} wants to pair.\n\nChat size: {size}.\n\nAccept secure pairing?",
   "@pairRequestDialogBody": {

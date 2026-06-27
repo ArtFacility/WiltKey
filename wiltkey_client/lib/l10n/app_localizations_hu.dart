@@ -489,6 +489,13 @@ class AppLocalizationsHu extends AppLocalizations {
   String get pairTitle => 'Eszközök párosítása';
 
   @override
+  String get pairRescanTooltip => 'Keresés frissítése';
+
+  @override
+  String get pairDoNotExitWarning =>
+      'Hagyd nyitva a WiltKey-t – ne válts appot és ne lépj ki, amíg a párosítás MINDKÉT eszközön be nem fejeződött.';
+
+  @override
   String get pairRequestDialogTitle => 'Párosítási kérelem';
 
   @override

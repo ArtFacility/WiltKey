@@ -826,17 +826,24 @@ class _GroupChatScreenState extends State<GroupChatScreen>
                   ),
                 ),
 
-                Container(
-                  color: t.bg,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
+                // SafeArea keeps the composer clear of the system gesture/nav
+                // bar (it collapses to zero when the keyboard is up). Pushed
+                // chat screens have no bottomNavigationBar to absorb that inset,
+                // unlike the dashboard/settings tabs inside AppShell.
+                SafeArea(
+                  top: false,
+                  child: Container(
+                    color: t.bg,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    child: isWilted
+                        ? (!contact.isHost
+                              ? _buildRefillComposer(t, contact)
+                              : _buildLockedComposer(t))
+                        : _buildComposer(t, contact),
                   ),
-                  child: isWilted
-                      ? (!contact.isHost
-                            ? _buildRefillComposer(t, contact)
-                            : _buildLockedComposer(t))
-                      : _buildComposer(t, contact),
                 ),
               ],
             ),

@@ -490,6 +490,13 @@ class AppLocalizationsDe extends AppLocalizations {
   String get pairTitle => 'Geräte koppeln';
 
   @override
+  String get pairRescanTooltip => 'Suche aktualisieren';
+
+  @override
+  String get pairDoNotExitWarning =>
+      'Lass WiltKey geöffnet – wechsle nicht die App und beende sie nicht, bis die Kopplung auf BEIDEN Geräten abgeschlossen ist.';
+
+  @override
   String get pairRequestDialogTitle => 'Kopplungsanfrage';
 
   @override

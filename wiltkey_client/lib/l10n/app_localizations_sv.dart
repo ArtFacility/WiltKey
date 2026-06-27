@@ -487,6 +487,13 @@ class AppLocalizationsSv extends AppLocalizations {
   String get pairTitle => 'Koppla enheter';
 
   @override
+  String get pairRescanTooltip => 'Uppdatera sökning';
+
+  @override
+  String get pairDoNotExitWarning =>
+      'Håll WiltKey öppen — byt inte app och avsluta inte förrän kopplingen är klar på BÅDA enheterna.';
+
+  @override
   String get pairRequestDialogTitle => 'Kopplingsförfrågan';
 
   @override

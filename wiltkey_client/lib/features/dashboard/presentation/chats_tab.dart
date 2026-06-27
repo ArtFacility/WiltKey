@@ -4,6 +4,7 @@ import '../../../core/state.dart';
 import '../../../core/models.dart';
 import '../../../core/pixel_art_avatar.dart';
 import '../../../core/custom_widgets.dart';
+import '../../../core/debug_clipboard.dart';
 import '../../../core/theme/wk.dart';
 import '../../../core/theme/wiltkey_tokens.dart';
 import '../../../core/theme/wiltkey_components.dart';
@@ -750,6 +751,7 @@ void showDebugConsole(BuildContext context) {
                     ),
                     Row(
                       children: [
+                        CopyDebugLogButton(logs: AppState.debugLogs),
                         IconButton(
                           icon: Icon(
                             Icons.delete_outline,

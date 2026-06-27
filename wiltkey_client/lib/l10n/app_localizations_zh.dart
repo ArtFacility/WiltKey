@@ -457,6 +457,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get pairTitle => '配对设备';
 
   @override
+  String get pairRescanTooltip => '刷新扫描';
+
+  @override
+  String get pairDoNotExitWarning => '请保持 WiltKey 打开——在两台设备都完成配对之前，请勿切换应用或退出。';
+
+  @override
   String get pairRequestDialogTitle => '配对请求';
 
   @override

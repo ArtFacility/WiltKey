@@ -511,15 +511,22 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                   ),
                 ),
 
-                Container(
-                  color: t.bg,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
+                // SafeArea keeps the composer clear of the system gesture/nav
+                // bar (it collapses to zero when the keyboard is up). Pushed
+                // chat screens have no bottomNavigationBar to absorb that inset,
+                // unlike the dashboard/settings tabs inside AppShell.
+                SafeArea(
+                  top: false,
+                  child: Container(
+                    color: t.bg,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    child: isWilted
+                        ? _buildLockedComposer(t)
+                        : _buildComposer(t, contact, maxFormatted),
                   ),
-                  child: isWilted
-                      ? _buildLockedComposer(t)
-                      : _buildComposer(t, contact, maxFormatted),
                 ),
               ],
             ),

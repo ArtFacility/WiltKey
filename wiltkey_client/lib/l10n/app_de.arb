@@ -141,6 +141,8 @@
   "settingsBiometricFailedSnackBar": "Fingerabdruck-Entsperrung konnte nicht aktiviert werden.",
   "pinForgotButton": "PIN vergessen? Gerät zurücksetzen",
   "pairTitle": "Geräte koppeln",
+  "pairRescanTooltip": "Suche aktualisieren",
+  "pairDoNotExitWarning": "Lass WiltKey geöffnet – wechsle nicht die App und beende sie nicht, bis die Kopplung auf BEIDEN Geräten abgeschlossen ist.",
   "pairRequestDialogTitle": "Kopplungsanfrage",
   "pairRequestDialogBody": "{peerName} möchte sich koppeln.\n\nChat-Größe: {size}.\n\nSicheres Koppeln akzeptieren?",
   "pairRequestReject": "Ablehnen",

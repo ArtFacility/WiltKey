@@ -486,6 +486,13 @@ class AppLocalizationsPl extends AppLocalizations {
   String get pairTitle => 'Parowanie urządzeń';
 
   @override
+  String get pairRescanTooltip => 'Odśwież skanowanie';
+
+  @override
+  String get pairDoNotExitWarning =>
+      'Nie zamykaj WiltKey — nie przełączaj aplikacji ani nie wychodź, dopóki parowanie nie zakończy się na OBU urządzeniach.';
+
+  @override
   String get pairRequestDialogTitle => 'Zaproszenie do parowania';
 
   @override

@@ -123,6 +123,47 @@ class WiltkeyPersistence {
     }
   }
 
+  // --- Pairing-time ledger (stale-nuke guard) ---
+  // A small {keyHash: epochMs} map recording when each contact was last paired
+  // or recharged. Used to reject a stale `nuke` that lingered on the relay (7-day
+  // TTL) and arrives AFTER the two devices re-paired — without it, that ghost
+  // nuke wipes the freshly-made contact on one side only. Kept out of the DB so
+  // it survives independently of contact rows (an undelivered nuke can target a
+  // keyHash that has no local contact row yet).
+  static const String _keyPairingTimes = 'wk_pairing_times';
+
+  Future<Map<String, dynamic>> _loadPairingTimes(SharedPreferences prefs) async {
+    final raw = prefs.getString(_keyPairingTimes);
+    if (raw == null || raw.isEmpty) return {};
+    try {
+      return (jsonDecode(raw) as Map).cast<String, dynamic>();
+    } catch (_) {
+      return {};
+    }
+  }
+
+  Future<void> setPairingTime(String keyHash, int epochMs) async {
+    final prefs = await SharedPreferences.getInstance();
+    final map = await _loadPairingTimes(prefs);
+    map[keyHash] = epochMs;
+    await prefs.setString(_keyPairingTimes, jsonEncode(map));
+  }
+
+  Future<int?> getPairingTime(String keyHash) async {
+    final prefs = await SharedPreferences.getInstance();
+    final map = await _loadPairingTimes(prefs);
+    final v = map[keyHash];
+    return v is int ? v : (v is num ? v.toInt() : null);
+  }
+
+  Future<void> clearPairingTime(String keyHash) async {
+    final prefs = await SharedPreferences.getInstance();
+    final map = await _loadPairingTimes(prefs);
+    if (map.remove(keyHash) != null) {
+      await prefs.setString(_keyPairingTimes, jsonEncode(map));
+    }
+  }
+
   // --- Optional biometric unlock ---
   Future<void> setBiometricEnabled(bool enabled) async {
     final prefs = await SharedPreferences.getInstance();
@@ -175,6 +216,7 @@ class WiltkeyPersistence {
     await prefs.remove(keyPinValidationHash);
     await prefs.remove(_keyBiometricEnabled);
     await prefs.remove(_keyLastUnlockMs);
+    await prefs.remove(_keyPairingTimes);
 
     // Tear down background notification work and wipe the keystore signing key.
     await WiltkeyNotifications.clearCredentials();

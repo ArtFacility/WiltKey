@@ -527,6 +527,28 @@ class BlePairingManager extends ChangeNotifier {
     }
   }
 
+  /// Manually tears down the active scan and starts a clean one — the same
+  /// reset that leaving and re-entering the Pair tab performs. BLE discovery
+  /// occasionally stalls (sparse/slow advertisers, or the 45s scan timeout
+  /// elapsing), and a fresh scan + re-advertise reliably brings missing devices
+  /// back without forcing the user to switch tabs. Surfaced as the refresh
+  /// button in the pairing screen's app bar.
+  Future<void> restartScan() async {
+    if (isSyncing || isSuccess) return;
+    log('[System] Manual scan refresh requested.');
+    await _scanSubscription?.cancel();
+    _scanSubscription = null;
+    try {
+      await FlutterBluePlus.stopScan();
+    } catch (e) {
+      log('[Scanner] stopScan during refresh failed: $e');
+    }
+    await startScanningFlow();
+    // Re-advertise too, so the peer re-discovers us (the inbound direction).
+    await stopAdvertising();
+    await startAdvertising();
+  }
+
   bool _shouldKeepDevice(String id, DateTime now) {
     final lastSeenTime = _lastSeen[id];
     final lastSeenInRangeTime = _lastSeenInRange[id];

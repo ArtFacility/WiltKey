@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../controllers/ble_pairing_manager.dart';
+import '../../../../core/debug_clipboard.dart';
 import '../../../../core/theme/wk.dart';
 
 class TerminalLogView extends StatelessWidget {
@@ -26,9 +27,14 @@ class TerminalLogView extends StatelessWidget {
                     t.uppercaseLabels ? 'DEBUG TERMINAL' : 'Activity log',
                     style: t.screenTitle.copyWith(fontSize: 15),
                   ),
-                  IconButton(
-                    icon: Icon(Icons.close, color: t.textSecondary),
-                    onPressed: () => Navigator.pop(context),
+                  Row(
+                    children: [
+                      CopyDebugLogButton(logs: manager.terminalLogs),
+                      IconButton(
+                        icon: Icon(Icons.close, color: t.textSecondary),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
                   ),
                 ],
               ),

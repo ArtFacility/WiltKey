@@ -53,12 +53,45 @@ extension AppStateInbound on AppState {
     });
   }
 
+  /// Extracts the issuance timestamp (epoch ms) from a `nuke` envelope, or null
+  /// for the legacy literal `VAPORIZE` envelope (and any unparseable payload) —
+  /// those are treated as "no timestamp", so the stale-nuke guard lets them
+  /// through and the chat is wiped exactly as before.
+  int? _parseNukeTimestamp(String envelope) {
+    try {
+      final decoded = jsonDecode(envelope);
+      if (decoded is Map && decoded['ts'] is num) {
+        return (decoded['ts'] as num).toInt();
+      }
+    } catch (_) {}
+    return null;
+  }
+
   Future<void> _dispatchIncoming(
     String senderId,
     String envelope,
     String contentType,
   ) async {
     if (contentType == 'nuke') {
+      // Stale-nuke guard: a `nuke` queued for us sits on the relay for up to 7
+      // days. If the peer nuked a chat we no longer had (or never had) and we
+      // then re-paired under the same keyHash, this ghost frame would land and
+      // wipe the freshly-made contact on our side only. The envelope carries the
+      // nuke's issuance time; if our current pairing for this peer is newer, the
+      // nuke is from a prior session — ACK it to clear the relay queue, but keep
+      // the contact. (Envelopes without a timestamp — old clients — wipe as before.)
+      final int? nukeTs = _parseNukeTimestamp(envelope);
+      if (nukeTs != null) {
+        final int? pairedAt = await _persistence.getPairingTime(senderId);
+        if (pairedAt != null && pairedAt > nukeTs) {
+          log(
+            '[WebSocket] Ignoring STALE nuke from $senderId — re-paired '
+            '${pairedAt - nukeTs}ms after it was issued. ACKing to clear queue.',
+          );
+          WebSocketClient().sendWSMessage({'type': 'ACK_NUKE'});
+          return;
+        }
+      }
       log(
         '[WebSocket] Received NUKE command from $senderId! Wiping keys and data for that contact...',
       );

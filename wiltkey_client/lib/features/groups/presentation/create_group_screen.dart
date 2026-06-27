@@ -179,9 +179,14 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
       ),
       body: Container(
         color: t.bg,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16.0),
-          child: Form(
+        // SafeArea keeps the scrollable form (and its Create button) clear of
+        // the system gesture/nav bar — this screen is pushed without a
+        // bottomNavigationBar to absorb that inset.
+        child: SafeArea(
+          top: false,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16.0),
+            child: Form(
             key: _formKey,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -482,6 +487,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
               ],
             ),
           ),
+        ),
         ),
       ),
     );

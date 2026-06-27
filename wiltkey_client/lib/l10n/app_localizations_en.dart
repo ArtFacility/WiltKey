@@ -481,6 +481,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get pairTitle => 'Pair Devices';
 
   @override
+  String get pairRescanTooltip => 'Refresh scan';
+
+  @override
+  String get pairDoNotExitWarning =>
+      'Keep WiltKey open — don\'t switch apps or exit until pairing has finished on BOTH devices.';
+
+  @override
   String get pairRequestDialogTitle => 'Pairing Request';
 
   @override

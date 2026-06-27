@@ -235,6 +235,14 @@ class _PairingScreenState extends State<PairingScreen>
             backgroundColor: t.bg,
             elevation: 0,
             actions: [
+              // Manual rescan — replicates the scan restart that tab-switching
+              // away and back performs, recovering devices that didn't show up.
+              if (!_manager.isSyncing && !_manager.isSuccess)
+                IconButton(
+                  icon: Icon(Icons.refresh, color: t.action, size: 22),
+                  tooltip: l10n.pairRescanTooltip,
+                  onPressed: () => _manager.restartScan(),
+                ),
               IconButton(
                 icon: Icon(Icons.terminal, color: t.action, size: 20),
                 onPressed: () => TerminalLogView.show(context, _manager),
@@ -267,8 +275,12 @@ class _PairingScreenState extends State<PairingScreen>
                       _buildDirectSyncForm(t),
                     ] else if (_manager.isSyncing) ...[
                       _buildSyncingProgressCard(t),
+                      const SizedBox(height: 16),
+                      _buildHoldWarning(t),
                     ] else if (_manager.isSuccess) ...[
                       _buildSuccessCard(t),
+                      const SizedBox(height: 16),
+                      _buildHoldWarning(t),
                     ],
                   ],
                 ),
@@ -285,6 +297,37 @@ class _PairingScreenState extends State<PairingScreen>
             ),
           ),
       ],
+    );
+  }
+
+  /// Shown while a sync is in progress or just succeeded: leaving the app or
+  /// killing it before the peer has also finished can leave only one side with
+  /// the contact. Warns the user to keep both devices in the app until both are
+  /// done.
+  Widget _buildHoldWarning(WiltkeyTokens t) {
+    final l10n = AppLocalizations.of(context)!;
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: t.budgetWilted.withValues(alpha: 0.08),
+        border: Border.all(
+          color: t.budgetWilted.withValues(alpha: 0.35),
+          width: 1,
+        ),
+        borderRadius: BorderRadius.circular(t.radiusControl),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.warning_amber_rounded, color: t.budgetWilted, size: 18),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              l10n.pairDoNotExitWarning,
+              style: t.bodySecondary.copyWith(color: t.budgetWilted, height: 1.4),
+            ),
+          ),
+        ],
+      ),
     );
   }
 

@@ -141,6 +141,8 @@
   "settingsBiometricFailedSnackBar": "Det gick inte att aktivera fingeravtrycksupplåsning.",
   "pinForgotButton": "Glömt PIN-kod? Återställ enhet",
   "pairTitle": "Koppla enheter",
+  "pairRescanTooltip": "Uppdatera sökning",
+  "pairDoNotExitWarning": "Håll WiltKey öppen — byt inte app och avsluta inte förrän kopplingen är klar på BÅDA enheterna.",
   "pairRequestDialogTitle": "Kopplingsförfrågan",
   "pairRequestDialogBody": "{peerName} vill koppla.\n\nChattstorlek: {size}.\n\nAcceptera säker koppling?",
   "pairRequestReject": "Neka",

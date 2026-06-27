@@ -192,6 +192,8 @@
   "settingsBiometricFailedSnackBar": "无法启用指纹解锁。",
   "pinForgotButton": "忘记 PIN 码？重置设备",
   "pairTitle": "配对设备",
+  "pairRescanTooltip": "刷新扫描",
+  "pairDoNotExitWarning": "请保持 WiltKey 打开——在两台设备都完成配对之前，请勿切换应用或退出。",
   "pairRequestDialogTitle": "配对请求",
   "pairRequestDialogBody": "{peerName} 想要与你配对。\n\n聊天容量: {size}。\n\n是否接受安全配对？",
   "@pairRequestDialogBody": {
