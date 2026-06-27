@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:wiltkey_client/l10n/app_localizations.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '../../../core/state.dart';
 import '../../../core/auth/biometric_auth.dart';
 import '../../../core/notifications/notification_service.dart';
@@ -12,10 +13,9 @@ import '../../../core/theme/wiltkey_tokens.dart';
 import '../../../core/localization/locale_controller.dart';
 import 'widgets/theme_picker.dart';
 
-/// Shown in the Settings "About" footer. [kAppVersion] tracks the marketing
-/// version in pubspec.yaml — bump both together. This 1.0.0 is the first
-/// semi-stable public release.
-const String kAppVersion = '1.0.0';
+/// Publisher shown in the Settings "About" footer. The version string itself is
+/// read from the build at runtime (package_info_plus), so pubspec.yaml's
+/// `version:` is the single source of truth — nothing to keep in sync here.
 const String kAppPublisher = 'ArtFacility';
 
 class SettingsScreen extends StatefulWidget {
@@ -54,6 +54,9 @@ class _SettingsScreenState extends State<SettingsScreen>
   bool _biometricAvailable = false;
   bool _biometricBusy = false;
 
+  // App version string ("v1.0.0 (1)") read from the build at runtime.
+  String _appVersion = '';
+
   @override
   void initState() {
     super.initState();
@@ -62,6 +65,12 @@ class _SettingsScreenState extends State<SettingsScreen>
 
     BiometricAuth.isAvailable().then((available) {
       if (mounted) setState(() => _biometricAvailable = available);
+    });
+
+    PackageInfo.fromPlatform().then((info) {
+      if (mounted) {
+        setState(() => _appVersion = 'v${info.version} (${info.buildNumber})');
+      }
     });
 
     _usernameController = TextEditingController(text: _appState.deviceName);
@@ -1055,7 +1064,10 @@ class _SettingsScreenState extends State<SettingsScreen>
           style: t.screenTitle.copyWith(fontSize: 15, letterSpacing: 1.5),
         ),
         const SizedBox(height: 4),
-        Text('v$kAppVersion · $kAppPublisher', style: t.dataMono),
+        Text(
+          _appVersion.isEmpty ? kAppPublisher : '$_appVersion · $kAppPublisher',
+          style: t.dataMono,
+        ),
       ],
     ),
   );

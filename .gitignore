@@ -13,6 +13,8 @@ wiltkey_history.json
 **/key.properties
 *.jks
 *.keystore
+# Machine-specific SDK paths (not secret, but don't commit).
+**/local.properties
 
 # Env / secret files.
 .env
@@ -58,3 +60,6 @@ desktop.ini
 
 # Duplicate font sources kept outside the client (app uses wiltkey_client/assets/fonts/).
 /assets/
+
+# Personal release cheat-sheet (not for the repo).
+/PLAY_RELEASE.md
