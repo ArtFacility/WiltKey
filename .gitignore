@@ -63,3 +63,7 @@ desktop.ini
 
 # Personal release cheat-sheet (not for the repo).
 /PLAY_RELEASE.md
+
+# Relay release build artifacts (upload to GitHub Releases, not git)
+wiltkey_server/dist/
+wiltkey_server/linux_wiltkey_server
