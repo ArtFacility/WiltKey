@@ -460,6 +460,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get pairRescanTooltip => '刷新扫描';
 
   @override
+  String get pairBluetoothOffWarning => '蓝牙已关闭。配对需要蓝牙来查找附近的设备——请打开蓝牙以继续。';
+
+  @override
+  String get pairBluetoothTurnOnButton => '打开蓝牙';
+
+  @override
   String get pairDoNotExitWarning => '请保持 WiltKey 打开——在两台设备都完成配对之前，请勿切换应用或退出。';
 
   @override
@@ -670,6 +676,18 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatTapForDetails => '轻触查看详情';
+
+  @override
+  String get chatSyncTooltip => '同步消息';
+
+  @override
+  String get chatStickerHint => '长按表情以贴纸形式发送';
+
+  @override
+  String get chatSyncStarted => '正在检查遗漏的消息…';
+
+  @override
+  String get chatSyncOffline => '离线状态下无法同步。';
 
   @override
   String get chatEncrypting => '加密中…';

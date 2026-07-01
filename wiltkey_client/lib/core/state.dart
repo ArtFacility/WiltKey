@@ -59,6 +59,11 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   bool isLoaded = false;
   bool isPickingMedia = false;
 
+  // Reentrancy guard for [processPendingInbox]: both the unlock path and the
+  // foreground-resume path drain the buffered background frames, and we must
+  // never let the two overlap (a double-drain could re-dispatch frames).
+  bool isDrainingPendingInbox = false;
+
   AppStatus status = AppStatus.normal;
   List<Contact> contacts = [];
   Map<String, List<ChatMessage>> messages = {};
@@ -379,7 +384,27 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
       if (!isLocked && masterKeyHex != null) {
         _checkConnectionHealth();
         startConnectionWatchdog();
+        // Apply anything the background socket buffered while minimized. The
+        // unlock path already does this, but a foreground that doesn't pass
+        // through the lock screen (biometric window / immediate-lock off) would
+        // otherwise leave buffered control frames — delivery_check requests and
+        // their responses — sitting unprocessed. Drain after the socket is back
+        // so any replies/resends triggered by replay can actually go out.
+        _drainPendingInboxOnResume();
       }
+    }
+  }
+
+  /// Foreground-resume drain: wait for the socket to be live, then replay any
+  /// frames the background socket buffered while we were minimized. Kept off the
+  /// synchronous lifecycle callback so the await chain (reconnect → replay →
+  /// outgoing replies/resends) can complete in the background.
+  Future<void> _drainPendingInboxOnResume() async {
+    try {
+      await ensureWebSocketConnected();
+      await processPendingInbox();
+    } catch (e) {
+      log('[Notifications] Resume drain failed: $e');
     }
   }
 

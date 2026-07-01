@@ -11,6 +11,7 @@ import '../../../../core/theme/wiltkey_components.dart';
 import '../controllers/ble_pairing_manager.dart';
 import 'widgets/terminal_log_view.dart';
 import 'widgets/charge_slider.dart';
+import 'widgets/bluetooth_off_banner.dart';
 
 class PairingScreen extends StatefulWidget {
   const PairingScreen({super.key});
@@ -257,6 +258,8 @@ class _PairingScreenState extends State<PairingScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    if (!_manager.isBluetoothOn)
+                      BluetoothOffBanner(manager: _manager),
                     if (!_manager.isSyncing && !_manager.isSuccess) ...[
                       _buildDeviceNameRow(t),
                       const SizedBox(height: 12),

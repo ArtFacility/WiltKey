@@ -58,6 +58,13 @@ class BlePairingManager extends ChangeNotifier {
   bool isScanning = false;
   bool isSyncing = false;
   bool isSuccess = false;
+
+  /// Live Bluetooth adapter power state. Optimistic default (true) until the
+  /// first [FlutterBluePlus.adapterState] emission so we don't flash a warning
+  /// during the brief init window. When false, BLE scan/advertise can't run —
+  /// the pair screens surface a warning banner instead of silently hanging.
+  bool isBluetoothOn = true;
+  StreamSubscription<BluetoothAdapterState>? _adapterStateSub;
   double syncProgress = 0.0;
   String syncStepText = 'Idle';
 
@@ -159,9 +166,38 @@ class BlePairingManager extends ChangeNotifier {
   }
 
   Future<void> initializeBle() async {
+    _listenToAdapterState();
     await requestBlePermissions();
     await initGattServer();
     startScanningFlow();
+  }
+
+  /// Tracks the Bluetooth adapter power state so the pair screens can warn when
+  /// it's off (rather than hanging on a scan/advertise that can never start),
+  /// and so we auto-recover the scan/advertise when the user turns it back on.
+  void _listenToAdapterState() {
+    _adapterStateSub ??= FlutterBluePlus.adapterState.listen((state) {
+      final on = state == BluetoothAdapterState.on;
+      if (on == isBluetoothOn) return;
+      isBluetoothOn = on;
+      log('[BLE State] Adapter is now ${on ? "ON" : "OFF"}.');
+      // When the radio comes back on, restart discovery + advertising so the
+      // screen recovers without the user having to leave and re-enter it.
+      if (on && !isSyncing && !isSuccess) {
+        restartScan();
+      }
+      notifyListeners();
+    });
+  }
+
+  /// Requests the OS turn Bluetooth on (Android shows the system enable prompt).
+  /// No-op/safe on platforms that don't support a programmatic toggle.
+  Future<void> requestBluetoothOn() async {
+    try {
+      await FlutterBluePlus.turnOn();
+    } catch (e) {
+      log('[BLE] turnOn() request failed or unsupported: $e');
+    }
   }
 
   Future<bool> requestBlePermissions() async {
@@ -1053,6 +1089,7 @@ class BlePairingManager extends ChangeNotifier {
   @override
   void dispose() {
     _scanSubscription?.cancel();
+    _adapterStateSub?.cancel();
     FlutterBluePlus.stopScan();
     _syncTimer?.cancel();
     _hexAnimationTimer?.cancel();

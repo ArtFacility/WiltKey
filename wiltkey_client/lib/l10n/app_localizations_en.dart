@@ -484,6 +484,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get pairRescanTooltip => 'Refresh scan';
 
   @override
+  String get pairBluetoothOffWarning =>
+      'Bluetooth is off. Pairing needs Bluetooth to find nearby devices — turn it on to continue.';
+
+  @override
+  String get pairBluetoothTurnOnButton => 'Turn on Bluetooth';
+
+  @override
   String get pairDoNotExitWarning =>
       'Keep WiltKey open — don\'t switch apps or exit until pairing has finished on BOTH devices.';
 
@@ -699,6 +706,18 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatTapForDetails => 'Tap for details';
+
+  @override
+  String get chatSyncTooltip => 'Sync messages';
+
+  @override
+  String get chatStickerHint => 'Hold an emoji to send a sticker';
+
+  @override
+  String get chatSyncStarted => 'Checking for missed messages…';
+
+  @override
+  String get chatSyncOffline => 'Can\'t sync while offline.';
 
   @override
   String get chatEncrypting => 'Encrypting…';

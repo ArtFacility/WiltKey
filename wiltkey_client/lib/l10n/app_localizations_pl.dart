@@ -489,6 +489,13 @@ class AppLocalizationsPl extends AppLocalizations {
   String get pairRescanTooltip => 'Odśwież skanowanie';
 
   @override
+  String get pairBluetoothOffWarning =>
+      'Bluetooth jest wyłączony. Parowanie wymaga Bluetootha do wykrycia pobliskich urządzeń — włącz go, aby kontynuować.';
+
+  @override
+  String get pairBluetoothTurnOnButton => 'Włącz Bluetooth';
+
+  @override
   String get pairDoNotExitWarning =>
       'Nie zamykaj WiltKey — nie przełączaj aplikacji ani nie wychodź, dopóki parowanie nie zakończy się na OBU urządzeniach.';
 
@@ -706,6 +713,18 @@ class AppLocalizationsPl extends AppLocalizations {
 
   @override
   String get chatTapForDetails => 'Stuknij, aby zobaczyć szczegóły';
+
+  @override
+  String get chatSyncTooltip => 'Synchronizuj wiadomości';
+
+  @override
+  String get chatStickerHint => 'Przytrzymaj emoji, aby wysłać naklejkę';
+
+  @override
+  String get chatSyncStarted => 'Szukanie pominiętych wiadomości…';
+
+  @override
+  String get chatSyncOffline => 'Nie można synchronizować w trybie offline.';
 
   @override
   String get chatEncrypting => 'Szyfrowanie…';

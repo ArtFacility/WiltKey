@@ -28,7 +28,7 @@ class GroupChatScreen extends StatefulWidget {
 }
 
 class _GroupChatScreenState extends State<GroupChatScreen>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   final AppState _appState = AppState();
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
@@ -48,6 +48,7 @@ class _GroupChatScreenState extends State<GroupChatScreen>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _appState.addListener(_updateState);
     _messageController.addListener(_updateCharCount);
     _scrollController.addListener(_scrollListener);
@@ -71,6 +72,7 @@ class _GroupChatScreenState extends State<GroupChatScreen>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     final c = _appState.activeContact;
     if (c != null) _appState.markChatRead(c);
     _sendBloom.dispose();
@@ -81,6 +83,18 @@ class _GroupChatScreenState extends State<GroupChatScreen>
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  /// Keep the latest message visible as the soft keyboard animates in/out (see
+  /// the matching note in ChatScreen).
+  @override
+  void didChangeMetrics() {
+    if (!_isAtBottom) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _scrollController.hasClients) {
+        _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+      }
+    });
   }
 
   void _scrollListener() {
@@ -274,6 +288,18 @@ class _GroupChatScreenState extends State<GroupChatScreen>
     }
   }
 
+  /// Long-press on a picker emoji → send it as a sticker (big, bubble-less).
+  /// Rides the normal group-message path with a sentinel marker.
+  void _handleSendSticker(String payload) async {
+    _sendBloom.forward(from: 0);
+    _scrollToBottom();
+    final error = await _appState.sendGroupMessage(wrapSticker(payload));
+    if (error != null) {
+      _appState.log('[GroupChat] Sticker send failed: $error');
+      if (mounted) _errorSnack(error);
+    }
+  }
+
   Future<void> _pickAndSendGroupImage(Contact contact) async {
     final picker = ImagePicker();
     XFile? image;
@@ -386,12 +412,19 @@ class _GroupChatScreenState extends State<GroupChatScreen>
 
     final bool isWilted = contact.isWilted;
 
-    return Stack(
-      children: [
-        Scaffold(
-          appBar: AppBar(
-            backgroundColor: t.bg,
-            elevation: 0,
+    return PopScope(
+      // Back / back-gesture closes the emoji panel first; the chat only pops
+      // once nothing else is open.
+      canPop: !_showEmoji,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop && _showEmoji) _hideEmoji();
+      },
+      child: Stack(
+        children: [
+          Scaffold(
+            appBar: AppBar(
+              backgroundColor: t.bg,
+              elevation: 0,
             titleSpacing: 8,
             title: Row(
               children: [
@@ -873,7 +906,8 @@ class _GroupChatScreenState extends State<GroupChatScreen>
                 : const SizedBox(),
           ),
         ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -1073,7 +1107,8 @@ class _GroupChatScreenState extends State<GroupChatScreen>
               child: TextField(
                 controller: _messageController,
                 focusNode: _inputFocus,
-                maxLines: null,
+                minLines: 1,
+                maxLines: 8,
                 onTap: _hideEmoji,
                 style: t.body.copyWith(fontSize: 13),
                 decoration: InputDecoration(
@@ -1155,6 +1190,7 @@ class _GroupChatScreenState extends State<GroupChatScreen>
           EmojiPickerPanel(
             controller: _messageController,
             emojiMap: CustomEmojiStore.cachedMap(contact.keyHash),
+            onSendSticker: _handleSendSticker,
           ),
         const SizedBox(height: 6),
         Row(
@@ -1635,6 +1671,35 @@ class _GroupChatScreenState extends State<GroupChatScreen>
     }
     final scale = _appState.chatTextScale;
     final textColor = isMe ? t.bubbleMeText : t.textPrimary;
+
+    // Sticker: render the single emoji / custom token large. (Group bubbles keep
+    // their sender tint/name, so the sticker stays inside the bubble here.)
+    final sticker = stickerPayload(displayText);
+    if (sticker != null) {
+      final m = RegExp(r'^:([a-z0-9_]{2,32}):$').firstMatch(sticker);
+      if (m != null) {
+        final emoji = emojiMap[m.group(1)];
+        if (emoji != null) {
+          final side = 88.0 * scale;
+          return Image.memory(
+            emoji.bytes,
+            width: side,
+            height: side,
+            gaplessPlayback: true,
+            filterQuality: FilterQuality.medium,
+            errorBuilder: (_, _, _) => Text(
+              sticker,
+              style: TextStyle(color: textColor, fontSize: 56 * scale),
+            ),
+          );
+        }
+      }
+      return Text(
+        sticker,
+        style: TextStyle(fontSize: 56 * scale, height: 1.1),
+      );
+    }
+
     final jumbo = jumboEmojiCount(displayText, emojiMap);
     if (jumbo != null) {
       final base = jumbo == 1 ? 40.0 : (jumbo <= 3 ? 34.0 : 26.0);

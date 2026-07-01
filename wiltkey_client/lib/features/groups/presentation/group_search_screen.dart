@@ -8,6 +8,7 @@ import '../../../core/theme/wiltkey_tokens.dart';
 import '../../../core/theme/wiltkey_components.dart';
 import '../../proximity/controllers/ble_pairing_manager.dart';
 import '../../proximity/presentation/widgets/terminal_log_view.dart';
+import '../../proximity/presentation/widgets/bluetooth_off_banner.dart';
 
 class GroupSearchScreen extends StatefulWidget {
   const GroupSearchScreen({super.key});
@@ -157,6 +158,8 @@ class _GroupSearchScreenState extends State<GroupSearchScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    if (!_manager.isBluetoothOn)
+                      BluetoothOffBanner(manager: _manager),
                     if (!_manager.isSyncing && !_manager.isSuccess) ...[
                       Container(
                         padding: const EdgeInsets.symmetric(

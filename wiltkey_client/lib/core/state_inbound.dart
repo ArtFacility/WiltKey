@@ -13,21 +13,30 @@ extension AppStateInbound on AppState {
   /// only [PendingInbox.clear] after processing completes, so a crash mid-replay
   /// can't drop messages.
   Future<void> processPendingInbox() async {
-    final frames = await PendingInbox.drainAll();
-    if (frames.isEmpty) return;
-    log(
-      '[Notifications] Replaying ${frames.length} buffered inbound frame(s).',
-    );
-    for (final f in frames) {
-      _deliverMessageToState(
-        f['sender_id'] as String? ?? '',
-        f['envelope'] as String? ?? '',
-        f['content_type'] as String? ?? 'text',
+    // Both the unlock path and the foreground-resume path call this; the guard
+    // stops them from draining the same buffer twice (which would re-dispatch
+    // frames — e.g. answer a delivery_check or apply a response more than once).
+    if (isDrainingPendingInbox) return;
+    isDrainingPendingInbox = true;
+    try {
+      final frames = await PendingInbox.drainAll();
+      if (frames.isEmpty) return;
+      log(
+        '[Notifications] Replaying ${frames.length} buffered inbound frame(s).',
       );
+      for (final f in frames) {
+        _deliverMessageToState(
+          f['sender_id'] as String? ?? '',
+          f['envelope'] as String? ?? '',
+          f['content_type'] as String? ?? 'text',
+        );
+      }
+      // Wait for the serialized inbound queue to fully drain before clearing.
+      await _incomingLock;
+      await PendingInbox.clear();
+    } finally {
+      isDrainingPendingInbox = false;
     }
-    // Wait for the serialized inbound queue to fully drain before clearing.
-    await _incomingLock;
-    await PendingInbox.clear();
   }
 
   /// Entry point for all inbound WS frames. Chains each delivery onto a single
@@ -202,6 +211,16 @@ extension AppStateInbound on AppState {
 
     if (contentType == 'chat_resync_response') {
       await _handleChatResyncResponse(senderId, envelope);
+      return;
+    }
+
+    if (contentType == 'delivery_check') {
+      await _handleDeliveryCheck(senderId, envelope);
+      return;
+    }
+
+    if (contentType == 'delivery_check_response') {
+      await _handleDeliveryCheckResponse(senderId, envelope);
       return;
     }
 
@@ -854,29 +873,147 @@ extension AppStateInbound on AppState {
 
       final chatKey = groupId ?? senderId;
       final contactIndex = contacts.indexWhere((c) => c.keyHash == chatKey);
-      if (contactIndex != -1) {
-        final contact = contacts[contactIndex];
-        final list = messages[contact.id] ?? [];
-        final msgIndex = list.indexWhere(
-          (m) => m.id == messageId || (m.isSentByMe && m.offset == offset),
-        );
-        if (msgIndex != -1) {
-          if (!list[msgIndex].isDelivered) {
-            list[msgIndex].isDelivered = true;
-            await WiltkeyDatabase.instance.updateMessageDelivered(
-              list[msgIndex].id,
-              true,
-            );
-            log(
-              '[Delivery Receipt] Marked message $messageId as delivered for ${contact.name}',
-            );
-            notifyListeners();
-            _persistence.saveState(this);
-          }
-        }
-      }
+      if (contactIndex == -1) return;
+      final contact = contacts[contactIndex];
+
+      // Persist the delivered flag straight to the DB, independent of whether the
+      // chat is currently windowed in memory. A receipt very often lands while the
+      // target chat isn't loaded — right after the app reopens from a closed state
+      // and replays buffered/queued frames — and the old in-memory-only update
+      // dropped those, leaving the message stuck on a single check forever.
+      await WiltkeyDatabase.instance.updateMessageDelivered(messageId, true);
+      await WiltkeyDatabase.instance.markSentDeliveredByOffset(
+        contact.id,
+        offset,
+      );
+
+      // Reflect it on the live bubble too, if the chat happens to be open.
+      final list = messages[contact.id] ?? [];
+      final msgIndex = list.indexWhere(
+        (m) => m.id == messageId || (m.isSentByMe && m.offset == offset),
+      );
+      final bool flippedInMemory = msgIndex != -1 && !list[msgIndex].isDelivered;
+      if (flippedInMemory) list[msgIndex].isDelivered = true;
+
+      log(
+        '[Delivery Receipt] Marked message $messageId (offset $offset) delivered for ${contact.name}',
+      );
+      notifyListeners();
     } catch (e) {
       log('[Delivery Receipt Error] Failed to handle receipt: $e');
+    }
+  }
+
+  /// 1-on-1 delivery reconciliation, peer side: the sender listed their
+  /// outbound messages ({id, offset}) and wants to know which we actually hold.
+  /// For each, we either confirm it (their single-check → double-check) or flag
+  /// it missing so they resend it. Fixes deliveries whose one-shot receipt was
+  /// lost (e.g. our app was closed past the receipt's queue TTL).
+  Future<void> _handleDeliveryCheck(String senderId, String envelope) async {
+    try {
+      final data = jsonDecode(envelope) as Map<String, dynamic>;
+      final items = (data['items'] as List<dynamic>? ?? []);
+      final contactIndex = contacts.indexWhere(
+        (c) => c.keyHash == senderId && !c.isGroup,
+      );
+      if (contactIndex == -1) return;
+      final contact = contacts[contactIndex];
+
+      final confirmed = <int>[];
+      final missing = <int>[];
+      for (final raw in items) {
+        final item = raw as Map<String, dynamic>;
+        final String id = item['id'] as String? ?? '';
+        final int offset = item['offset'] as int? ?? -1;
+        if (offset < 0) continue;
+        final has = await WiltkeyDatabase.instance.messageExists(
+          contact.id,
+          id: id,
+          offset: offset,
+        );
+        (has ? confirmed : missing).add(offset);
+      }
+
+      WebSocketClient().sendWSMessage({
+        'type': 'SEND_MESSAGE',
+        'recipient_id': senderId,
+        'envelope': jsonEncode({'confirmed': confirmed, 'missing': missing}),
+        'content_type': 'delivery_check_response',
+      });
+      log(
+        '[Delivery Sync] Answered delivery_check from $senderId: '
+        '${confirmed.length} held, ${missing.length} missing',
+      );
+    } catch (e) {
+      log('[Delivery Sync Error] handle delivery_check failed: $e');
+    }
+  }
+
+  /// 1-on-1 delivery reconciliation, sender side: the peer answered our check.
+  /// Mark every confirmed offset delivered, and resend the ones they're missing
+  /// the normal way (which yields a fresh delivery receipt once they ingest it).
+  Future<void> _handleDeliveryCheckResponse(
+    String senderId,
+    String envelope,
+  ) async {
+    try {
+      final data = jsonDecode(envelope) as Map<String, dynamic>;
+      final confirmed = (data['confirmed'] as List<dynamic>? ?? [])
+          .map((e) => e as int)
+          .toList();
+      final missing = (data['missing'] as List<dynamic>? ?? [])
+          .map((e) => e as int)
+          .toList();
+      final contactIndex = contacts.indexWhere(
+        (c) => c.keyHash == senderId && !c.isGroup,
+      );
+      if (contactIndex == -1) return;
+      final contact = contacts[contactIndex];
+
+      if (confirmed.isNotEmpty) {
+        final list = messages[contact.id] ?? [];
+        for (final off in confirmed) {
+          await WiltkeyDatabase.instance.markSentDeliveredByOffset(
+            contact.id,
+            off,
+          );
+          // Reflect it on any in-memory bubble immediately.
+          for (final m in list) {
+            if (m.isSentByMe && m.offset == off) m.isDelivered = true;
+          }
+        }
+        notifyMessageReceived();
+        _persistence.saveState(this);
+      }
+
+      if (missing.isNotEmpty && WebSocketClient().isConnected) {
+        for (final off in missing) {
+          final rows = await WiltkeyDatabase.instance.getMessagesInOffsetRange(
+            contact.id,
+            off,
+            off + 1,
+          );
+          for (final msg in rows) {
+            if (!msg.isSentByMe) continue;
+            WebSocketClient().sendWSMessage({
+              'type': 'SEND_MESSAGE',
+              'recipient_id': contact.keyHash,
+              'envelope': jsonEncode({
+                't': msg.contentType,
+                'd': msg.text,
+                'offset': msg.offset,
+                'id': msg.id,
+              }),
+              'content_type': msg.contentType,
+            });
+          }
+        }
+        log(
+          '[Delivery Sync] Resent ${missing.length} message(s) the peer was missing',
+        );
+      }
+    } catch (e) {
+      log('[Delivery Sync Error] handle delivery_check_response failed: $e');
     }
   }
 

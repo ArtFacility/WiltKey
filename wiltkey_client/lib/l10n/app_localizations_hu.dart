@@ -492,6 +492,13 @@ class AppLocalizationsHu extends AppLocalizations {
   String get pairRescanTooltip => 'Keresés frissítése';
 
   @override
+  String get pairBluetoothOffWarning =>
+      'A Bluetooth ki van kapcsolva. A párosításhoz Bluetooth kell a közeli eszközök megtalálásához — kapcsold be a folytatáshoz.';
+
+  @override
+  String get pairBluetoothTurnOnButton => 'Bluetooth bekapcsolása';
+
+  @override
   String get pairDoNotExitWarning =>
       'Hagyd nyitva a WiltKey-t – ne válts appot és ne lépj ki, amíg a párosítás MINDKÉT eszközön be nem fejeződött.';
 
@@ -711,6 +718,18 @@ class AppLocalizationsHu extends AppLocalizations {
 
   @override
   String get chatTapForDetails => 'Koppints a részletekért';
+
+  @override
+  String get chatSyncTooltip => 'Üzenetek szinkronizálása';
+
+  @override
+  String get chatStickerHint => 'Tartson nyomva egy emojit matrica küldéséhez';
+
+  @override
+  String get chatSyncStarted => 'Elmaradt üzenetek keresése…';
+
+  @override
+  String get chatSyncOffline => 'Offline nem lehet szinkronizálni.';
 
   @override
   String get chatEncrypting => 'Titkosítás…';

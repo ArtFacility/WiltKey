@@ -28,7 +28,8 @@ class ChatScreen extends StatefulWidget {
   State<ChatScreen> createState() => _ChatScreenState();
 }
 
-class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
+class _ChatScreenState extends State<ChatScreen>
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   final AppState _appState = AppState();
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
@@ -54,6 +55,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _appState.addListener(_updateState);
     _messageController.addListener(_updateCharCount);
     _scrollController.addListener(_scrollListener);
@@ -68,6 +70,13 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
         await _appState.decryptBatch(contact);
         if (!mounted) return;
         _pinToBottomUntilStable();
+        // One-shot reconciliation on open: only fires when there's actually
+        // something to fix (a stuck-undelivered run or an inbound gap), so it's
+        // not server spam — just heals the common "stuck on single-check" case
+        // without the user hunting for the sync button.
+        if (!contact.isGroup && _needsReconcile(contact)) {
+          _appState.syncOneOnOneChat(contact);
+        }
       });
       CustomEmojiStore.load(contact.keyHash).then((_) {
         if (mounted) setState(() {});
@@ -77,6 +86,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     // Mark everything seen during this session read, so leaving the chat clears
     // its unread badge on the list.
     final c = _appState.activeContact;
@@ -89,6 +99,21 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     _scrollController.dispose();
     _inputFocus.dispose();
     super.dispose();
+  }
+
+  /// Fires on every viewport metrics change, including each frame the soft
+  /// keyboard animates in/out. If we were pinned to the bottom (reading the
+  /// latest message — the one you're replying to), stay pinned as the list's
+  /// viewport shrinks, instead of leaving the last message hidden behind the
+  /// keyboard.
+  @override
+  void didChangeMetrics() {
+    if (!_isAtBottom) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _scrollController.hasClients) {
+        _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+      }
+    });
   }
 
   List<ChatMessage> _visibleMessages(Contact contact) {
@@ -325,6 +350,55 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     }
   }
 
+  /// Long-press on an emoji in the picker → send it immediately as a sticker
+  /// (a big, bubble-less solitary message). Rides the normal text path with a
+  /// sentinel marker, so encryption/delivery/resync are unchanged.
+  void _handleSendSticker(String payload) async {
+    _sendBloom.forward(from: 0);
+    _scrollToBottom();
+    final error = await _appState.sendMessage(wrapSticker(payload));
+    if (error != null && mounted) _errorSnack(error);
+  }
+
+  /// True when a sent message is still on a single check while a *later* sent
+  /// message already double-checked — a strong tell that an earlier delivery
+  /// receipt was lost. Also true when the peer's incoming pointer shows a gap
+  /// (we're missing inbound history). Drives both the auto-reconcile-on-open and
+  /// the attention dot on the header sync button.
+  bool _needsReconcile(Contact contact) {
+    final list = _appState.messages[contact.id] ?? [];
+    bool seenDeliveredLater = false;
+    for (int i = list.length - 1; i >= 0; i--) {
+      final m = list[i];
+      if (!m.isSentByMe || m.isPending || m.isFailed) continue;
+      if (m.isDelivered) {
+        seenDeliveredLater = true;
+      } else if (seenDeliveredLater) {
+        return true; // undelivered older than a delivered one → stuck receipt
+      }
+    }
+    return false;
+  }
+
+  Future<void> _handleSyncTap(Contact contact) async {
+    final l10n = AppLocalizations.of(context)!;
+    final messenger = ScaffoldMessenger.of(context);
+    final t = context.wk;
+    final ok = await _appState.syncOneOnOneChat(contact);
+    if (!mounted) return;
+    messenger.showSnackBar(
+      SnackBar(
+        backgroundColor: t.surface,
+        content: Text(
+          ok ? l10n.chatSyncStarted : l10n.chatSyncOffline,
+          style: t.bodySecondary.copyWith(
+            color: ok ? t.action : t.danger,
+          ),
+        ),
+      ),
+    );
+  }
+
   void _openChatDetails(Contact contact) {
     Navigator.push(
       context,
@@ -347,11 +421,18 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     final bool isWilted = contact.isWilted;
     final bool isArchived = contact.isArchived;
 
-    return Stack(
-      children: [
-        Scaffold(
-          appBar: AppBar(
-            backgroundColor: t.bg,
+    return PopScope(
+      // Back / back-gesture closes the emoji panel first; the chat only pops
+      // once nothing else is open.
+      canPop: !_showEmoji,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop && _showEmoji) _hideEmoji();
+      },
+      child: Stack(
+        children: [
+          Scaffold(
+            appBar: AppBar(
+              backgroundColor: t.bg,
             elevation: 0,
             titleSpacing: 8,
             title: Row(
@@ -422,6 +503,24 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
               ],
             ),
             actions: [
+              // Manual message reconciliation. Always available (so the user can
+              // pull messages they suspect they're missing). When we detect a
+              // likely stuck delivery the glyph switches to the "sync problem"
+              // variant — attention is conveyed by the icon shape rather than a
+              // colour, so it reads the same on the dark (cyberpunk/garden) and
+              // light (paperink) themes. Tinted with the shared [action] accent,
+              // matching every other header icon.
+              IconButton(
+                icon: Icon(
+                  _needsReconcile(contact)
+                      ? Icons.sync_problem
+                      : Icons.sync,
+                  color: t.action,
+                  size: 20,
+                ),
+                tooltip: l10n.chatSyncTooltip,
+                onPressed: () => _handleSyncTap(contact),
+              ),
               if (_appState.showDebugButtons)
                 IconButton(
                   icon: Icon(
@@ -555,7 +654,8 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                 : const SizedBox(),
           ),
         ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -701,6 +801,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
           EmojiPickerPanel(
             controller: _messageController,
             emojiMap: CustomEmojiStore.cachedMap(contact.keyHash),
+            onSendSticker: _handleSendSticker,
           ),
         const SizedBox(height: 6),
         Row(

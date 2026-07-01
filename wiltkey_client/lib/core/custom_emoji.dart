@@ -254,6 +254,26 @@ class CustomEmojiStore {
   }
 }
 
+// --- Stickers ----------------------------------------------------------------
+// A "sticker" is an ordinary message whose body is a single emoji (unicode) or
+// custom `:name:` token, sent for big, bubble-less display. It rides the normal
+// text path — no new content_type and no extra OTP/keystream budget — and is
+// distinguished only by a control-character sentinel that can't appear in
+// user-typed text, so it survives encryption, delivery, and resync untouched.
+const String kStickerMarker = 'stk';
+
+/// Wraps an emoji / `:name:` token as a sticker message body.
+String wrapSticker(String payload) => '$kStickerMarker$payload';
+
+/// The sticker payload if [text] is a sticker body, otherwise null.
+String? stickerPayload(String text) => text.startsWith(kStickerMarker)
+    ? text.substring(kStickerMarker.length)
+    : null;
+
+/// Human-readable form for previews/notifications: the bare emoji/token with the
+/// sentinel stripped (so the control chars never leak into a chat-list subtitle).
+String stripStickerMarker(String text) => stickerPayload(text) ?? text;
+
 // --- Jumbo-emoji detection ---------------------------------------------------
 // Messengers render an emoji-only message at a larger size ("jumbo"). We treat
 // a message as jumbo when, after removing whitespace and resolved custom

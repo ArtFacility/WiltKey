@@ -495,6 +495,13 @@ class AppLocalizationsFr extends AppLocalizations {
   String get pairRescanTooltip => 'Actualiser la recherche';
 
   @override
+  String get pairBluetoothOffWarning =>
+      'Le Bluetooth est désactivé. L\'association a besoin du Bluetooth pour détecter les appareils à proximité — activez-le pour continuer.';
+
+  @override
+  String get pairBluetoothTurnOnButton => 'Activer le Bluetooth';
+
+  @override
   String get pairDoNotExitWarning =>
       'Garde WiltKey ouvert — ne change pas d\'application et ne quitte pas avant que le jumelage soit terminé sur les DEUX appareils.';
 
@@ -713,6 +720,18 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get chatTapForDetails => 'Appuie pour les détails';
+
+  @override
+  String get chatSyncTooltip => 'Synchroniser les messages';
+
+  @override
+  String get chatStickerHint => 'Maintenez un emoji pour envoyer un sticker';
+
+  @override
+  String get chatSyncStarted => 'Recherche de messages manqués…';
+
+  @override
+  String get chatSyncOffline => 'Synchronisation impossible hors ligne.';
 
   @override
   String get chatEncrypting => 'Chiffrement…';

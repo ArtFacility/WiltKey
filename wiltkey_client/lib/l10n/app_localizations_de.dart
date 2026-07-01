@@ -493,6 +493,13 @@ class AppLocalizationsDe extends AppLocalizations {
   String get pairRescanTooltip => 'Suche aktualisieren';
 
   @override
+  String get pairBluetoothOffWarning =>
+      'Bluetooth ist aus. Zum Koppeln wird Bluetooth benötigt, um Geräte in der Nähe zu finden — bitte einschalten, um fortzufahren.';
+
+  @override
+  String get pairBluetoothTurnOnButton => 'Bluetooth einschalten';
+
+  @override
   String get pairDoNotExitWarning =>
       'Lass WiltKey geöffnet – wechsle nicht die App und beende sie nicht, bis die Kopplung auf BEIDEN Geräten abgeschlossen ist.';
 
@@ -709,6 +716,18 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get chatTapForDetails => 'Tippen für Details';
+
+  @override
+  String get chatSyncTooltip => 'Nachrichten synchronisieren';
+
+  @override
+  String get chatStickerHint => 'Emoji halten, um einen Sticker zu senden';
+
+  @override
+  String get chatSyncStarted => 'Suche nach verpassten Nachrichten…';
+
+  @override
+  String get chatSyncOffline => 'Synchronisierung offline nicht möglich.';
 
   @override
   String get chatEncrypting => 'Verschlüsseln…';

@@ -665,11 +665,23 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           const SizedBox(height: 20),
           Text(l10n.onboardingPinEnter, style: t.bodySecondary),
           const SizedBox(height: 8),
-          _buildPinInput(t, _pinController, _pinFocus),
+          _buildPinInput(
+            t,
+            _pinController,
+            _pinFocus,
+            textInputAction: TextInputAction.next,
+            onSubmitted: () => _confirmPinFocus.requestFocus(),
+          ),
           const SizedBox(height: 16),
           Text(l10n.onboardingPinConfirm, style: t.bodySecondary),
           const SizedBox(height: 8),
-          _buildPinInput(t, _confirmPinController, _confirmPinFocus),
+          _buildPinInput(
+            t,
+            _confirmPinController,
+            _confirmPinFocus,
+            textInputAction: TextInputAction.done,
+            onSubmitted: _nextPage,
+          ),
           if (_pinError.isNotEmpty) ...[
             const SizedBox(height: 12),
             Text(
@@ -688,8 +700,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   Widget _buildPinInput(
     WiltkeyTokens t,
     TextEditingController controller,
-    FocusNode focusNode,
-  ) {
+    FocusNode focusNode, {
+    required TextInputAction textInputAction,
+    required VoidCallback onSubmitted,
+  }) {
     // A tap anywhere on the box focuses the (invisible) field — previously only
     // the field's small intrinsic area was tappable, so most of the box did
     // nothing. The opaque GestureDetector covers the full width/height.
@@ -706,6 +720,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               focusNode: focusNode,
               keyboardType: TextInputType.number,
               maxLength: 6,
+              // First field's keyboard "enter" jumps to the confirm field; the
+              // confirm field's "enter" submits (see call sites).
+              textInputAction: textInputAction,
+              onSubmitted: (_) => onSubmitted(),
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
               decoration: const InputDecoration(counterText: ''),
               onChanged: (val) {

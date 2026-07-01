@@ -15,6 +15,12 @@ import (
 
 var ctx = context.Background()
 
+// maxQueueLen bounds a single recipient's offline queue. Without a cap, an
+// authenticated sender can ZADD unbounded envelopes into a victim's queue
+// (measured ~50k/s) and exhaust Redis memory. When exceeded, the oldest
+// (soonest-to-expire) entries are dropped.
+const maxQueueLen = 1000
+
 type memoryZ struct {
 	senderID    string
 	envelope    string
@@ -50,6 +56,7 @@ type RedisClient struct {
 	memoryPairings    map[string]memoryPairing
 	memoryTunnels     map[string]string
 	memoryTunnelBytes map[string]int64
+	memoryNukes       map[string]ipFail
 	mu                sync.RWMutex
 }
 
@@ -83,6 +90,7 @@ func NewRedisClient(addr string) (*RedisClient, error) {
 			memoryPairings:    make(map[string]memoryPairing),
 			memoryTunnels:     make(map[string]string),
 			memoryTunnelBytes: make(map[string]int64),
+			memoryNukes:       make(map[string]ipFail),
 		}, nil
 	}
 	return &RedisClient{rdb: rdb}, nil
@@ -126,13 +134,24 @@ func (r *RedisClient) AddMessageToQueue(recipientID string, senderID string, env
 	if r.isMemory {
 		r.mu.Lock()
 		defer r.mu.Unlock()
-		expiry := time.Now().Add(ttl)
-		r.memoryQueue[recipientID] = append(r.memoryQueue[recipientID], memoryZ{
+		now := time.Now()
+		q := append(r.memoryQueue[recipientID], memoryZ{
 			senderID:    senderID,
 			envelope:    envelope,
 			contentType: contentType,
-			expires:     expiry,
+			expires:     now.Add(ttl),
 		})
+		// Drop expired entries in place, then cap to the newest maxQueueLen.
+		pruned := q[:0]
+		for _, item := range q {
+			if item.expires.After(now) {
+				pruned = append(pruned, item)
+			}
+		}
+		if len(pruned) > maxQueueLen {
+			pruned = pruned[len(pruned)-maxQueueLen:]
+		}
+		r.memoryQueue[recipientID] = pruned
 		return nil
 	}
 
@@ -141,13 +160,30 @@ func (r *RedisClient) AddMessageToQueue(recipientID string, senderID string, env
 		"envelope":     envelope,
 		"content_type": contentType,
 	})
-	score := float64(time.Now().Add(ttl).Unix())
+	now := time.Now()
 	member := redis.Z{
-		Score:  score,
+		Score:  float64(now.Add(ttl).Unix()),
 		Member: string(queueEntry),
 	}
 	key := fmt.Sprintf("queue:%s", recipientID)
-	return r.rdb.ZAdd(ctx, key, member).Err()
+
+	pipe := r.rdb.TxPipeline()
+	pipe.ZAdd(ctx, key, member)
+	// Purge already-expired entries (expiry score < now) so dead weight can't pile up.
+	pipe.ZRemRangeByScore(ctx, key, "-inf", fmt.Sprintf("(%d", now.Unix()))
+	// Self-clean an abandoned queue even if it's never fetched.
+	pipe.Expire(ctx, key, 7*24*time.Hour)
+	card := pipe.ZCard(ctx, key)
+	if _, err := pipe.Exec(ctx); err != nil {
+		return err
+	}
+	// Cap: remove the (n - maxQueueLen) lowest-score (soonest-expiring) entries.
+	if n := card.Val(); n > maxQueueLen {
+		if err := r.rdb.ZRemRangeByRank(ctx, key, 0, n-maxQueueLen-1).Err(); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // FetchAndClearQueue retrieves all non-expired messages for a recipient, then deletes the queue.
@@ -234,17 +270,23 @@ func (r *RedisClient) GetActiveQueueCount(recipientID string) (int64, error) {
 	return r.rdb.ZCount(ctx, key, fmt.Sprintf("%f", now), "+inf").Result()
 }
 
+// nukeBlockTTL bounds how long a nuke can hold a recipient's queue blocked. An
+// online victim auto-ACKs and unblocks immediately; this TTL only bites an OFFLINE
+// victim. Shortened from 7 days to 24h so a malicious nuke can't deny delivery for
+// a week (matches the message-queue TTL).
+const nukeBlockTTL = 24 * time.Hour
+
 // BlockQueue marks a queue as blocked (Nuked status).
 func (r *RedisClient) BlockQueue(userID string) error {
 	if r.isMemory {
 		r.mu.Lock()
 		defer r.mu.Unlock()
-		r.memoryBlocks[userID] = time.Now().Add(7 * 24 * time.Hour)
+		r.memoryBlocks[userID] = time.Now().Add(nukeBlockTTL)
 		return nil
 	}
 
 	key := fmt.Sprintf("block:%s", userID)
-	return r.rdb.Set(ctx, key, "1", 7*24*time.Hour).Err() // 7 days block limit
+	return r.rdb.Set(ctx, key, "1", nukeBlockTTL).Err()
 }
 
 // UnblockQueue clears the block status.
@@ -343,6 +385,67 @@ func (r *RedisClient) IsNonceUnique(nonce string) (bool, error) {
 	key := fmt.Sprintf("pow:nonce:%s", nonce)
 	// SET key 1 NX EX 600
 	ok, err := r.rdb.SetNX(ctx, key, "1", 10*time.Minute).Result()
+	if err != nil {
+		return false, err
+	}
+	return ok, nil
+}
+
+// AllowNuke rate-limits NUKE_RECIPIENT per sender over a sliding 1h window, so a
+// single client can't mass-block or loop-block queues. Returns false once the
+// sender has issued more than `limit` nukes in the past hour.
+func (r *RedisClient) AllowNuke(senderID string, limit int64) (bool, error) {
+	if r.isMemory {
+		r.mu.Lock()
+		defer r.mu.Unlock()
+		now := time.Now()
+		v, ok := r.memoryNukes[senderID]
+		if !ok || v.expires.Before(now) {
+			r.memoryNukes[senderID] = ipFail{count: 1, expires: now.Add(time.Hour)}
+			return true, nil
+		}
+		if v.count >= limit {
+			return false, nil
+		}
+		v.count++
+		r.memoryNukes[senderID] = v
+		return true, nil
+	}
+
+	key := fmt.Sprintf("nukerate:%s", senderID)
+	pipe := r.rdb.TxPipeline()
+	incr := pipe.Incr(ctx, key)
+	pipe.Expire(ctx, key, time.Hour)
+	if _, err := pipe.Exec(ctx); err != nil {
+		return false, err
+	}
+	return incr.Val() <= limit, nil
+}
+
+// ConsumeVoucher atomically marks a voucher (keyed by its signature) as spent so a
+// valid voucher can't be replayed to post unlimited messages. Returns false if the
+// voucher was already used or is already expired. The marker lives until the
+// voucher's own expiry. (Reuses the nonce set in memory mode — same "seen once"
+// semantics.)
+func (r *RedisClient) ConsumeVoucher(sig string, expiryUnix int64) (bool, error) {
+	ttl := time.Until(time.Unix(expiryUnix, 0))
+	if ttl <= 0 {
+		return false, nil
+	}
+	if r.isMemory {
+		r.mu.Lock()
+		defer r.mu.Unlock()
+		key := "voucher:" + sig
+		now := time.Now()
+		if exp, ok := r.memoryNonces[key]; ok && exp.After(now) {
+			return false, nil
+		}
+		r.memoryNonces[key] = now.Add(ttl)
+		return true, nil
+	}
+
+	key := fmt.Sprintf("voucher:used:%s", sig)
+	ok, err := r.rdb.SetNX(ctx, key, "1", ttl).Result()
 	if err != nil {
 		return false, err
 	}

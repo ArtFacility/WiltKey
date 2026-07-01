@@ -20,12 +20,23 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
+// Per-connection flood guard. The HTTP rate-limit middleware does not cover /ws,
+// and once authenticated a socket could otherwise route/queue at ~50k msg/s. A
+// token bucket permits legitimate bursts (group fan-out, resync) up to the
+// capacity, then limits sustained throughput to the refill rate.
+const (
+	wsBucketCapacity = 200.0 // max burst
+	wsRefillPerSec   = 100.0 // sustained messages/sec
+)
+
 // Client represents a connected WebSocket user.
 type Client struct {
-	id   string
-	conn *websocket.Conn
-	send chan []byte
-	hub  *Hub
+	id         string
+	conn       *websocket.Conn
+	send       chan []byte
+	hub        *Hub
+	tokens     float64   // flood-guard bucket (readPump goroutine only — no lock)
+	lastRefill time.Time
 }
 
 // Hub manages all active WebSocket connections.
@@ -100,9 +111,21 @@ func (c *Client) SendJSON(v interface{}) {
 		log.Printf("Error marshalling JSON: %v", err)
 		return
 	}
+	// A client can be unregistered (its `send` channel closed) between the moment
+	// a caller looked it up via getClient (which releases the hub lock) and the
+	// moment we send here. Sending on a closed channel PANICS, which — with no
+	// recover on the readPump goroutine — would crash the entire relay and drop
+	// every connected user. Recover so a gone/racing client only costs this one
+	// dropped frame instead of the whole process.
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("[SendJSON] dropped frame for %s (client already gone): %v", c.id, r)
+		}
+	}()
 	select {
 	case c.send <- data:
 	default:
+		// Send buffer full: treat as a dead/slow consumer and evict it.
 		c.hub.unregister <- c
 		c.conn.Close()
 	}
@@ -152,6 +175,21 @@ func (c *Client) readPump() {
 			}
 			break
 		}
+
+		// Token-bucket flood guard (readPump is the only goroutine touching these
+		// fields, so no locking is needed).
+		now := time.Now()
+		c.tokens += now.Sub(c.lastRefill).Seconds() * wsRefillPerSec
+		if c.tokens > wsBucketCapacity {
+			c.tokens = wsBucketCapacity
+		}
+		c.lastRefill = now
+		if c.tokens < 1 {
+			log.Printf("[WebSocket] Client %s exceeded flood limit — disconnecting", c.id)
+			c.SendJSON(WSMessage{Type: "ERROR", Message: "Rate limit exceeded — slow down"})
+			break
+		}
+		c.tokens--
 
 		var msg WSMessage
 		if err := json.Unmarshal(message, &msg); err != nil {
@@ -217,12 +255,6 @@ func (c *Client) handleWSMessage(msg WSMessage) {
 		c.handleNukeRecipient(msg)
 	case "ACK_NUKE":
 		c.handleAckNuke(msg)
-	case "TUNNEL_INIT":
-		c.handleTunnelInit(msg)
-	case "TUNNEL_PACKET":
-		c.handleTunnelPacket(msg)
-	case "TUNNEL_CLOSE":
-		c.handleTunnelClose(msg)
 	default:
 		log.Printf("[WebSocket] Unhandled message type: %s", msg.Type)
 	}
@@ -281,10 +313,12 @@ func ServeWS(hub *Hub, w http.ResponseWriter, r *http.Request) {
 
 	// Authentication successful
 	client := &Client{
-		id:   userID,
-		conn: conn,
-		send: make(chan []byte, 256),
-		hub:  hub,
+		id:         userID,
+		conn:       conn,
+		send:       make(chan []byte, 256),
+		hub:        hub,
+		tokens:     wsBucketCapacity,
+		lastRefill: time.Now(),
 	}
 
 	client.hub.register <- client

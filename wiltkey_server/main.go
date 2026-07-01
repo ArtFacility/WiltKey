@@ -12,18 +12,39 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
 var rdb *RedisClient
 
+// clientIP resolves the real client IP for rate-limiting / bans. In production the
+// relay only ever sees traffic from nginx on loopback (ufw blocks the relay port),
+// so r.RemoteAddr is always 127.0.0.1 — using it directly collapses every user into
+// one shared bucket. We therefore trust X-Real-IP / X-Forwarded-For ONLY when the
+// direct peer is loopback (our own reverse proxy); otherwise a client could spoof
+// those headers to evade a ban. If not proxied, RemoteAddr is used as-is.
+func clientIP(r *http.Request) string {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		host = r.RemoteAddr
+	}
+	if host == "127.0.0.1" || host == "::1" {
+		if xr := strings.TrimSpace(r.Header.Get("X-Real-IP")); xr != "" {
+			return xr
+		}
+		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+			// First entry is the original client; the rest are proxy hops.
+			return strings.TrimSpace(strings.Split(xff, ",")[0])
+		}
+	}
+	return host
+}
+
 // IP middleware to enforce rate-limiting and validation failure bans
 func rateLimitMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		ip, _, err := net.SplitHostPort(r.RemoteAddr)
-		if err != nil {
-			ip = r.RemoteAddr // fallback
-		}
+		ip := clientIP(r)
 
 		// 1. Check IP Ban
 		banned, err := rdb.CheckIPBan(ip)
@@ -100,7 +121,10 @@ func handleGetChallenge(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	difficulty := 4 // Default difficulty: 4 leading hex zeros
+	// 5 leading hex zeros (~1M hashes avg vs ~65k at difficulty 4). The client
+	// reads this value from the challenge response, so raising it needs no client
+	// change; it only raises the cost for anyone abusing the HTTP queue/post path.
+	difficulty := 5
 	err = rdb.StorePoWChallenge(challenge, difficulty)
 	if err != nil {
 		http.Error(w, "Failed to store challenge", http.StatusInternalServerError)
@@ -132,10 +156,7 @@ func handlePostQueue(hub *Hub) http.HandlerFunc {
 			return
 		}
 
-		ip, _, err := net.SplitHostPort(r.RemoteAddr)
-		if err != nil {
-			ip = r.RemoteAddr
-		}
+		ip := clientIP(r)
 
 		var req PostMessageRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -195,6 +216,19 @@ func handlePostQueue(hub *Hub) http.HandlerFunc {
 				handleValidationFailure(w, ip, reason)
 				return
 			}
+
+			// Single-use: a valid voucher (signed by the recipient authorizing a
+			// sender) otherwise bypasses PoW and could be replayed indefinitely.
+			// Bind it by signature so it can only post once.
+			fresh, err := rdb.ConsumeVoucher(req.Voucher.Signature, req.Voucher.Expiry)
+			if err != nil {
+				http.Error(w, "Database error", http.StatusInternalServerError)
+				return
+			}
+			if !fresh {
+				handleValidationFailure(w, ip, "voucher already used or expired")
+				return
+			}
 		} else {
 			http.Error(w, "Unsupported spam protection mechanism", http.StatusBadRequest)
 			return
@@ -249,10 +283,7 @@ func handleQueueStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ip, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		ip = r.RemoteAddr
-	}
+	ip := clientIP(r)
 
 	q := r.URL.Query()
 	id := q.Get("id")

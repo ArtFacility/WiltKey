@@ -333,6 +333,56 @@ extension AppStateChats on AppState {
     return true;
   }
 
+  /// Manual / one-shot reconciliation for a 1-on-1 chat. Two directions:
+  ///   1. Pull any inbound messages we're missing — ask the peer to resync
+  ///      everything past our contiguous incoming pointer (reuses the resync
+  ///      that gap-detection fires automatically on a newer message, but here we
+  ///      trigger it even when no newer message arrived to expose the gap).
+  ///   2. Reconcile our outbound deliveries — send the peer a `delivery_check`
+  ///      of our still-undelivered sent messages; they confirm the ones they
+  ///      hold (so the tick double-checks) and we resend the ones they're
+  ///      missing. This recovers from a lost one-shot delivery receipt (e.g. the
+  ///      app was closed past the receipt's relay-queue TTL).
+  /// No-op for groups (they have their own multi-candidate resync) and offline.
+  Future<bool> syncOneOnOneChat(Contact contact) async {
+    if (contact.isGroup) return false;
+    await ensureWebSocketConnected();
+    if (!WebSocketClient().isConnected) return false;
+
+    // 1. Pull missing inbound history.
+    if (contact.incomingMaxOffset > contact.incomingOffset) {
+      _requestChatResync(
+        contact,
+        contact.incomingOffset,
+        contact.incomingMaxOffset,
+      );
+    }
+
+    // 2. Verify outbound deliveries (cap the list so a very stuck chat can't
+    // build an oversized frame).
+    final undelivered = await WiltkeyDatabase.instance
+        .getUndeliveredSentMessages(contact.id);
+    final capped = undelivered.length > 200
+        ? undelivered.sublist(undelivered.length - 200)
+        : undelivered;
+    if (capped.isNotEmpty) {
+      final items = [
+        for (final m in capped) {'id': m.id, 'offset': m.offset},
+      ];
+      WebSocketClient().sendWSMessage({
+        'type': 'SEND_MESSAGE',
+        'recipient_id': contact.keyHash,
+        'envelope': jsonEncode({'items': items}),
+        'content_type': 'delivery_check',
+      });
+    }
+    log(
+      '[Delivery Sync] Manual sync for ${contact.name}: pulled inbound, '
+      'checked ${capped.length} undelivered message(s)',
+    );
+    return true;
+  }
+
   Future<void> decryptMessage(Contact contact, ChatMessage message) async {
     if (message.decryptedText != null || message.isFailed) return;
     try {

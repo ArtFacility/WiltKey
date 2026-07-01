@@ -66,8 +66,24 @@ func (c *Client) handleNukeRecipient(msg WSMessage) {
 	if msg.RecipientID == "" {
 		return
 	}
+
+	// Rate-limit nukes per sender so a client that knows a victim's hash can't
+	// mass-block or loop-block queues (the block denies offline delivery). A
+	// legitimate user nukes contacts only occasionally.
+	const nukeLimitPerHour = 10
+	allowed, err := c.hub.rdb.AllowNuke(c.id, nukeLimitPerHour)
+	if err != nil {
+		c.SendJSON(WSMessage{Type: "ERROR", Message: "Nuke rate check failed"})
+		return
+	}
+	if !allowed {
+		log.Printf("[Relay Warning] Client %s exceeded nuke rate limit (%d/hr)", c.id, nukeLimitPerHour)
+		c.SendJSON(WSMessage{Type: "ERROR", Message: "Nuke rate limit exceeded"})
+		return
+	}
+
 	// Block queue in Redis
-	err := c.hub.rdb.BlockQueue(msg.RecipientID)
+	err = c.hub.rdb.BlockQueue(msg.RecipientID)
 	if err != nil {
 		c.SendJSON(WSMessage{Type: "ERROR", Message: "Failed to apply nuke lock"})
 		return
@@ -101,96 +117,11 @@ func (c *Client) handleAckNuke(msg WSMessage) {
 	}
 }
 
-// handleTunnelInit initiates a WebSocket route mapping tunnel between two ephemeral keys.
-func (c *Client) handleTunnelInit(msg WSMessage) {
-	if msg.RecipientID == "" || msg.EphemeralPubkey == "" {
-		c.SendJSON(WSMessage{Type: "ERROR", Message: "Missing ephemeral keys"})
-		return
-	}
-
-	err := c.hub.rdb.CreateTunnel(msg.RecipientID, msg.EphemeralPubkey, 1*time.Hour)
-	if err != nil {
-		c.SendJSON(WSMessage{Type: "ERROR", Message: "Failed to map ephemeral tunnel"})
-		return
-	}
-
-	c.hub.mu.Lock()
-	c.hub.clients[msg.EphemeralPubkey] = c
-	c.hub.mu.Unlock()
-
-	target, ok := c.hub.getClient(msg.RecipientID)
-	if ok {
-		target.SendJSON(WSMessage{
-			Type:            "TUNNEL_INIT",
-			RecipientID:     msg.RecipientID,
-			EphemeralPubkey: msg.EphemeralPubkey,
-		})
-	}
-
-	c.SendJSON(WSMessage{
-		Type:            "TUNNEL_OK",
-		RecipientID:     msg.RecipientID,
-		EphemeralPubkey: msg.EphemeralPubkey,
-	})
-}
-
-// handleTunnelPacket forwards packets through the WS ephemeral tunnel, checking the 1KB cap.
-func (c *Client) handleTunnelPacket(msg WSMessage) {
-	if msg.RecipientID == "" || msg.Envelope == "" {
-		c.SendJSON(WSMessage{Type: "ERROR", Message: "Missing tunnel envelope or recipient"})
-		return
-	}
-
-	packetBytes := int64(len(msg.Envelope))
-
-	var tunnelID string
-	if c.id < msg.RecipientID {
-		tunnelID = c.id + ":" + msg.RecipientID
-	} else {
-		tunnelID = msg.RecipientID + ":" + c.id
-	}
-
-	totalBytes, err := c.hub.rdb.IncrementTunnelBytes(tunnelID, packetBytes)
-	if err != nil {
-		c.SendJSON(WSMessage{Type: "ERROR", Message: "Failed to increment packet audit ledger"})
-		return
-	}
-
-	if totalBytes > 1024 {
-		c.SendJSON(WSMessage{Type: "ERROR", Message: "1KB tunnel bandwidth quota exceeded. Connection closed."})
-		c.handleTunnelClose(msg)
-		return
-	}
-
-	target, ok := c.hub.getClient(msg.RecipientID)
-	if ok {
-		target.SendJSON(WSMessage{
-			Type:        "TUNNEL_PACKET",
-			SenderID:    c.id,
-			Envelope:    msg.Envelope,
-			ContentType: msg.ContentType,
-		})
-	}
-}
-
-// handleTunnelClose deletes the WS ephemeral tunnel routes.
-func (c *Client) handleTunnelClose(msg WSMessage) {
-	if msg.RecipientID == "" {
-		return
-	}
-
-	c.hub.rdb.DeleteTunnel(c.id, msg.RecipientID)
-
-	target, ok := c.hub.getClient(msg.RecipientID)
-	if ok {
-		target.SendJSON(WSMessage{
-			Type:     "TUNNEL_CLOSED",
-			SenderID: c.id,
-		})
-	}
-
-	c.hub.mu.Lock()
-	delete(c.hub.clients, c.id)
-	delete(c.hub.clients, msg.RecipientID)
-	c.hub.mu.Unlock()
-}
+// NOTE: The TUNNEL_INIT / TUNNEL_PACKET / TUNNEL_CLOSE handlers were removed on
+// 2026-07-01. They were a scrapped feature (zero client references) but remained
+// a live, authenticated attack surface: TUNNEL_INIT let any caller overwrite an
+// arbitrary user's hub entry (routing hijack), and TUNNEL_CLOSE let any caller
+// delete an arbitrary user's hub entry (silent eviction) AND could leave a
+// closed-channel client behind that crashed the whole relay on the next send.
+// The underlying Redis tunnel helpers in redis.go are now dead code (only the
+// mock test references them) and can be deleted in a later cleanup.

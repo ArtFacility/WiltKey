@@ -495,6 +495,36 @@ class WiltkeyDatabase {
     );
   }
 
+  /// Undelivered outbound messages for a chat (sent by me, not yet acked, not in
+  /// a failed state) — the source list for the 1-on-1 delivery reconciliation
+  /// sync. Forwards OTP ciphertext (no master decryption needed) so the rows can
+  /// also be re-sent verbatim if the peer reports them missing.
+  Future<List<ChatMessage>> getUndeliveredSentMessages(String chatId) async {
+    final db = await _database;
+    final rows = await db.query(
+      'messages',
+      where:
+          "chat_id = ? AND is_sent_by_me = 1 AND is_delivered = 0 AND is_failed = 0 AND sender_id != 'system'",
+      whereArgs: [chatId],
+      orderBy: 'timestamp ASC',
+    );
+    return [for (final r in rows) _rowToMessage(r)];
+  }
+
+  /// Flags every outbound message at [offset] as delivered — used by the
+  /// delivery-check reconciliation to ack rows that may not be in the loaded
+  /// window (so we can't address them by id).
+  Future<void> markSentDeliveredByOffset(String chatId, int offset) async {
+    final db = await _database;
+    await db.update(
+      'messages',
+      {'is_delivered': 1},
+      where:
+          "chat_id = ? AND offset = ? AND is_sent_by_me = 1 AND sender_id != 'system'",
+      whereArgs: [chatId, offset],
+    );
+  }
+
   Future<void> deleteMessagesForChat(String chatId) async {
     final db = await _database;
     await db.delete('messages', where: 'chat_id = ?', whereArgs: [chatId]);

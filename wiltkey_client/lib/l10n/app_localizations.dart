@@ -966,6 +966,18 @@ abstract class AppLocalizations {
   /// **'Refresh scan'**
   String get pairRescanTooltip;
 
+  /// No description provided for @pairBluetoothOffWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'Bluetooth is off. Pairing needs Bluetooth to find nearby devices — turn it on to continue.'**
+  String get pairBluetoothOffWarning;
+
+  /// No description provided for @pairBluetoothTurnOnButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn on Bluetooth'**
+  String get pairBluetoothTurnOnButton;
+
   /// No description provided for @pairDoNotExitWarning.
   ///
   /// In en, this message translates to:
@@ -1337,6 +1349,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Tap for details'**
   String get chatTapForDetails;
+
+  /// No description provided for @chatSyncTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync messages'**
+  String get chatSyncTooltip;
+
+  /// No description provided for @chatStickerHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Hold an emoji to send a sticker'**
+  String get chatStickerHint;
+
+  /// No description provided for @chatSyncStarted.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking for missed messages…'**
+  String get chatSyncStarted;
+
+  /// No description provided for @chatSyncOffline.
+  ///
+  /// In en, this message translates to:
+  /// **'Can\'t sync while offline.'**
+  String get chatSyncOffline;
 
   /// No description provided for @chatEncrypting.
   ///
