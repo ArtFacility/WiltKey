@@ -5,10 +5,13 @@ import '../wk.dart';
 import 'effects/paperink_unlock.dart';
 import 'effects/paperink_sync_visual.dart';
 import 'effects/paperink_nuke_flood.dart';
+import 'effects/paperink_voice_playback.dart';
 
 /// Paper & Ink component set: hand-drawn Ensō budget indicators, minimal hanko
 /// keypad badges, and delegated screen overlays.
-class PaperinkComponents implements WiltkeyComponents {
+class PaperinkComponents
+    with VoiceScrubberDefaults
+    implements WiltkeyComponents {
   const PaperinkComponents();
 
   @override
@@ -176,6 +179,22 @@ class PaperinkComponents implements WiltkeyComponents {
   @override
   Widget nukeOverlay({required VoidCallback onDone}) =>
       PaperinkNukeFlood(onDone: onDone);
+
+  // Shadows the VoiceScrubberDefaults mixin: the bespoke unrolling handscroll.
+  @override
+  Widget voiceScrubber({
+    required double progress,
+    required bool isPlaying,
+    int seed = 0,
+    ValueChanged<double>? onSeek,
+    Color? accent,
+  }) => PaperinkVoicePlayback(
+    progress: progress,
+    isPlaying: isPlaying,
+    seed: seed,
+    onSeek: onSeek,
+    accent: accent,
+  );
 }
 
 /// Renders the circular single-breath brush circle (Ensō).

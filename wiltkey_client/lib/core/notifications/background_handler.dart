@@ -14,7 +14,12 @@ import 'pending_inbox.dart';
 // Outer WebSocket content types that represent an actual user message worth a
 // "you got a message" alert. Control frames (receipts, resync, borrow, metadata,
 // nuke, emoji defs) are still buffered for replay but never raise a notification.
-const Set<String> _notifyContentTypes = {'text', 'image', 'group_message'};
+const Set<String> _notifyContentTypes = {
+  'text',
+  'image',
+  'voice',
+  'group_message',
+};
 
 const _secure = FlutterSecureStorage(
   aOptions: AndroidOptions(encryptedSharedPreferences: true),
@@ -80,13 +85,16 @@ class _MessageTaskHandler extends TaskHandler {
   @override
   Future<void> onStart(DateTime timestamp, TaskStarter starter) async {
     await WiltkeyNotifications.initLocalNotifications();
+    await _writeFgHeartbeat();
     _creds = await _loadCreds();
     await _connect();
   }
 
-  // Periodic watchdog: re-open the socket if it dropped.
+  // Periodic watchdog: refresh the heartbeat (so the backstop poll knows the
+  // service is alive) and re-open the socket if it dropped.
   @override
   void onRepeatEvent(DateTime timestamp) {
+    _writeFgHeartbeat();
     if (_socket == null && !_connecting) {
       _connect();
     }
@@ -94,6 +102,12 @@ class _MessageTaskHandler extends TaskHandler {
 
   @override
   Future<void> onDestroy(DateTime timestamp, bool isTimeout) async {
+    // Clear the heartbeat so the backstop poll notices immediately that the
+    // service is gone and starts delivering. `isTimeout` is the Android 15 6-hour
+    // dataSync cap; the plugin has already stopped the service (no ANR), and the
+    // backstop poll scheduled alongside Instant mode carries delivery until the
+    // app is next foregrounded (which restarts the service).
+    await _clearFgHeartbeat();
     await _close();
   }
 
@@ -173,30 +187,65 @@ class _MessageTaskHandler extends TaskHandler {
   }
 }
 
+// --- Foreground-service heartbeat (shared between the two background isolates) --
+
+Future<void> _writeFgHeartbeat() async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(kPrefFgHeartbeatMs, DateTime.now().millisecondsSinceEpoch);
+  } catch (_) {}
+}
+
+Future<void> _clearFgHeartbeat() async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(kPrefFgHeartbeatMs, 0);
+  } catch (_) {}
+}
+
+/// True if the Instant foreground service wrote a heartbeat recently — i.e. the
+/// socket is up and delivering, so the backstop poll should stay silent.
+Future<bool> _fgServiceAlive() async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final hb = prefs.getInt(kPrefFgHeartbeatMs) ?? 0;
+    if (hb == 0) return false;
+    return DateTime.now().millisecondsSinceEpoch - hb < kFgHeartbeatFreshMs;
+  } catch (_) {
+    return false;
+  }
+}
+
 // =============================================================================
-// LOW POWER MODE — periodic queue/status poll (WorkManager)
+// LOW POWER / BACKSTOP MODE — adaptive queue/status poll (WorkManager)
 // =============================================================================
 
 @pragma('vm:entry-point')
 void callbackDispatcher() {
   Workmanager().executeTask((task, inputData) async {
     if (task != kLowPowerTaskName) return true;
+    bool foundMessage = false;
+    bool fgAlive = false;
     try {
-      final creds = await _loadCreds();
-      if (creds != null) {
-        final hasPayload = await _pollQueueStatus(creds);
-        if (hasPayload) {
-          await WiltkeyNotifications.initLocalNotifications();
-          await WiltkeyNotifications.showMessageNotification();
+      // Stay silent while the Instant foreground service is alive — it's already
+      // delivering, so polling here would only risk a duplicate alert and waste
+      // battery. When its heartbeat is stale (killed / 6h dataSync timeout / OEM
+      // battery-killer), take over delivery.
+      fgAlive = await _fgServiceAlive();
+      if (!fgAlive) {
+        final creds = await _loadCreds();
+        if (creds != null) {
+          foundMessage = await _pollQueueStatus(creds);
+          if (foundMessage) {
+            await WiltkeyNotifications.initLocalNotifications();
+            await WiltkeyNotifications.showMessageNotification();
+          }
         }
       }
     } catch (_) {
       // Swallow — a failed poll should not disable future runs.
     } finally {
-      // Self-reschedule so polling keeps cycling (~10 min) while the mode is
-      // still Low Power. Cancelled by the main isolate when the app returns to
-      // the foreground.
-      await _rescheduleIfLowPower();
+      await _rescheduleAdaptivePoll(foundMessage: foundMessage, fgAlive: fgAlive);
     }
     return true;
   });
@@ -232,16 +281,32 @@ Future<bool> _pollQueueStatus(_BgCreds creds) async {
   }
 }
 
-Future<void> _rescheduleIfLowPower() async {
+// Re-enqueue the next poll on the adaptive ladder, if the app still wants it
+// ([kPrefBgPollActive], cleared on foreground / mode off):
+//   • fresh service heartbeat  → idle at the sparse rung (socket is delivering);
+//   • a message was found       → snap back to the fast rung for catch-up;
+//   • an empty poll             → step one rung sparser to save battery.
+Future<void> _rescheduleAdaptivePoll({
+  required bool foundMessage,
+  required bool fgAlive,
+}) async {
   final prefs = await SharedPreferences.getInstance();
-  final mode = NotificationMode.fromStorage(
-    prefs.getString(kPrefNotificationMode),
-  );
-  if (mode != NotificationMode.lowPower) return;
+  if (!(prefs.getBool(kPrefBgPollActive) ?? false)) return;
+
+  int index = prefs.getInt(kPrefLowPowerBackoffIndex) ?? 0;
+  if (fgAlive) {
+    index = kLowPowerBackoff.length - 1;
+  } else if (foundMessage) {
+    index = 0;
+  } else {
+    index = (index + 1).clamp(0, kLowPowerBackoff.length - 1);
+  }
+  await prefs.setInt(kPrefLowPowerBackoffIndex, index);
+
   await Workmanager().registerOneOffTask(
     kLowPowerTaskUnique,
     kLowPowerTaskName,
-    initialDelay: kLowPowerInterval,
+    initialDelay: lowPowerDelayForIndex(index),
     existingWorkPolicy: ExistingWorkPolicy.replace,
     constraints: Constraints(networkType: NetworkType.connected),
   );

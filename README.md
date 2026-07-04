@@ -61,8 +61,10 @@ And the whole thing is designed to *not* hold your attention. No infinite feed, 
 - **Group chats** that work over the same in-person trust model.
 - **Image sending** with a compression slider so you can see exactly what a picture will "cost" before it goes, plus a *send hidden* option for spoiler/tap-to-reveal pics.
 - **Custom emojis per chat** — make a `:pepesad:` or a `:mogged:`, use it inline with `:name:`.
+- **Voice messages** — hold to record and pick the quality before you send, from crisp down to charmingly lo-fi. They ride the same one-time pad as everything else, and each theme plays them back its own way.
 - **Nuke a chat** from both sides — wipes the messages and the keys, on your device and theirs.
 - **PIN + fingerprint lock**, and the app blocks screenshots/screen-recording on release builds.
+- **Notifications on your terms** — a fully Google-free mode (a light on-device background connection or periodic checks), or, on the Play Store build, an optional real-time push that sends only a *content-free* wake-up through Google — never your messages. (Only the Play build registers a wake-up token with the relay; the self-built/FOSS build stays completely Google-free.)
 - **Localized** into several languages (Mostly AI for now, and this is the easiest place to help out — see below).
 
 A couple of short demos (click to watch):
@@ -85,12 +87,17 @@ You'll need the [Flutter SDK](https://docs.flutter.dev/get-started/install) (And
 ```bash
 cd wiltkey_client
 flutter pub get
-flutter run            # debug build — screenshots allowed
+flutter run --flavor foss --dart-define=WK_FCM=false   # Google-free build
 ```
+
+The app builds in **two flavors**, and a `--flavor` is required:
+
+- **`foss`** — zero Google services. This is the one you want for a self-built or sideloaded install; notifications run entirely on-device (a background connection or light polling).
+- **`play`** — the Google Play build. Adds Firebase Cloud Messaging as an *optional*, content-free push wake-up (needs your own `google-services.json`). Build it with `--flavor play --dart-define=WK_FCM=true`.
 
 > Debug builds intentionally **don't** block screenshots, so you can capture stuff like the shots above. Release builds always do.
 
-The Go relay lives in `wiltkey_server/` if you want to run your own instead of the default one.
+The Go relay lives in `wiltkey_server/` if you want to run your own instead of the default one. (The FCM push is opt-in there too — it stays disabled unless you point it at Firebase credentials, so a self-hosted relay needs no Google account.)
 
 ## Status & roadmap
 

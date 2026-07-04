@@ -181,6 +181,15 @@ class AppLocalizationsSv extends AppLocalizations {
   String get settingsTabProfile => 'Profil';
 
   @override
+  String get settingsTabSecurity => 'Säkerhet';
+
+  @override
+  String get settingsSecuritySectionAccess => 'Åtkomst och upplåsning';
+
+  @override
+  String get settingsSecuritySectionDanger => 'Farozon';
+
+  @override
   String get settingsTabNetwork => 'Nätverk';
 
   @override
@@ -249,6 +258,16 @@ class AppLocalizationsSv extends AppLocalizations {
 
   @override
   String get settingsChangePinTitle => 'Ändra PIN-kod';
+
+  @override
+  String get changePinVerifyTitle => 'Verifiera nuvarande PIN-kod';
+
+  @override
+  String get changePinVerifyPrompt =>
+      'Ange din nuvarande PIN-kod för att fortsätta.';
+
+  @override
+  String get changePinSetTitle => 'Ange ny PIN-kod';
 
   @override
   String get settingsChangePinOldPin => 'Ange nuvarande PIN-kod';
@@ -362,20 +381,49 @@ class AppLocalizationsSv extends AppLocalizations {
 
   @override
   String get notificationModeLowPowerDesc =>
-      'Letar efter nya meddelanden ungefär var 10:e minut. Sparar på batteriet.';
+      'Söker regelbundet efter nya meddelanden i bakgrunden – snabbt direkt efter att du stängt appen, sedan mer sällan för att spara batteri. Ingen konstant anslutning, så aviseringar kan fördröjas.';
 
   @override
   String get notificationModeInstant => 'Direkt';
 
   @override
   String get notificationModeInstantDesc =>
-      'Håller en säker anslutning aktiv i bakgrunden för omedelbara aviseringar. Visar en pågående avisering och drar mer batteri.';
+      'Valfritt. Håller en totalsträckskrypterad anslutning öppen i bakgrunden för att synkronisera dina inkommande meddelanden i realtid, vilket visas med en pågående avisering. Wiltkey använder detta i stället för push-tjänster från Google eller Apple av integritetsskäl, så att det fungerar även utan Google Play-tjänster – på bekostnad av mer batteri.';
 
   @override
   String get notificationNewMessageBody => 'Du har fått ett meddelande';
 
   @override
-  String get notificationSecureLinkActive => 'Säker anslutning aktiv';
+  String get notificationSecureLinkActive => 'Synkroniserar säkra meddelanden';
+
+  @override
+  String get onboardingNotificationsTitle => 'Aviseringar';
+
+  @override
+  String get onboardingNotificationsExplanation =>
+      'Wiltkey använder inte push-aviseringar från Google eller Apple – ingenting om dina meddelanden når deras servrar. Välj hur du vill bli aviserad. Du kan ändra detta när som helst i Inställningar.';
+
+  @override
+  String get onboardingFactPushTitle => 'INGA PUSH-SERVRAR';
+
+  @override
+  String get onboardingFactPushBody =>
+      'Vanliga appar skickar dina aviseringar via Google eller Apple och avslöjar vem som skriver till dig och när. Wiltkey gör aldrig det – som standard sker inga kontroller i bakgrunden, och all avisering körs helt på din enhet.';
+
+  @override
+  String get notificationModeInstantDescFcm =>
+      'Valfritt. Använder Googles push-tjänst som en enkel väckningssignal så att nya meddelanden kommer fram i realtid. Endast en innehållslös signal går via Google – aldrig dina meddelanden, som förblir totalsträckskrypterade på reläet tills din enhet hämtar dem. Snällare mot batteriet än en ständig anslutning.';
+
+  @override
+  String get onboardingNotificationsExplanationFcm =>
+      'För aviseringar i realtid använder den här versionen Googles push-tjänst enbart som en väckningssignal – en innehållslös signal, aldrig dina meddelanden, som aldrig rör Googles servrar. Välj hur du vill bli aviserad; du kan ändra detta när som helst i Inställningar.';
+
+  @override
+  String get onboardingFactPushTitleFcm => 'INNEHÅLLSLÖS PUSH';
+
+  @override
+  String get onboardingFactPushBodyFcm =>
+      'Vanliga appar skickar innehållet i dina aviseringar via Google och avslöjar vad som skickas och när. Den här versionen använder Google bara som en innehållslös väckningssignal – ingen meddelandedata, inga läsbara metadata – och allt förblir totalsträckskrypterat.';
 
   @override
   String get chatsLockedSubtitle =>
@@ -847,6 +895,34 @@ class AppLocalizationsSv extends AppLocalizations {
 
   @override
   String get chatVoiceComingSoon => 'Röstmeddelanden kommer snart.';
+
+  @override
+  String get chatVoiceHoldHint =>
+      'Håll in för att spela in ett röstmeddelande.';
+
+  @override
+  String get chatVoiceReleaseCancel => 'Släpp för att avbryta';
+
+  @override
+  String get chatVoicePermissionDenied =>
+      'Mikrofonbehörighet krävs för att spela in röstmeddelanden.';
+
+  @override
+  String get chatVoiceQualityLofi => 'Lo-fi';
+
+  @override
+  String get chatVoiceQualityVoice => 'Röst';
+
+  @override
+  String get chatVoiceQualityClear => 'Klar';
+
+  @override
+  String get chatVoiceUnavailable => 'Röstmeddelande otillgängligt';
+
+  @override
+  String chatVoiceTooLargeSnackBar(String cost, String charge) {
+    return 'Röstmeddelandet är för stort ($cost) för återstående utrymme ($charge).';
+  }
 
   @override
   String get chatDetailsDeleteConfirmTitle => 'Radera chatt?';

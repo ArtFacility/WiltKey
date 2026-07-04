@@ -45,15 +45,17 @@ type Hub struct {
 	register   chan *Client
 	unregister chan *Client
 	rdb        *RedisClient
+	push       *PushSender
 	mu         sync.RWMutex
 }
 
-func NewHub(rdb *RedisClient) *Hub {
+func NewHub(rdb *RedisClient, push *PushSender) *Hub {
 	return &Hub{
 		clients:    make(map[string]*Client),
 		register:   make(chan *Client),
 		unregister: make(chan *Client),
 		rdb:        rdb,
+		push:       push,
 	}
 }
 

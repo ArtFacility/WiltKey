@@ -20,7 +20,7 @@ extension AppStateChats on AppState {
     if (msg.isSentByMe || msg.isSystem) return;
     if (msg.contentType == 'emoji_def' || msg.contentType == 'emoji_delete')
       return;
-    if (activeContact?.id == contact.id) return; // user is reading it
+    if (visibleChatId == contact.id) return; // user is actively viewing it
     unreadCounts[contact.id] = (unreadCounts[contact.id] ?? 0) + 1;
   }
 
@@ -70,9 +70,14 @@ extension AppStateChats on AppState {
 
   void selectContact(Contact contact) {
     activeContact = contact;
+    visibleChatId = contact.id; // the chat screen is about to be shown
     lastReadMs[contact.id] =
         DateTime.now().millisecondsSinceEpoch; // clear unread on open
     unreadCounts.remove(contact.id);
+    // Opening a chat means the user has seen its alerts: drop any lingering tray
+    // notification and dismiss the in-app banner if it's pointing here.
+    WiltkeyNotifications.cancelMessageNotifications();
+    if (messageAlert.value?.contact.id == contact.id) messageAlert.value = null;
     if (contact.isArchived) {
       // Read-only: no pad, no peer relationship to refresh or sync.
       notifyListeners();
@@ -154,6 +159,7 @@ extension AppStateChats on AppState {
           (contentType == 'image' || contentType == 'image_hidden')
           ? base64Decode(text)
           : null,
+      decodedAudioBytes: contentType == 'voice' ? base64Decode(text) : null,
       decryptedText: text, // original plaintext cached in-memory
     );
     appendLoadedMessage(contact.id, newMessage);
@@ -403,6 +409,8 @@ extension AppStateChats on AppState {
       // Cache decoded image bytes if image
       if (message.contentType == 'image') {
         message.decodedImageBytes = base64Decode(message.decryptedText!);
+      } else if (message.contentType == 'voice') {
+        message.decodedAudioBytes = base64Decode(message.decryptedText!);
       }
       await WiltkeyDatabase.instance.saveMessage(
         message,
@@ -442,6 +450,8 @@ extension AppStateChats on AppState {
           msg.decryptedText = utf8.decode(plainBytes);
           if (msg.contentType == 'image') {
             msg.decodedImageBytes = base64Decode(msg.decryptedText!);
+          } else if (msg.contentType == 'voice') {
+            msg.decodedAudioBytes = base64Decode(msg.decryptedText!);
           }
           await WiltkeyDatabase.instance.saveMessage(
             msg,

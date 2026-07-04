@@ -179,6 +179,15 @@ class AppLocalizationsPl extends AppLocalizations {
   String get settingsTabProfile => 'Profil';
 
   @override
+  String get settingsTabSecurity => 'Bezpieczeństwo';
+
+  @override
+  String get settingsSecuritySectionAccess => 'Dostęp i odblokowanie';
+
+  @override
+  String get settingsSecuritySectionDanger => 'Strefa zagrożenia';
+
+  @override
   String get settingsTabNetwork => 'Sieć';
 
   @override
@@ -247,6 +256,15 @@ class AppLocalizationsPl extends AppLocalizations {
 
   @override
   String get settingsChangePinTitle => 'Zmień PIN';
+
+  @override
+  String get changePinVerifyTitle => 'Potwierdź obecny PIN';
+
+  @override
+  String get changePinVerifyPrompt => 'Wprowadź obecny PIN, aby kontynuować.';
+
+  @override
+  String get changePinSetTitle => 'Ustaw nowy PIN';
 
   @override
   String get settingsChangePinOldPin => 'Wpisz obecny PIN';
@@ -360,20 +378,50 @@ class AppLocalizationsPl extends AppLocalizations {
 
   @override
   String get notificationModeLowPowerDesc =>
-      'Sprawdza nowe wiadomości co około 10 minut. Oszczędza baterię.';
+      'Okresowo sprawdza nowe wiadomości w tle – szybko zaraz po zamknięciu aplikacji, a potem rzadziej, aby oszczędzać baterię. Brak stałego połączenia, więc powiadomienia mogą być opóźnione.';
 
   @override
   String get notificationModeInstant => 'Natychmiastowe';
 
   @override
   String get notificationModeInstantDesc =>
-      'Utrzymuje aktywne bezpieczne połączenie w tle dla natychmiastowych powiadomień. Pokazuje stałe powiadomienie i zużywa więcej baterii.';
+      'Opcjonalne. Utrzymuje w tle otwarte połączenie szyfrowane end-to-end, aby synchronizować przychodzące wiadomości w czasie rzeczywistym, co sygnalizuje stałe powiadomienie. Wiltkey używa tego zamiast usług push Google lub Apple ze względu na prywatność, dzięki czemu działa nawet bez Usług Google Play – kosztem większego zużycia baterii.';
 
   @override
   String get notificationNewMessageBody => 'Masz nową wiadomość';
 
   @override
-  String get notificationSecureLinkActive => 'Bezpieczne połączenie aktywne';
+  String get notificationSecureLinkActive =>
+      'Synchronizowanie bezpiecznych wiadomości';
+
+  @override
+  String get onboardingNotificationsTitle => 'Powiadomienia';
+
+  @override
+  String get onboardingNotificationsExplanation =>
+      'Wiltkey nie korzysta z powiadomień push Google ani Apple — nic o Twoich wiadomościach nie trafia na ich serwery. Wybierz, jak chcesz otrzymywać powiadomienia. Możesz to zmienić w każdej chwili w Ustawieniach.';
+
+  @override
+  String get onboardingFactPushTitle => 'BRAK SERWERÓW PUSH';
+
+  @override
+  String get onboardingFactPushBody =>
+      'Zwykłe aplikacje przesyłają Twoje powiadomienia przez Google lub Apple, ujawniając, kto i kiedy do Ciebie pisze. Wiltkey nigdy tego nie robi — domyślnie nie ma żadnych sprawdzeń w tle, a każde powiadomienie działa wyłącznie na Twoim urządzeniu.';
+
+  @override
+  String get notificationModeInstantDescFcm =>
+      'Opcjonalne. Wykorzystuje usługę push Google jako lekki sygnał wybudzający, aby nowe wiadomości docierały w czasie rzeczywistym. Przez Google przechodzi tylko pusty sygnał — nigdy Twoje wiadomości, które pozostają szyfrowane end-to-end na przekaźniku, dopóki Twoje urządzenie ich nie pobierze. Mniej obciąża baterię niż stałe połączenie.';
+
+  @override
+  String get onboardingNotificationsExplanationFcm =>
+      'Aby otrzymywać alerty w czasie rzeczywistym, ta wersja używa usługi push Google wyłącznie jako sygnału wybudzającego — pustego sygnału, nigdy Twoich wiadomości, które nigdy nie trafiają na serwery Google. Wybierz, jak chcesz być powiadamiany; możesz to zmienić w każdej chwili w Ustawieniach.';
+
+  @override
+  String get onboardingFactPushTitleFcm => 'PUSH BEZ TREŚCI';
+
+  @override
+  String get onboardingFactPushBodyFcm =>
+      'Zwykłe aplikacje przesyłają treść powiadomień przez Google, ujawniając, co i kiedy jest wysyłane. Ta wersja używa Google tylko jako pustego sygnału wybudzającego — bez danych wiadomości, bez czytelnych metadanych — a wszystko pozostaje szyfrowane end-to-end.';
 
   @override
   String get chatsLockedSubtitle =>
@@ -847,6 +895,33 @@ class AppLocalizationsPl extends AppLocalizations {
 
   @override
   String get chatVoiceComingSoon => 'Wiadomości głosowe już wkrótce.';
+
+  @override
+  String get chatVoiceHoldHint => 'Przytrzymaj, aby nagrać wiadomość głosową.';
+
+  @override
+  String get chatVoiceReleaseCancel => 'Puść, aby anulować';
+
+  @override
+  String get chatVoicePermissionDenied =>
+      'Do nagrywania wiadomości głosowych potrzebne jest uprawnienie do mikrofonu.';
+
+  @override
+  String get chatVoiceQualityLofi => 'Lo-fi';
+
+  @override
+  String get chatVoiceQualityVoice => 'Głos';
+
+  @override
+  String get chatVoiceQualityClear => 'Wyraźnie';
+
+  @override
+  String get chatVoiceUnavailable => 'Wiadomość głosowa niedostępna';
+
+  @override
+  String chatVoiceTooLargeSnackBar(String cost, String charge) {
+    return 'Wiadomość głosowa za duża ($cost) na pozostałe miejsce ($charge).';
+  }
 
   @override
   String get chatDetailsDeleteConfirmTitle => 'Usunąć czat?';

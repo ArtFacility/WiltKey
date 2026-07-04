@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:wiltkey_client/l10n/app_localizations.dart';
 import '../../../core/state.dart';
 import '../../../core/models.dart';
+import '../../../core/pixel_art_avatar.dart';
 import '../../../core/notifications/notification_service.dart';
 import '../../../core/theme/wk.dart';
 import '../../dashboard/presentation/chats_tab.dart';
@@ -40,7 +43,9 @@ class AppShell extends StatefulWidget {
   State<AppShell> createState() => _AppShellState();
 }
 
-class _AppShellState extends State<AppShell> implements ShellNavigator {
+class _AppShellState extends State<AppShell>
+    with WidgetsBindingObserver
+    implements ShellNavigator {
   final AppState _appState = AppState();
   int _index = ShellTab.chats;
 
@@ -48,32 +53,54 @@ class _AppShellState extends State<AppShell> implements ShellNavigator {
   void initState() {
     super.initState();
     _appState.addListener(_onState);
+    WidgetsBinding.instance.addObserver(this);
     // The shell mounts right after unlock — if we were opened from a message
     // notification, deep-link straight into that chat.
     WidgetsBinding.instance.addPostFrameCallback((_) => _openPendingChat());
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // A notification tapped while the app was already running (warm) doesn't
+    // re-run initState, so the deep-link would otherwise be missed — the stashed
+    // target chat sits unopened and its unread badge lingers. Re-check on resume.
+    if (state == AppLifecycleState.resumed) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _openPendingChat());
+    }
+  }
+
+  // Guards against the cold-start postFrame and a near-simultaneous resume both
+  // consuming the pending key before either clears it (which would double-push).
+  bool _consumingPending = false;
+
   /// Opens the chat a tapped notification targeted (1:1 only; group frames carry
   /// a member id that won't resolve, so they harmlessly fall back to the list).
   Future<void> _openPendingChat() async {
-    final key = await WiltkeyNotifications.takePendingChat();
-    if (key == null || !mounted) return;
-    final idx = _appState.contacts.indexWhere((c) => c.keyHash == key);
-    if (idx == -1) return;
-    final Contact c = _appState.contacts[idx];
-    _appState.selectContact(c);
-    if (!mounted) return;
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) =>
-            c.isGroup ? const GroupChatScreen() : const ChatScreen(),
-      ),
-    );
+    if (_consumingPending) return;
+    _consumingPending = true;
+    try {
+      final key = await WiltkeyNotifications.takePendingChat();
+      if (key == null || !mounted) return;
+      final idx = _appState.contacts.indexWhere((c) => c.keyHash == key);
+      if (idx == -1) return;
+      final Contact c = _appState.contacts[idx];
+      _appState.selectContact(c);
+      if (!mounted) return;
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) =>
+              c.isGroup ? const GroupChatScreen() : const ChatScreen(),
+        ),
+      );
+    } finally {
+      _consumingPending = false;
+    }
   }
 
   @override
   void dispose() {
     _appState.removeListener(_onState);
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
@@ -99,14 +126,26 @@ class _AppShellState extends State<AppShell> implements ShellNavigator {
         body: context.wkc.ambientBackground(
           child: SafeArea(
             bottom: false,
-            child: IndexedStack(
-              index: _index,
+            child: Stack(
               children: [
-                const ChatsTab(),
-                // PairTab mounts PairingScreen ONLY while active, so BLE never
-                // scans from launch and stops the moment you leave the tab.
-                _PairTab(isActive: _index == ShellTab.pair),
-                const SettingsScreen(embedded: true),
+                IndexedStack(
+                  index: _index,
+                  children: [
+                    const ChatsTab(),
+                    // PairTab mounts PairingScreen ONLY while active, so BLE never
+                    // scans from launch and stops the moment you leave the tab.
+                    _PairTab(isActive: _index == ShellTab.pair),
+                    const SettingsScreen(embedded: true),
+                  ],
+                ),
+                // In-app heads-up for messages that land while the app is open and
+                // you're not in that chat (so busy users aren't blind to them).
+                const Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: _MessageBannerHost(),
+                ),
               ],
             ),
           ),
@@ -150,6 +189,173 @@ class _ShellScope extends InheritedWidget {
 
   @override
   bool updateShouldNotify(_ShellScope old) => navigator != old.navigator;
+}
+
+/// Top heads-up banner for messages arriving while the app is open. Listens to
+/// [AppState.messageAlert] (which only fires for a real user message landing in a
+/// chat you aren't currently viewing), slides a compact card in from the top,
+/// auto-dismisses after a few seconds, and deep-links into the chat on tap.
+class _MessageBannerHost extends StatefulWidget {
+  const _MessageBannerHost();
+
+  @override
+  State<_MessageBannerHost> createState() => _MessageBannerHostState();
+}
+
+class _MessageBannerHostState extends State<_MessageBannerHost>
+    with SingleTickerProviderStateMixin {
+  final AppState _appState = AppState();
+  late final AnimationController _anim = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 260),
+  );
+  InAppMessageAlert? _displayed; // kept during the slide-out after clearing
+  int? _shownSeq;
+  Timer? _dismissTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _appState.messageAlert.addListener(_onAlert);
+  }
+
+  void _onAlert() {
+    final alert = _appState.messageAlert.value;
+    if (alert == null) {
+      _slideOut();
+      return;
+    }
+    if (alert.seq == _shownSeq) return; // already showing this one
+    setState(() {
+      _displayed = alert;
+      _shownSeq = alert.seq;
+    });
+    _anim.forward();
+    _dismissTimer?.cancel();
+    _dismissTimer = Timer(const Duration(seconds: 4), () {
+      _appState.messageAlert.value = null; // → _onAlert → _slideOut
+    });
+  }
+
+  void _slideOut() {
+    _dismissTimer?.cancel();
+    if (_anim.status == AnimationStatus.dismissed) return;
+    _anim.reverse().then((_) {
+      if (mounted) setState(() => _displayed = null);
+    });
+  }
+
+  void _open(Contact c) {
+    _dismissTimer?.cancel();
+    _appState.messageAlert.value = null;
+    _appState.selectContact(c);
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) =>
+            c.isGroup ? const GroupChatScreen() : const ChatScreen(),
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _appState.messageAlert.removeListener(_onAlert);
+    _dismissTimer?.cancel();
+    _anim.dispose();
+    super.dispose();
+  }
+
+  String _avatarHex(Contact c) {
+    if (c.isGroup && c.groupIconHex != null && c.groupIconHex!.isNotEmpty) {
+      return c.groupIconHex!;
+    }
+    if (c.profileImageB64 != null && c.profileImageB64!.isNotEmpty) {
+      return c.profileImageB64!;
+    }
+    return PixelArtAvatar.generateIdenticon(c.keyHash);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final displayed = _displayed;
+    if (displayed == null) return const SizedBox.shrink();
+    final t = context.wk;
+    final l10n = AppLocalizations.of(context)!;
+    final c = displayed.contact;
+
+    return AnimatedBuilder(
+      animation: _anim,
+      builder: (context, child) {
+        final v = Curves.easeOutCubic.transform(_anim.value);
+        return Opacity(
+          opacity: v,
+          child: Transform.translate(
+            offset: Offset(0, -16 * (1 - v)),
+            child: child,
+          ),
+        );
+      },
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+        child: Dismissible(
+          key: ValueKey('msg_banner_${displayed.seq}'),
+          direction: DismissDirection.up,
+          onDismissed: (_) => _appState.messageAlert.value = null,
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(t.radiusCard),
+              onTap: () => _open(c),
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: t.surface,
+                  borderRadius: BorderRadius.circular(t.radiusCard),
+                  border: Border.all(color: t.action, width: t.borderWidth),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.25),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    PixelArtAvatar(hexString: _avatarHex(c), size: 38),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            c.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: t.body.copyWith(fontWeight: FontWeight.w600),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            l10n.notificationNewMessageBody,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: t.bodySecondary,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Icon(Icons.chevron_right, color: t.textTertiary, size: 20),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _NukedView extends StatelessWidget {

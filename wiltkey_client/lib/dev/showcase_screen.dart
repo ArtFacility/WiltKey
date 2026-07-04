@@ -37,6 +37,11 @@ class _ShowcaseScreenState extends State<ShowcaseScreen> {
   double _progress = 0.4;
   SyncVisualState _pairState = SyncVisualState.connecting;
 
+  // Voice scrubber state.
+  double _voiceProgress = 0.35;
+  bool _voicePlaying = false;
+  int _voiceSeed = 7;
+
   void _addBlip({
     required double strength,
     bool isWiltkey = false,
@@ -92,6 +97,8 @@ class _ShowcaseScreenState extends State<ShowcaseScreen> {
                 _nukeSection(context),
                 const SizedBox(height: 16),
                 _pairingProgressSection(context),
+                const SizedBox(height: 16),
+                _voiceScrubberSection(context),
                 const SizedBox(height: 32),
               ],
             ),
@@ -413,6 +420,49 @@ class _ShowcaseScreenState extends State<ShowcaseScreen> {
           'progress',
           _progress,
           (v) => setState(() => _progress = v),
+        ),
+      ],
+    );
+  }
+
+  Widget _voiceScrubberSection(BuildContext context) {
+    final t = context.wk;
+    return _card(
+      context,
+      'Voice scrubber  ·  voiceScrubber',
+      'The inline voice-note progress track. Cyberpunk lights up a soundwave, '
+          'garden greens a vine and reveals its leaves, paperink unrolls a '
+          'handscroll. Tap/drag the track itself to seek; isPlaying runs the '
+          'idle motion (shimmer / leaf sway / roller turn).',
+      [
+        context.wkc.voiceScrubber(
+          progress: _voiceProgress,
+          isPlaying: _voicePlaying,
+          seed: _voiceSeed,
+          onSeek: (f) => setState(() => _voiceProgress = f),
+        ),
+        const SizedBox(height: 8),
+        _labelledSlider(
+          context,
+          'progress',
+          _voiceProgress,
+          (v) => setState(() => _voiceProgress = v),
+        ),
+        Row(
+          children: [
+            Text('isPlaying', style: t.body),
+            const Spacer(),
+            _miniBtn(
+              context,
+              'Reseed',
+              () => setState(() => _voiceSeed = _rng.nextInt(1 << 31)),
+            ),
+            const SizedBox(width: 8),
+            Switch(
+              value: _voicePlaying,
+              onChanged: (v) => setState(() => _voicePlaying = v),
+            ),
+          ],
         ),
       ],
     );

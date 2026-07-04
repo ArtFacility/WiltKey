@@ -42,7 +42,12 @@ func (c *Client) handleSendMessage(msg WSMessage) {
 		if err != nil {
 			log.Printf("[Relay Error] Failed to queue offline message for %s in Redis: %v", msg.RecipientID, err)
 			c.SendJSON(WSMessage{Type: "ERROR", Message: "Failed to queue message offline"})
+			return
 		}
+		// Recipient is offline: if they run the Play flavor and registered an FCM
+		// token, fire a content-free wake-up ping so their app surfaces the alert
+		// without holding a background socket. Best-effort, off the critical path.
+		go c.hub.sendWakePush(msg.RecipientID, c.id, msg.ContentType)
 	}
 }
 

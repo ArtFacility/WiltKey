@@ -440,6 +440,71 @@ void main() {
     expect(done, isTrue);
   });
 
+  // The voice scrubber is an inline, continuously-driven, interactive widget:
+  // it must build in every theme, seek on tap, keep animating while playing,
+  // and stay fully static (settleable) under reduce-motion.
+  testWidgets('voiceScrubber renders, seeks, and honours reduce-motion', (
+    tester,
+  ) async {
+    const scrubKey = Key('voice-scrub');
+    for (final theme in [
+      buildCyberpunkTheme(),
+      buildGardenTheme(),
+      buildPaperinkTheme(),
+    ]) {
+      double? seeked;
+      Widget host({required bool reduceMotion, required bool isPlaying}) =>
+          MaterialApp(
+            theme: theme,
+            home: MediaQuery(
+              data: MediaQueryData(disableAnimations: reduceMotion),
+              child: Scaffold(
+                body: Center(
+                  child: SizedBox(
+                    width: 200,
+                    child: Builder(
+                      builder: (context) => KeyedSubtree(
+                        key: scrubKey,
+                        child: context.wkc.voiceScrubber(
+                          progress: 0.5,
+                          isPlaying: isPlaying,
+                          seed: 42,
+                          onSeek: (f) => seeked = f,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+
+      // Paused: no idle animation — must settle cleanly.
+      await tester.pumpWidget(host(reduceMotion: false, isPlaying: false));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+
+      // Tap the middle of the track → seeks to ~0.5.
+      await tester.tap(find.byKey(scrubKey));
+      expect(seeked, isNotNull);
+      expect(seeked!, closeTo(0.5, 0.1));
+
+      // Playing with motion: the idle ticker runs without throwing…
+      await tester.pumpWidget(host(reduceMotion: false, isPlaying: true));
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(tester.takeException(), isNull);
+      // …and is disposed when playback stops, so the tree settles again.
+      await tester.pumpWidget(host(reduceMotion: false, isPlaying: false));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+
+      // Reduce-motion while playing: static split only — must settle.
+      await tester.pumpWidget(host(reduceMotion: true, isPlaying: true));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    }
+  });
+
   testWidgets('nukeOverlay animates and calls onDone in both themes', (
     tester,
   ) async {

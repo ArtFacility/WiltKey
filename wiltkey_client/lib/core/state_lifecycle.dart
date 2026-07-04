@@ -50,6 +50,9 @@ extension AppStateLifecycle on AppState {
 
   Future<void> triggerNuke() async {
     status = AppStatus.nuked;
+    // Play flavor: drop our FCM token from the relay first (needs the identity key,
+    // which the nuke is about to wipe) so a dead identity can't be pinged.
+    await unregisterPushToken();
     // Send NUKE_RECIPIENT command to all contacts to vaporize their side
     for (var contact in contacts) {
       WebSocketClient().sendWSMessage({

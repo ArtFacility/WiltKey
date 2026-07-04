@@ -414,6 +414,24 @@ abstract class AppLocalizations {
   /// **'Profile'**
   String get settingsTabProfile;
 
+  /// No description provided for @settingsTabSecurity.
+  ///
+  /// In en, this message translates to:
+  /// **'Security'**
+  String get settingsTabSecurity;
+
+  /// No description provided for @settingsSecuritySectionAccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Access & unlock'**
+  String get settingsSecuritySectionAccess;
+
+  /// No description provided for @settingsSecuritySectionDanger.
+  ///
+  /// In en, this message translates to:
+  /// **'Danger zone'**
+  String get settingsSecuritySectionDanger;
+
   /// No description provided for @settingsTabNetwork.
   ///
   /// In en, this message translates to:
@@ -551,6 +569,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Change PIN'**
   String get settingsChangePinTitle;
+
+  /// No description provided for @changePinVerifyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Verify current PIN'**
+  String get changePinVerifyTitle;
+
+  /// No description provided for @changePinVerifyPrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your current PIN to continue.'**
+  String get changePinVerifyPrompt;
+
+  /// No description provided for @changePinSetTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Set new PIN'**
+  String get changePinSetTitle;
 
   /// No description provided for @settingsChangePinOldPin.
   ///
@@ -759,7 +795,7 @@ abstract class AppLocalizations {
   /// No description provided for @notificationModeLowPowerDesc.
   ///
   /// In en, this message translates to:
-  /// **'Checks for new messages about every 10 minutes. Easy on the battery.'**
+  /// **'Periodically checks for new messages in the background — quickly right after you close the app, then less often to save battery. No constant connection, so alerts can be delayed.'**
   String get notificationModeLowPowerDesc;
 
   /// No description provided for @notificationModeInstant.
@@ -771,7 +807,7 @@ abstract class AppLocalizations {
   /// No description provided for @notificationModeInstantDesc.
   ///
   /// In en, this message translates to:
-  /// **'Keeps a secure link active in the background for instant alerts. Shows an ongoing notification and uses more battery.'**
+  /// **'Optional. Keeps an end-to-end-encrypted connection open in the background to sync your incoming messages in real time, shown by an ongoing notification. Wiltkey uses this instead of Google or Apple push services for privacy, so it works even without Google Play Services — at the cost of more battery.'**
   String get notificationModeInstantDesc;
 
   /// No description provided for @notificationNewMessageBody.
@@ -783,8 +819,56 @@ abstract class AppLocalizations {
   /// No description provided for @notificationSecureLinkActive.
   ///
   /// In en, this message translates to:
-  /// **'Secure link active'**
+  /// **'Syncing secure messages'**
   String get notificationSecureLinkActive;
+
+  /// No description provided for @onboardingNotificationsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Alerts'**
+  String get onboardingNotificationsTitle;
+
+  /// No description provided for @onboardingNotificationsExplanation.
+  ///
+  /// In en, this message translates to:
+  /// **'Wiltkey doesn\'t use Google or Apple push notifications — nothing about your messages ever touches their servers. Choose how you\'d like to be alerted. You can change this any time in Settings.'**
+  String get onboardingNotificationsExplanation;
+
+  /// No description provided for @onboardingFactPushTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'NO PUSH SERVERS'**
+  String get onboardingFactPushTitle;
+
+  /// No description provided for @onboardingFactPushBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Normal apps route your notifications through Google or Apple, revealing who messages you and when. Wiltkey never does — the default is no background checks at all, and any alerting runs entirely on your device.'**
+  String get onboardingFactPushBody;
+
+  /// No description provided for @notificationModeInstantDescFcm.
+  ///
+  /// In en, this message translates to:
+  /// **'Optional. Uses Google\'s push service as a lightweight wake-up so new messages arrive in real time. Only a content-free ping goes through Google — never your messages, which stay end-to-end encrypted on the relay until your device fetches them. Lighter on battery than a constant connection.'**
+  String get notificationModeInstantDescFcm;
+
+  /// No description provided for @onboardingNotificationsExplanationFcm.
+  ///
+  /// In en, this message translates to:
+  /// **'For real-time alerts, this build uses Google\'s push service purely as a wake-up signal — a content-free ping, never your messages, which never touch Google\'s servers. Choose how you\'d like to be alerted; you can change this any time in Settings.'**
+  String get onboardingNotificationsExplanationFcm;
+
+  /// No description provided for @onboardingFactPushTitleFcm.
+  ///
+  /// In en, this message translates to:
+  /// **'CONTENT-FREE PUSH'**
+  String get onboardingFactPushTitleFcm;
+
+  /// No description provided for @onboardingFactPushBodyFcm.
+  ///
+  /// In en, this message translates to:
+  /// **'Normal apps route your notification content through Google, revealing what\'s sent and when. This build uses Google only as a content-free wake-up ping — no message data, no readable metadata — and everything stays encrypted end to end.'**
+  String get onboardingFactPushBodyFcm;
 
   /// No description provided for @chatsLockedSubtitle.
   ///
@@ -1589,6 +1673,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Voice messages are coming soon.'**
   String get chatVoiceComingSoon;
+
+  /// No description provided for @chatVoiceHoldHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Hold to record a voice message.'**
+  String get chatVoiceHoldHint;
+
+  /// No description provided for @chatVoiceReleaseCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Release to cancel'**
+  String get chatVoiceReleaseCancel;
+
+  /// No description provided for @chatVoicePermissionDenied.
+  ///
+  /// In en, this message translates to:
+  /// **'Microphone permission is needed to record voice messages.'**
+  String get chatVoicePermissionDenied;
+
+  /// No description provided for @chatVoiceQualityLofi.
+  ///
+  /// In en, this message translates to:
+  /// **'Lo-fi'**
+  String get chatVoiceQualityLofi;
+
+  /// No description provided for @chatVoiceQualityVoice.
+  ///
+  /// In en, this message translates to:
+  /// **'Voice'**
+  String get chatVoiceQualityVoice;
+
+  /// No description provided for @chatVoiceQualityClear.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear'**
+  String get chatVoiceQualityClear;
+
+  /// No description provided for @chatVoiceUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Voice note unavailable'**
+  String get chatVoiceUnavailable;
+
+  /// No description provided for @chatVoiceTooLargeSnackBar.
+  ///
+  /// In en, this message translates to:
+  /// **'Voice note too large ({cost}) for remaining space ({charge}).'**
+  String chatVoiceTooLargeSnackBar(String cost, String charge);
 
   /// No description provided for @chatDetailsDeleteConfirmTitle.
   ///

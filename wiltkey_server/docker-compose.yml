@@ -9,6 +9,14 @@ services:
     environment:
       - PORT=8000
       - REDIS_ADDR=redis:6379
+      # FCM wake-up push (Play flavor). Points at the mounted service-account
+      # JSON below. Leave the file absent + this unset to run push-disabled.
+      - FCM_CREDENTIALS_FILE=/app/fcm-service-account.json
+    volumes:
+      # Firebase service-account key (secret, gitignored). Download it from
+      # Firebase Console → Project settings → Service accounts → Generate new
+      # private key, and save it here as fcm-service-account.json. Read-only.
+      - ./fcm-service-account.json:/app/fcm-service-account.json:ro
     depends_on:
       - redis
     restart: unless-stopped

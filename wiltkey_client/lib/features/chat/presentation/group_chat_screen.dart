@@ -17,6 +17,8 @@ import 'widgets/compression_dialog.dart';
 import 'widgets/emoji_autocomplete_bar.dart';
 import 'widgets/emoji_picker_panel.dart';
 import 'widgets/debug_console_sheet.dart';
+import 'widgets/voice_recording_mixin.dart';
+import 'widgets/voice_message_player.dart';
 import '../../groups/presentation/group_settings_screen.dart';
 import '../../groups/presentation/group_invite_screen.dart';
 
@@ -28,8 +30,34 @@ class GroupChatScreen extends StatefulWidget {
 }
 
 class _GroupChatScreenState extends State<GroupChatScreen>
-    with TickerProviderStateMixin, WidgetsBindingObserver {
+    with TickerProviderStateMixin, WidgetsBindingObserver, VoiceRecordingMixin {
   final AppState _appState = AppState();
+
+  // Chat opened with — releases [AppState.visibleChatId] on dispose only if a
+  // newer chat hasn't taken over.
+  String? _openChatId;
+
+  // Voice recording (hold-to-record mic + quality chip + HUD) lives in
+  // VoiceRecordingMixin; this screen just wires the hooks below.
+  @override
+  Contact? get voiceContact => _appState.activeContact;
+
+  @override
+  Future<String?> sendVoiceMessage(String base64Payload, String mimeType) =>
+      _appState.sendGroupMessage(base64Payload, contentType: 'voice');
+
+  @override
+  void onVoiceError(String message) => _errorSnack(message);
+
+  @override
+  void onVoiceSent() => _scrollToBottom();
+
+  @override
+  void onVoiceRecordingStarted() {
+    _hideEmoji();
+    _inputFocus.unfocus();
+  }
+
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final FocusNode _inputFocus = FocusNode();
@@ -55,6 +83,8 @@ class _GroupChatScreenState extends State<GroupChatScreen>
 
     final contact = _appState.activeContact;
     if (contact != null) {
+      _openChatId = contact.id;
+      _appState.visibleChatId = contact.id; // now on screen → mute its own alerts
       _appState.loadInitialMessages(contact).then((_) async {
         if (!mounted) return;
         // Await decryption (it fills text heights) BEFORE pinning, then re-pin
@@ -68,6 +98,8 @@ class _GroupChatScreenState extends State<GroupChatScreen>
         _warmEmojis(contact.keyHash);
       }
     }
+
+    initVoiceRecording();
   }
 
   @override
@@ -75,6 +107,7 @@ class _GroupChatScreenState extends State<GroupChatScreen>
     WidgetsBinding.instance.removeObserver(this);
     final c = _appState.activeContact;
     if (c != null) _appState.markChatRead(c);
+    if (_appState.visibleChatId == _openChatId) _appState.visibleChatId = null;
     _sendBloom.dispose();
     _appState.removeListener(_updateState);
     _inputFocus.dispose();
@@ -82,6 +115,7 @@ class _GroupChatScreenState extends State<GroupChatScreen>
     _scrollController.removeListener(_scrollListener);
     _messageController.dispose();
     _scrollController.dispose();
+    disposeVoiceRecording();
     super.dispose();
   }
 
@@ -259,13 +293,6 @@ class _GroupChatScreenState extends State<GroupChatScreen>
     if (_showEmoji) setState(() => _showEmoji = false);
   }
 
-  void _onMicTap() {
-    final l10n = AppLocalizations.of(context)!;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(l10n.chatVoiceComingSoon)));
-  }
-
   void _handleSend() async {
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
@@ -425,487 +452,506 @@ class _GroupChatScreenState extends State<GroupChatScreen>
             appBar: AppBar(
               backgroundColor: t.bg,
               elevation: 0,
-            titleSpacing: 8,
-            title: Row(
-              children: [
-                GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () => _openGroupDetails(contact),
-                  child: Row(
-                    children: [
-                      PixelArtAvatar(
-                        hexString:
-                            (contact.groupIconHex != null &&
-                                contact.groupIconHex!.isNotEmpty)
-                            ? contact.groupIconHex!
-                            : PixelArtAvatar.generateIdenticon(contact.keyHash),
-                        size: 34,
-                      ),
-                      const SizedBox(width: 10),
-                    ],
-                  ),
-                ),
-                Expanded(
-                  child: GestureDetector(
+              titleSpacing: 8,
+              title: Row(
+                children: [
+                  GestureDetector(
                     behavior: HitTestBehavior.opaque,
                     onTap: () => _openGroupDetails(contact),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
+                    child: Row(
                       children: [
-                        Text(
-                          contact.name,
-                          style: t.body.copyWith(fontWeight: FontWeight.w600),
-                          overflow: TextOverflow.ellipsis,
+                        PixelArtAvatar(
+                          hexString:
+                              (contact.groupIconHex != null &&
+                                  contact.groupIconHex!.isNotEmpty)
+                              ? contact.groupIconHex!
+                              : PixelArtAvatar.generateIdenticon(
+                                  contact.keyHash,
+                                ),
+                          size: 34,
                         ),
-                        Text(
-                          l10n.groupTapForDetails(contact.hostName ?? ''),
-                          style: t.dataMono.copyWith(
-                            fontSize: 9,
-                            color: t.textTertiary,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                        const SizedBox(width: 10),
                       ],
                     ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                context.wkc.budgetIndicator(
-                  ourFraction: currentPercent,
-                  isWilted: isWilted,
-                  variant: BudgetIndicatorVariant.chatHeader,
-                  semanticLabel: l10n.chatRemainingLabel(
-                    AppState.formatBytes(remainingBytesNow),
+                  Expanded(
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => _openGroupDetails(contact),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            contact.name,
+                            style: t.body.copyWith(fontWeight: FontWeight.w600),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Text(
+                            l10n.groupTapForDetails(contact.hostName ?? ''),
+                            style: t.dataMono.copyWith(
+                              fontSize: 9,
+                              color: t.textTertiary,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
+                  const SizedBox(width: 8),
+                  context.wkc.budgetIndicator(
+                    ourFraction: currentPercent,
+                    isWilted: isWilted,
+                    variant: BudgetIndicatorVariant.chatHeader,
+                    semanticLabel: l10n.chatRemainingLabel(
+                      AppState.formatBytes(remainingBytesNow),
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                if (_appState.showDebugButtons)
+                  IconButton(
+                    icon: Icon(
+                      Icons.terminal_outlined,
+                      color: t.action,
+                      size: 20,
+                    ),
+                    tooltip: 'Debug console',
+                    onPressed: () => DebugConsoleSheet.show(context, _appState),
+                  ),
+                IconButton(
+                  icon: Icon(Icons.hub_outlined, color: t.identity, size: 20),
+                  tooltip: 'Group members',
+                  onPressed: () => _showMembersSheet(contact),
                 ),
               ],
-            ),
-            actions: [
-              if (_appState.showDebugButtons)
-                IconButton(
-                  icon: Icon(
-                    Icons.terminal_outlined,
-                    color: t.action,
-                    size: 20,
+              bottom: PreferredSize(
+                preferredSize: const Size.fromHeight(22),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16.0,
+                    vertical: 2.0,
                   ),
-                  tooltip: 'Debug console',
-                  onPressed: () => DebugConsoleSheet.show(context, _appState),
-                ),
-              IconButton(
-                icon: Icon(Icons.hub_outlined, color: t.identity, size: 20),
-                tooltip: 'Group members',
-                onPressed: () => _showMembersSheet(contact),
-              ),
-            ],
-            bottom: PreferredSize(
-              preferredSize: const Size.fromHeight(22),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16.0,
-                  vertical: 2.0,
-                ),
-                child: GestureDetector(
-                  onTap: () => _showMembersSheet(contact),
-                  behavior: HitTestBehavior.opaque,
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: memberList.isNotEmpty
-                            ? context.wkc.groupBudgetIndicator(
-                                members: _memberBudgets(shownHeaderMembers),
-                                emptySlots: 0,
-                              )
-                            : context.wkc.budgetIndicator(
-                                ourFraction: currentPercent,
-                                isWilted: isWilted,
-                                variant: BudgetIndicatorVariant.detail,
-                              ),
-                      ),
-                      if (hiddenHeaderMembers > 0) ...[
-                        const SizedBox(width: 8),
+                  child: GestureDetector(
+                    onTap: () => _showMembersSheet(contact),
+                    behavior: HitTestBehavior.opaque,
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: memberList.isNotEmpty
+                              ? context.wkc.groupBudgetIndicator(
+                                  members: _memberBudgets(shownHeaderMembers),
+                                  emptySlots: 0,
+                                )
+                              : context.wkc.budgetIndicator(
+                                  ourFraction: currentPercent,
+                                  isWilted: isWilted,
+                                  variant: BudgetIndicatorVariant.detail,
+                                ),
+                        ),
+                        if (hiddenHeaderMembers > 0) ...[
+                          const SizedBox(width: 8),
+                          Text(
+                            '+$hiddenHeaderMembers',
+                            style: t.dataMono.copyWith(
+                              color: t.textTertiary,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                        const SizedBox(width: 12),
                         Text(
-                          '+$hiddenHeaderMembers',
+                          AppState.formatBytes(remainingBytesNow),
                           style: t.dataMono.copyWith(
-                            color: t.textTertiary,
+                            color: isWilted ? t.budgetWilted : t.positive,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                       ],
-                      const SizedBox(width: 12),
-                      Text(
-                        AppState.formatBytes(remainingBytesNow),
-                        style: t.dataMono.copyWith(
-                          color: isWilted ? t.budgetWilted : t.positive,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-          body: Container(
-            color: t.bg,
-            child: Column(
-              children: [
-                if (isWilted)
-                  Container(
-                    width: double.infinity,
-                    color: t.budgetWilted.withValues(alpha: 0.12),
-                    padding: const EdgeInsets.symmetric(
-                      vertical: 8,
-                      horizontal: 16,
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.lock_clock, color: t.budgetWilted, size: 16),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            t.uppercaseLabels
-                                ? l10n.chatLockedLabel.toUpperCase()
-                                : l10n.chatLockedLabel,
-                            style: t.badgeLabel.copyWith(color: t.budgetWilted),
+            body: Container(
+              color: t.bg,
+              child: Column(
+                children: [
+                  if (isWilted)
+                    Container(
+                      width: double.infinity,
+                      color: t.budgetWilted.withValues(alpha: 0.12),
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 8,
+                        horizontal: 16,
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.lock_clock,
+                            color: t.budgetWilted,
+                            size: 16,
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                Expanded(
-                  child: ListView.builder(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 16,
-                    ),
-                    itemCount: messageList.length,
-                    itemBuilder: (context, index) {
-                      final message = messageList[index];
-                      final isMe = message.isSentByMe;
-                      final String displayText =
-                          message.decryptedText ?? message.text;
-
-                      if (message.contentType == 'refill_request') {
-                        return _buildRefillRequest(
-                          t,
-                          contact,
-                          message,
-                          displayText,
-                        );
-                      }
-
-                      final bool isSystem = message.senderId == 'system';
-                      if (isSystem) {
-                        return Center(
-                          child: Container(
-                            margin: const EdgeInsets.only(bottom: 16, top: 4),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: t.action.withValues(alpha: 0.07),
-                              border: Border.all(
-                                color: t.action.withValues(alpha: 0.25),
-                                width: 1,
-                              ),
-                              borderRadius: BorderRadius.circular(t.radiusPill),
-                            ),
+                          const SizedBox(width: 8),
+                          Expanded(
                             child: Text(
                               t.uppercaseLabels
-                                  ? displayText.toUpperCase()
-                                  : displayText,
-                              style: t.dataMono.copyWith(
-                                color: t.action,
-                                letterSpacing: 0.6,
+                                  ? l10n.chatLockedLabel.toUpperCase()
+                                  : l10n.chatLockedLabel,
+                              style: t.badgeLabel.copyWith(
+                                color: t.budgetWilted,
                               ),
                             ),
                           ),
-                        );
-                      }
+                        ],
+                      ),
+                    ),
 
-                      final bool isFirstInBatch =
-                          (index == 0) ||
-                          (messageList[index - 1].senderId !=
-                              message.senderId) ||
-                          messageList[index - 1].senderId == 'system';
+                  Expanded(
+                    child: ListView.builder(
+                      controller: _scrollController,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 16,
+                      ),
+                      itemCount: messageList.length,
+                      itemBuilder: (context, index) {
+                        final message = messageList[index];
+                        final isMe = message.isSentByMe;
+                        final String displayText =
+                            message.decryptedText ?? message.text;
 
-                      Contact? memberContact;
-                      for (final c in _appState.contacts) {
-                        if (c.keyHash == message.senderId) {
-                          memberContact = c;
-                          break;
+                        if (message.contentType == 'refill_request') {
+                          return _buildRefillRequest(
+                            t,
+                            contact,
+                            message,
+                            displayText,
+                          );
                         }
-                      }
 
-                      final groupProfiles =
-                          _appState.groupProfilesCache[contact.id];
-                      final memberProfile = groupProfiles?[message.senderId];
-
-                      final String senderName = isMe
-                          ? (_appState.deviceName.isNotEmpty
-                                ? _appState.deviceName
-                                : 'You')
-                          : (memberProfile != null
-                                ? memberProfile['name'] ?? ''
-                                : (memberContact != null
-                                      ? memberContact.name
-                                      : 'Member ${message.senderId.substring(0, min(6, message.senderId.length))}'));
-
-                      final String avatarHex = isMe
-                          ? (_appState.profileImageB64.isNotEmpty
-                                ? _appState.profileImageB64
-                                : PixelArtAvatar.generateIdenticon(
-                                    _appState.userId,
-                                  ))
-                          : (memberProfile != null &&
-                                    memberProfile['profile_image'] != null &&
-                                    memberProfile['profile_image']!.isNotEmpty
-                                ? memberProfile['profile_image']!
-                                : (memberContact != null &&
-                                          memberContact.profileImageB64 !=
-                                              null &&
-                                          memberContact
-                                              .profileImageB64!
-                                              .isNotEmpty
-                                      ? memberContact.profileImageB64!
-                                      : PixelArtAvatar.generateIdenticon(
-                                          message.senderId,
-                                        )));
-
-                      // Self uses the action accent; the host uses the identity
-                      // accent; every other member gets their own stable colour
-                      // (the same one as their flower/bar slice) so messages are
-                      // easy to tell apart.
-                      final bool isSenderHost =
-                          !isMe &&
-                          contact.hostKeyHash != null &&
-                          message.senderId == contact.hostKeyHash;
-                      final Color memberColor = isMe
-                          ? t.action
-                          : (isSenderHost
-                                ? t.identity
-                                : memberPaletteColor(message.senderId));
-                      final Color borderColor = isMe
-                          ? t.bubbleMeBorder
-                          : memberColor.withValues(alpha: 0.45);
-                      // Tint each member's bubble fill toward their own colour
-                      // (subtle), so senders are distinguishable at a glance.
-                      // Blending into [bubbleThem] keeps it theme-appropriate:
-                      // it darkens on dark themes, brightens on the light one.
-                      final Color bgColor = isMe
-                          ? t.bubbleMe
-                          : Color.lerp(t.bubbleThem, memberColor, 0.14)!;
-                      final Color nameColor = memberColor;
-
-                      final Widget bubble = Container(
-                        margin: EdgeInsets.only(
-                          bottom: isFirstInBatch ? 12 : 4,
-                        ),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 10,
-                        ),
-                        constraints: BoxConstraints(
-                          maxWidth: MediaQuery.of(context).size.width * 0.75,
-                        ),
-                        decoration: BoxDecoration(
-                          color: bgColor,
-                          border: Border.all(
-                            color: borderColor,
-                            width: t.borderWidth,
-                          ),
-                          borderRadius: BorderRadius.only(
-                            topLeft: Radius.circular(t.radiusCard),
-                            topRight: Radius.circular(t.radiusCard),
-                            bottomLeft: isMe
-                                ? Radius.circular(t.radiusCard)
-                                : const Radius.circular(6),
-                            bottomRight: isMe
-                                ? const Radius.circular(6)
-                                : Radius.circular(t.radiusCard),
-                          ),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildGroupContent(
-                              t,
-                              message,
-                              displayText,
-                              emojiMap,
-                              isMe,
+                        final bool isSystem = message.senderId == 'system';
+                        if (isSystem) {
+                          return Center(
+                            child: Container(
+                              margin: const EdgeInsets.only(bottom: 16, top: 4),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: t.action.withValues(alpha: 0.07),
+                                border: Border.all(
+                                  color: t.action.withValues(alpha: 0.25),
+                                  width: 1,
+                                ),
+                                borderRadius: BorderRadius.circular(
+                                  t.radiusPill,
+                                ),
+                              ),
+                              child: Text(
+                                t.uppercaseLabels
+                                    ? displayText.toUpperCase()
+                                    : displayText,
+                                style: t.dataMono.copyWith(
+                                  color: t.action,
+                                  letterSpacing: 0.6,
+                                ),
+                              ),
                             ),
-                            const SizedBox(height: 4),
-                            message.isPending
-                                ? Row(
-                                    mainAxisAlignment: MainAxisAlignment.end,
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      SizedBox(
-                                        width: 8,
-                                        height: 8,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 1.3,
-                                          valueColor:
-                                              AlwaysStoppedAnimation<Color>(
-                                                isMe
-                                                    ? t.bubbleMeText.withValues(
-                                                        alpha: 0.6,
-                                                      )
-                                                    : t.textTertiary,
-                                              ),
+                          );
+                        }
+
+                        final bool isFirstInBatch =
+                            (index == 0) ||
+                            (messageList[index - 1].senderId !=
+                                message.senderId) ||
+                            messageList[index - 1].senderId == 'system';
+
+                        Contact? memberContact;
+                        for (final c in _appState.contacts) {
+                          if (c.keyHash == message.senderId) {
+                            memberContact = c;
+                            break;
+                          }
+                        }
+
+                        final groupProfiles =
+                            _appState.groupProfilesCache[contact.id];
+                        final memberProfile = groupProfiles?[message.senderId];
+
+                        final String senderName = isMe
+                            ? (_appState.deviceName.isNotEmpty
+                                  ? _appState.deviceName
+                                  : 'You')
+                            : (memberProfile != null
+                                  ? memberProfile['name'] ?? ''
+                                  : (memberContact != null
+                                        ? memberContact.name
+                                        : 'Member ${message.senderId.substring(0, min(6, message.senderId.length))}'));
+
+                        final String avatarHex = isMe
+                            ? (_appState.profileImageB64.isNotEmpty
+                                  ? _appState.profileImageB64
+                                  : PixelArtAvatar.generateIdenticon(
+                                      _appState.userId,
+                                    ))
+                            : (memberProfile != null &&
+                                      memberProfile['profile_image'] != null &&
+                                      memberProfile['profile_image']!.isNotEmpty
+                                  ? memberProfile['profile_image']!
+                                  : (memberContact != null &&
+                                            memberContact.profileImageB64 !=
+                                                null &&
+                                            memberContact
+                                                .profileImageB64!
+                                                .isNotEmpty
+                                        ? memberContact.profileImageB64!
+                                        : PixelArtAvatar.generateIdenticon(
+                                            message.senderId,
+                                          )));
+
+                        // Self uses the action accent; the host uses the identity
+                        // accent; every other member gets their own stable colour
+                        // (the same one as their flower/bar slice) so messages are
+                        // easy to tell apart.
+                        final bool isSenderHost =
+                            !isMe &&
+                            contact.hostKeyHash != null &&
+                            message.senderId == contact.hostKeyHash;
+                        final Color memberColor = isMe
+                            ? t.action
+                            : (isSenderHost
+                                  ? t.identity
+                                  : memberPaletteColor(message.senderId));
+                        final Color borderColor = isMe
+                            ? t.bubbleMeBorder
+                            : memberColor.withValues(alpha: 0.45);
+                        // Tint each member's bubble fill toward their own colour
+                        // (subtle), so senders are distinguishable at a glance.
+                        // Blending into [bubbleThem] keeps it theme-appropriate:
+                        // it darkens on dark themes, brightens on the light one.
+                        final Color bgColor = isMe
+                            ? t.bubbleMe
+                            : Color.lerp(t.bubbleThem, memberColor, 0.14)!;
+                        final Color nameColor = memberColor;
+
+                        final Widget bubble = Container(
+                          margin: EdgeInsets.only(
+                            bottom: isFirstInBatch ? 12 : 4,
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 10,
+                          ),
+                          constraints: BoxConstraints(
+                            maxWidth: MediaQuery.of(context).size.width * 0.75,
+                          ),
+                          decoration: BoxDecoration(
+                            color: bgColor,
+                            border: Border.all(
+                              color: borderColor,
+                              width: t.borderWidth,
+                            ),
+                            borderRadius: BorderRadius.only(
+                              topLeft: Radius.circular(t.radiusCard),
+                              topRight: Radius.circular(t.radiusCard),
+                              bottomLeft: isMe
+                                  ? Radius.circular(t.radiusCard)
+                                  : const Radius.circular(6),
+                              bottomRight: isMe
+                                  ? const Radius.circular(6)
+                                  : Radius.circular(t.radiusCard),
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildGroupContent(
+                                t,
+                                message,
+                                displayText,
+                                emojiMap,
+                                isMe,
+                              ),
+                              const SizedBox(height: 4),
+                              message.isPending
+                                  ? Row(
+                                      mainAxisAlignment: MainAxisAlignment.end,
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        SizedBox(
+                                          width: 8,
+                                          height: 8,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 1.3,
+                                            valueColor:
+                                                AlwaysStoppedAnimation<Color>(
+                                                  isMe
+                                                      ? t.bubbleMeText
+                                                            .withValues(
+                                                              alpha: 0.6,
+                                                            )
+                                                      : t.textTertiary,
+                                                ),
+                                          ),
                                         ),
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Text(
-                                        l10n.chatEncrypting,
-                                        style: t.dataMono.copyWith(
-                                          fontSize: 9,
-                                          color: isMe
-                                              ? t.bubbleMeText.withValues(
-                                                  alpha: 0.6,
-                                                )
-                                              : t.textTertiary,
-                                        ),
-                                      ),
-                                    ],
-                                  )
-                                : Row(
-                                    mainAxisAlignment: MainAxisAlignment.end,
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Text(
-                                        '${message.timestamp.hour.toString().padLeft(2, '0')}:${message.timestamp.minute.toString().padLeft(2, '0')}',
-                                        style: t.dataMono.copyWith(
-                                          fontSize: 9,
-                                          color: isMe
-                                              ? t.bubbleMeText.withValues(
-                                                  alpha: 0.6,
-                                                )
-                                              : t.textTertiary,
-                                        ),
-                                      ),
-                                      if (isMe) ...[
-                                        const SizedBox(width: 4),
-                                        Icon(
-                                          message.isDelivered
-                                              ? Icons.done_all
-                                              : Icons.check,
-                                          color: message.isDelivered
-                                              ? t.action
-                                              : t.textTertiary,
-                                          size: 10,
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          l10n.chatEncrypting,
+                                          style: t.dataMono.copyWith(
+                                            fontSize: 9,
+                                            color: isMe
+                                                ? t.bubbleMeText.withValues(
+                                                    alpha: 0.6,
+                                                  )
+                                                : t.textTertiary,
+                                          ),
                                         ),
                                       ],
-                                    ],
-                                  ),
-                          ],
-                        ),
-                      );
-
-                      return Row(
-                        mainAxisAlignment: isMe
-                            ? MainAxisAlignment.end
-                            : MainAxisAlignment.start,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (!isMe) ...[
-                            isFirstInBatch
-                                ? PixelArtAvatar(hexString: avatarHex, size: 28)
-                                : const SizedBox(width: 28),
-                            const SizedBox(width: 8),
-                          ],
-                          Flexible(
-                            child: Column(
-                              crossAxisAlignment: isMe
-                                  ? CrossAxisAlignment.end
-                                  : CrossAxisAlignment.start,
-                              children: [
-                                if (isFirstInBatch)
-                                  Padding(
-                                    padding: EdgeInsets.only(
-                                      bottom: 4.0,
-                                      left: isMe ? 0.0 : 2.0,
-                                      right: isMe ? 2.0 : 0.0,
+                                    )
+                                  : Row(
+                                      mainAxisAlignment: MainAxisAlignment.end,
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          '${message.timestamp.hour.toString().padLeft(2, '0')}:${message.timestamp.minute.toString().padLeft(2, '0')}',
+                                          style: t.dataMono.copyWith(
+                                            fontSize: 9,
+                                            color: isMe
+                                                ? t.bubbleMeText.withValues(
+                                                    alpha: 0.6,
+                                                  )
+                                                : t.textTertiary,
+                                          ),
+                                        ),
+                                        if (isMe) ...[
+                                          const SizedBox(width: 4),
+                                          Icon(
+                                            message.isDelivered
+                                                ? Icons.done_all
+                                                : Icons.check,
+                                            color: message.isDelivered
+                                                ? t.action
+                                                : t.textTertiary,
+                                            size: 10,
+                                          ),
+                                        ],
+                                      ],
                                     ),
-                                    child: Text(
-                                      senderName,
-                                      style: t.dataMono.copyWith(
-                                        color: nameColor,
-                                        fontWeight: FontWeight.bold,
-                                        letterSpacing: 0.3,
+                            ],
+                          ),
+                        );
+
+                        return Row(
+                          mainAxisAlignment: isMe
+                              ? MainAxisAlignment.end
+                              : MainAxisAlignment.start,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (!isMe) ...[
+                              isFirstInBatch
+                                  ? PixelArtAvatar(
+                                      hexString: avatarHex,
+                                      size: 28,
+                                    )
+                                  : const SizedBox(width: 28),
+                              const SizedBox(width: 8),
+                            ],
+                            Flexible(
+                              child: Column(
+                                crossAxisAlignment: isMe
+                                    ? CrossAxisAlignment.end
+                                    : CrossAxisAlignment.start,
+                                children: [
+                                  if (isFirstInBatch)
+                                    Padding(
+                                      padding: EdgeInsets.only(
+                                        bottom: 4.0,
+                                        left: isMe ? 0.0 : 2.0,
+                                        right: isMe ? 2.0 : 0.0,
+                                      ),
+                                      child: Text(
+                                        senderName,
+                                        style: t.dataMono.copyWith(
+                                          color: nameColor,
+                                          fontWeight: FontWeight.bold,
+                                          letterSpacing: 0.3,
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                message.isPending
-                                    ? Opacity(opacity: 0.6, child: bubble)
-                                    : bubble,
-                              ],
+                                  message.isPending
+                                      ? Opacity(opacity: 0.6, child: bubble)
+                                      : bubble,
+                                ],
+                              ),
                             ),
-                          ),
-                          if (isMe) ...[
-                            const SizedBox(width: 8),
-                            isFirstInBatch
-                                ? PixelArtAvatar(hexString: avatarHex, size: 28)
-                                : const SizedBox(width: 28),
+                            if (isMe) ...[
+                              const SizedBox(width: 8),
+                              isFirstInBatch
+                                  ? PixelArtAvatar(
+                                      hexString: avatarHex,
+                                      size: 28,
+                                    )
+                                  : const SizedBox(width: 28),
+                            ],
                           ],
-                        ],
-                      );
-                    },
-                  ),
-                ),
-
-                // SafeArea keeps the composer clear of the system gesture/nav
-                // bar (it collapses to zero when the keyboard is up). Pushed
-                // chat screens have no bottomNavigationBar to absorb that inset,
-                // unlike the dashboard/settings tabs inside AppShell.
-                SafeArea(
-                  top: false,
-                  child: Container(
-                    color: t.bg,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
+                        );
+                      },
                     ),
-                    child: isWilted
-                        ? (!contact.isHost
-                              ? _buildRefillComposer(t, contact)
-                              : _buildLockedComposer(t))
-                        : _buildComposer(t, contact),
                   ),
-                ),
-              ],
+
+                  // SafeArea keeps the composer clear of the system gesture/nav
+                  // bar (it collapses to zero when the keyboard is up). Pushed
+                  // chat screens have no bottomNavigationBar to absorb that inset,
+                  // unlike the dashboard/settings tabs inside AppShell.
+                  SafeArea(
+                    top: false,
+                    child: Container(
+                      color: t.bg,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      child: isWilted
+                          ? (!contact.isHost
+                                ? _buildRefillComposer(t, contact)
+                                : _buildLockedComposer(t))
+                          : _buildComposer(t, contact),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
 
-        Positioned(
-          bottom: 90,
-          right: 16,
-          child: AnimatedOpacity(
-            opacity: _showScrollDownArrow ? 1.0 : 0.0,
-            duration: const Duration(milliseconds: 200),
-            child: _showScrollDownArrow
-                ? FloatingActionButton.small(
-                    backgroundColor: t.surface,
-                    shape: CircleBorder(
-                      side: BorderSide(color: t.action.withValues(alpha: 0.5)),
-                    ),
-                    onPressed: () {
-                      _scrollToBottom();
-                      setState(() {
-                        _showScrollDownArrow = false;
-                      });
-                    },
-                    child: Icon(Icons.arrow_downward, color: t.action),
-                  )
-                : const SizedBox(),
+          Positioned(
+            bottom: 90,
+            right: 16,
+            child: AnimatedOpacity(
+              opacity: _showScrollDownArrow ? 1.0 : 0.0,
+              duration: const Duration(milliseconds: 200),
+              child: _showScrollDownArrow
+                  ? FloatingActionButton.small(
+                      backgroundColor: t.surface,
+                      shape: CircleBorder(
+                        side: BorderSide(
+                          color: t.action.withValues(alpha: 0.5),
+                        ),
+                      ),
+                      onPressed: () {
+                        _scrollToBottom();
+                        setState(() {
+                          _showScrollDownArrow = false;
+                        });
+                      },
+                      child: Icon(Icons.arrow_downward, color: t.action),
+                    )
+                  : const SizedBox(),
+            ),
           ),
-        ),
         ],
       ),
     );
@@ -1090,57 +1136,60 @@ class _GroupChatScreenState extends State<GroupChatScreen>
         Row(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            Padding(
-              padding: const EdgeInsets.only(right: 4.0),
-              child: IconButton(
-                icon: Icon(
-                  _showEmoji
-                      ? Icons.keyboard_outlined
-                      : Icons.emoji_emotions_outlined,
-                  color: t.action,
-                  size: 22,
+            if (!isRecordingVoice)
+              Padding(
+                padding: const EdgeInsets.only(right: 4.0),
+                child: IconButton(
+                  icon: Icon(
+                    _showEmoji
+                        ? Icons.keyboard_outlined
+                        : Icons.emoji_emotions_outlined,
+                    color: t.action,
+                    size: 22,
+                  ),
+                  onPressed: _toggleEmoji,
                 ),
-                onPressed: _toggleEmoji,
               ),
-            ),
             Expanded(
-              child: TextField(
-                controller: _messageController,
-                focusNode: _inputFocus,
-                minLines: 1,
-                maxLines: 8,
-                onTap: _hideEmoji,
-                style: t.body.copyWith(fontSize: 13),
-                decoration: InputDecoration(
-                  hintText: l10n.chatMessageHint,
-                  hintStyle: t.body.copyWith(
-                    fontSize: 13,
-                    color: t.textTertiary,
-                  ),
-                  filled: true,
-                  fillColor: t.surface,
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 11,
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderSide: BorderSide(
-                      color: t.border,
-                      width: t.borderWidth,
+              child: isRecordingVoice
+                  ? buildRecordingHud(t, l10n)
+                  : TextField(
+                      controller: _messageController,
+                      focusNode: _inputFocus,
+                      minLines: 1,
+                      maxLines: 8,
+                      onTap: _hideEmoji,
+                      style: t.body.copyWith(fontSize: 13),
+                      decoration: InputDecoration(
+                        hintText: l10n.chatMessageHint,
+                        hintStyle: t.body.copyWith(
+                          fontSize: 13,
+                          color: t.textTertiary,
+                        ),
+                        filled: true,
+                        fillColor: t.surface,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 11,
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderSide: BorderSide(
+                            color: t.border,
+                            width: t.borderWidth,
+                          ),
+                          borderRadius: BorderRadius.circular(t.radiusCard),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderSide: BorderSide(
+                            color: t.action,
+                            width: t.borderWidth,
+                          ),
+                          borderRadius: BorderRadius.circular(t.radiusCard),
+                        ),
+                      ),
                     ),
-                    borderRadius: BorderRadius.circular(t.radiusCard),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderSide: BorderSide(
-                      color: t.action,
-                      width: t.borderWidth,
-                    ),
-                    borderRadius: BorderRadius.circular(t.radiusCard),
-                  ),
-                ),
-              ),
             ),
-            if (contact.imagesAllowed ?? true) ...[
+            if (!isRecordingVoice && (contact.imagesAllowed ?? true)) ...[
               const SizedBox(width: 4),
               Padding(
                 padding: const EdgeInsets.only(bottom: 4.0),
@@ -1155,35 +1204,30 @@ class _GroupChatScreenState extends State<GroupChatScreen>
               ),
             ],
             const SizedBox(width: 8),
-            Padding(
-              padding: const EdgeInsets.only(bottom: 4.0),
-              child: _charCount == 0
-                  ? IconButton(
-                      icon: Icon(
-                        Icons.mic_none_outlined,
-                        color: t.action,
-                        size: 22,
-                      ),
-                      onPressed: _onMicTap,
-                    )
-                  : AnimatedBuilder(
-                      animation: _sendBloom,
-                      builder: (context, child) {
-                        final scale = 1.0 + 0.16 * sin(_sendBloom.value * pi);
-                        return Transform.scale(scale: scale, child: child);
-                      },
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: overSize ? t.textTertiary : t.action,
-                          borderRadius: BorderRadius.circular(t.radiusControl),
-                        ),
-                        child: IconButton(
-                          icon: Icon(Icons.send, color: t.onAction, size: 18),
-                          onPressed: overSize ? null : _handleSend,
-                        ),
-                      ),
+            if (_charCount == 0)
+              // Empty field → hold-to-record mic (tap it for the quality picker).
+              buildVoiceButton(t, l10n)
+            else
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4.0),
+                child: AnimatedBuilder(
+                  animation: _sendBloom,
+                  builder: (context, child) {
+                    final scale = 1.0 + 0.16 * sin(_sendBloom.value * pi);
+                    return Transform.scale(scale: scale, child: child);
+                  },
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: overSize ? t.textTertiary : t.action,
+                      borderRadius: BorderRadius.circular(t.radiusControl),
                     ),
-            ),
+                    child: IconButton(
+                      icon: Icon(Icons.send, color: t.onAction, size: 18),
+                      onPressed: overSize ? null : _handleSend,
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
         if (_showEmoji)
@@ -1669,6 +1713,16 @@ class _GroupChatScreenState extends State<GroupChatScreen>
     if (ct == 'image' || ct == 'image_hidden') {
       return _buildGroupImage(t, message);
     }
+    if (ct == 'voice') {
+      if (message.decodedAudioBytes == null) {
+        try {
+          message.decodedAudioBytes = base64Decode(
+            message.decryptedText ?? displayText,
+          );
+        } catch (_) {}
+      }
+      return VoiceMessagePlayer(message: message);
+    }
     final scale = _appState.chatTextScale;
     final textColor = isMe ? t.bubbleMeText : t.textPrimary;
 
@@ -1694,10 +1748,7 @@ class _GroupChatScreenState extends State<GroupChatScreen>
           );
         }
       }
-      return Text(
-        sticker,
-        style: TextStyle(fontSize: 56 * scale, height: 1.1),
-      );
+      return Text(sticker, style: TextStyle(fontSize: 56 * scale, height: 1.1));
     }
 
     final jumbo = jumboEmojiCount(displayText, emojiMap);

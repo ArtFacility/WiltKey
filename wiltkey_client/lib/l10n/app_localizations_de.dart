@@ -181,6 +181,15 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsTabProfile => 'Profil';
 
   @override
+  String get settingsTabSecurity => 'Sicherheit';
+
+  @override
+  String get settingsSecuritySectionAccess => 'Zugriff & Entsperren';
+
+  @override
+  String get settingsSecuritySectionDanger => 'Gefahrenzone';
+
+  @override
   String get settingsTabNetwork => 'Netzwerk';
 
   @override
@@ -250,6 +259,16 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsChangePinTitle => 'PIN ändern';
+
+  @override
+  String get changePinVerifyTitle => 'Aktuelle PIN bestätigen';
+
+  @override
+  String get changePinVerifyPrompt =>
+      'Gib deine aktuelle PIN ein, um fortzufahren.';
+
+  @override
+  String get changePinSetTitle => 'Neue PIN festlegen';
 
   @override
   String get settingsChangePinOldPin => 'Aktuelle PIN eingeben';
@@ -364,20 +383,50 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get notificationModeLowPowerDesc =>
-      'Prüft etwa alle 10 Minuten auf neue Nachrichten. Schont den Akku.';
+      'Prüft im Hintergrund regelmäßig auf neue Nachrichten – schnell direkt nach dem Schließen der App, dann seltener, um den Akku zu schonen. Keine ständige Verbindung, daher können Benachrichtigungen verzögert eintreffen.';
 
   @override
   String get notificationModeInstant => 'Sofort';
 
   @override
   String get notificationModeInstantDesc =>
-      'Hält eine sichere Verbindung im Hintergrund aktiv für sofortige Benachrichtigungen. Zeigt eine dauerhafte Benachrichtigung und verbraucht mehr Akku.';
+      'Optional. Hält im Hintergrund eine Ende-zu-Ende-verschlüsselte Verbindung offen, um eingehende Nachrichten in Echtzeit zu synchronisieren, angezeigt durch eine dauerhafte Benachrichtigung. Wiltkey nutzt dies aus Datenschutzgründen anstelle von Push-Diensten von Google oder Apple und funktioniert daher auch ohne Google Play Services – auf Kosten von mehr Akkuverbrauch.';
 
   @override
   String get notificationNewMessageBody => 'Du hast eine Nachricht';
 
   @override
-  String get notificationSecureLinkActive => 'Sichere Verbindung aktiv';
+  String get notificationSecureLinkActive =>
+      'Sichere Nachrichten werden synchronisiert';
+
+  @override
+  String get onboardingNotificationsTitle => 'Benachrichtigungen';
+
+  @override
+  String get onboardingNotificationsExplanation =>
+      'Wiltkey verwendet keine Push-Dienste von Google oder Apple – nichts über deine Nachrichten erreicht deren Server. Wähle, wie du benachrichtigt werden möchtest. Du kannst dies jederzeit in den Einstellungen ändern.';
+
+  @override
+  String get onboardingFactPushTitle => 'KEINE PUSH-SERVER';
+
+  @override
+  String get onboardingFactPushBody =>
+      'Normale Apps leiten deine Benachrichtigungen über Google oder Apple und verraten so, wer dir wann schreibt. Wiltkey tut das nie – standardmäßig gibt es keine Hintergrundabfragen, und jede Benachrichtigung läuft vollständig auf deinem Gerät.';
+
+  @override
+  String get notificationModeInstantDescFcm =>
+      'Optional. Nutzt den Push-Dienst von Google als leichtes Wecksignal, damit neue Nachrichten in Echtzeit ankommen. Über Google läuft nur ein inhaltsloser Ping – niemals deine Nachrichten, die Ende-zu-Ende-verschlüsselt auf dem Relay bleiben, bis dein Gerät sie abruft. Schont den Akku mehr als eine dauerhafte Verbindung.';
+
+  @override
+  String get onboardingNotificationsExplanationFcm =>
+      'Für Echtzeit-Benachrichtigungen nutzt diese Version den Push-Dienst von Google nur als Wecksignal – ein inhaltsloser Ping, niemals deine Nachrichten, die die Server von Google nie berühren. Wähle, wie du benachrichtigt werden möchtest; du kannst das jederzeit in den Einstellungen ändern.';
+
+  @override
+  String get onboardingFactPushTitleFcm => 'INHALTSLOSER PUSH';
+
+  @override
+  String get onboardingFactPushBodyFcm =>
+      'Normale Apps leiten deine Benachrichtigungsinhalte über Google und verraten, was wann gesendet wird. Diese Version nutzt Google nur als inhaltslosen Weck-Ping – keine Nachrichtendaten, keine lesbaren Metadaten – und alles bleibt Ende-zu-Ende-verschlüsselt.';
 
   @override
   String get chatsLockedSubtitle =>
@@ -850,6 +899,34 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get chatVoiceComingSoon => 'Sprachnachrichten kommen bald.';
+
+  @override
+  String get chatVoiceHoldHint =>
+      'Zum Aufnehmen einer Sprachnachricht gedrückt halten.';
+
+  @override
+  String get chatVoiceReleaseCancel => 'Loslassen zum Abbrechen';
+
+  @override
+  String get chatVoicePermissionDenied =>
+      'Zum Aufnehmen von Sprachnachrichten wird die Mikrofonberechtigung benötigt.';
+
+  @override
+  String get chatVoiceQualityLofi => 'Lo-fi';
+
+  @override
+  String get chatVoiceQualityVoice => 'Sprache';
+
+  @override
+  String get chatVoiceQualityClear => 'Klar';
+
+  @override
+  String get chatVoiceUnavailable => 'Sprachnachricht nicht verfügbar';
+
+  @override
+  String chatVoiceTooLargeSnackBar(String cost, String charge) {
+    return 'Sprachnachricht zu groß ($cost) für den verbleibenden Platz ($charge).';
+  }
 
   @override
   String get chatDetailsDeleteConfirmTitle => 'Chat löschen?';

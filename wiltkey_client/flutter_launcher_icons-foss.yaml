@@ -1,0 +1,7 @@
+# FOSS-flavor launcher icon (hue-shifted teal variant, so it's visually distinct
+# from the Play build on the device). Generated into android/app/src/foss/res by:
+# dart run flutter_launcher_icons
+flutter_launcher_icons:
+  android: "launcher_icon"
+  image_path: "assets/icon/icon_foss.png"
+  min_sdk_android: 21

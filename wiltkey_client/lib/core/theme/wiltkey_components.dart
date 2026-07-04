@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'wiltkey_tokens.dart';
+import 'components/voice_scrubber.dart';
 
 /// Where a budget indicator is being rendered. Themes may choose a different
 /// size/granularity per slot (e.g. a compact flower in a list row vs. a labelled
@@ -247,6 +248,47 @@ abstract class WiltkeyComponents {
   /// first play is smooth. Called once when the PIN screen appears. Default
   /// no-op; only themes with a costly first frame need to override it.
   void precacheUnlock(BuildContext context) {}
+
+  /// Inline voice-message progress track, painted inside the chat bubble. Unlike
+  /// the other effect hooks this is NOT a full-screen overlay — it's a small,
+  /// interactive, continuously-driven widget: the bubble feeds [progress] (0..1
+  /// playhead) and [isPlaying] every frame. [seed] is a stable per-message value
+  /// (the message id's hash) so the generated waveform is identical across
+  /// rebuilds and on both peers; [onSeek] gets a 0..1 fraction on tap/drag;
+  /// [accent] optionally tints it.
+  ///
+  /// A shared default exists in [VoiceScrubberDefaults]; themes mix it in and
+  /// override only for a bespoke look (see THEMING.md §3.2).
+  Widget voiceScrubber({
+    required double progress,
+    required bool isPlaying,
+    int seed = 0,
+    ValueChanged<double>? onSeek,
+    Color? accent,
+  });
+}
+
+/// The default [WiltkeyComponents.voiceScrubber] — the shared, token-driven
+/// [DefaultVoiceScrubber]. Because the theme component sets `implements`
+/// [WiltkeyComponents] (rather than extend it), a concrete method on the
+/// interface wouldn't be inherited; mixing this in supplies the default while
+/// keeping the class's `const` constructor (the mixin holds no state). A theme
+/// that wants a bespoke scrubber just declares its own `voiceScrubber`, which
+/// shadows this. See THEMING.md §3.2.
+mixin VoiceScrubberDefaults {
+  Widget voiceScrubber({
+    required double progress,
+    required bool isPlaying,
+    int seed = 0,
+    ValueChanged<double>? onSeek,
+    Color? accent,
+  }) => DefaultVoiceScrubber(
+    progress: progress,
+    isPlaying: isPlaying,
+    seed: seed,
+    onSeek: onSeek,
+    accent: accent,
+  );
 }
 
 /// Non-lerping [ThemeExtension] that carries the active theme's component

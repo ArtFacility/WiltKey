@@ -57,6 +57,9 @@
   "onboardingFactKdfBody": "A standard PIN can be brute-forced in milliseconds. Wiltkey processes your PIN through a hardening function, making brute-force attacks on the local database impossible.",
   "settingsTitle": "Settings",
   "settingsTabProfile": "Profile",
+  "settingsTabSecurity": "Security",
+  "settingsSecuritySectionAccess": "Access & unlock",
+  "settingsSecuritySectionDanger": "Danger zone",
   "settingsTabNetwork": "Network",
   "settingsTabAlerts": "Notifications",
   "settingsSavedIndicator": "Saved",
@@ -80,6 +83,9 @@
   "settingsResetConfirmCancel": "Cancel",
   "settingsResetConfirmReset": "Reset",
   "settingsChangePinTitle": "Change PIN",
+  "changePinVerifyTitle": "Verify current PIN",
+  "changePinVerifyPrompt": "Enter your current PIN to continue.",
+  "changePinSetTitle": "Set new PIN",
   "settingsChangePinOldPin": "Enter current PIN",
   "settingsChangePinNewPin": "Enter new PIN (4–6 digits)",
   "settingsChangePinConfirmPin": "Confirm new PIN",
@@ -114,11 +120,19 @@
   "notificationModeOff": "Off",
   "notificationModeOffDesc": "No background checks. You only see messages when you open the app.",
   "notificationModeLowPower": "Low Power",
-  "notificationModeLowPowerDesc": "Checks for new messages about every 10 minutes. Easy on the battery.",
+  "notificationModeLowPowerDesc": "Periodically checks for new messages in the background — quickly right after you close the app, then less often to save battery. No constant connection, so alerts can be delayed.",
   "notificationModeInstant": "Instant",
-  "notificationModeInstantDesc": "Keeps a secure link active in the background for instant alerts. Shows an ongoing notification and uses more battery.",
+  "notificationModeInstantDesc": "Optional. Keeps an end-to-end-encrypted connection open in the background to sync your incoming messages in real time, shown by an ongoing notification. Wiltkey uses this instead of Google or Apple push services for privacy, so it works even without Google Play Services — at the cost of more battery.",
   "notificationNewMessageBody": "You got a message",
-  "notificationSecureLinkActive": "Secure link active",
+  "notificationSecureLinkActive": "Syncing secure messages",
+  "onboardingNotificationsTitle": "Alerts",
+  "onboardingNotificationsExplanation": "Wiltkey doesn't use Google or Apple push notifications — nothing about your messages ever touches their servers. Choose how you'd like to be alerted. You can change this any time in Settings.",
+  "onboardingFactPushTitle": "NO PUSH SERVERS",
+  "onboardingFactPushBody": "Normal apps route your notifications through Google or Apple, revealing who messages you and when. Wiltkey never does — the default is no background checks at all, and any alerting runs entirely on your device.",
+  "notificationModeInstantDescFcm": "Optional. Uses Google's push service as a lightweight wake-up so new messages arrive in real time. Only a content-free ping goes through Google — never your messages, which stay end-to-end encrypted on the relay until your device fetches them. Lighter on battery than a constant connection.",
+  "onboardingNotificationsExplanationFcm": "For real-time alerts, this build uses Google's push service purely as a wake-up signal — a content-free ping, never your messages, which never touch Google's servers. Choose how you'd like to be alerted; you can change this any time in Settings.",
+  "onboardingFactPushTitleFcm": "CONTENT-FREE PUSH",
+  "onboardingFactPushBodyFcm": "Normal apps route your notification content through Google, revealing what's sent and when. This build uses Google only as a content-free wake-up ping — no message data, no readable metadata — and everything stays encrypted end to end.",
   "chatsLockedSubtitle": "Locked · pair in person to unlock",
   "chatsMemberCount": "{count} members",
   "@chatsMemberCount": {
@@ -434,6 +448,24 @@
   "chatLockedLabel": "Locked · pair in person to continue",
   "chatMessageHint": "Message",
   "chatVoiceComingSoon": "Voice messages are coming soon.",
+  "chatVoiceHoldHint": "Hold to record a voice message.",
+  "chatVoiceReleaseCancel": "Release to cancel",
+  "chatVoicePermissionDenied": "Microphone permission is needed to record voice messages.",
+  "chatVoiceQualityLofi": "Lo-fi",
+  "chatVoiceQualityVoice": "Voice",
+  "chatVoiceQualityClear": "Clear",
+  "chatVoiceUnavailable": "Voice note unavailable",
+  "chatVoiceTooLargeSnackBar": "Voice note too large ({cost}) for remaining space ({charge}).",
+  "@chatVoiceTooLargeSnackBar": {
+    "placeholders": {
+      "cost": {
+        "type": "String"
+      },
+      "charge": {
+        "type": "String"
+      }
+    }
+  },
   "chatDetailsDeleteConfirmTitle": "Delete chat?",
   "chatDetailsDeleteConfirmBody": "This will permanently delete all messages and encryption keys for this contact. This cannot be undone.",
   "chatDetailsDeleteConfirmButton": "Delete Chat",

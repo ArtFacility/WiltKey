@@ -1,0 +1,6 @@
+# Play-flavor launcher icon (the original pink brand icon). Generated into
+# android/app/src/play/res by: dart run flutter_launcher_icons
+flutter_launcher_icons:
+  android: "launcher_icon"
+  image_path: "assets/icon/icon.png"
+  min_sdk_android: 21

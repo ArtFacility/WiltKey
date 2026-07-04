@@ -6,6 +6,11 @@ import io.flutter.embedding.android.FlutterFragmentActivity
 // import android.content.pm.ApplicationInfo
 // import android.view.WindowManager
 
+// FOSS-flavor MainActivity. Lives in src/foss/ (NOT src/main/) because the Play
+// flavor supplies its own MainActivity under src/play/ — a class of the same
+// fully-qualified name can't exist in both `main` and a flavor source set
+// (they're additive, so it would be a redeclaration). Plain: no Firebase.
+//
 // FlutterFragmentActivity (not FlutterActivity) is required by local_auth so the
 // biometric prompt can attach to a FragmentActivity host.
 class MainActivity : FlutterFragmentActivity() {

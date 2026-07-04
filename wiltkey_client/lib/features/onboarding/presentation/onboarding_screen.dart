@@ -2,15 +2,25 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:wiltkey_client/l10n/app_localizations.dart';
+import '../../../core/build_flavor.dart';
 import '../../../core/state.dart';
 import '../../../core/pixel_art_avatar.dart';
 import '../../../core/pixel_art_editor.dart';
 import '../../../core/theme/wk.dart';
 import '../../../core/theme/wiltkey_tokens.dart';
 import '../../../core/localization/locale_controller.dart';
+import '../../../core/notifications/notification_service.dart';
 import '../../settings/presentation/widgets/theme_picker.dart';
 
-enum OnboardingPageType { language, welcome, theme, profile, avatar, pin }
+enum OnboardingPageType {
+  language,
+  welcome,
+  theme,
+  profile,
+  avatar,
+  notifications,
+  pin,
+}
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -43,6 +53,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   final FocusNode _confirmPinFocus = FocusNode();
   String _pinError = '';
 
+  // Notification preference chosen during onboarding. Defaults to Off so we
+  // educate rather than nudge — the app deliberately behaves unlike FCM messengers,
+  // and any background work is opt-in. Applied after the enclave is created.
+  NotificationMode _selectedNotificationMode = NotificationMode.off;
+
   @override
   void initState() {
     super.initState();
@@ -60,6 +75,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       OnboardingPageType.theme,
       OnboardingPageType.profile,
       OnboardingPageType.avatar,
+      OnboardingPageType.notifications,
       OnboardingPageType.pin,
     ]);
   }
@@ -182,6 +198,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   Future<void> _initializeSecureEnclave(AppLocalizations l10n) async {
+    // Capture the root navigator up front: `setupPinAndInitialize` flips AppState
+    // out of onboarding, so the app root swaps this OnboardingScreen for AppShell
+    // and unmounts our State mid-await. A `mounted`-guarded pop would then be
+    // skipped, stranding this spinner dialog over the dashboard (only a back-press
+    // cleared it). The captured NavigatorState survives the swap, so pop always fires.
+    final navigator = Navigator.of(context, rootNavigator: true);
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -197,10 +219,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         codename: _codenameController.text.trim().toUpperCase(),
         profileImage: _pixelGrid.join(),
       );
-      if (mounted) Navigator.pop(context); // Pop loading dialog
+      // Apply the notification choice now that the enclave exists. Off is the
+      // default state already, so only act when the user opted into a background
+      // mode — this also triggers the OS notification-permission prompt.
+      if (_selectedNotificationMode != NotificationMode.off) {
+        await _appState.setNotificationMode(_selectedNotificationMode);
+      }
+      navigator.pop(); // Pop loading dialog (screen may already be unmounted)
     } catch (e) {
+      navigator.pop();
       if (mounted) {
-        Navigator.pop(context);
         setState(() => _pinError = l10n.onboardingSetupFailed(e.toString()));
       }
     }
@@ -222,6 +250,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           return _buildProfileDetailsPage(t, l10n);
         case OnboardingPageType.avatar:
           return _buildAvatarCustomizerPage(t, l10n);
+        case OnboardingPageType.notifications:
+          return _buildNotificationsPage(t, l10n);
         case OnboardingPageType.pin:
           return _buildPinSetupPage(t, l10n);
       }
@@ -361,6 +391,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       case OnboardingPageType.avatar:
         title = l10n.onboardingFactLimitsTitle;
         fact = l10n.onboardingFactLimitsBody;
+        break;
+      case OnboardingPageType.notifications:
+        // Play flavor uses FCM, so the "no push servers" fact would be false there.
+        title = kFcmEnabled
+            ? l10n.onboardingFactPushTitleFcm
+            : l10n.onboardingFactPushTitle;
+        fact = kFcmEnabled
+            ? l10n.onboardingFactPushBodyFcm
+            : l10n.onboardingFactPushBody;
         break;
       case OnboardingPageType.pin:
         title = l10n.onboardingFactKdfTitle;
@@ -646,6 +685,106 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildNotificationsPage(WiltkeyTokens t, AppLocalizations l10n) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 8),
+          _stepTitle(t, l10n.onboardingNotificationsTitle),
+          const SizedBox(height: 12),
+          Text(
+            kFcmEnabled
+                ? l10n.onboardingNotificationsExplanationFcm
+                : l10n.onboardingNotificationsExplanation,
+            style: t.bodySecondary.copyWith(height: 1.5),
+          ),
+          const SizedBox(height: 20),
+          _notificationModeCard(
+            t,
+            mode: NotificationMode.off,
+            label: l10n.notificationModeOff,
+            description: l10n.notificationModeOffDesc,
+          ),
+          const SizedBox(height: 10),
+          _notificationModeCard(
+            t,
+            mode: NotificationMode.lowPower,
+            label: l10n.notificationModeLowPower,
+            description: l10n.notificationModeLowPowerDesc,
+          ),
+          const SizedBox(height: 10),
+          _notificationModeCard(
+            t,
+            mode: NotificationMode.instant,
+            label: l10n.notificationModeInstant,
+            description: kFcmEnabled
+                ? l10n.notificationModeInstantDescFcm
+                : l10n.notificationModeInstantDesc,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _notificationModeCard(
+    WiltkeyTokens t, {
+    required NotificationMode mode,
+    required String label,
+    required String description,
+  }) {
+    final selected = _selectedNotificationMode == mode;
+    return GestureDetector(
+      onTap: () => setState(() => _selectedNotificationMode = mode),
+      child: AnimatedContainer(
+        duration: t.motionShort,
+        curve: Curves.easeOut,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: t.surface,
+          borderRadius: BorderRadius.circular(t.radiusCard),
+          border: Border.all(
+            color: selected ? t.action : t.border,
+            width: selected ? 2 : t.borderWidth,
+          ),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              selected
+                  ? Icons.radio_button_checked
+                  : Icons.radio_button_unchecked,
+              color: selected ? t.action : t.textTertiary,
+              size: 20,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: t.body.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: selected ? t.textPrimary : t.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    description,
+                    style: t.bodySecondary.copyWith(height: 1.4),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

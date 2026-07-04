@@ -8,7 +8,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:workmanager/workmanager.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../build_flavor.dart';
 import 'background_handler.dart';
+import 'push_channel.dart';
 
 /// How the app checks for incoming messages while it is backgrounded/locked.
 /// Persisted under [kPrefNotificationMode]; also read by the background isolates
@@ -17,8 +19,10 @@ enum NotificationMode {
   /// Nothing runs in the background (legacy behavior).
   off,
 
-  /// A periodic (~10 min) background poll of `GET /api/v1/queue/status`.
-  /// No persistent socket; cheap on battery.
+  /// An adaptive background poll of `GET /api/v1/queue/status`: tight right after
+  /// the app is backgrounded (~30 s) so a quick reply still feels near-instant,
+  /// backing off toward ~10 min while it stays quiet and snapping back when a
+  /// message lands. No persistent socket; light on battery.
   lowPower,
 
   /// An Android foreground service keeps a WebSocket open in a background
@@ -48,13 +52,53 @@ const String kSecureSigningKey = 'wk_bg_signing_key';
 
 const String kLowPowerTaskName = 'wk_low_power_poll';
 const String kLowPowerTaskUnique = 'wk_low_power_poll_unique';
-const Duration kLowPowerInterval = Duration(minutes: 10);
+
+/// Adaptive backoff ladder for the background poll. After the app is backgrounded
+/// the poll starts at the fast end so a reply that lands seconds later still feels
+/// near-real-time; each empty poll steps one rung sparser to save battery, and a
+/// poll that finds a message snaps back to the fast rung. Android's Doze/App
+/// Standby will stretch the short rungs once the device is idle (WorkManager can't
+/// guarantee sub-15-min wakeups) — so these are a best-effort target: tight right
+/// after the app closes, sparse when the device is truly idle.
+const List<Duration> kLowPowerBackoff = <Duration>[
+  Duration(seconds: 30),
+  Duration(minutes: 1),
+  Duration(minutes: 2),
+  Duration(minutes: 5),
+  Duration(minutes: 10),
+];
+
+/// Persisted current rung index into [kLowPowerBackoff].
+const String kPrefLowPowerBackoffIndex = 'wk_low_power_backoff_index';
+
+/// True while the app is backgrounded in a mode that wants the poll cycling.
+/// Gates the self-reschedule so the loop stops cleanly on foreground / mode off.
+const String kPrefBgPollActive = 'wk_bg_poll_active';
+
+/// Heartbeat (epoch ms) written by the Instant foreground service on start and on
+/// every watchdog tick. While it's fresh the backstop poll stays silent (the
+/// socket is delivering); when it goes stale — the Android 15 6-hour dataSync
+/// timeout or an OEM battery-killer stopping the service — the poll takes over.
+const String kPrefFgHeartbeatMs = 'wk_fg_heartbeat_ms';
+const int kFgHeartbeatFreshMs = 90 * 1000;
+
+/// Next poll delay for a given backoff rung (clamped to the ladder).
+Duration lowPowerDelayForIndex(int index) {
+  if (index <= 0) return kLowPowerBackoff.first;
+  if (index >= kLowPowerBackoff.length) return kLowPowerBackoff.last;
+  return kLowPowerBackoff[index];
+}
 
 const String kFgChannelId = 'wk_secure_link';
 const String kFgChannelName = 'Secure link';
 const String kMsgChannelId = 'wk_messages';
 const String kMsgChannelName = 'Messages';
 const int kFgServiceId = 4711;
+
+/// Single collapsed id for the "you got a message" alert — every new-message
+/// notification reuses it (so they don't stack), and it's the id we cancel once
+/// the app is foregrounded / the chat is opened.
+const int kMsgNotificationId = 1;
 
 /// Orchestrates the notification system on the **main** isolate: local
 /// notification setup, permission, caching the credentials the background
@@ -144,12 +188,21 @@ class WiltkeyNotifications {
       ),
     );
     await plugin.show(
-      1,
+      kMsgNotificationId,
       'Wiltkey',
       l10n.notificationNewMessageBody,
       details,
       payload: chatKey,
     );
+  }
+
+  /// Dismiss the "you got a message" alert(s). Called when the app returns to the
+  /// foreground and when a chat is opened, so a message the user has now seen
+  /// doesn't linger in the tray. Safe to call when nothing is showing.
+  static Future<void> cancelMessageNotifications() async {
+    try {
+      await plugin.cancel(kMsgNotificationId);
+    } catch (_) {}
   }
 
   /// Notification-tap handler (foreground + background isolates). We can't
@@ -184,6 +237,9 @@ class WiltkeyNotifications {
     final prefs = await SharedPreferences.getInstance();
     key ??= prefs.getString(_kPendingChat);
     await prefs.remove(_kPendingChat);
+    // Play flavor: an FCM push posts its notification natively, so the tap target
+    // rides a separate native channel instead of flutter_local_notifications.
+    key ??= await PushChannel.takePendingChat();
     return (key != null && key.isNotEmpty) ? key : null;
   }
 
@@ -230,11 +286,27 @@ class WiltkeyNotifications {
         break;
       case NotificationMode.lowPower:
         await _stopForegroundService();
-        await _scheduleLowPowerPoll();
+        await _scheduleAdaptivePoll();
         break;
       case NotificationMode.instant:
-        await _cancelLowPowerPoll();
-        await _startForegroundService();
+        if (kFcmEnabled) {
+          // Play flavor: FCM is the sole wake-up trigger — NO persistent foreground
+          // service (no persistent notification, no Android 15 6-hour dataSync cap,
+          // lighter battery) and NO backstop poll (it would double-notify alongside
+          // FCM, since there's no foreground-service heartbeat to gate it). A rare
+          // missed push just leaves the message queued, encrypted, on the relay; it
+          // arrives the next time the app is opened. Users who can't rely on Play
+          // Services can pick Low Power instead.
+          await stopBackgroundWork();
+        } else {
+          // FOSS flavor: a foreground-service socket delivers instantly.
+          await _startForegroundService();
+          // Backstop poll: silent and idle at the sparse rung while the service is
+          // healthy (heartbeat fresh), it seamlessly takes over delivery if the
+          // service is killed — including the Android 15 6-hour dataSync timeout
+          // and OEM battery-killers — instead of Instant going silent.
+          await _scheduleAdaptivePoll();
+        }
         break;
     }
   }
@@ -243,9 +315,16 @@ class WiltkeyNotifications {
   /// back ownership of the socket, so background work stands down.
   static Future<void> onAppForegrounded() async {
     await stopBackgroundWork();
+    // The user is back in the app — clear any pending "new message" tray alert so
+    // it doesn't linger after they've seen (or are about to see) the message.
+    await cancelMessageNotifications();
   }
 
   static Future<void> stopBackgroundWork() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(kPrefBgPollActive, false);
+    } catch (_) {}
     await _stopForegroundService();
     await _cancelLowPowerPoll();
   }
@@ -291,14 +370,20 @@ class WiltkeyNotifications {
     } catch (_) {}
   }
 
-  // Low power mode: a self-rescheduling one-off poll (~10 min). WorkManager's
-  // periodic floor is 15 min, so we re-enqueue a one-off each run instead.
-  static Future<void> _scheduleLowPowerPoll() async {
+  // A self-rescheduling one-off poll on the adaptive backoff ladder. WorkManager's
+  // periodic floor is 15 min, so we re-enqueue a one-off each run (see the
+  // background isolate's reschedule) instead of a periodic task. Starts at the
+  // fast rung; the background handler steps it. Used for Low Power mode and as the
+  // Instant-mode backstop.
+  static Future<void> _scheduleAdaptivePoll() async {
     try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(kPrefBgPollActive, true);
+      await prefs.setInt(kPrefLowPowerBackoffIndex, 0); // start fast
       await Workmanager().registerOneOffTask(
         kLowPowerTaskUnique,
         kLowPowerTaskName,
-        initialDelay: kLowPowerInterval,
+        initialDelay: lowPowerDelayForIndex(0),
         existingWorkPolicy: ExistingWorkPolicy.replace,
         constraints: Constraints(networkType: NetworkType.connected),
       );

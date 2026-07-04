@@ -8,6 +8,7 @@ import '../../../../core/pixel_art_avatar.dart';
 import '../../../../core/theme/wk.dart';
 import '../../../../core/theme/wiltkey_tokens.dart';
 import 'package:wiltkey_client/l10n/app_localizations.dart';
+import 'voice_message_player.dart';
 
 class MessageBubble extends StatelessWidget {
   final ChatMessage message;
@@ -252,6 +253,15 @@ class MessageBubble extends StatelessWidget {
     }
 
     final decryptedText = message.decryptedText ?? displayText;
+
+    if (message.contentType == 'voice') {
+      if (message.decodedAudioBytes == null) {
+        try {
+          message.decodedAudioBytes = base64Decode(decryptedText);
+        } catch (_) {}
+      }
+      return VoiceMessagePlayer(message: message);
+    }
 
     if (message.contentType == 'image' ||
         message.contentType == 'image_hidden') {

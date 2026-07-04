@@ -180,6 +180,15 @@ class AppLocalizationsHu extends AppLocalizations {
   String get settingsTabProfile => 'Profil';
 
   @override
+  String get settingsTabSecurity => 'Biztonság';
+
+  @override
+  String get settingsSecuritySectionAccess => 'Hozzáférés és feloldás';
+
+  @override
+  String get settingsSecuritySectionDanger => 'Veszélyzóna';
+
+  @override
   String get settingsTabNetwork => 'Hálózat';
 
   @override
@@ -249,6 +258,16 @@ class AppLocalizationsHu extends AppLocalizations {
 
   @override
   String get settingsChangePinTitle => 'PIN módosítása';
+
+  @override
+  String get changePinVerifyTitle => 'Jelenlegi PIN ellenőrzése';
+
+  @override
+  String get changePinVerifyPrompt =>
+      'Add meg a jelenlegi PIN-kódodat a folytatáshoz.';
+
+  @override
+  String get changePinSetTitle => 'Új PIN beállítása';
 
   @override
   String get settingsChangePinOldPin => 'Add meg a jelenlegi PIN-kódot';
@@ -363,20 +382,50 @@ class AppLocalizationsHu extends AppLocalizations {
 
   @override
   String get notificationModeLowPowerDesc =>
-      'Körülbelül 10 percenként ellenőrzi az új üzeneteket. Kíméli az akkumulátort.';
+      'Rendszeresen ellenőrzi az új üzeneteket a háttérben – gyorsan közvetlenül az alkalmazás bezárása után, majd ritkábban az akkumulátor kímélése érdekében. Nincs állandó kapcsolat, ezért az értesítések késhetnek.';
 
   @override
   String get notificationModeInstant => 'Azonnali';
 
   @override
   String get notificationModeInstantDesc =>
-      'Aktívan tart egy biztonságos kapcsolatot a háttérben az azonnali riasztásokért. Állandó értesítést mutat, és több akkumulátort fogyaszt.';
+      'Opcionális. A háttérben nyitva tart egy végpontok közötti titkosított kapcsolatot, hogy valós időben szinkronizálja a bejövő üzeneteket, amit egy állandó értesítés jelez. A Wiltkey adatvédelmi okokból ezt használja a Google vagy az Apple push-szolgáltatásai helyett, így Google Play-szolgáltatások nélkül is működik – nagyobb akkumulátor-fogyasztás árán.';
 
   @override
   String get notificationNewMessageBody => 'Új üzeneted érkezett';
 
   @override
-  String get notificationSecureLinkActive => 'Értesítési kapcsolat aktív';
+  String get notificationSecureLinkActive =>
+      'Biztonságos üzenetek szinkronizálása';
+
+  @override
+  String get onboardingNotificationsTitle => 'Értesítések';
+
+  @override
+  String get onboardingNotificationsExplanation =>
+      'A Wiltkey nem használ Google vagy Apple push-értesítéseket – az üzeneteidről semmi nem kerül a szervereikre. Válaszd ki, hogyan szeretnél értesítést kapni. Ezt bármikor módosíthatod a Beállításokban.';
+
+  @override
+  String get onboardingFactPushTitle => 'NINCS PUSH-SZERVER';
+
+  @override
+  String get onboardingFactPushBody =>
+      'A szokásos alkalmazások a Google-ön vagy Apple-ön keresztül küldik az értesítéseket, elárulva, ki és mikor ír neked. A Wiltkey ezt soha nem teszi – alapból egyáltalán nincs háttérellenőrzés, és minden értesítés kizárólag a te eszközödön fut.';
+
+  @override
+  String get notificationModeInstantDescFcm =>
+      'Választható. A Google push-szolgáltatását használja egyszerű ébresztőjelként, hogy az új üzenetek valós időben megérkezzenek. A Google-ön csak egy tartalom nélküli jelzés megy át – soha nem az üzeneteid, amelyek végponttól végpontig titkosítva maradnak a relén, amíg az eszközöd le nem tölti őket. Kevésbé terheli az akkut, mint az állandó kapcsolat.';
+
+  @override
+  String get onboardingNotificationsExplanationFcm =>
+      'A valós idejű értesítésekhez ez a verzió a Google push-szolgáltatását kizárólag ébresztőjelként használja – egy tartalom nélküli jelzés, soha nem az üzeneteid, amelyek soha nem érintik a Google szervereit. Válaszd ki, hogyan szeretnél értesítést kapni; ezt bármikor módosíthatod a Beállításokban.';
+
+  @override
+  String get onboardingFactPushTitleFcm => 'TARTALOM NÉLKÜLI PUSH';
+
+  @override
+  String get onboardingFactPushBodyFcm =>
+      'A szokásos alkalmazások a Google-ön keresztül küldik az értesítések tartalmát, elárulva, mit és mikor küldenek. Ez a verzió a Google-t csak tartalom nélküli ébresztőjelként használja – nincs üzenetadat, nincs olvasható metaadat –, és minden végponttól végpontig titkosítva marad.';
 
   @override
   String get chatsLockedSubtitle =>
@@ -855,6 +904,33 @@ class AppLocalizationsHu extends AppLocalizations {
 
   @override
   String get chatVoiceComingSoon => 'A hangüzenetek hamarosan jönnek.';
+
+  @override
+  String get chatVoiceHoldHint => 'Tartsd nyomva hangüzenet rögzítéséhez.';
+
+  @override
+  String get chatVoiceReleaseCancel => 'Engedd el a megszakításhoz';
+
+  @override
+  String get chatVoicePermissionDenied =>
+      'A hangüzenetek rögzítéséhez mikrofon-engedély szükséges.';
+
+  @override
+  String get chatVoiceQualityLofi => 'Lo-fi';
+
+  @override
+  String get chatVoiceQualityVoice => 'Hang';
+
+  @override
+  String get chatVoiceQualityClear => 'Tiszta';
+
+  @override
+  String get chatVoiceUnavailable => 'A hangüzenet nem érhető el';
+
+  @override
+  String chatVoiceTooLargeSnackBar(String cost, String charge) {
+    return 'A hangüzenet túl nagy ($cost) a fennmaradó helyhez ($charge).';
+  }
 
   @override
   String get chatDetailsDeleteConfirmTitle => 'Törlöd a csevegést?';

@@ -179,6 +179,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsTabProfile => 'Profile';
 
   @override
+  String get settingsTabSecurity => 'Security';
+
+  @override
+  String get settingsSecuritySectionAccess => 'Access & unlock';
+
+  @override
+  String get settingsSecuritySectionDanger => 'Danger zone';
+
+  @override
   String get settingsTabNetwork => 'Network';
 
   @override
@@ -247,6 +256,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsChangePinTitle => 'Change PIN';
+
+  @override
+  String get changePinVerifyTitle => 'Verify current PIN';
+
+  @override
+  String get changePinVerifyPrompt => 'Enter your current PIN to continue.';
+
+  @override
+  String get changePinSetTitle => 'Set new PIN';
 
   @override
   String get settingsChangePinOldPin => 'Enter current PIN';
@@ -357,20 +375,49 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get notificationModeLowPowerDesc =>
-      'Checks for new messages about every 10 minutes. Easy on the battery.';
+      'Periodically checks for new messages in the background — quickly right after you close the app, then less often to save battery. No constant connection, so alerts can be delayed.';
 
   @override
   String get notificationModeInstant => 'Instant';
 
   @override
   String get notificationModeInstantDesc =>
-      'Keeps a secure link active in the background for instant alerts. Shows an ongoing notification and uses more battery.';
+      'Optional. Keeps an end-to-end-encrypted connection open in the background to sync your incoming messages in real time, shown by an ongoing notification. Wiltkey uses this instead of Google or Apple push services for privacy, so it works even without Google Play Services — at the cost of more battery.';
 
   @override
   String get notificationNewMessageBody => 'You got a message';
 
   @override
-  String get notificationSecureLinkActive => 'Secure link active';
+  String get notificationSecureLinkActive => 'Syncing secure messages';
+
+  @override
+  String get onboardingNotificationsTitle => 'Alerts';
+
+  @override
+  String get onboardingNotificationsExplanation =>
+      'Wiltkey doesn\'t use Google or Apple push notifications — nothing about your messages ever touches their servers. Choose how you\'d like to be alerted. You can change this any time in Settings.';
+
+  @override
+  String get onboardingFactPushTitle => 'NO PUSH SERVERS';
+
+  @override
+  String get onboardingFactPushBody =>
+      'Normal apps route your notifications through Google or Apple, revealing who messages you and when. Wiltkey never does — the default is no background checks at all, and any alerting runs entirely on your device.';
+
+  @override
+  String get notificationModeInstantDescFcm =>
+      'Optional. Uses Google\'s push service as a lightweight wake-up so new messages arrive in real time. Only a content-free ping goes through Google — never your messages, which stay end-to-end encrypted on the relay until your device fetches them. Lighter on battery than a constant connection.';
+
+  @override
+  String get onboardingNotificationsExplanationFcm =>
+      'For real-time alerts, this build uses Google\'s push service purely as a wake-up signal — a content-free ping, never your messages, which never touch Google\'s servers. Choose how you\'d like to be alerted; you can change this any time in Settings.';
+
+  @override
+  String get onboardingFactPushTitleFcm => 'CONTENT-FREE PUSH';
+
+  @override
+  String get onboardingFactPushBodyFcm =>
+      'Normal apps route your notification content through Google, revealing what\'s sent and when. This build uses Google only as a content-free wake-up ping — no message data, no readable metadata — and everything stays encrypted end to end.';
 
   @override
   String get chatsLockedSubtitle => 'Locked · pair in person to unlock';
@@ -837,6 +884,33 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatVoiceComingSoon => 'Voice messages are coming soon.';
+
+  @override
+  String get chatVoiceHoldHint => 'Hold to record a voice message.';
+
+  @override
+  String get chatVoiceReleaseCancel => 'Release to cancel';
+
+  @override
+  String get chatVoicePermissionDenied =>
+      'Microphone permission is needed to record voice messages.';
+
+  @override
+  String get chatVoiceQualityLofi => 'Lo-fi';
+
+  @override
+  String get chatVoiceQualityVoice => 'Voice';
+
+  @override
+  String get chatVoiceQualityClear => 'Clear';
+
+  @override
+  String get chatVoiceUnavailable => 'Voice note unavailable';
+
+  @override
+  String chatVoiceTooLargeSnackBar(String cost, String charge) {
+    return 'Voice note too large ($cost) for remaining space ($charge).';
+  }
 
   @override
   String get chatDetailsDeleteConfirmTitle => 'Delete chat?';

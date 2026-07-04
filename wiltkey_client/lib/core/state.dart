@@ -3,6 +3,7 @@ library wiltkey_state;
 import 'package:flutter/material.dart';
 import 'dart:math' hide log;
 import 'dart:convert';
+import 'dart:io' show HttpClient, ContentType;
 import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -16,8 +17,10 @@ import 'network/websocket_client.dart';
 import 'db/wiltkey_db.dart';
 import 'chat_metadata.dart';
 import 'custom_emoji.dart';
+import 'build_flavor.dart';
 import 'notifications/notification_service.dart';
 import 'notifications/pending_inbox.dart';
+import 'notifications/push_channel.dart';
 
 part 'state_auth.dart';
 part 'state_chats.dart';
@@ -27,8 +30,22 @@ part 'state_emoji.dart';
 part 'state_lifecycle.dart';
 part 'state_inbound.dart';
 part 'state_groups.dart';
+part 'state_push.dart';
 
 enum AppStatus { normal, nuked }
+
+/// A transient "you got a message" cue for the in-app heads-up banner (shown by
+/// the shell when a message lands for a chat you're not currently in, while the
+/// app is open). Distinct from the OS tray notification, which only fires while
+/// the app is backgrounded.
+class InAppMessageAlert {
+  final Contact contact;
+
+  /// Monotonic tag so the banner treats each arrival as a new event even when
+  /// two messages come from the same contact back to back.
+  final int seq;
+  InAppMessageAlert(this.contact, this.seq);
+}
 
 class AppState extends ChangeNotifier with WidgetsBindingObserver {
   static final AppState _instance = AppState._internal();
@@ -67,7 +84,17 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   AppStatus status = AppStatus.normal;
   List<Contact> contacts = [];
   Map<String, List<ChatMessage>> messages = {};
+
+  // The last-selected chat. Stays set even after you leave the chat screen —
+  // it's the routing anchor for "keep the open chat's Contact object fresh" on
+  // inbound metadata updates, NOT a reliable "currently on screen" signal.
   Contact? activeContact;
+
+  // The chat whose screen is ACTUALLY on top right now (set on open, cleared on
+  // close by the chat screens). This — not [activeContact] — gates unread-badge
+  // and in-app-banner suppression, so returning to the dashboard immediately
+  // re-enables alerts for the chat you were just in.
+  String? visibleChatId;
 
   // Debug Console Logs
   static final List<String> debugLogs = [];
@@ -155,6 +182,31 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   // DB-derived unread counts per contact.id (computed at unlock, kept live as
   // messages arrive / chats are read). Source for the chats-list badge.
   Map<String, int> unreadCounts = {};
+
+  // Latest foreground/background lifecycle state (tracked in
+  // didChangeAppLifecycleState). Gates the in-app heads-up banner: we only want
+  // it while the app is actually on screen — backgrounded arrivals are the OS
+  // notification's job.
+  AppLifecycleState appLifecycleState = AppLifecycleState.resumed;
+  bool get isAppForeground =>
+      appLifecycleState == AppLifecycleState.resumed && !isLocked;
+
+  // Fires when a user message arrives for a chat that isn't currently open while
+  // the app is foreground — the shell listens and shows a top banner so busy
+  // users aren't blind to new messages while they're in the app. Null between
+  // events.
+  final ValueNotifier<InAppMessageAlert?> messageAlert = ValueNotifier(null);
+  int _messageAlertSeq = 0;
+
+  /// Emit an in-app heads-up cue for [contact], unless the user is already in
+  /// that chat, the app is backgrounded/locked, or we're replaying frames the
+  /// background socket buffered while away (those were already tray-notified).
+  void emitMessageAlert(Contact contact) {
+    if (!isAppForeground) return;
+    if (isDrainingPendingInbox) return;
+    if (visibleChatId == contact.id) return; // already looking at this chat
+    messageAlert.value = InAppMessageAlert(contact, ++_messageAlertSeq);
+  }
 
   /// Appends a freshly-arrived/sent message to a chat's in-memory window — but
   /// only when that window is currently loaded. If the chat isn't open, the
@@ -245,6 +297,9 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
         broadcastMyProfileToGroups();
         // Emoji defs/deletes are ordinary lane messages — autoSyncAllGroups (above)
         // and per-peer resync replay them; no separate emoji broadcast needed.
+        // Play flavor: (re)assert our FCM wake-up token now that we have a live,
+        // authenticated link (also covers token rotation after a reconnect).
+        refreshPushRegistration();
       }
       notifyListeners();
     };
@@ -364,6 +419,7 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState lifecycleState) {
+    appLifecycleState = lifecycleState;
     if (lifecycleState == AppLifecycleState.paused) {
       if (isPickingMedia) {
         log(
@@ -417,8 +473,16 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     await _persistence.saveState(this);
     if (mode == NotificationMode.off) {
       await WiltkeyNotifications.stopBackgroundWork();
+      await unregisterPushToken(); // Play: stop being FCM-wakeable
     } else {
       await WiltkeyNotifications.requestPermission();
+      // Play flavor: Instant is FCM-backed — register the wake-up token; leaving
+      // Instant for Low Power drops it (Low Power uses its own poll, not FCM).
+      if (mode == NotificationMode.instant) {
+        await registerPushToken();
+      } else {
+        await unregisterPushToken();
+      }
     }
   }
 

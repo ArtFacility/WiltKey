@@ -27,6 +27,11 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
+    <!-- Voice messages: record a short voice note (Opus on API 29+, AAC-LC fallback
+         below). Playback needs no permission. Audio never leaves the device
+         unencrypted — it rides the OTP pad like an image attachment. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
     <application
         android:label="WiltKey"
         android:name="${applicationName}"

@@ -38,7 +38,7 @@ func TestIntegration(t *testing.T) {
 	// Clear test keys
 	rdb.FlushAll()
 
-	hub := NewHub(rdb)
+	hub := NewHub(rdb, NewPushSender()) // NewPushSender() is disabled without FCM env
 	go hub.Run()
 
 	mux := http.NewServeMux()
@@ -292,7 +292,7 @@ func TestGroupChatHubAndSpoke(t *testing.T) {
 	rdb = testRdb
 	rdb.FlushAll()
 
-	hub := NewHub(rdb)
+	hub := NewHub(rdb, NewPushSender()) // NewPushSender() is disabled without FCM env
 	go hub.Run()
 
 	mux := http.NewServeMux()

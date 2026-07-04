@@ -248,6 +248,17 @@ extension AppStateAuth on AppState {
     log('Onboarding complete. Enclave initialized.');
   }
 
+  /// Pure check that [pin] is the current PIN, with no side effects (unlike
+  /// [unlockApp], which loads state). Used by the in-settings change-PIN flow to
+  /// gate step 1 before asking for a new PIN.
+  Future<bool> verifyPin(String pin) async {
+    if (masterKeyHex == null) return false;
+    final prefs = await SharedPreferences.getInstance();
+    final pinSalt = prefs.getString(WiltkeyPersistence.keyPinSalt);
+    if (pinSalt == null) return false;
+    return deriveKey(pin, pinSalt) == masterKeyHex;
+  }
+
   Future<bool> changePin(String oldPin, String newPin) async {
     if (masterKeyHex == null) return false;
 

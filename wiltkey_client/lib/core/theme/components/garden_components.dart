@@ -6,10 +6,11 @@ import 'petal_flower.dart';
 import 'effects/garden_sync_visual.dart';
 import 'effects/garden_pin_visuals.dart';
 import 'effects/garden_nuke_wilt.dart';
+import 'effects/garden_voice_playback.dart';
 
 /// Dusk Garden component set: petal flowers, soft pills, serif titles, and an
 /// ambient backdrop with gradients + drifting fireflies.
-class GardenComponents implements WiltkeyComponents {
+class GardenComponents with VoiceScrubberDefaults implements WiltkeyComponents {
   /// Whether the ambient background draws fireflies (off by default under
   /// reduce-motion; this flag lets a future "calm" sub-theme disable them too).
   final bool fireflies;
@@ -132,6 +133,22 @@ class GardenComponents implements WiltkeyComponents {
 
   @override
   void precacheUnlock(BuildContext context) {} // cheap first frame; nothing to warm
+
+  // Shadows the VoiceScrubberDefaults mixin: the bespoke greening vine.
+  @override
+  Widget voiceScrubber({
+    required double progress,
+    required bool isPlaying,
+    int seed = 0,
+    ValueChanged<double>? onSeek,
+    Color? accent,
+  }) => GardenVoicePlayback(
+    progress: progress,
+    isPlaying: isPlaying,
+    seed: seed,
+    onSeek: onSeek,
+    accent: accent,
+  );
 }
 
 /// Reads tokens and renders the petal flower in one of two modes (see

@@ -1,0 +1,10 @@
+# Firebase service-account key for FCM wake-up push (Play flavor). Contains a
+# private key — NEVER commit. Download from Firebase Console → Project settings →
+# Service accounts → Generate new private key, and save it here with this name.
+fcm-service-account.json
+# Any other stray service-account exports.
+*-firebase-adminsdk-*.json
+
+# Local build artifacts.
+wiltkey_server.exe
+wiltkey-relay

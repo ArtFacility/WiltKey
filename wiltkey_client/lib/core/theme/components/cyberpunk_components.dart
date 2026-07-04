@@ -5,9 +5,12 @@ import 'segmented_charge_bar.dart';
 import 'effects/cyberpunk_sync_visual.dart';
 import 'effects/cyberpunk_unlock.dart';
 import 'effects/cyberpunk_nuke_purge.dart';
+import 'effects/cyberpunk_voice_playback.dart';
 
 /// Cyberpunk component set: segmented charge bars, bordered caps chips, flat bg.
-class CyberpunkComponents implements WiltkeyComponents {
+class CyberpunkComponents
+    with VoiceScrubberDefaults
+    implements WiltkeyComponents {
   const CyberpunkComponents();
 
   @override
@@ -177,4 +180,20 @@ class CyberpunkComponents implements WiltkeyComponents {
 
   @override
   void precacheUnlock(BuildContext context) {} // cheap first frame; nothing to warm
+
+  // Shadows the VoiceScrubberDefaults mixin: the bespoke lit-up soundwave.
+  @override
+  Widget voiceScrubber({
+    required double progress,
+    required bool isPlaying,
+    int seed = 0,
+    ValueChanged<double>? onSeek,
+    Color? accent,
+  }) => CyberpunkVoicePlayback(
+    progress: progress,
+    isPlaying: isPlaying,
+    seed: seed,
+    onSeek: onSeek,
+    accent: accent,
+  );
 }

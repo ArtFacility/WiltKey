@@ -528,14 +528,17 @@ extension AppStateGroups on AppState {
     final contact = activeContact!;
     final groupId = contact.keyHash;
 
-    // maxMessageSize is a TEXT policy; images and emoji defs are bounded by lane
-    // space + the sender's own pre-send size checks, so don't reject them here.
+    // maxMessageSize is a TEXT policy; images, voice notes and emoji defs are
+    // bounded by lane space + the sender's own pre-send size checks, so don't
+    // reject them here.
     final bool isImage =
         contentType == 'image' || contentType == 'image_hidden';
+    final bool isVoice = contentType == 'voice';
     final bool isEmojiCtl =
         contentType == 'emoji_def' || contentType == 'emoji_delete';
     final payloadBytes = utf8.encode(text).length;
     if (!isImage &&
+        !isVoice &&
         !isEmojiCtl &&
         contact.maxMessageSize != null &&
         payloadBytes > contact.maxMessageSize!) {
@@ -558,6 +561,7 @@ extension AppStateGroups on AppState {
         isSentByMe: true,
         isPending: true,
         decodedImageBytes: isImage ? base64Decode(text) : null,
+        decodedAudioBytes: isVoice ? base64Decode(text) : null,
         decryptedText: text,
       );
       appendLoadedMessage(contact.id, placeholder);

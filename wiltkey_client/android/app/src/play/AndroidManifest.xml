@@ -1,0 +1,24 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Play-flavor additions, merged into the main manifest. FCM wake-up push. -->
+    <application>
+        <!-- Receives the relay's data-only wake-up ping and posts a content-free
+             notification (see WiltkeyFirebaseService). -->
+        <service
+            android:name=".WiltkeyFirebaseService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
+        <!-- Fallbacks Firebase uses only if a message ever carried a notification
+             payload (ours never do — they're data-only). Kept consistent with the
+             app's status-bar icon and message channel regardless. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_stat_notif" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="wk_messages" />
+    </application>
+</manifest>

@@ -264,6 +264,10 @@ func handlePostQueue(hub *Hub) http.HandlerFunc {
 				http.Error(w, "Failed to store message offline", http.StatusInternalServerError)
 				return
 			}
+			// Offline recipient: fire an FCM wake-up ping if they registered a token
+			// (Play flavor). The HTTP post path doesn't carry a sender identity, so
+			// the ping is fully anonymous (no sender_id to deep-link with).
+			go hub.sendWakePush(req.RecipientID, "", "")
 		}
 
 		w.WriteHeader(http.StatusAccepted) // 202 Accepted
@@ -543,13 +547,19 @@ func main() {
 	defer rdb.Close()
 	log.Printf("Connected to Redis at %s", redisAddr)
 
-	hub := NewHub(rdb)
+	// FCM wake-up push sender (Play flavor). Disabled/no-op unless
+	// FCM_CREDENTIALS_FILE points at a Firebase service-account JSON.
+	push := NewPushSender()
+
+	hub := NewHub(rdb, push)
 	go hub.Run()
 
 	// HTTP Routing
 	http.HandleFunc("/api/v1/pow/challenge", rateLimitMiddleware(handleGetChallenge))
 	http.HandleFunc("/api/v1/queue/post", rateLimitMiddleware(handlePostQueue(hub)))
 	http.HandleFunc("/api/v1/queue/status", rateLimitMiddleware(handleQueueStatus))
+	http.HandleFunc("/api/v1/push/register", rateLimitMiddleware(handlePushRegister))
+	http.HandleFunc("/api/v1/push/unregister", rateLimitMiddleware(handlePushUnregister))
 	http.HandleFunc("/api/v1/pair/init", rateLimitMiddleware(handlePairInit))
 	http.HandleFunc("/api/v1/pair/join", rateLimitMiddleware(handlePairJoin))
 	http.HandleFunc("/api/v1/pair/poll", rateLimitMiddleware(handlePairPoll))

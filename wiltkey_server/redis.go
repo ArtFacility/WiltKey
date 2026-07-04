@@ -57,6 +57,7 @@ type RedisClient struct {
 	memoryTunnels     map[string]string
 	memoryTunnelBytes map[string]int64
 	memoryNukes       map[string]ipFail
+	memoryPushTokens  map[string]string
 	mu                sync.RWMutex
 }
 
@@ -91,6 +92,7 @@ func NewRedisClient(addr string) (*RedisClient, error) {
 			memoryTunnels:     make(map[string]string),
 			memoryTunnelBytes: make(map[string]int64),
 			memoryNukes:       make(map[string]ipFail),
+			memoryPushTokens:  make(map[string]string),
 		}, nil
 	}
 	return &RedisClient{rdb: rdb}, nil
@@ -116,6 +118,7 @@ func (r *RedisClient) FlushAll() error {
 		r.memoryPairings = make(map[string]memoryPairing)
 		r.memoryTunnels = make(map[string]string)
 		r.memoryTunnelBytes = make(map[string]int64)
+		r.memoryPushTokens = make(map[string]string)
 		return nil
 	}
 	return r.rdb.FlushAll(ctx).Err()
@@ -323,6 +326,54 @@ func (r *RedisClient) IsQueueBlocked(userID string) (bool, error) {
 		return false, err
 	}
 	return val > 0, nil
+}
+
+// pushTokenTTL bounds how long a stored FCM registration token lives without a
+// refresh. The Play-flavor client re-registers on every foreground/connect, so a
+// live user keeps it fresh; this TTL just garbage-collects tokens for users who
+// uninstalled or went dark, so we stop trying to wake a dead device forever.
+const pushTokenTTL = 60 * 24 * time.Hour
+
+// SetPushToken stores (or refreshes) the FCM registration token for a user. Only
+// the Play-flavor build ever calls the endpoint that reaches this; FOSS builds
+// never register, so no token is ever stored for them.
+func (r *RedisClient) SetPushToken(userID string, token string) error {
+	if r.isMemory {
+		r.mu.Lock()
+		defer r.mu.Unlock()
+		r.memoryPushTokens[userID] = token
+		return nil
+	}
+	key := fmt.Sprintf("push:%s", userID)
+	return r.rdb.Set(ctx, key, token, pushTokenTTL).Err()
+}
+
+// GetPushToken returns the user's FCM token, or "" if none is registered.
+func (r *RedisClient) GetPushToken(userID string) (string, error) {
+	if r.isMemory {
+		r.mu.RLock()
+		defer r.mu.RUnlock()
+		return r.memoryPushTokens[userID], nil
+	}
+	key := fmt.Sprintf("push:%s", userID)
+	val, err := r.rdb.Get(ctx, key).Result()
+	if err == redis.Nil {
+		return "", nil
+	}
+	return val, err
+}
+
+// DeletePushToken drops a user's FCM token (mode switched to Off/FOSS, logout,
+// nuke, or FCM reported the token stale/unregistered on a send).
+func (r *RedisClient) DeletePushToken(userID string) error {
+	if r.isMemory {
+		r.mu.Lock()
+		defer r.mu.Unlock()
+		delete(r.memoryPushTokens, userID)
+		return nil
+	}
+	key := fmt.Sprintf("push:%s", userID)
+	return r.rdb.Del(ctx, key).Err()
 }
 
 // StorePoWChallenge stores a transient PoW challenge string mapped to its difficulty.

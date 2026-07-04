@@ -42,6 +42,28 @@ android {
         versionName = flutter.versionName
     }
 
+    // Dual-flavor distribution (see documentation/Notif_Fragmenting.md):
+    //   • play — Google Play build. Keeps the canonical applicationId so it stays
+    //     the SAME Play listing (internal testing / verification unaffected).
+    //     Compiles in Firebase Cloud Messaging for a battery-light wake-up ping.
+    //   • foss — GitHub/website build. Gets the .foss applicationId suffix so it's
+    //     a distinct installable, and pulls in ZERO Google Play Services code.
+    // Flutter requires a flavor to be named on build/run, e.g.:
+    //   flutter run   --flavor foss  --dart-define=WK_FCM=false
+    //   flutter build appbundle --flavor play --dart-define=WK_FCM=true
+    flavorDimensions += "distribution"
+    productFlavors {
+        create("play") {
+            dimension = "distribution"
+            // No applicationIdSuffix: this IS xyz.artfacility.wiltkey.
+        }
+        create("foss") {
+            dimension = "distribution"
+            applicationIdSuffix = ".foss"
+            versionNameSuffix = "-foss"
+        }
+    }
+
     signingConfigs {
         create("release") {
             if (keystorePropertiesFile.exists()) {
@@ -85,4 +107,19 @@ flutter {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+
+    // Firebase Cloud Messaging — compiled into the PLAY flavor ONLY (via the
+    // flavor-scoped `playImplementation` configuration). The FOSS build never sees
+    // these artifacts, so it ships free of Google Play Services. The native FCM
+    // service + push MethodChannel live under src/play/ to match.
+    "playImplementation"(platform("com.google.firebase:firebase-bom:33.5.1"))
+    "playImplementation"("com.google.firebase:firebase-messaging")
+}
+
+// Apply the Google Services plugin ONLY when building the Play flavor. It requires
+// google-services.json and would fail the Google-free FOSS build, so we gate it on
+// the requested task name containing "Play" (Gradle configures plugins before it
+// knows the active flavor, so a task-name check is the standard workaround).
+if (gradle.startParameter.taskRequests.toString().contains("Play", ignoreCase = true)) {
+    apply(plugin = "com.google.gms.google-services")
 }

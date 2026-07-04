@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:wiltkey_client/l10n/app_localizations.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import '../../../core/build_flavor.dart';
 import '../../../core/state.dart';
 import '../../../core/auth/biometric_auth.dart';
 import '../../../core/debug_clipboard.dart';
@@ -13,6 +14,7 @@ import '../../../core/theme/wk.dart';
 import '../../../core/theme/wiltkey_tokens.dart';
 import '../../../core/localization/locale_controller.dart';
 import 'widgets/theme_picker.dart';
+import 'change_pin_screen.dart';
 
 /// Publisher shown in the Settings "About" footer. The version string itself is
 /// read from the build at runtime (package_info_plus), so pubspec.yaml's
@@ -61,7 +63,7 @@ class _SettingsScreenState extends State<SettingsScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
     _appState.addListener(_updateStateFromModel);
 
     BiometricAuth.isAvailable().then((available) {
@@ -242,198 +244,10 @@ class _SettingsScreenState extends State<SettingsScreen>
     if (mounted) setState(() => _biometricBusy = false);
   }
 
-  void _showChangePinDialog() {
-    final t = context.wk;
-    final l10n = AppLocalizations.of(context)!;
-    final oldPinController = TextEditingController();
-    final newPinController = TextEditingController();
-    final confirmPinController = TextEditingController();
-    String error = '';
-
-    InputDecoration pinField() => InputDecoration(
-      filled: true,
-      fillColor: t.bg,
-      counterText: '',
-      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(t.radiusControl),
-        borderSide: BorderSide(color: t.border),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(t.radiusControl),
-        borderSide: BorderSide(color: t.action),
-      ),
-    );
-
-    showDialog(
-      context: context,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (statefulContext, setDialogState) {
-            return AlertDialog(
-              backgroundColor: t.surface,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(t.radiusCard),
-                side: BorderSide(color: t.positive, width: 1.5),
-              ),
-              title: Row(
-                children: [
-                  Icon(Icons.lock_outline, color: t.action, size: 20),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      t.uppercaseLabels
-                          ? l10n.settingsChangePinTitle.toUpperCase()
-                          : l10n.settingsChangePinTitle,
-                      style: t.screenTitle.copyWith(fontSize: 15),
-                    ),
-                  ),
-                ],
-              ),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(l10n.settingsChangePinOldPin, style: t.bodySecondary),
-                  const SizedBox(height: 6),
-                  TextField(
-                    controller: oldPinController,
-                    obscureText: true,
-                    keyboardType: TextInputType.number,
-                    style: t.dataMono.copyWith(
-                      color: t.textPrimary,
-                      fontSize: 12,
-                      letterSpacing: 2.0,
-                    ),
-                    maxLength: 6,
-                    decoration: pinField(),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(l10n.settingsChangePinNewPin, style: t.bodySecondary),
-                  const SizedBox(height: 6),
-                  TextField(
-                    controller: newPinController,
-                    obscureText: true,
-                    keyboardType: TextInputType.number,
-                    style: t.dataMono.copyWith(
-                      color: t.textPrimary,
-                      fontSize: 12,
-                      letterSpacing: 2.0,
-                    ),
-                    maxLength: 6,
-                    decoration: pinField(),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    l10n.settingsChangePinConfirmPin,
-                    style: t.bodySecondary,
-                  ),
-                  const SizedBox(height: 6),
-                  TextField(
-                    controller: confirmPinController,
-                    obscureText: true,
-                    keyboardType: TextInputType.number,
-                    style: t.dataMono.copyWith(
-                      color: t.textPrimary,
-                      fontSize: 12,
-                      letterSpacing: 2.0,
-                    ),
-                    maxLength: 6,
-                    decoration: pinField(),
-                  ),
-                  if (error.isNotEmpty) ...[
-                    const SizedBox(height: 10),
-                    Text(
-                      error,
-                      style: t.bodySecondary.copyWith(
-                        color: t.danger,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () {
-                    oldPinController.dispose();
-                    newPinController.dispose();
-                    confirmPinController.dispose();
-                    Navigator.pop(dialogContext);
-                  },
-                  child: Text(
-                    l10n.commonCancel,
-                    style: TextStyle(color: t.textSecondary),
-                  ),
-                ),
-                ElevatedButton(
-                  onPressed: () async {
-                    final oldPin = oldPinController.text;
-                    final newPin = newPinController.text;
-                    final confirm = confirmPinController.text;
-
-                    if (oldPin.isEmpty || newPin.isEmpty || confirm.isEmpty) {
-                      setDialogState(
-                        () => error = l10n.settingsChangePinEmptyFieldsError,
-                      );
-                      return;
-                    }
-                    if (newPin.length < 4 || newPin.length > 6) {
-                      setDialogState(
-                        () => error = l10n.settingsChangePinLengthError,
-                      );
-                      return;
-                    }
-                    if (newPin != confirm) {
-                      setDialogState(
-                        () => error = l10n.settingsChangePinMatchError,
-                      );
-                      return;
-                    }
-
-                    final bool success = await _appState.changePin(
-                      oldPin,
-                      newPin,
-                    );
-                    if (success) {
-                      oldPinController.dispose();
-                      newPinController.dispose();
-                      confirmPinController.dispose();
-                      if (mounted) {
-                        Navigator.pop(dialogContext);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            backgroundColor: t.surface,
-                            content: Text(
-                              l10n.settingsChangePinUpdatedSnackBar,
-                              style: t.bodySecondary.copyWith(
-                                color: t.action,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        );
-                      }
-                    } else {
-                      setDialogState(
-                        () => error = l10n.settingsChangePinIncorrectError,
-                      );
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: t.action,
-                    foregroundColor: t.onAction,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(t.radiusControl),
-                    ),
-                  ),
-                  child: Text(l10n.settingsProfileChangePinButton),
-                ),
-              ],
-            );
-          },
-        );
-      },
+  void _openChangePin() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const ChangePinScreen()),
     );
   }
 
@@ -473,6 +287,12 @@ class _SettingsScreenState extends State<SettingsScreen>
                   : l10n.settingsTabProfile,
             ),
             Tab(
+              icon: const Icon(Icons.shield_outlined, size: 20),
+              text: t.uppercaseLabels
+                  ? l10n.settingsTabSecurity.toUpperCase()
+                  : l10n.settingsTabSecurity,
+            ),
+            Tab(
               icon: const Icon(Icons.wifi, size: 20),
               text: t.uppercaseLabels
                   ? l10n.settingsTabNetwork.toUpperCase()
@@ -493,6 +313,7 @@ class _SettingsScreenState extends State<SettingsScreen>
             controller: _tabController,
             children: [
               _buildProfileTab(t, l10n),
+              _buildSecurityTab(t, l10n),
               _buildNetworkTab(t, l10n),
               _buildNotificationsTab(t, l10n),
             ],
@@ -799,7 +620,22 @@ class _SettingsScreenState extends State<SettingsScreen>
               ],
             ),
           ),
-          Divider(color: t.border, height: 40),
+          const SizedBox(height: 16),
+        ],
+      ),
+    );
+  }
+
+  // Security tab: fingerprint unlock, PIN change, and the destructive identity
+  // reset — kept out of Profile so that tab stays purely customization.
+  Widget _buildSecurityTab(WiltkeyTokens t, AppLocalizations l10n) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _section(t, l10n.settingsSecuritySectionAccess),
+          const SizedBox(height: 12),
 
           // Optional fingerprint unlock (Android biometrics). Hidden when the
           // device has no enrolled biometrics.
@@ -838,7 +674,7 @@ class _SettingsScreenState extends State<SettingsScreen>
 
           Center(
             child: OutlinedButton.icon(
-              onPressed: _showChangePinDialog,
+              onPressed: _openChangePin,
               icon: const Icon(Icons.lock_outline, size: 16),
               label: Text(l10n.settingsProfileChangePinButton),
               style: OutlinedButton.styleFrom(
@@ -851,8 +687,10 @@ class _SettingsScreenState extends State<SettingsScreen>
               ),
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 28),
 
+          _section(t, l10n.settingsSecuritySectionDanger),
+          const SizedBox(height: 12),
           Center(
             child: ElevatedButton.icon(
               onPressed: _confirmResetIdentity,
@@ -1091,7 +929,11 @@ class _SettingsScreenState extends State<SettingsScreen>
       ),
       NotificationMode.instant => (
         l10n.notificationModeInstant,
-        l10n.notificationModeInstantDesc,
+        // Play flavor backs Instant with FCM, not a foreground socket — describe
+        // that instead of the FOSS "no Google push" copy.
+        kFcmEnabled
+            ? l10n.notificationModeInstantDescFcm
+            : l10n.notificationModeInstantDesc,
       ),
     };
     return ListTile(

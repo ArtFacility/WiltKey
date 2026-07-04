@@ -62,6 +62,16 @@ extension AppStateInbound on AppState {
     });
   }
 
+  /// True for a real inbound user message worth surfacing (text/photo/voice) —
+  /// mirrors the background handler's notify allowlist. Control writes, emoji
+  /// pool ops, system lines and our own echoes never raise the in-app banner.
+  bool _isNotifiableMessage(ChatMessage msg) {
+    if (msg.isSentByMe || msg.isSystem) return false;
+    return msg.contentType == 'text' ||
+        msg.contentType == 'image' ||
+        msg.contentType == 'voice';
+  }
+
   /// Extracts the issuance timestamp (epoch ms) from a `nuke` envelope, or null
   /// for the legacy literal `VAPORIZE` envelope (and any unparseable payload) —
   /// those are treated as "no timestamp", so the stale-nuke guard lets them
@@ -600,6 +610,7 @@ extension AppStateInbound on AppState {
         contact,
         newMessage,
       ); // live arrival → unread badge if not open
+      if (_isNotifiableMessage(newMessage)) emitMessageAlert(contact);
       await WiltkeyDatabase.instance.saveMessage(
         newMessage,
         contact.id,
@@ -810,6 +821,9 @@ extension AppStateInbound on AppState {
         contact,
         newMessage,
       ); // live arrival → unread badge if not open
+      if (innerSenderId != userId && _isNotifiableMessage(newMessage)) {
+        emitMessageAlert(contact);
+      }
       await WiltkeyDatabase.instance.saveMessage(
         newMessage,
         contact.id,

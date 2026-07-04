@@ -172,6 +172,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsTabProfile => '个人资料';
 
   @override
+  String get settingsTabSecurity => '安全';
+
+  @override
+  String get settingsSecuritySectionAccess => '访问与解锁';
+
+  @override
+  String get settingsSecuritySectionDanger => '危险区域';
+
+  @override
   String get settingsTabNetwork => '网络';
 
   @override
@@ -239,6 +248,15 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsChangePinTitle => '修改 PIN 码';
+
+  @override
+  String get changePinVerifyTitle => '验证当前 PIN 码';
+
+  @override
+  String get changePinVerifyPrompt => '输入当前 PIN 码以继续。';
+
+  @override
+  String get changePinSetTitle => '设置新 PIN 码';
 
   @override
   String get settingsChangePinOldPin => '输入当前 PIN 码';
@@ -345,19 +363,50 @@ class AppLocalizationsZh extends AppLocalizations {
   String get notificationModeLowPower => '低功耗';
 
   @override
-  String get notificationModeLowPowerDesc => '每隔约 10 分钟检查一次新消息。省电模式。';
+  String get notificationModeLowPowerDesc =>
+      '在后台定期检查新消息——刚关闭应用后会较频繁地检查，随后逐渐减少以节省电量。没有持续连接，因此通知可能会有延迟。';
 
   @override
   String get notificationModeInstant => '即时通知';
 
   @override
-  String get notificationModeInstantDesc => '在后台保持安全连接以获取即时通知。会显示一条常驻通知，且较为耗电。';
+  String get notificationModeInstantDesc =>
+      '可选。在后台保持一条端到端加密连接，实时同步收到的消息，并通过一条常驻通知显示。出于隐私考虑，Wiltkey 使用此方式而非 Google 或 Apple 的推送服务，因此即使没有 Google Play 服务也能正常工作——代价是更耗电。';
 
   @override
   String get notificationNewMessageBody => '你收到一条消息';
 
   @override
-  String get notificationSecureLinkActive => '安全链路已激活';
+  String get notificationSecureLinkActive => '正在同步安全消息';
+
+  @override
+  String get onboardingNotificationsTitle => '通知';
+
+  @override
+  String get onboardingNotificationsExplanation =>
+      'Wiltkey 不使用 Google 或 Apple 的推送通知——你的消息不会以任何形式经过它们的服务器。请选择你希望的提醒方式。你随时可以在“设置”中更改。';
+
+  @override
+  String get onboardingFactPushTitle => '无推送服务器';
+
+  @override
+  String get onboardingFactPushBody =>
+      '普通应用通过 Google 或 Apple 转发通知，从而暴露谁在何时给你发消息。Wiltkey 从不这样做——默认完全不进行后台检查，任何提醒都完全在你的设备上运行。';
+
+  @override
+  String get notificationModeInstantDescFcm =>
+      '可选。使用 Google 的推送服务作为轻量级唤醒信号，让新消息实时送达。只有不含内容的信号会经过 Google——绝不包含你的消息，消息在中继上保持端到端加密，直到你的设备将其取回。比持续连接更省电。';
+
+  @override
+  String get onboardingNotificationsExplanationFcm =>
+      '为实现实时提醒，此版本仅将 Google 的推送服务用作唤醒信号——一个不含内容的信号，绝不包含你的消息，你的消息也绝不会经过 Google 的服务器。选择你希望的提醒方式；你可以随时在设置中更改。';
+
+  @override
+  String get onboardingFactPushTitleFcm => '无内容推送';
+
+  @override
+  String get onboardingFactPushBodyFcm =>
+      '普通应用通过 Google 转发通知内容，从而暴露发送了什么以及何时发送。此版本仅将 Google 用作不含内容的唤醒信号——没有消息数据，没有可读的元数据——所有内容始终保持端到端加密。';
 
   @override
   String get chatsLockedSubtitle => '已锁定 · 需当面配对以解锁';
@@ -806,6 +855,32 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatVoiceComingSoon => '语音消息即将推出。';
+
+  @override
+  String get chatVoiceHoldHint => '按住以录制语音消息。';
+
+  @override
+  String get chatVoiceReleaseCancel => '松开以取消';
+
+  @override
+  String get chatVoicePermissionDenied => '录制语音消息需要麦克风权限。';
+
+  @override
+  String get chatVoiceQualityLofi => '低保真';
+
+  @override
+  String get chatVoiceQualityVoice => '语音';
+
+  @override
+  String get chatVoiceQualityClear => '清晰';
+
+  @override
+  String get chatVoiceUnavailable => '语音消息不可用';
+
+  @override
+  String chatVoiceTooLargeSnackBar(String cost, String charge) {
+    return '语音消息过大（$cost），超出剩余空间（$charge）。';
+  }
 
   @override
   String get chatDetailsDeleteConfirmTitle => '删除聊天？';

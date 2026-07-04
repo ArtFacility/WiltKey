@@ -12,3 +12,8 @@ GeneratedPluginRegistrant.java
 key.properties
 **/*.keystore
 **/*.jks
+
+# Firebase config for the Play flavor (FCM wake-up push). Per-developer; not
+# committed. Place it at app/src/play/google-services.json — the Google Services
+# plugin only reads it for Play-flavor builds, so the FOSS build never needs it.
+**/google-services.json

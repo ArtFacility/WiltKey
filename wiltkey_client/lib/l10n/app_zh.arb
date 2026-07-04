@@ -57,6 +57,9 @@
   "onboardingFactKdfBody": "普通的 PIN 码 in 几毫秒内就可以被暴力破解。Wiltkey 会通过强化函数处理你的 PIN 码，让针对本地数据库的暴力破解变得根本不可能。",
   "settingsTitle": "设置",
   "settingsTabProfile": "个人资料",
+  "settingsTabSecurity": "安全",
+  "settingsSecuritySectionAccess": "访问与解锁",
+  "settingsSecuritySectionDanger": "危险区域",
   "settingsTabNetwork": "网络",
   "settingsTabAlerts": "通知",
   "settingsSavedIndicator": "已保存",
@@ -80,6 +83,9 @@
   "settingsResetConfirmCancel": "取消",
   "settingsResetConfirmReset": "重置",
   "settingsChangePinTitle": "修改 PIN 码",
+  "changePinVerifyTitle": "验证当前 PIN 码",
+  "changePinVerifyPrompt": "输入当前 PIN 码以继续。",
+  "changePinSetTitle": "设置新 PIN 码",
   "settingsChangePinOldPin": "输入当前 PIN 码",
   "settingsChangePinNewPin": "输入新 PIN 码 (4-6 位数字)",
   "settingsChangePinConfirmPin": "确认新 PIN 码",
@@ -114,11 +120,19 @@
   "notificationModeOff": "关闭",
   "notificationModeOffDesc": "无后台检查。只有打开应用时才能收到消息。",
   "notificationModeLowPower": "低功耗",
-  "notificationModeLowPowerDesc": "每隔约 10 分钟检查一次新消息。省电模式。",
+  "notificationModeLowPowerDesc": "在后台定期检查新消息——刚关闭应用后会较频繁地检查，随后逐渐减少以节省电量。没有持续连接，因此通知可能会有延迟。",
   "notificationModeInstant": "即时通知",
-  "notificationModeInstantDesc": "在后台保持安全连接以获取即时通知。会显示一条常驻通知，且较为耗电。",
+  "notificationModeInstantDesc": "可选。在后台保持一条端到端加密连接，实时同步收到的消息，并通过一条常驻通知显示。出于隐私考虑，Wiltkey 使用此方式而非 Google 或 Apple 的推送服务，因此即使没有 Google Play 服务也能正常工作——代价是更耗电。",
   "notificationNewMessageBody": "你收到一条消息",
-  "notificationSecureLinkActive": "安全链路已激活",
+  "notificationSecureLinkActive": "正在同步安全消息",
+  "onboardingNotificationsTitle": "通知",
+  "onboardingNotificationsExplanation": "Wiltkey 不使用 Google 或 Apple 的推送通知——你的消息不会以任何形式经过它们的服务器。请选择你希望的提醒方式。你随时可以在“设置”中更改。",
+  "onboardingFactPushTitle": "无推送服务器",
+  "onboardingFactPushBody": "普通应用通过 Google 或 Apple 转发通知，从而暴露谁在何时给你发消息。Wiltkey 从不这样做——默认完全不进行后台检查，任何提醒都完全在你的设备上运行。",
+  "notificationModeInstantDescFcm": "可选。使用 Google 的推送服务作为轻量级唤醒信号，让新消息实时送达。只有不含内容的信号会经过 Google——绝不包含你的消息，消息在中继上保持端到端加密，直到你的设备将其取回。比持续连接更省电。",
+  "onboardingNotificationsExplanationFcm": "为实现实时提醒，此版本仅将 Google 的推送服务用作唤醒信号——一个不含内容的信号，绝不包含你的消息，你的消息也绝不会经过 Google 的服务器。选择你希望的提醒方式；你可以随时在设置中更改。",
+  "onboardingFactPushTitleFcm": "无内容推送",
+  "onboardingFactPushBodyFcm": "普通应用通过 Google 转发通知内容，从而暴露发送了什么以及何时发送。此版本仅将 Google 用作不含内容的唤醒信号——没有消息数据，没有可读的元数据——所有内容始终保持端到端加密。",
   "chatsLockedSubtitle": "已锁定 · 需当面配对以解锁",
   "chatsMemberCount": "{count} 个成员",
   "@chatsMemberCount": {
@@ -434,6 +448,24 @@
   "chatLockedLabel": "已锁定 · 需当面配对以继续",
   "chatMessageHint": "消息",
   "chatVoiceComingSoon": "语音消息即将推出。",
+  "chatVoiceHoldHint": "按住以录制语音消息。",
+  "chatVoiceReleaseCancel": "松开以取消",
+  "chatVoicePermissionDenied": "录制语音消息需要麦克风权限。",
+  "chatVoiceQualityLofi": "低保真",
+  "chatVoiceQualityVoice": "语音",
+  "chatVoiceQualityClear": "清晰",
+  "chatVoiceUnavailable": "语音消息不可用",
+  "chatVoiceTooLargeSnackBar": "语音消息过大（{cost}），超出剩余空间（{charge}）。",
+  "@chatVoiceTooLargeSnackBar": {
+    "placeholders": {
+      "cost": {
+        "type": "String"
+      },
+      "charge": {
+        "type": "String"
+      }
+    }
+  },
   "chatDetailsDeleteConfirmTitle": "删除聊天？",
   "chatDetailsDeleteConfirmBody": "这将永久删除此联系人的所有消息和加密密钥。此操作无法撤销。",
   "chatDetailsDeleteConfirmButton": "删除聊天",

@@ -20,6 +20,7 @@ import 'widgets/diagnostics_dialog.dart';
 import 'widgets/failed_actions_dialog.dart';
 import 'widgets/compression_dialog.dart';
 import 'widgets/debug_console_sheet.dart';
+import 'widgets/voice_recording_mixin.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -29,7 +30,7 @@ class ChatScreen extends StatefulWidget {
 }
 
 class _ChatScreenState extends State<ChatScreen>
-    with TickerProviderStateMixin, WidgetsBindingObserver {
+    with TickerProviderStateMixin, WidgetsBindingObserver, VoiceRecordingMixin {
   final AppState _appState = AppState();
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
@@ -46,11 +47,40 @@ class _ChatScreenState extends State<ChatScreen>
   bool _showScrollDownArrow = false;
   final Set<String> _revealedMessageIds = {};
 
+  // The chat this screen opened with — used to release the "visible chat" flag on
+  // dispose only if a newer chat hasn't taken over (see [AppState.visibleChatId]).
+  String? _openChatId;
+
   // Send-button "bloom" micro-animation.
   late final AnimationController _sendBloom = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 250),
   );
+
+  // Voice recording (hold-to-record mic + quality chip + HUD) lives in
+  // VoiceRecordingMixin; this screen just wires the hooks below.
+  @override
+  Contact? get voiceContact => _appState.activeContact;
+
+  @override
+  Future<String?> sendVoiceMessage(String base64Payload, String mimeType) =>
+      _appState.sendMessage(
+        base64Payload,
+        contentType: 'voice',
+        mimeType: mimeType,
+      );
+
+  @override
+  void onVoiceError(String message) => _errorSnack(message);
+
+  @override
+  void onVoiceSent() => _scrollToBottom();
+
+  @override
+  void onVoiceRecordingStarted() {
+    _hideEmoji();
+    _inputFocus.unfocus();
+  }
 
   @override
   void initState() {
@@ -62,6 +92,8 @@ class _ChatScreenState extends State<ChatScreen>
 
     final contact = _appState.activeContact;
     if (contact != null) {
+      _openChatId = contact.id;
+      _appState.visibleChatId = contact.id; // now on screen → mute its own alerts
       // Load the most-recent page (windowed), then decrypt any OTP-only ones.
       _appState.loadInitialMessages(contact).then((_) async {
         if (!mounted) return;
@@ -82,6 +114,8 @@ class _ChatScreenState extends State<ChatScreen>
         if (mounted) setState(() {});
       });
     }
+
+    initVoiceRecording();
   }
 
   @override
@@ -91,6 +125,9 @@ class _ChatScreenState extends State<ChatScreen>
     // its unread badge on the list.
     final c = _appState.activeContact;
     if (c != null) _appState.markChatRead(c);
+    // Release the "visible chat" flag so the dashboard resumes alerting for this
+    // chat — but only if a newer chat hasn't already claimed it (deep-link on top).
+    if (_appState.visibleChatId == _openChatId) _appState.visibleChatId = null;
     _sendBloom.dispose();
     _appState.removeListener(_updateState);
     _messageController.removeListener(_updateCharCount);
@@ -98,6 +135,7 @@ class _ChatScreenState extends State<ChatScreen>
     _messageController.dispose();
     _scrollController.dispose();
     _inputFocus.dispose();
+    disposeVoiceRecording();
     super.dispose();
   }
 
@@ -323,13 +361,6 @@ class _ChatScreenState extends State<ChatScreen>
     if (_showEmoji) setState(() => _showEmoji = false);
   }
 
-  void _onMicTap() {
-    final l10n = AppLocalizations.of(context)!;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(l10n.chatVoiceComingSoon)));
-  }
-
   void _handleSend() async {
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
@@ -391,9 +422,7 @@ class _ChatScreenState extends State<ChatScreen>
         backgroundColor: t.surface,
         content: Text(
           ok ? l10n.chatSyncStarted : l10n.chatSyncOffline,
-          style: t.bodySecondary.copyWith(
-            color: ok ? t.action : t.danger,
-          ),
+          style: t.bodySecondary.copyWith(color: ok ? t.action : t.danger),
         ),
       ),
     );
@@ -433,227 +462,235 @@ class _ChatScreenState extends State<ChatScreen>
           Scaffold(
             appBar: AppBar(
               backgroundColor: t.bg,
-            elevation: 0,
-            titleSpacing: 8,
-            title: Row(
-              children: [
-                GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () => _openChatDetails(contact),
-                  child: Row(
-                    children: [
-                      PixelArtAvatar(
-                        hexString:
-                            (contact.profileImageB64 != null &&
-                                contact.profileImageB64!.isNotEmpty)
-                            ? contact.profileImageB64!
-                            : PixelArtAvatar.generateIdenticon(contact.keyHash),
-                        size: 34,
-                      ),
-                      const SizedBox(width: 10),
-                    ],
-                  ),
-                ),
-                Expanded(
-                  child: GestureDetector(
+              elevation: 0,
+              titleSpacing: 8,
+              title: Row(
+                children: [
+                  GestureDetector(
                     behavior: HitTestBehavior.opaque,
                     onTap: () => _openChatDetails(contact),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
+                    child: Row(
                       children: [
-                        Text(
-                          contact.name,
-                          style: t.body.copyWith(fontWeight: FontWeight.w600),
-                          overflow: TextOverflow.ellipsis,
+                        PixelArtAvatar(
+                          hexString:
+                              (contact.profileImageB64 != null &&
+                                  contact.profileImageB64!.isNotEmpty)
+                              ? contact.profileImageB64!
+                              : PixelArtAvatar.generateIdenticon(
+                                  contact.keyHash,
+                                ),
+                          size: 34,
                         ),
-                        Text(
-                          l10n.chatTapForDetails,
-                          style: t.dataMono.copyWith(
-                            fontSize: 9,
-                            color: t.textTertiary,
-                          ),
-                        ),
+                        const SizedBox(width: 10),
                       ],
                     ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                // Budget glyph in the header (flower in garden, compact bar in
-                // cyberpunk). Tap → diagnostics.
-                GestureDetector(
-                  onTap: () => DiagnosticsDialog.show(
-                    context,
-                    contact,
-                    _appState.userId,
+                  Expanded(
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => _openChatDetails(contact),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            contact.name,
+                            style: t.body.copyWith(fontWeight: FontWeight.w600),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Text(
+                            l10n.chatTapForDetails,
+                            style: t.dataMono.copyWith(
+                              fontSize: 9,
+                              color: t.textTertiary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                  child: context.wkc.budgetIndicator(
-                    ourFraction: currentPercent,
-                    theirFraction: contact.getTheirChargePercentage(
+                  const SizedBox(width: 8),
+                  // Budget glyph in the header (flower in garden, compact bar in
+                  // cyberpunk). Tap → diagnostics.
+                  GestureDetector(
+                    onTap: () => DiagnosticsDialog.show(
+                      context,
+                      contact,
                       _appState.userId,
                     ),
-                    isWilted: isWilted,
-                    split: true,
-                    variant: BudgetIndicatorVariant.chatHeader,
-                    semanticLabel: l10n.chatRemainingLabel(
-                      AppState.formatBytes(contact.remainingBufferBytes),
+                    child: context.wkc.budgetIndicator(
+                      ourFraction: currentPercent,
+                      theirFraction: contact.getTheirChargePercentage(
+                        _appState.userId,
+                      ),
+                      isWilted: isWilted,
+                      split: true,
+                      variant: BudgetIndicatorVariant.chatHeader,
+                      semanticLabel: l10n.chatRemainingLabel(
+                        AppState.formatBytes(contact.remainingBufferBytes),
+                      ),
                     ),
                   ),
-                ),
-              ],
-            ),
-            actions: [
-              // Manual message reconciliation. Always available (so the user can
-              // pull messages they suspect they're missing). When we detect a
-              // likely stuck delivery the glyph switches to the "sync problem"
-              // variant — attention is conveyed by the icon shape rather than a
-              // colour, so it reads the same on the dark (cyberpunk/garden) and
-              // light (paperink) themes. Tinted with the shared [action] accent,
-              // matching every other header icon.
-              IconButton(
-                icon: Icon(
-                  _needsReconcile(contact)
-                      ? Icons.sync_problem
-                      : Icons.sync,
-                  color: t.action,
-                  size: 20,
-                ),
-                tooltip: l10n.chatSyncTooltip,
-                onPressed: () => _handleSyncTap(contact),
+                ],
               ),
-              if (_appState.showDebugButtons)
+              actions: [
+                // Manual message reconciliation. Always available (so the user can
+                // pull messages they suspect they're missing). When we detect a
+                // likely stuck delivery the glyph switches to the "sync problem"
+                // variant — attention is conveyed by the icon shape rather than a
+                // colour, so it reads the same on the dark (cyberpunk/garden) and
+                // light (paperink) themes. Tinted with the shared [action] accent,
+                // matching every other header icon.
                 IconButton(
                   icon: Icon(
-                    Icons.terminal_outlined,
+                    _needsReconcile(contact) ? Icons.sync_problem : Icons.sync,
                     color: t.action,
                     size: 20,
                   ),
-                  tooltip: 'Debug console',
-                  onPressed: () => DebugConsoleSheet.show(context, _appState),
+                  tooltip: l10n.chatSyncTooltip,
+                  onPressed: () => _handleSyncTap(contact),
                 ),
-            ],
-          ),
-          body: Container(
-            color: t.bg,
-            child: Column(
-              children: [
-                if (isWilted)
-                  Container(
-                    width: double.infinity,
-                    color: t.budgetWilted.withValues(alpha: 0.12),
-                    padding: const EdgeInsets.symmetric(
-                      vertical: 8,
-                      horizontal: 16,
+                if (_appState.showDebugButtons)
+                  IconButton(
+                    icon: Icon(
+                      Icons.terminal_outlined,
+                      color: t.action,
+                      size: 20,
                     ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.lock_clock, color: t.budgetWilted, size: 16),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            t.uppercaseLabels
-                                ? (isArchived
-                                          ? l10n.chatsArchivedSubtitle
-                                          : l10n.chatLockedLabel)
-                                      .toUpperCase()
-                                : (isArchived
-                                      ? l10n.chatsArchivedSubtitle
-                                      : l10n.chatLockedLabel),
-                            style: t.badgeLabel.copyWith(color: t.budgetWilted),
-                          ),
-                        ),
-                      ],
-                    ),
+                    tooltip: 'Debug console',
+                    onPressed: () => DebugConsoleSheet.show(context, _appState),
                   ),
-
-                Expanded(
-                  child: ListView.builder(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 16,
-                    ),
-                    itemCount: messageList.length,
-                    itemBuilder: (context, index) {
-                      final message = messageList[index];
-                      final String displayText =
-                          message.decryptedText ?? message.text;
-
-                      final bool isFirstInBatch =
-                          (index == 0) ||
-                          (messageList[index - 1].isSentByMe !=
-                              message.isSentByMe) ||
-                          messageList[index - 1].isSystem;
-
-                      return MessageBubble(
-                        message: message,
-                        displayText: displayText,
-                        contact: contact,
-                        appState: _appState,
-                        emojiMap: CustomEmojiStore.cachedMap(contact.keyHash),
-                        isMe: message.isSentByMe,
-                        isFirstInBatch: isFirstInBatch,
-                        isRevealed: _revealedMessageIds.contains(message.id),
-                        onRevealTap: () {
-                          setState(() {
-                            _revealedMessageIds.add(message.id);
-                          });
-                        },
-                        onFailedTap: () => FailedActionsDialog.show(
-                          context,
-                          contact,
-                          message,
-                          _appState,
-                        ),
-                      );
-                    },
-                  ),
-                ),
-
-                // SafeArea keeps the composer clear of the system gesture/nav
-                // bar (it collapses to zero when the keyboard is up). Pushed
-                // chat screens have no bottomNavigationBar to absorb that inset,
-                // unlike the dashboard/settings tabs inside AppShell.
-                SafeArea(
-                  top: false,
-                  child: Container(
-                    color: t.bg,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    child: isWilted
-                        ? _buildLockedComposer(t)
-                        : _buildComposer(t, contact, maxFormatted),
-                  ),
-                ),
               ],
             ),
-          ),
-        ),
-        Positioned(
-          bottom: 90,
-          right: 16,
-          child: AnimatedOpacity(
-            opacity: _showScrollDownArrow ? 1.0 : 0.0,
-            duration: const Duration(milliseconds: 200),
-            child: _showScrollDownArrow
-                ? FloatingActionButton.small(
-                    backgroundColor: t.surface,
-                    shape: CircleBorder(
-                      side: BorderSide(color: t.action.withValues(alpha: 0.5)),
+            body: Container(
+              color: t.bg,
+              child: Column(
+                children: [
+                  if (isWilted)
+                    Container(
+                      width: double.infinity,
+                      color: t.budgetWilted.withValues(alpha: 0.12),
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 8,
+                        horizontal: 16,
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.lock_clock,
+                            color: t.budgetWilted,
+                            size: 16,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              t.uppercaseLabels
+                                  ? (isArchived
+                                            ? l10n.chatsArchivedSubtitle
+                                            : l10n.chatLockedLabel)
+                                        .toUpperCase()
+                                  : (isArchived
+                                        ? l10n.chatsArchivedSubtitle
+                                        : l10n.chatLockedLabel),
+                              style: t.badgeLabel.copyWith(
+                                color: t.budgetWilted,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    onPressed: () {
-                      _scrollToBottom();
-                      setState(() {
-                        _showScrollDownArrow = false;
-                      });
-                    },
-                    child: Icon(Icons.arrow_downward, color: t.action),
-                  )
-                : const SizedBox(),
+
+                  Expanded(
+                    child: ListView.builder(
+                      controller: _scrollController,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 16,
+                      ),
+                      itemCount: messageList.length,
+                      itemBuilder: (context, index) {
+                        final message = messageList[index];
+                        final String displayText =
+                            message.decryptedText ?? message.text;
+
+                        final bool isFirstInBatch =
+                            (index == 0) ||
+                            (messageList[index - 1].isSentByMe !=
+                                message.isSentByMe) ||
+                            messageList[index - 1].isSystem;
+
+                        return MessageBubble(
+                          message: message,
+                          displayText: displayText,
+                          contact: contact,
+                          appState: _appState,
+                          emojiMap: CustomEmojiStore.cachedMap(contact.keyHash),
+                          isMe: message.isSentByMe,
+                          isFirstInBatch: isFirstInBatch,
+                          isRevealed: _revealedMessageIds.contains(message.id),
+                          onRevealTap: () {
+                            setState(() {
+                              _revealedMessageIds.add(message.id);
+                            });
+                          },
+                          onFailedTap: () => FailedActionsDialog.show(
+                            context,
+                            contact,
+                            message,
+                            _appState,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+
+                  // SafeArea keeps the composer clear of the system gesture/nav
+                  // bar (it collapses to zero when the keyboard is up). Pushed
+                  // chat screens have no bottomNavigationBar to absorb that inset,
+                  // unlike the dashboard/settings tabs inside AppShell.
+                  SafeArea(
+                    top: false,
+                    child: Container(
+                      color: t.bg,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      child: isWilted
+                          ? _buildLockedComposer(t)
+                          : _buildComposer(t, contact, maxFormatted),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
-        ),
+          Positioned(
+            bottom: 90,
+            right: 16,
+            child: AnimatedOpacity(
+              opacity: _showScrollDownArrow ? 1.0 : 0.0,
+              duration: const Duration(milliseconds: 200),
+              child: _showScrollDownArrow
+                  ? FloatingActionButton.small(
+                      backgroundColor: t.surface,
+                      shape: CircleBorder(
+                        side: BorderSide(
+                          color: t.action.withValues(alpha: 0.5),
+                        ),
+                      ),
+                      onPressed: () {
+                        _scrollToBottom();
+                        setState(() {
+                          _showScrollDownArrow = false;
+                        });
+                      },
+                      child: Icon(Icons.arrow_downward, color: t.action),
+                    )
+                  : const SizedBox(),
+            ),
+          ),
         ],
       ),
     );
@@ -698,57 +735,60 @@ class _ChatScreenState extends State<ChatScreen>
         Row(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            Padding(
-              padding: const EdgeInsets.only(bottom: 4.0),
-              child: IconButton(
-                icon: Icon(
-                  _showEmoji
-                      ? Icons.keyboard_outlined
-                      : Icons.emoji_emotions_outlined,
-                  color: t.action,
-                  size: 22,
+            if (!isRecordingVoice)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4.0),
+                child: IconButton(
+                  icon: Icon(
+                    _showEmoji
+                        ? Icons.keyboard_outlined
+                        : Icons.emoji_emotions_outlined,
+                    color: t.action,
+                    size: 22,
+                  ),
+                  onPressed: _toggleEmoji,
                 ),
-                onPressed: _toggleEmoji,
               ),
-            ),
             Expanded(
-              child: TextField(
-                controller: _messageController,
-                focusNode: _inputFocus,
-                minLines: 1,
-                maxLines: 8,
-                onTap: _hideEmoji,
-                style: t.body.copyWith(fontSize: 13),
-                decoration: InputDecoration(
-                  hintText: l10n.chatMessageHint,
-                  hintStyle: t.body.copyWith(
-                    fontSize: 13,
-                    color: t.textTertiary,
-                  ),
-                  filled: true,
-                  fillColor: t.surface,
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 11,
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderSide: BorderSide(
-                      color: t.border,
-                      width: t.borderWidth,
+              child: isRecordingVoice
+                  ? buildRecordingHud(t, l10n)
+                  : TextField(
+                      controller: _messageController,
+                      focusNode: _inputFocus,
+                      minLines: 1,
+                      maxLines: 8,
+                      onTap: _hideEmoji,
+                      style: t.body.copyWith(fontSize: 13),
+                      decoration: InputDecoration(
+                        hintText: l10n.chatMessageHint,
+                        hintStyle: t.body.copyWith(
+                          fontSize: 13,
+                          color: t.textTertiary,
+                        ),
+                        filled: true,
+                        fillColor: t.surface,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 11,
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderSide: BorderSide(
+                            color: t.border,
+                            width: t.borderWidth,
+                          ),
+                          borderRadius: BorderRadius.circular(t.radiusCard),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderSide: BorderSide(
+                            color: t.action,
+                            width: t.borderWidth,
+                          ),
+                          borderRadius: BorderRadius.circular(t.radiusCard),
+                        ),
+                      ),
                     ),
-                    borderRadius: BorderRadius.circular(t.radiusCard),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderSide: BorderSide(
-                      color: t.action,
-                      width: t.borderWidth,
-                    ),
-                    borderRadius: BorderRadius.circular(t.radiusCard),
-                  ),
-                ),
-              ),
             ),
-            if (contact.imagesAllowed ?? true) ...[
+            if (!isRecordingVoice && (contact.imagesAllowed ?? true)) ...[
               const SizedBox(width: 4),
               Padding(
                 padding: const EdgeInsets.only(bottom: 4.0),
@@ -763,38 +803,32 @@ class _ChatScreenState extends State<ChatScreen>
               ),
             ],
             const SizedBox(width: 8),
-            Padding(
-              padding: const EdgeInsets.only(bottom: 4.0),
-              child: _charCount == 0
-                  // Empty field: voice-message affordance (recording wired later).
-                  ? IconButton(
-                      icon: Icon(
-                        Icons.mic_none_outlined,
-                        color: t.action,
-                        size: 22,
-                      ),
-                      onPressed: _onMicTap,
-                    )
-                  : AnimatedBuilder(
-                      animation: _sendBloom,
-                      builder: (context, child) {
-                        final v = _sendBloom.value;
-                        final scale =
-                            1.0 + 0.16 * sin(v * pi); // bloom out and back
-                        return Transform.scale(scale: scale, child: child);
-                      },
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: t.action,
-                          borderRadius: BorderRadius.circular(t.radiusControl),
-                        ),
-                        child: IconButton(
-                          icon: Icon(Icons.send, color: t.onAction, size: 18),
-                          onPressed: _handleSend,
-                        ),
-                      ),
+            if (_charCount == 0)
+              // Empty field → hold-to-record mic (tap it for the quality picker).
+              buildVoiceButton(t, l10n)
+            else
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4.0),
+                child: AnimatedBuilder(
+                  animation: _sendBloom,
+                  builder: (context, child) {
+                    final v = _sendBloom.value;
+                    final scale =
+                        1.0 + 0.16 * sin(v * pi); // bloom out and back
+                    return Transform.scale(scale: scale, child: child);
+                  },
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: t.action,
+                      borderRadius: BorderRadius.circular(t.radiusControl),
                     ),
-            ),
+                    child: IconButton(
+                      icon: Icon(Icons.send, color: t.onAction, size: 18),
+                      onPressed: _handleSend,
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
         if (_showEmoji)

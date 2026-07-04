@@ -181,6 +181,15 @@ class AppLocalizationsFr extends AppLocalizations {
   String get settingsTabProfile => 'Profil';
 
   @override
+  String get settingsTabSecurity => 'Sécurité';
+
+  @override
+  String get settingsSecuritySectionAccess => 'Accès et déverrouillage';
+
+  @override
+  String get settingsSecuritySectionDanger => 'Zone de danger';
+
+  @override
   String get settingsTabNetwork => 'Réseau';
 
   @override
@@ -250,6 +259,16 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get settingsChangePinTitle => 'Modifier le code PIN';
+
+  @override
+  String get changePinVerifyTitle => 'Vérifier le code PIN actuel';
+
+  @override
+  String get changePinVerifyPrompt =>
+      'Saisis ton code PIN actuel pour continuer.';
+
+  @override
+  String get changePinSetTitle => 'Définir le nouveau code PIN';
 
   @override
   String get settingsChangePinOldPin => 'Saisis le code PIN actuel';
@@ -367,20 +386,50 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get notificationModeLowPowerDesc =>
-      'Vérifie les nouveaux messages toutes les 10 minutes environ. Économe pour la batterie.';
+      'Vérifie régulièrement les nouveaux messages en arrière-plan – rapidement juste après la fermeture de l\'application, puis moins souvent pour économiser la batterie. Pas de connexion permanente, les alertes peuvent donc être retardées.';
 
   @override
   String get notificationModeInstant => 'Instantané';
 
   @override
   String get notificationModeInstantDesc =>
-      'Garde un lien sécurisé actif en arrière-plan pour des alertes instantanées. Affiche une notification permanente et consomme plus de batterie.';
+      'Optionnel. Maintient une connexion chiffrée de bout en bout en arrière-plan pour synchroniser tes messages entrants en temps réel, signalée par une notification permanente. Wiltkey utilise ceci au lieu des services de notifications push de Google ou Apple pour la confidentialité, ce qui lui permet de fonctionner même sans les services Google Play – au prix d\'une consommation de batterie plus élevée.';
 
   @override
   String get notificationNewMessageBody => 'Tu as un message';
 
   @override
-  String get notificationSecureLinkActive => 'Lien sécurisé actif';
+  String get notificationSecureLinkActive =>
+      'Synchronisation des messages sécurisés';
+
+  @override
+  String get onboardingNotificationsTitle => 'Alertes';
+
+  @override
+  String get onboardingNotificationsExplanation =>
+      'Wiltkey n\'utilise pas les notifications push de Google ou d\'Apple — rien concernant vos messages ne transite par leurs serveurs. Choisissez comment vous souhaitez être alerté. Vous pourrez modifier ce choix à tout moment dans les Paramètres.';
+
+  @override
+  String get onboardingFactPushTitle => 'AUCUN SERVEUR PUSH';
+
+  @override
+  String get onboardingFactPushBody =>
+      'Les applications classiques acheminent vos notifications via Google ou Apple, révélant qui vous écrit et quand. Wiltkey ne le fait jamais — par défaut, aucune vérification en arrière-plan, et toute alerte s\'exécute entièrement sur votre appareil.';
+
+  @override
+  String get notificationModeInstantDescFcm =>
+      'Facultatif. Utilise le service push de Google comme un simple signal de réveil pour recevoir les nouveaux messages en temps réel. Seul un ping sans contenu passe par Google — jamais vos messages, qui restent chiffrés de bout en bout sur le relais jusqu\'à ce que votre appareil les récupère. Plus léger pour la batterie qu\'une connexion permanente.';
+
+  @override
+  String get onboardingNotificationsExplanationFcm =>
+      'Pour les alertes en temps réel, cette version utilise le service push de Google uniquement comme signal de réveil — un ping sans contenu, jamais vos messages, qui ne touchent jamais les serveurs de Google. Choisissez comment être averti ; vous pourrez changer cela à tout moment dans les Réglages.';
+
+  @override
+  String get onboardingFactPushTitleFcm => 'PUSH SANS CONTENU';
+
+  @override
+  String get onboardingFactPushBodyFcm =>
+      'Les applications classiques acheminent le contenu de vos notifications via Google, révélant ce qui est envoyé et quand. Cette version utilise Google uniquement comme un ping de réveil sans contenu — aucune donnée de message, aucune métadonnée lisible — et tout reste chiffré de bout en bout.';
 
   @override
   String get chatsLockedSubtitle =>
@@ -856,6 +905,34 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get chatVoiceComingSoon => 'Les messages vocaux arrivent bientôt.';
+
+  @override
+  String get chatVoiceHoldHint =>
+      'Maintenez pour enregistrer un message vocal.';
+
+  @override
+  String get chatVoiceReleaseCancel => 'Relâchez pour annuler';
+
+  @override
+  String get chatVoicePermissionDenied =>
+      'L\'autorisation du microphone est nécessaire pour enregistrer des messages vocaux.';
+
+  @override
+  String get chatVoiceQualityLofi => 'Lo-fi';
+
+  @override
+  String get chatVoiceQualityVoice => 'Voix';
+
+  @override
+  String get chatVoiceQualityClear => 'Clair';
+
+  @override
+  String get chatVoiceUnavailable => 'Message vocal indisponible';
+
+  @override
+  String chatVoiceTooLargeSnackBar(String cost, String charge) {
+    return 'Message vocal trop volumineux ($cost) pour l\'espace restant ($charge).';
+  }
 
   @override
   String get chatDetailsDeleteConfirmTitle => 'Supprimer la discussion ?';

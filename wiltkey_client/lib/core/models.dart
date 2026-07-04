@@ -269,6 +269,10 @@ class ChatMessage {
   // In-memory only — a message is never persisted while still pending.
   bool isPending;
   Uint8List? decodedImageBytes;
+  // In-memory decoded voice payload (VoiceHeader + container'd audio), set when a
+  // 'voice' message is sent or its ciphertext is decrypted. Never persisted (the
+  // DB keeps the base64 ciphertext in `text`, like images).
+  Uint8List? decodedAudioBytes;
   String? decryptedText; // In-memory cached decrypted plaintext
 
   ChatMessage({
@@ -283,6 +287,7 @@ class ChatMessage {
     this.isDelivered = false,
     this.isPending = false,
     this.decodedImageBytes,
+    this.decodedAudioBytes,
     this.decryptedText,
   });
 
