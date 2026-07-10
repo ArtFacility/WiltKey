@@ -812,6 +812,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get groupCreateButton => '创建群组';
 
   @override
+  String get groupCreateProgressTitle => '正在创建群组…';
+
+  @override
+  String get groupCreateProgressSubtitle => '正在准备群组的加密容量和成员通道，这可能需要片刻，请稍候。';
+
+  @override
   String groupCreateFailedSnackBar(String error) {
     return '创建群组失败: $error';
   }
@@ -1170,4 +1176,33 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get themePaperinkDesc => '温润的和纸，浓淡相宜的墨色，朱红印章。';
+
+  @override
+  String get accessibilityWarningTitle => '无障碍服务已启用';
+
+  @override
+  String accessibilityWarningBody(String names) {
+    return '有一个可读取屏幕内容的无障碍服务正在运行：$names。这对于屏幕阅读器或密码管理器等工具来说是正常的。如果不是你开启的，请检查你的无障碍设置。';
+  }
+
+  @override
+  String get accessibilityWarningDismiss => '关闭';
+
+  @override
+  String get accessibilityWarningOpenSettings => '查看设置';
+
+  @override
+  String get chatImageCompressionAllowDownload => '允许保存到相册';
+
+  @override
+  String get chatImageDownload => '下载';
+
+  @override
+  String get chatImageSaveAs => '另存为';
+
+  @override
+  String get chatImageSavedToGallery => '已保存到相册';
+
+  @override
+  String get chatImageSaveFailed => '无法保存图片';
 }

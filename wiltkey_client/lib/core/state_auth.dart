@@ -197,6 +197,12 @@ extension AppStateAuth on AppState {
     // Stamp the unlock so the biometric 4h idle window resets.
     await _touchUnlock();
 
+    // One-time: heal Instant mode for users who updated in place from the old
+    // foreground-service build to the FCM build (wires up the push token +
+    // permission so they don't have to toggle the mode by hand). Fire-and-forget
+    // so a permission prompt / network call doesn't stall the unlock.
+    reconcileInstantModeAfterUpgrade();
+
     log('App unlocked. WebSocket connected.');
   }
 

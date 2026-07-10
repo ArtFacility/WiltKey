@@ -247,6 +247,8 @@
   "groupCreatePolicyAllowImagesSub": "Tillåt medlemmar att skicka bilder",
   "groupCreatePolicyPayloadSize": "Maximal meddelandestorlek",
   "groupCreateButton": "Skapa grupp",
+  "groupCreateProgressTitle": "Skapar grupp…",
+  "groupCreateProgressSubtitle": "Förbereder gruppens krypteringsförråd och medlemmarnas kapacitet. Det kan ta en stund – ha tålamod.",
   "groupCreateFailedSnackBar": "Kunde inte skapa grupp: {error}",
   "pairSyncingAwaitingApproval": "Väntar på att vännen ska godkänna...",
   "pairSyncingCoordinating": "Konfigurerar nyckelutbyte...",
@@ -363,5 +365,14 @@
   "themeGardenName": "Dusk Garden",
   "themeGardenDesc": "Mjuka jordtoner, varmt linne, blomblad för din budget.",
   "themePaperinkName": "Paper & Ink",
-  "themePaperinkDesc": "Varmt washi-papper, sumi-bläck i utspädningar, cinnoberröd hanko-stämpel."
+  "themePaperinkDesc": "Varmt washi-papper, sumi-bläck i utspädningar, cinnoberröd hanko-stämpel.",
+  "accessibilityWarningTitle": "Tillgänglighetstjänst aktiv",
+  "accessibilityWarningBody": "En tillgänglighetstjänst som kan läsa innehåll på skärmen är aktiv: {names}. Det är normalt för verktyg som skärmläsare eller lösenordshanterare. Om du inte har aktiverat någon, granska dina tillgänglighetsinställningar.",
+  "accessibilityWarningDismiss": "Stäng",
+  "accessibilityWarningOpenSettings": "Granska inställningar",
+  "chatImageCompressionAllowDownload": "Tillåt att spara i galleriet",
+  "chatImageDownload": "Ladda ner",
+  "chatImageSaveAs": "Spara som",
+  "chatImageSavedToGallery": "Sparad i galleriet",
+  "chatImageSaveFailed": "Det gick inte att spara bilden"
 }

@@ -247,6 +247,8 @@
   "groupCreatePolicyAllowImagesSub": "Permettre aux membres d'envoyer des photos",
   "groupCreatePolicyPayloadSize": "Taille max d'un message",
   "groupCreateButton": "Créer le groupe",
+  "groupCreateProgressTitle": "Création du groupe…",
+  "groupCreateProgressSubtitle": "Préparation de la réserve de chiffrement du groupe et de la capacité des membres. Cela peut prendre un moment — un peu de patience.",
   "groupCreateFailedSnackBar": "Échec de création du groupe: {error}",
   "pairSyncingAwaitingApproval": "En attente de son acceptation...",
   "pairSyncingCoordinating": "Configuration de l'échange de clés...",
@@ -363,5 +365,14 @@
   "themeGardenName": "Dusk Garden",
   "themeGardenDesc": "Tons de terre douce, lin chaleureux, pétales pour ton budget.",
   "themePaperinkName": "Paper & Ink",
-  "themePaperinkDesc": "Papier washi chaleureux, encre sumi en dilutions, sceau hanko vermillon."
+  "themePaperinkDesc": "Papier washi chaleureux, encre sumi en dilutions, sceau hanko vermillon.",
+  "accessibilityWarningTitle": "Service d'accessibilité actif",
+  "accessibilityWarningBody": "Un service d'accessibilité pouvant lire le contenu de l'écran est actif : {names}. C'est normal pour des outils comme les lecteurs d'écran ou les gestionnaires de mots de passe. Si vous n'en avez pas activé, vérifiez vos paramètres d'accessibilité.",
+  "accessibilityWarningDismiss": "Ignorer",
+  "accessibilityWarningOpenSettings": "Vérifier les paramètres",
+  "chatImageCompressionAllowDownload": "Autoriser l'enregistrement dans la galerie",
+  "chatImageDownload": "Télécharger",
+  "chatImageSaveAs": "Enregistrer sous",
+  "chatImageSavedToGallery": "Enregistré dans la galerie",
+  "chatImageSaveFailed": "Impossible d'enregistrer l'image"
 }

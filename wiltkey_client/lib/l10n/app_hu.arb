@@ -247,6 +247,8 @@
   "groupCreatePolicyAllowImagesSub": "Tagok küldhetnek fényképeket",
   "groupCreatePolicyPayloadSize": "Maximális üzenetméret",
   "groupCreateButton": "Csoport létrehozása",
+  "groupCreateProgressTitle": "Csoport létrehozása…",
+  "groupCreateProgressSubtitle": "A csoport titkosítási készletének és a tagok kapacitásának előkészítése. Ez eltarthat egy pillanatig – kis türelmet.",
   "groupCreateFailedSnackBar": "Sikertelen csoportlétrehozás: {error}",
   "pairSyncingAwaitingApproval": "Várakozás a barátod jóváhagyására...",
   "pairSyncingCoordinating": "Nyilvános kulcsok cseréjének előkészítése...",
@@ -363,5 +365,14 @@
   "themeGardenName": "Alkony Kert",
   "themeGardenDesc": "Lágy földszínek, meleg vászon, szirmok a csevegéshez.",
   "themePaperinkName": "Papír és Tinta",
-  "themePaperinkDesc": "Meleg washi papír, sumi tinta árnyalatai, cinóbervörös hanko pecsét."
+  "themePaperinkDesc": "Meleg washi papír, sumi tinta árnyalatai, cinóbervörös hanko pecsét.",
+  "accessibilityWarningTitle": "Kisegítő szolgáltatás aktív",
+  "accessibilityWarningBody": "Egy kisegítő szolgáltatás, amely képes olvasni a képernyő tartalmát, aktív: {names}. Ez normális az olyan eszközöknél, mint a képernyőolvasók vagy jelszókezelők. Ha nem te kapcsoltál be ilyet, ellenőrizd a kisegítő lehetőségek beállításait.",
+  "accessibilityWarningDismiss": "Bezárás",
+  "accessibilityWarningOpenSettings": "Beállítások megnyitása",
+  "chatImageCompressionAllowDownload": "Mentés engedélyezése a galériába",
+  "chatImageDownload": "Letöltés",
+  "chatImageSaveAs": "Mentés másként",
+  "chatImageSavedToGallery": "Elmentve a galériába",
+  "chatImageSaveFailed": "A kép mentése nem sikerült"
 }

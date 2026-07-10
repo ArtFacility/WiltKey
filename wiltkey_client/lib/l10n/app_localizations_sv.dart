@@ -851,6 +851,13 @@ class AppLocalizationsSv extends AppLocalizations {
   String get groupCreateButton => 'Skapa grupp';
 
   @override
+  String get groupCreateProgressTitle => 'Skapar grupp…';
+
+  @override
+  String get groupCreateProgressSubtitle =>
+      'Förbereder gruppens krypteringsförråd och medlemmarnas kapacitet. Det kan ta en stund – ha tålamod.';
+
+  @override
   String groupCreateFailedSnackBar(String error) {
     return 'Kunde inte skapa grupp: $error';
   }
@@ -1224,4 +1231,34 @@ class AppLocalizationsSv extends AppLocalizations {
   @override
   String get themePaperinkDesc =>
       'Varmt washi-papper, sumi-bläck i utspädningar, cinnoberröd hanko-stämpel.';
+
+  @override
+  String get accessibilityWarningTitle => 'Tillgänglighetstjänst aktiv';
+
+  @override
+  String accessibilityWarningBody(String names) {
+    return 'En tillgänglighetstjänst som kan läsa innehåll på skärmen är aktiv: $names. Det är normalt för verktyg som skärmläsare eller lösenordshanterare. Om du inte har aktiverat någon, granska dina tillgänglighetsinställningar.';
+  }
+
+  @override
+  String get accessibilityWarningDismiss => 'Stäng';
+
+  @override
+  String get accessibilityWarningOpenSettings => 'Granska inställningar';
+
+  @override
+  String get chatImageCompressionAllowDownload =>
+      'Tillåt att spara i galleriet';
+
+  @override
+  String get chatImageDownload => 'Ladda ner';
+
+  @override
+  String get chatImageSaveAs => 'Spara som';
+
+  @override
+  String get chatImageSavedToGallery => 'Sparad i galleriet';
+
+  @override
+  String get chatImageSaveFailed => 'Det gick inte att spara bilden';
 }

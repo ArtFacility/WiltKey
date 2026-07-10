@@ -170,9 +170,9 @@ class _ChatScreenState extends State<ChatScreen>
     if (atBottom != _isAtBottom) {
       setState(() {
         _isAtBottom = atBottom;
-        if (atBottom) {
-          _showScrollDownArrow = false;
-        }
+        // Show the jump-to-latest pill whenever we're scrolled up (not only when
+        // a new message lands), and hide it the moment we're back at the bottom.
+        _showScrollDownArrow = !atBottom;
       });
     }
     // Near the top → page in older history, anchoring the view so it doesn't jump.
@@ -248,6 +248,49 @@ class _ChatScreenState extends State<ChatScreen>
     }
   }
 
+  /// A small "jump to latest" pill that fades/slides in whenever the user is
+  /// scrolled up, sitting just above the composer. Tapping it snaps to the
+  /// bottom. Hidden (and non-interactive) when already at the bottom.
+  Widget _scrollDownPill(WiltkeyTokens t) {
+    return IgnorePointer(
+      ignoring: !_showScrollDownArrow,
+      child: AnimatedSlide(
+        offset: _showScrollDownArrow ? Offset.zero : const Offset(0, 0.6),
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+        child: AnimatedOpacity(
+          opacity: _showScrollDownArrow ? 1.0 : 0.0,
+          duration: const Duration(milliseconds: 180),
+          child: Center(
+            child: Material(
+              color: t.surface,
+              elevation: 3,
+              shadowColor: Colors.black.withValues(alpha: 0.25),
+              shape: StadiumBorder(
+                side: BorderSide(color: t.action.withValues(alpha: 0.5)),
+              ),
+              child: InkWell(
+                customBorder: const StadiumBorder(),
+                onTap: () {
+                  _scrollToBottom();
+                  setState(() => _showScrollDownArrow = false);
+                },
+                child: Padding(
+                  padding: const EdgeInsets.all(9),
+                  child: Icon(
+                    Icons.keyboard_double_arrow_down,
+                    size: 20,
+                    color: t.action,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   /// Jumps to the bottom and keeps re-jumping each frame until the scroll extent
   /// stops growing — message decryption and async image decode both expand the
   /// list after the first layout, which otherwise leaves the view stranded at a
@@ -267,9 +310,12 @@ class _ChatScreenState extends State<ChatScreen>
         stableFrames = 0;
         lastExtent = pos.maxScrollExtent;
       }
-      // Stop once the height has been steady for a few frames, or after a cap
-      // (~0.5s) so we never trap the user from scrolling on a slow-loading chat.
-      if (stableFrames < 3 && totalFrames < 30) {
+      // Stop once the height has been steady for several frames, or after a cap
+      // (~2.5s) so we never trap the user from scrolling on a slow-loading chat.
+      // The generous window lets many async image decodes finish growing the
+      // list before we settle, so an image-heavy chat opens pinned to the bottom
+      // instead of stranding a few screens up.
+      if (stableFrames < 6 && totalFrames < 150) {
         WidgetsBinding.instance.addPostFrameCallback((_) => tick());
       }
     }
@@ -341,6 +387,7 @@ class _ChatScreenState extends State<ChatScreen>
       base64Data,
       contentType: contentType,
       mimeType: 'image/webp',
+      allowSave: choice.allowSave,
     );
     if (error != null) {
       _errorSnack(error);
@@ -602,7 +649,9 @@ class _ChatScreenState extends State<ChatScreen>
                     ),
 
                   Expanded(
-                    child: ListView.builder(
+                    child: Stack(
+                      children: [
+                        ListView.builder(
                       controller: _scrollController,
                       padding: const EdgeInsets.symmetric(
                         horizontal: 12,
@@ -642,6 +691,16 @@ class _ChatScreenState extends State<ChatScreen>
                           ),
                         );
                       },
+                        ),
+                        // Jump-to-latest pill, anchored just above the composer
+                        // (bottom of the message area), centred horizontally.
+                        Positioned(
+                          left: 0,
+                          right: 0,
+                          bottom: 8,
+                          child: _scrollDownPill(t),
+                        ),
+                      ],
                     ),
                   ),
 
@@ -664,31 +723,6 @@ class _ChatScreenState extends State<ChatScreen>
                   ),
                 ],
               ),
-            ),
-          ),
-          Positioned(
-            bottom: 90,
-            right: 16,
-            child: AnimatedOpacity(
-              opacity: _showScrollDownArrow ? 1.0 : 0.0,
-              duration: const Duration(milliseconds: 200),
-              child: _showScrollDownArrow
-                  ? FloatingActionButton.small(
-                      backgroundColor: t.surface,
-                      shape: CircleBorder(
-                        side: BorderSide(
-                          color: t.action.withValues(alpha: 0.5),
-                        ),
-                      ),
-                      onPressed: () {
-                        _scrollToBottom();
-                        setState(() {
-                          _showScrollDownArrow = false;
-                        });
-                      },
-                      child: Icon(Icons.arrow_downward, color: t.action),
-                    )
-                  : const SizedBox(),
             ),
           ),
         ],

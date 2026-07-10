@@ -23,7 +23,7 @@ class WiltkeyDatabase {
     final path = p.join(dbPath, 'wiltkey.db');
     _db = await openDatabase(
       path,
-      version: 5,
+      version: 7,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -55,6 +55,20 @@ class WiltkeyDatabase {
     if (oldVersion < 5) {
       await db.execute(
         'ALTER TABLE messages ADD COLUMN is_failed INTEGER DEFAULT 0',
+      );
+    }
+    // v6: emoji reactions — mutable side-metadata synced over the AES meta
+    // channel (not the OTP pad). JSON: {token: [reactorId, ...]}. Low-sensitivity
+    // (emoji + already-known key hashes), so stored plaintext for cheap in-place
+    // updates, unlike the master-encrypted message body.
+    if (oldVersion < 6) {
+      await db.execute('ALTER TABLE messages ADD COLUMN reactions TEXT');
+    }
+    // v7: per-image sender opt-in to let the recipient save/download it. Rides as
+    // frame metadata, not in the OTP body. Legacy rows default 0 (non-downloadable).
+    if (oldVersion < 7) {
+      await db.execute(
+        'ALTER TABLE messages ADD COLUMN allow_save INTEGER DEFAULT 0',
       );
     }
   }
@@ -160,7 +174,9 @@ class WiltkeyDatabase {
         offset INTEGER,
         is_delivered INTEGER,
         text_encrypted_master TEXT,
-        is_failed INTEGER DEFAULT 0
+        is_failed INTEGER DEFAULT 0,
+        reactions TEXT,
+        allow_save INTEGER DEFAULT 0
       )
     ''');
     // Speeds windowed paging (chat_id + timestamp ORDER/LIMIT) and unread counts.
@@ -296,6 +312,24 @@ class WiltkeyDatabase {
       );
     }
 
+    // Reactions ride a separate sync channel (not this row's write-once body).
+    // A re-save of an existing message (resync / duplicate redelivery) carries no
+    // in-memory reactions, and INSERT OR REPLACE would wipe any already stored —
+    // so preserve the persisted set when the incoming message has none.
+    String? reactionsJson = msg.reactionsJson;
+    if (reactionsJson == null) {
+      final existing = await db.query(
+        'messages',
+        columns: ['reactions'],
+        where: 'id = ?',
+        whereArgs: [msg.id],
+        limit: 1,
+      );
+      if (existing.isNotEmpty) {
+        reactionsJson = existing.first['reactions'] as String?;
+      }
+    }
+
     await db.insert('messages', {
       'id': msg.id,
       'chat_id': chatId,
@@ -308,7 +342,46 @@ class WiltkeyDatabase {
       'is_delivered': msg.isDelivered ? 1 : 0,
       'text_encrypted_master': textEncryptedMaster,
       'is_failed': msg.isFailed ? 1 : 0,
+      'reactions': reactionsJson,
+      'allow_save': msg.allowSave ? 1 : 0,
     }, conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  /// Read-modify-write a single reaction on a stored message. Best-effort: if the
+  /// target message isn't stored yet (a reaction can outrun its message under
+  /// store-and-forward), returns null (no-op). Otherwise returns the message's
+  /// full reaction map after the change so callers can refresh the in-memory copy
+  /// without a second read.
+  Future<Map<String, Set<String>>?> mutateMessageReaction(
+    String messageId, {
+    required String token,
+    required String reactorId,
+    required bool add,
+  }) async {
+    final db = await _database;
+    final rows = await db.query(
+      'messages',
+      columns: ['reactions'],
+      where: 'id = ?',
+      whereArgs: [messageId],
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    final current = ChatMessage.decodeReactions(rows.first['reactions'] as String?);
+    final set = current.putIfAbsent(token, () => <String>{});
+    if (add) {
+      set.add(reactorId);
+    } else {
+      set.remove(reactorId);
+      if (set.isEmpty) current.remove(token);
+    }
+    await db.update(
+      'messages',
+      {'reactions': ChatMessage.encodeReactions(current)},
+      where: 'id = ?',
+      whereArgs: [messageId],
+    );
+    return current;
   }
 
   /// Decodes a raw `messages` row into a [ChatMessage], decrypting the body from
@@ -345,10 +418,12 @@ class WiltkeyDatabase {
       offset: row['offset'] as int,
       isDelivered: (row['is_delivered'] as int) == 1,
       isFailed: (row['is_failed'] as int? ?? 0) == 1,
+      allowSave: (row['allow_save'] as int? ?? 0) == 1,
       decryptedText: decryptedText,
       decodedImageBytes: (contentType == 'image' && decryptedText != null)
           ? base64Decode(decryptedText)
           : null,
+      reactions: ChatMessage.decodeReactions(row['reactions'] as String?),
     );
   }
 

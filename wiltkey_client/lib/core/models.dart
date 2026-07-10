@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
 class Contact {
@@ -269,11 +270,22 @@ class ChatMessage {
   // In-memory only — a message is never persisted while still pending.
   bool isPending;
   Uint8List? decodedImageBytes;
+  // Sender opt-in: whether the recipient may save/download this image to their
+  // gallery. Rides as frame metadata (`dl`), NOT baked into the image bytes, so
+  // rendering stays backward compatible. Absent on legacy/older-peer images →
+  // defaults false (treat as non-downloadable).
+  final bool allowSave;
   // In-memory decoded voice payload (VoiceHeader + container'd audio), set when a
   // 'voice' message is sent or its ciphertext is decrypted. Never persisted (the
   // DB keeps the base64 ciphertext in `text`, like images).
   Uint8List? decodedAudioBytes;
   String? decryptedText; // In-memory cached decrypted plaintext
+
+  // Emoji reactions: token -> set of reactor identity ids (userId for us, the
+  // sender's keyHash for others). Token is a unicode emoji or a `:name:` custom
+  // emoji ref. Mutable side-metadata synced over the AES meta channel (NOT the
+  // OTP append log), so — unlike the ciphertext — a persisted message can change.
+  Map<String, Set<String>> reactions;
 
   ChatMessage({
     required this.id,
@@ -287,13 +299,39 @@ class ChatMessage {
     this.isDelivered = false,
     this.isPending = false,
     this.decodedImageBytes,
+    this.allowSave = false,
     this.decodedAudioBytes,
     this.decryptedText,
-  });
+    Map<String, Set<String>>? reactions,
+  }) : reactions = reactions ?? {};
 
   bool get isSystem =>
       senderId == 'system' ||
       text.startsWith('Connected. Chat session secure.');
+
+  bool get hasReactions => reactions.isNotEmpty;
+
+  /// Serialise [reactions] (sets → lists) to a JSON string, or null if empty.
+  /// Used for the DB `reactions` column.
+  static String? encodeReactions(Map<String, Set<String>> r) {
+    if (r.isEmpty) return null;
+    return jsonEncode(r.map((k, v) => MapEntry(k, v.toList())));
+  }
+
+  /// Inverse of [encodeReactions]; tolerant of null/garbage (→ empty map).
+  static Map<String, Set<String>> decodeReactions(String? s) {
+    if (s == null || s.isEmpty) return {};
+    try {
+      final raw = jsonDecode(s) as Map<String, dynamic>;
+      return raw.map(
+        (k, v) => MapEntry(k, {...(v as List).map((e) => e.toString())}),
+      );
+    } catch (_) {
+      return {};
+    }
+  }
+
+  String? get reactionsJson => encodeReactions(reactions);
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -304,6 +342,9 @@ class ChatMessage {
     'isSentByMe': isSentByMe,
     'offset': offset,
     'isDelivered': isDelivered,
+    if (allowSave) 'allowSave': allowSave,
+    if (reactions.isNotEmpty)
+      'reactions': reactions.map((k, v) => MapEntry(k, v.toList())),
   };
 
   factory ChatMessage.fromJson(Map<String, dynamic> json) {
@@ -325,7 +366,11 @@ class ChatMessage {
       isSentByMe: json['isSentByMe'] as bool,
       offset: offset,
       isDelivered: json['isDelivered'] as bool? ?? false,
+      allowSave: json['allowSave'] as bool? ?? false,
       decryptedText: isSystem ? text : null,
+      reactions: (json['reactions'] as Map<String, dynamic>?)?.map(
+        (k, v) => MapEntry(k, {...(v as List).map((e) => e.toString())}),
+      ),
     );
   }
 }

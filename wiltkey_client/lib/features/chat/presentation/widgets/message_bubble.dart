@@ -9,6 +9,8 @@ import '../../../../core/theme/wk.dart';
 import '../../../../core/theme/wiltkey_tokens.dart';
 import 'package:wiltkey_client/l10n/app_localizations.dart';
 import 'voice_message_player.dart';
+import 'reactions.dart';
+import 'image_viewer.dart';
 
 class MessageBubble extends StatelessWidget {
   final ChatMessage message;
@@ -89,8 +91,12 @@ class MessageBubble extends StatelessWidget {
         : (isMe ? t.bubbleMeText.withValues(alpha: 0.6) : t.textTertiary);
 
     const double tail = 6;
+    // Inter-message spacing lives on the outer Column (as a trailing spacer)
+    // rather than the bubble's own margin, so a reactions row can sit flush under
+    // its bubble instead of being pushed down into the gap above the next message.
+    final double batchGap = isFirstInBatch ? 12 : 4;
     final Widget bubble = Container(
-      margin: EdgeInsets.only(bottom: isFirstInBatch ? 12 : 4),
+      margin: EdgeInsets.zero,
       padding: isSticker
           ? const EdgeInsets.symmetric(horizontal: 2, vertical: 2)
           : const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -185,9 +191,21 @@ class MessageBubble extends StatelessWidget {
     final Widget shownBubble = message.isPending
         ? Opacity(opacity: 0.6, child: bubble)
         : bubble;
-    final Widget bubbleWidget = message.isFailed && onFailedTap != null
-        ? GestureDetector(onTap: onFailedTap, child: shownBubble)
-        : shownBubble;
+    // Long-press any settled bubble to react; a failed bubble keeps its tap-to-
+    // retry. Pending bubbles aren't reactable yet (no stable persisted target).
+    final Widget bubbleWidget = GestureDetector(
+      onTap: (message.isFailed && onFailedTap != null) ? onFailedTap : null,
+      onLongPress: message.isPending
+          ? null
+          : () => showReactionPicker(
+              context,
+              appState: appState,
+              contact: contact,
+              message: message,
+              emojiMap: emojiMap,
+            ),
+      child: shownBubble,
+    );
 
     return Row(
       mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
@@ -206,7 +224,32 @@ class MessageBubble extends StatelessWidget {
               : const SizedBox(width: 28),
           const SizedBox(width: 8),
         ],
-        Flexible(child: bubbleWidget),
+        // Expanded + Align pins the bubble to its owner's side: mine hugs the
+        // right edge, theirs the left. (A bare Flexible leaves the bubble
+        // drifting toward the centre.) The bubble keeps its own maxWidth cap.
+        Expanded(
+          child: Align(
+            alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+            heightFactor: 1,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: isMe
+                  ? CrossAxisAlignment.end
+                  : CrossAxisAlignment.start,
+              children: [
+                bubbleWidget,
+                ReactionsRow(
+                  message: message,
+                  contact: contact,
+                  appState: appState,
+                  emojiMap: emojiMap,
+                  isMe: isMe,
+                ),
+                SizedBox(height: batchGap),
+              ],
+            ),
+          ),
+        ),
         if (isMe) ...[
           const SizedBox(width: 8),
           isFirstInBatch
@@ -320,15 +363,23 @@ class MessageBubble extends StatelessWidget {
       }
 
       if (imageBytes != null) {
-        return ConstrainedBox(
-          constraints: const BoxConstraints(maxHeight: 300, maxWidth: 280),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(t.radiusControl),
-            child: Image.memory(
-              imageBytes,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) =>
-                  _imageError(t, l10n),
+        final bytes = imageBytes;
+        return GestureDetector(
+          onTap: () => ImageViewerScreen.open(
+            context,
+            imageBytes: bytes,
+            allowSave: message.allowSave,
+          ),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 300, maxWidth: 280),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(t.radiusControl),
+              child: Image.memory(
+                bytes,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) =>
+                    _imageError(t, l10n),
+              ),
             ),
           ),
         );

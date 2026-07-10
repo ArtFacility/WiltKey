@@ -6,6 +6,7 @@ import '../../../core/state.dart';
 import '../../../core/models.dart';
 import '../../../core/pixel_art_avatar.dart';
 import '../../../core/notifications/notification_service.dart';
+import '../../../core/security/security_service.dart';
 import '../../../core/theme/wk.dart';
 import '../../dashboard/presentation/chats_tab.dart';
 import '../../chat/presentation/chat_screen.dart';
@@ -57,6 +58,9 @@ class _AppShellState extends State<AppShell>
     // The shell mounts right after unlock — if we were opened from a message
     // notification, deep-link straight into that chat.
     WidgetsBinding.instance.addPostFrameCallback((_) => _openPendingChat());
+    // One-shot heads-up if a third-party accessibility service can read the
+    // screen (informational, not a block).
+    WidgetsBinding.instance.addPostFrameCallback((_) => _maybeWarnAccessibility());
   }
 
   @override
@@ -66,7 +70,53 @@ class _AppShellState extends State<AppShell>
     // target chat sits unopened and its unread badge lingers. Re-check on resume.
     if (state == AppLifecycleState.resumed) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _openPendingChat());
+      // The user may have enabled an accessibility service while away.
+      WidgetsBinding.instance
+          .addPostFrameCallback((_) => _maybeWarnAccessibility());
     }
+  }
+
+  // Session-scoped guards so the accessibility warning shows at most once and
+  // never stacks: dismissed once → not shown again until the app restarts.
+  bool _a11yWarningActive = false;
+  bool _a11yWarningDismissed = false;
+
+  /// Surfaces a soft, dismissible warning when a non-allowlisted accessibility
+  /// service is active. Fail-open (see [SecurityService]); never blocks the UI.
+  Future<void> _maybeWarnAccessibility() async {
+    if (_a11yWarningDismissed || _a11yWarningActive) return;
+    final res = await SecurityService.checkAccessibility();
+    if (!res.unsafe ||
+        !mounted ||
+        _a11yWarningActive ||
+        _a11yWarningDismissed) {
+      return;
+    }
+    _a11yWarningActive = true;
+    final l10n = AppLocalizations.of(context)!;
+    final names = res.labels.join(', ');
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.accessibilityWarningTitle),
+        content: Text(l10n.accessibilityWarningBody(names)),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              SecurityService.openAccessibilitySettings();
+            },
+            child: Text(l10n.accessibilityWarningOpenSettings),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(l10n.accessibilityWarningDismiss),
+          ),
+        ],
+      ),
+    );
+    _a11yWarningActive = false;
+    _a11yWarningDismissed = true;
   }
 
   // Guards against the cold-start postFrame and a near-simultaneous resume both
@@ -86,12 +136,14 @@ class _AppShellState extends State<AppShell>
       final Contact c = _appState.contacts[idx];
       _appState.selectContact(c);
       if (!mounted) return;
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) =>
-              c.isGroup ? const GroupChatScreen() : const ChatScreen(),
-        ),
-      );
+      Navigator.of(context)
+          .push(
+            MaterialPageRoute(
+              builder: (_) =>
+                  c.isGroup ? const GroupChatScreen() : const ChatScreen(),
+            ),
+          )
+          .then((_) => _appState.clearVisibleChatIfCurrent(c.id));
     } finally {
       _consumingPending = false;
     }
@@ -249,12 +301,14 @@ class _MessageBannerHostState extends State<_MessageBannerHost>
     _dismissTimer?.cancel();
     _appState.messageAlert.value = null;
     _appState.selectContact(c);
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) =>
-            c.isGroup ? const GroupChatScreen() : const ChatScreen(),
-      ),
-    );
+    Navigator.of(context)
+        .push(
+          MaterialPageRoute(
+            builder: (_) =>
+                c.isGroup ? const GroupChatScreen() : const ChatScreen(),
+          ),
+        )
+        .then((_) => _appState.clearVisibleChatIfCurrent(c.id));
   }
 
   @override

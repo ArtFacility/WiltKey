@@ -13,6 +13,17 @@ extension AppStateChats on AppState {
   /// Unread badge count for a chat (DB-derived; kept live as messages arrive).
   int unreadCount(Contact contact) => unreadCounts[contact.id] ?? 0;
 
+  /// Belt-and-suspenders for [visibleChatId]: call when a pushed chat route pops
+  /// back to the dashboard, so that chat's unread badge + in-app banner resume
+  /// immediately even if the chat screen's own `dispose` didn't clear the flag
+  /// (lifecycle/timing edge cases). Safe no-op if a different chat is now on top.
+  void clearVisibleChatIfCurrent(String chatId) {
+    if (visibleChatId == chatId) {
+      visibleChatId = null;
+      notifyListeners();
+    }
+  }
+
   /// Bumps a chat's unread count for a freshly-arrived inbound message, unless
   /// that chat is the one currently open. Control writes / system lines never
   /// count. Call only for live arrivals (not historical resync replays).
@@ -105,6 +116,7 @@ extension AppStateChats on AppState {
     String text, {
     String contentType = 'text',
     String? mimeType,
+    bool allowSave = false,
   }) async {
     log('sendMessage starting. type: $contentType, len: ${text.length}');
     if (activeContact == null || status == AppStatus.nuked) {
@@ -159,6 +171,7 @@ extension AppStateChats on AppState {
           (contentType == 'image' || contentType == 'image_hidden')
           ? base64Decode(text)
           : null,
+      allowSave: allowSave,
       decodedAudioBytes: contentType == 'voice' ? base64Decode(text) : null,
       decryptedText: text, // original plaintext cached in-memory
     );
@@ -222,6 +235,7 @@ extension AppStateChats on AppState {
         'id': newMessage.id,
       };
       if (mimeType != null) envelope['mime'] = mimeType;
+      if (allowSave) envelope['dl'] = true;
       final envelopeStr = jsonEncode(envelope);
 
       // Send payload over WebSocket
@@ -320,6 +334,8 @@ extension AppStateChats on AppState {
       't': message.contentType,
       'd': message.text,
       'offset': message.offset,
+      'id': message.id,
+      if (message.allowSave) 'dl': true,
     };
     final envelopeStr = jsonEncode(envelope);
 
@@ -387,6 +403,34 @@ extension AppStateChats on AppState {
       'checked ${capped.length} undelivered message(s)',
     );
     return true;
+  }
+
+  /// A peer's message just landed while we're online — the ideal moment to heal
+  /// this chat's delivery state without the user hunting for the Sync button. The
+  /// peer is demonstrably reachable, so a `delivery_check` for our stuck-on-single
+  /// sends will get answered, and any inbound gap can be pulled. Runs [syncOneOnOneChat]
+  /// only when there's actually something to fix, and at most one sync per chat at
+  /// a time (a burst of arrivals coalesces into one). No-op for groups.
+  Future<void> maybeAutoReconcileOnPeerMessage(Contact contact) async {
+    if (contact.isGroup) return;
+    if (_autoReconcileInFlight.contains(contact.id)) return;
+
+    final hasInboundGap = contact.incomingMaxOffset > contact.incomingOffset;
+    bool hasStuckOutbound = false;
+    if (!hasInboundGap) {
+      final undelivered = await WiltkeyDatabase.instance
+          .getUndeliveredSentMessages(contact.id);
+      hasStuckOutbound = undelivered.isNotEmpty;
+    }
+    if (!hasInboundGap && !hasStuckOutbound) return;
+
+    _autoReconcileInFlight.add(contact.id);
+    try {
+      await syncOneOnOneChat(contact);
+      log('[Delivery Sync] Auto-reconciled ${contact.name} on peer arrival.');
+    } finally {
+      _autoReconcileInFlight.remove(contact.id);
+    }
   }
 
   Future<void> decryptMessage(Contact contact, ChatMessage message) async {

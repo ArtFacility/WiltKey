@@ -414,6 +414,8 @@
   "groupCreatePolicyAllowImagesSub": "允许成员发送照片",
   "groupCreatePolicyPayloadSize": "最大消息大小",
   "groupCreateButton": "创建群组",
+  "groupCreateProgressTitle": "正在创建群组…",
+  "groupCreateProgressSubtitle": "正在准备群组的加密容量和成员通道，这可能需要片刻，请稍候。",
   "groupCreateFailedSnackBar": "创建群组失败: {error}",
   "@groupCreateFailedSnackBar": {
     "placeholders": {
@@ -652,5 +654,14 @@
   "themeGardenName": "暮色花园",
   "themeGardenDesc": "温和的泥土色调与温暖的亚麻材质，用花瓣点缀你的额度。",
   "themePaperinkName": "纸与墨",
-  "themePaperinkDesc": "温润的和纸，浓淡相宜的墨色，朱红印章。"
+  "themePaperinkDesc": "温润的和纸，浓淡相宜的墨色，朱红印章。",
+  "accessibilityWarningTitle": "无障碍服务已启用",
+  "accessibilityWarningBody": "有一个可读取屏幕内容的无障碍服务正在运行：{names}。这对于屏幕阅读器或密码管理器等工具来说是正常的。如果不是你开启的，请检查你的无障碍设置。",
+  "accessibilityWarningDismiss": "关闭",
+  "accessibilityWarningOpenSettings": "查看设置",
+  "chatImageCompressionAllowDownload": "允许保存到相册",
+  "chatImageDownload": "下载",
+  "chatImageSaveAs": "另存为",
+  "chatImageSavedToGallery": "已保存到相册",
+  "chatImageSaveFailed": "无法保存图片"
 }

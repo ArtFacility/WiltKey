@@ -841,6 +841,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get groupCreateButton => 'Create Group';
 
   @override
+  String get groupCreateProgressTitle => 'Creating group…';
+
+  @override
+  String get groupCreateProgressSubtitle =>
+      'Preparing your group\'s encryption pad and member capacity. This can take a moment — hang tight.';
+
+  @override
   String groupCreateFailedSnackBar(String error) {
     return 'Failed to create group: $error';
   }
@@ -1215,4 +1222,33 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get themePaperinkDesc =>
       'Warm washi paper, sumi ink dilutions, vermilion hanko seal.';
+
+  @override
+  String get accessibilityWarningTitle => 'Accessibility service active';
+
+  @override
+  String accessibilityWarningBody(String names) {
+    return 'An accessibility service that can read on-screen content is active: $names. This is normal for tools like screen readers or password managers. If you didn\'t turn one on, review your accessibility settings.';
+  }
+
+  @override
+  String get accessibilityWarningDismiss => 'Dismiss';
+
+  @override
+  String get accessibilityWarningOpenSettings => 'Review settings';
+
+  @override
+  String get chatImageCompressionAllowDownload => 'Allow saving to gallery';
+
+  @override
+  String get chatImageDownload => 'Download';
+
+  @override
+  String get chatImageSaveAs => 'Save as';
+
+  @override
+  String get chatImageSavedToGallery => 'Saved to gallery';
+
+  @override
+  String get chatImageSaveFailed => 'Couldn\'t save the image';
 }

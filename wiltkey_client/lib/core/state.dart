@@ -31,6 +31,7 @@ part 'state_lifecycle.dart';
 part 'state_inbound.dart';
 part 'state_groups.dart';
 part 'state_push.dart';
+part 'state_reactions.dart';
 
 enum AppStatus { normal, nuked }
 
@@ -95,6 +96,11 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   // and in-app-banner suppression, so returning to the dashboard immediately
   // re-enables alerts for the chat you were just in.
   String? visibleChatId;
+
+  // 1-on-1 chats with an auto-reconcile sync currently in flight — a dedup guard
+  // so a burst of peer messages can't fire overlapping delivery_check syncs (see
+  // [maybeAutoReconcileOnPeerMessage]).
+  final Set<String> _autoReconcileInFlight = {};
 
   // Debug Console Logs
   static final List<String> debugLogs = [];
@@ -471,6 +477,12 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     notificationMode = mode;
     notifyListeners();
     await _persistence.saveState(this);
+    // Picking a mode explicitly counts as "configured", so the one-time upgrade
+    // migration (reconcileInstantModeAfterUpgrade) never second-guesses it.
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(kPrefPushMigrationDone, true);
+    } catch (_) {}
     if (mode == NotificationMode.off) {
       await WiltkeyNotifications.stopBackgroundWork();
       await unregisterPushToken(); // Play: stop being FCM-wakeable

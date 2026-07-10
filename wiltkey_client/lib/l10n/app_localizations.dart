@@ -1596,6 +1596,18 @@ abstract class AppLocalizations {
   /// **'Create Group'**
   String get groupCreateButton;
 
+  /// No description provided for @groupCreateProgressTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Creating group…'**
+  String get groupCreateProgressTitle;
+
+  /// No description provided for @groupCreateProgressSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing your group\'s encryption pad and member capacity. This can take a moment — hang tight.'**
+  String get groupCreateProgressSubtitle;
+
   /// No description provided for @groupCreateFailedSnackBar.
   ///
   /// In en, this message translates to:
@@ -2237,6 +2249,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Warm washi paper, sumi ink dilutions, vermilion hanko seal.'**
   String get themePaperinkDesc;
+
+  /// No description provided for @accessibilityWarningTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Accessibility service active'**
+  String get accessibilityWarningTitle;
+
+  /// No description provided for @accessibilityWarningBody.
+  ///
+  /// In en, this message translates to:
+  /// **'An accessibility service that can read on-screen content is active: {names}. This is normal for tools like screen readers or password managers. If you didn\'t turn one on, review your accessibility settings.'**
+  String accessibilityWarningBody(String names);
+
+  /// No description provided for @accessibilityWarningDismiss.
+  ///
+  /// In en, this message translates to:
+  /// **'Dismiss'**
+  String get accessibilityWarningDismiss;
+
+  /// No description provided for @accessibilityWarningOpenSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Review settings'**
+  String get accessibilityWarningOpenSettings;
+
+  /// No description provided for @chatImageCompressionAllowDownload.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow saving to gallery'**
+  String get chatImageCompressionAllowDownload;
+
+  /// No description provided for @chatImageDownload.
+  ///
+  /// In en, this message translates to:
+  /// **'Download'**
+  String get chatImageDownload;
+
+  /// No description provided for @chatImageSaveAs.
+  ///
+  /// In en, this message translates to:
+  /// **'Save as'**
+  String get chatImageSaveAs;
+
+  /// No description provided for @chatImageSavedToGallery.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved to gallery'**
+  String get chatImageSavedToGallery;
+
+  /// No description provided for @chatImageSaveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t save the image'**
+  String get chatImageSaveFailed;
 }
 
 class _AppLocalizationsDelegate

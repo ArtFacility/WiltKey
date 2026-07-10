@@ -30,6 +30,11 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
   // 10x10 pixel art icon (100-char hex grid); edited via the shared popup.
   late List<String> _pixelGrid;
 
+  // Guards the create flow: generating the group keystream/lanes is a heavy,
+  // multi-hundred-ms await, so we lock out repeat taps (which would otherwise
+  // spawn duplicate groups) and show a blocking progress dialog meanwhile.
+  bool _creating = false;
+
   final List<double> _totalGroupSizeOptions = [5.0, 10.0, 20.0, 50.0, 100.0];
   final List<double> _laneSizeOptions = [1.0, 2.0, 5.0, 10.0];
   final List<double> _messageSizeOptions = [0.5, 1.0, 2.0, 5.0, 10.0];
@@ -92,7 +97,13 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
   }
 
   void _onCreateGroup() async {
+    // Re-entry guard: the blocking dialog below already swallows taps, but this
+    // closes the tiny synchronous window before it appears — so no accidental
+    // duplicate groups even on a frantic double-tap.
+    if (_creating) return;
     if (!_formKey.currentState!.validate()) return;
+    setState(() => _creating = true);
+    _showCreatingDialog();
 
     final groupName = _nameController.text.trim();
     final groupIconHex = _pixelGrid.join();
@@ -133,6 +144,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
       );
 
       if (mounted) {
+        Navigator.of(context, rootNavigator: true).pop(); // close progress
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
@@ -143,6 +155,8 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
     } catch (e) {
       _appState.log('[Group Error] Failed to create group: $e');
       if (mounted) {
+        Navigator.of(context, rootNavigator: true).pop(); // close progress
+        setState(() => _creating = false); // allow a retry
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -154,6 +168,64 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
         );
       }
     }
+  }
+
+  /// Non-dismissible "forging the pad" progress popup. The keystream generation
+  /// is a single opaque await (no progress signal), so the bar is indeterminate.
+  void _showCreatingDialog() {
+    final t = context.wk;
+    final l10n = AppLocalizations.of(context)!;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => PopScope(
+        canPop: false, // back button can't cancel mid-generation
+        child: Dialog(
+          backgroundColor: t.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(t.radiusCard),
+            side: BorderSide(color: t.border, width: t.borderWidth),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 22, 20, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.vpn_key_outlined, size: 18, color: t.identity),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        t.uppercaseLabels
+                            ? l10n.groupCreateProgressTitle.toUpperCase()
+                            : l10n.groupCreateProgressTitle,
+                        style: t.body.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  l10n.groupCreateProgressSubtitle,
+                  style: t.bodySecondary,
+                ),
+                const SizedBox(height: 16),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(t.radiusPill),
+                  child: LinearProgressIndicator(
+                    minHeight: 6,
+                    backgroundColor: t.budgetEmpty,
+                    valueColor: AlwaysStoppedAnimation<Color>(t.identity),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -472,7 +544,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                 const SizedBox(height: 24),
 
                 ElevatedButton.icon(
-                  onPressed: _onCreateGroup,
+                  onPressed: _creating ? null : _onCreateGroup,
                   icon: const Icon(Icons.check_circle_outline, size: 16),
                   label: Text(l10n.groupCreateButton),
                   style: ElevatedButton.styleFrom(

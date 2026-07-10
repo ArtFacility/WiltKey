@@ -247,6 +247,8 @@
   "groupCreatePolicyAllowImagesSub": "Mitgliedern das Senden von Fotos erlauben",
   "groupCreatePolicyPayloadSize": "Maximale Nachrichtengröße",
   "groupCreateButton": "Gruppe erstellen",
+  "groupCreateProgressTitle": "Gruppe wird erstellt…",
+  "groupCreateProgressSubtitle": "Der Verschlüsselungsvorrat der Gruppe und die Kapazität der Mitglieder werden vorbereitet. Das kann einen Moment dauern – bitte hab Geduld.",
   "groupCreateFailedSnackBar": "Fehler beim Erstellen der Gruppe: {error}",
   "pairSyncingAwaitingApproval": "Warte darauf, dass dein Freund akzeptiert...",
   "pairSyncingCoordinating": "Richte Schlüsselaustausch ein...",
@@ -363,5 +365,14 @@
   "themeGardenName": "Abendgarten",
   "themeGardenDesc": "Weiche Erdtöne, warmes Leinen, Blütenblätter für dein Budget.",
   "themePaperinkName": "Papier & Tinte",
-  "themePaperinkDesc": "Warmes Washi-Papier, Sumi-Tinte in Abstufungen, zinnoberrotes Hanko-Siegel."
+  "themePaperinkDesc": "Warmes Washi-Papier, Sumi-Tinte in Abstufungen, zinnoberrotes Hanko-Siegel.",
+  "accessibilityWarningTitle": "Bedienungshilfe aktiv",
+  "accessibilityWarningBody": "Ein Bedienungshilfedienst, der Bildschirminhalte lesen kann, ist aktiv: {names}. Das ist bei Tools wie Screenreadern oder Passwortmanagern normal. Falls du keinen aktiviert hast, überprüfe deine Bedienungshilfe-Einstellungen.",
+  "accessibilityWarningDismiss": "Schließen",
+  "accessibilityWarningOpenSettings": "Einstellungen prüfen",
+  "chatImageCompressionAllowDownload": "Speichern in Galerie erlauben",
+  "chatImageDownload": "Herunterladen",
+  "chatImageSaveAs": "Speichern als",
+  "chatImageSavedToGallery": "In Galerie gespeichert",
+  "chatImageSaveFailed": "Bild konnte nicht gespeichert werden"
 }

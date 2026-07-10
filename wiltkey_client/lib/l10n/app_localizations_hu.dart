@@ -857,6 +857,13 @@ class AppLocalizationsHu extends AppLocalizations {
   String get groupCreateButton => 'Csoport létrehozása';
 
   @override
+  String get groupCreateProgressTitle => 'Csoport létrehozása…';
+
+  @override
+  String get groupCreateProgressSubtitle =>
+      'A csoport titkosítási készletének és a tagok kapacitásának előkészítése. Ez eltarthat egy pillanatig – kis türelmet.';
+
+  @override
   String groupCreateFailedSnackBar(String error) {
     return 'Sikertelen csoportlétrehozás: $error';
   }
@@ -1232,4 +1239,34 @@ class AppLocalizationsHu extends AppLocalizations {
   @override
   String get themePaperinkDesc =>
       'Meleg washi papír, sumi tinta árnyalatai, cinóbervörös hanko pecsét.';
+
+  @override
+  String get accessibilityWarningTitle => 'Kisegítő szolgáltatás aktív';
+
+  @override
+  String accessibilityWarningBody(String names) {
+    return 'Egy kisegítő szolgáltatás, amely képes olvasni a képernyő tartalmát, aktív: $names. Ez normális az olyan eszközöknél, mint a képernyőolvasók vagy jelszókezelők. Ha nem te kapcsoltál be ilyet, ellenőrizd a kisegítő lehetőségek beállításait.';
+  }
+
+  @override
+  String get accessibilityWarningDismiss => 'Bezárás';
+
+  @override
+  String get accessibilityWarningOpenSettings => 'Beállítások megnyitása';
+
+  @override
+  String get chatImageCompressionAllowDownload =>
+      'Mentés engedélyezése a galériába';
+
+  @override
+  String get chatImageDownload => 'Letöltés';
+
+  @override
+  String get chatImageSaveAs => 'Mentés másként';
+
+  @override
+  String get chatImageSavedToGallery => 'Elmentve a galériába';
+
+  @override
+  String get chatImageSaveFailed => 'A kép mentése nem sikerült';
 }

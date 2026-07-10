@@ -234,6 +234,11 @@ extension AppStateInbound on AppState {
       return;
     }
 
+    if (contentType == 'reaction') {
+      await _handleReaction(senderId, envelope);
+      return;
+    }
+
     Map<String, dynamic>? envelopeJson;
     try {
       envelopeJson = jsonDecode(envelope) as Map<String, dynamic>;
@@ -275,6 +280,11 @@ extension AppStateInbound on AppState {
         } catch (e) {
           log('[Group Error] Failed to apply group_member_profile: $e');
         }
+        return;
+      }
+
+      if (contentType == 'group_reaction') {
+        await _handleGroupReaction(contact, senderId, envelopeJson!);
         return;
       }
 
@@ -544,6 +554,7 @@ extension AppStateInbound on AppState {
       int offset = 0;
       String? decryptedPlaintext;
       String messageId = DateTime.now().toString();
+      bool allowSave = false;
 
       try {
         if (envelopeJson != null) {
@@ -551,6 +562,7 @@ extension AppStateInbound on AppState {
           rawContent = envelopeJson['d'] as String? ?? envelope;
           offset = envelopeJson['offset'] as int? ?? 0;
           messageId = envelopeJson['id'] as String? ?? messageId;
+          allowSave = envelopeJson['dl'] == true;
         }
 
         final cipherBytes = base64Decode(rawContent);
@@ -598,6 +610,7 @@ extension AppStateInbound on AppState {
         timestamp: DateTime.now(),
         isSentByMe: false,
         offset: offset,
+        allowSave: allowSave,
         decryptedText: decryptedPlaintext,
         decodedImageBytes:
             (resolvedContentType == 'image' && decryptedPlaintext != null)
@@ -610,7 +623,12 @@ extension AppStateInbound on AppState {
         contact,
         newMessage,
       ); // live arrival → unread badge if not open
-      if (_isNotifiableMessage(newMessage)) emitMessageAlert(contact);
+      if (_isNotifiableMessage(newMessage)) {
+        emitMessageAlert(contact);
+        // Peer is online → auto-heal any stuck ticks / inbound gap on this chat
+        // so the user never has to spam the Sync button (runs only when needed).
+        maybeAutoReconcileOnPeerMessage(contact);
+      }
       await WiltkeyDatabase.instance.saveMessage(
         newMessage,
         contact.id,
@@ -657,6 +675,7 @@ extension AppStateInbound on AppState {
       final offset = envelopeJson?['offset'] as int?;
       final dataB64 = envelopeJson?['d'] as String?;
       final innerType = envelopeJson?['t'] as String? ?? 'text';
+      final bool allowSave = envelopeJson?['dl'] == true;
       final messageId =
           envelopeJson?['id'] as String? ?? DateTime.now().toString();
       final tsMillis = envelopeJson?['ts'] as int?;
@@ -804,6 +823,7 @@ extension AppStateInbound on AppState {
         timestamp: timestamp,
         isSentByMe: innerSenderId == userId,
         offset: offset,
+        allowSave: allowSave,
         decryptedText: decryptedText,
         decodedImageBytes: (innerType == 'image')
             ? base64Decode(decryptedText)
@@ -1017,6 +1037,7 @@ extension AppStateInbound on AppState {
                 'd': msg.text,
                 'offset': msg.offset,
                 'id': msg.id,
+                if (msg.allowSave) 'dl': true,
               }),
               'content_type': msg.contentType,
             });
@@ -1228,6 +1249,7 @@ extension AppStateInbound on AppState {
           'timestamp': msg.timestamp.toIso8601String(),
           'isSentByMe': msg.isSentByMe,
           'offset': msg.offset,
+          'allowSave': msg.allowSave,
         });
       }
 
@@ -1333,6 +1355,7 @@ extension AppStateInbound on AppState {
         final String innerSenderId = m['senderId'] as String;
         final DateTime timestamp = DateTime.parse(m['timestamp'] as String);
         final bool isSentByMe = m['isSentByMe'] as bool;
+        final bool allowSave = m['allowSave'] as bool? ?? false;
 
         if (contact.isGroup && contentType == 'group_lane_header') {
           try {
@@ -1417,6 +1440,7 @@ extension AppStateInbound on AppState {
             timestamp: timestamp,
             isSentByMe: msgIsSentByMe,
             offset: offset,
+            allowSave: allowSave,
             decryptedText: decryptedText,
             decodedImageBytes: (contentType == 'image')
                 ? base64Decode(decryptedText)

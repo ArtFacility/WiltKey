@@ -19,6 +19,8 @@ import 'widgets/emoji_picker_panel.dart';
 import 'widgets/debug_console_sheet.dart';
 import 'widgets/voice_recording_mixin.dart';
 import 'widgets/voice_message_player.dart';
+import 'widgets/reactions.dart';
+import 'widgets/image_viewer.dart';
 import '../../groups/presentation/group_settings_screen.dart';
 import '../../groups/presentation/group_invite_screen.dart';
 
@@ -138,9 +140,9 @@ class _GroupChatScreenState extends State<GroupChatScreen>
     if (atBottom != _isAtBottom) {
       setState(() {
         _isAtBottom = atBottom;
-        if (atBottom) {
-          _showScrollDownArrow = false;
-        }
+        // Show the jump-to-latest pill whenever we're scrolled up (not only when
+        // a new message lands), and hide it the moment we're back at the bottom.
+        _showScrollDownArrow = !atBottom;
       });
     }
     if (pos.pixels < 240) _maybeLoadOlder();
@@ -242,6 +244,49 @@ class _GroupChatScreenState extends State<GroupChatScreen>
     }
   }
 
+  /// A small "jump to latest" pill that fades/slides in whenever the user is
+  /// scrolled up, sitting just above the composer. Tapping it snaps to the
+  /// bottom. Hidden (and non-interactive) when already at the bottom.
+  Widget _scrollDownPill(WiltkeyTokens t) {
+    return IgnorePointer(
+      ignoring: !_showScrollDownArrow,
+      child: AnimatedSlide(
+        offset: _showScrollDownArrow ? Offset.zero : const Offset(0, 0.6),
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+        child: AnimatedOpacity(
+          opacity: _showScrollDownArrow ? 1.0 : 0.0,
+          duration: const Duration(milliseconds: 180),
+          child: Center(
+            child: Material(
+              color: t.surface,
+              elevation: 3,
+              shadowColor: Colors.black.withValues(alpha: 0.25),
+              shape: StadiumBorder(
+                side: BorderSide(color: t.action.withValues(alpha: 0.5)),
+              ),
+              child: InkWell(
+                customBorder: const StadiumBorder(),
+                onTap: () {
+                  _scrollToBottom();
+                  setState(() => _showScrollDownArrow = false);
+                },
+                child: Padding(
+                  padding: const EdgeInsets.all(9),
+                  child: Icon(
+                    Icons.keyboard_double_arrow_down,
+                    size: 20,
+                    color: t.action,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   /// Jumps to the bottom and keeps re-jumping each frame until the scroll extent
   /// stops growing — message decryption and async image decode both expand the
   /// list after the first layout, which otherwise leaves the view stranded at a
@@ -261,7 +306,10 @@ class _GroupChatScreenState extends State<GroupChatScreen>
         stableFrames = 0;
         lastExtent = pos.maxScrollExtent;
       }
-      if (stableFrames < 3 && totalFrames < 30) {
+      // Generous window (~2.5s) so many async image decodes can finish growing
+      // the list before we settle — an image-heavy chat opens pinned to the
+      // bottom instead of stranding a few screens up.
+      if (stableFrames < 6 && totalFrames < 150) {
         WidgetsBinding.instance.addPostFrameCallback((_) => tick());
       }
     }
@@ -369,7 +417,11 @@ class _GroupChatScreenState extends State<GroupChatScreen>
     }
 
     final ct = choice.hidden ? 'image_hidden' : 'image';
-    final error = await _appState.sendGroupMessage(base64Data, contentType: ct);
+    final error = await _appState.sendGroupMessage(
+      base64Data,
+      contentType: ct,
+      allowSave: choice.allowSave,
+    );
     if (error != null) {
       _errorSnack(error);
     }
@@ -610,7 +662,9 @@ class _GroupChatScreenState extends State<GroupChatScreen>
                     ),
 
                   Expanded(
-                    child: ListView.builder(
+                    child: Stack(
+                      children: [
+                        ListView.builder(
                       controller: _scrollController,
                       padding: const EdgeInsets.symmetric(
                         horizontal: 12,
@@ -738,10 +792,11 @@ class _GroupChatScreenState extends State<GroupChatScreen>
                             : Color.lerp(t.bubbleThem, memberColor, 0.14)!;
                         final Color nameColor = memberColor;
 
+                        // Spacing moved to the outer Column (trailing spacer) so
+                        // a reactions row hugs its own bubble rather than the
+                        // message below it.
                         final Widget bubble = Container(
-                          margin: EdgeInsets.only(
-                            bottom: isFirstInBatch ? 12 : 4,
-                          ),
+                          margin: EdgeInsets.zero,
                           padding: const EdgeInsets.symmetric(
                             horizontal: 14,
                             vertical: 10,
@@ -860,8 +915,14 @@ class _GroupChatScreenState extends State<GroupChatScreen>
                                   : const SizedBox(width: 28),
                               const SizedBox(width: 8),
                             ],
-                            Flexible(
-                              child: Column(
+                            Expanded(
+                              child: Align(
+                                alignment: isMe
+                                    ? Alignment.centerRight
+                                    : Alignment.centerLeft,
+                                heightFactor: 1,
+                                child: Column(
+                                mainAxisSize: MainAxisSize.min,
                                 crossAxisAlignment: isMe
                                     ? CrossAxisAlignment.end
                                     : CrossAxisAlignment.start,
@@ -884,8 +945,26 @@ class _GroupChatScreenState extends State<GroupChatScreen>
                                     ),
                                   message.isPending
                                       ? Opacity(opacity: 0.6, child: bubble)
-                                      : bubble,
+                                      : GestureDetector(
+                                          onLongPress: () => showReactionPicker(
+                                            context,
+                                            appState: _appState,
+                                            contact: contact,
+                                            message: message,
+                                            emojiMap: emojiMap,
+                                          ),
+                                          child: bubble,
+                                        ),
+                                  ReactionsRow(
+                                    message: message,
+                                    contact: contact,
+                                    appState: _appState,
+                                    emojiMap: emojiMap,
+                                    isMe: isMe,
+                                  ),
+                                  SizedBox(height: isFirstInBatch ? 12 : 4),
                                 ],
+                                ),
                               ),
                             ),
                             if (isMe) ...[
@@ -900,6 +979,16 @@ class _GroupChatScreenState extends State<GroupChatScreen>
                           ],
                         );
                       },
+                        ),
+                        // Jump-to-latest pill, anchored just above the composer
+                        // (bottom of the message area), centred horizontally.
+                        Positioned(
+                          left: 0,
+                          right: 0,
+                          bottom: 8,
+                          child: _scrollDownPill(t),
+                        ),
+                      ],
                     ),
                   ),
 
@@ -924,32 +1013,6 @@ class _GroupChatScreenState extends State<GroupChatScreen>
                   ),
                 ],
               ),
-            ),
-          ),
-
-          Positioned(
-            bottom: 90,
-            right: 16,
-            child: AnimatedOpacity(
-              opacity: _showScrollDownArrow ? 1.0 : 0.0,
-              duration: const Duration(milliseconds: 200),
-              child: _showScrollDownArrow
-                  ? FloatingActionButton.small(
-                      backgroundColor: t.surface,
-                      shape: CircleBorder(
-                        side: BorderSide(
-                          color: t.action.withValues(alpha: 0.5),
-                        ),
-                      ),
-                      onPressed: () {
-                        _scrollToBottom();
-                        setState(() {
-                          _showScrollDownArrow = false;
-                        });
-                      },
-                      child: Icon(Icons.arrow_downward, color: t.action),
-                    )
-                  : const SizedBox(),
             ),
           ),
         ],
@@ -1861,15 +1924,23 @@ class _GroupChatScreenState extends State<GroupChatScreen>
       return _imageError(t);
     }
 
-    return ConstrainedBox(
-      constraints: const BoxConstraints(maxHeight: 300, maxWidth: 260),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(t.radiusControl),
-        child: Image.memory(
-          imageBytes,
-          fit: BoxFit.cover,
-          gaplessPlayback: true,
-          errorBuilder: (context, error, stackTrace) => _imageError(t),
+    final bytes = imageBytes;
+    return GestureDetector(
+      onTap: () => ImageViewerScreen.open(
+        context,
+        imageBytes: bytes,
+        allowSave: message.allowSave,
+      ),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxHeight: 300, maxWidth: 260),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(t.radiusControl),
+          child: Image.memory(
+            bytes,
+            fit: BoxFit.cover,
+            gaplessPlayback: true,
+            errorBuilder: (context, error, stackTrace) => _imageError(t),
+          ),
         ),
       ),
     );

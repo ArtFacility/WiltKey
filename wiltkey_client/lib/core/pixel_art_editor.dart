@@ -4,11 +4,13 @@ import 'package:wiltkey_client/l10n/app_localizations.dart';
 import 'theme/wk.dart';
 import 'theme/wiltkey_tokens.dart';
 import 'pixel_art_avatar.dart';
+import 'pixel_palette.dart';
 
 /// Reusable 10x10 pixel-art editor used for personal avatars (settings,
 /// onboarding) and group icons (create group). Self-contained drawing/colour
-/// state; emits the current 100-char hex grid via [onChanged]. Present it as a
-/// modal with [showPixelArtEditor].
+/// state; emits the current grid string via [onChanged] in whichever encoding
+/// [PixelGrid.encode] chooses (legacy hex when only classic colours are used,
+/// otherwise `v2:`). Present it as a modal with [showPixelArtEditor].
 ///
 /// Living inside a modal is deliberate: it sidesteps the gesture-arena conflict
 /// the inline editors had, where a paint drag would fight the surrounding
@@ -32,35 +34,46 @@ class PixelArtEditor extends StatefulWidget {
     this.previewSize = 220,
   });
 
-  static bool isValidHex(String hex) =>
-      RegExp(r'^[0-9a-fA-F]{100}$').hasMatch(hex);
+  /// True for any valid grid string (either encoding).
+  static bool isValidHex(String hex) => PixelGrid.isValid(hex);
 
-  /// A 2–3 colour, horizontally-symmetric retro sprite. Used by the Random chip
-  /// and as a fallback when no valid initial grid (and no identicon seed) is
+  /// A 2–3 colour, horizontally-symmetric retro sprite drawn from the current
+  /// authoring palette (retired/legacy colours are excluded). Used by the Random
+  /// chip and as a fallback when no valid initial grid (and no identicon seed) is
   /// supplied.
   static String randomSymmetricGrid() {
     final rand = Random();
+    final authoring = <int>[];
+    for (final s in WkPalette.authoringSets) {
+      for (int i = s.start; i < s.end && i < WkPalette.length; i++) {
+        authoring.add(i);
+      }
+    }
+    if (authoring.isEmpty) authoring.add(0);
+
     final numColors = rand.nextInt(2) + 2; // 2 or 3 colours
     final chosen = <int>[0]; // always keep the dark background available
-    while (chosen.length < numColors) {
-      final c = rand.nextInt(16);
+    var guard = 0;
+    while (chosen.length < numColors && guard++ < 64) {
+      final c = authoring[rand.nextInt(authoring.length)];
       if (!chosen.contains(c)) chosen.add(c);
     }
-    final grid = List.filled(100, '0');
+    final grid = List<int>.filled(PixelGrid.cells, 0);
     for (int y = 0; y < 10; y++) {
       for (int x = 0; x < 5; x++) {
-        final ch = chosen[rand.nextInt(chosen.length)].toRadixString(16);
+        final ch = chosen[rand.nextInt(chosen.length)];
         grid[y * 10 + x] = ch;
         grid[y * 10 + (9 - x)] = ch; // mirror for symmetry
       }
     }
-    return grid.join();
+    return PixelGrid.encode(grid);
   }
 
-  /// Normalises [initialHex] to a drawable grid: keeps a valid grid, otherwise
-  /// falls back to an identicon (when [identiconSeed] is given) or a random one.
+  /// Normalises [initialHex] to a drawable grid string: keeps a valid grid,
+  /// otherwise falls back to an identicon (when [identiconSeed] is given) or a
+  /// random one.
   static String normalize(String initialHex, {String? identiconSeed}) {
-    if (isValidHex(initialHex)) return initialHex;
+    if (PixelGrid.isValid(initialHex)) return initialHex;
     if (identiconSeed != null && identiconSeed.isNotEmpty) {
       return PixelArtAvatar.generateIdenticon(identiconSeed);
     }
@@ -72,34 +85,39 @@ class PixelArtEditor extends StatefulWidget {
 }
 
 class _PixelArtEditorState extends State<PixelArtEditor> {
-  late List<String> _grid;
+  late List<int> _grid;
   late int _selColor;
 
   @override
   void initState() {
     super.initState();
-    _grid = PixelArtEditor.normalize(
-      widget.initialHex,
-      identiconSeed: widget.identiconSeed,
-    ).split('');
-    _selColor = widget.defaultColorIndex.clamp(0, 15);
+    _grid = PixelGrid.parseOrBlank(
+      PixelArtEditor.normalize(
+        widget.initialHex,
+        identiconSeed: widget.identiconSeed,
+      ),
+    );
+    // Callers may still request a legacy default (e.g. a classic index); if it
+    // isn't drawable, fall back to the first colour of the authoring palette.
+    _selColor = WkPalette.isAuthoringIndex(widget.defaultColorIndex)
+        ? widget.defaultColorIndex
+        : WkPalette.firstAuthoringIndex;
   }
 
-  void _emit() => widget.onChanged(_grid.join());
+  void _emit() => widget.onChanged(PixelGrid.encode(_grid));
 
   void _draw(Offset pos, double w, double h) {
     final x = (pos.dx / (w / 10)).floor();
     final y = (pos.dy / (h / 10)).floor();
     if (x < 0 || x >= 10 || y < 0 || y >= 10) return;
     final idx = y * 10 + x;
-    final ch = _selColor.toRadixString(16);
-    if (_grid[idx] == ch) return;
-    setState(() => _grid[idx] = ch);
+    if (_grid[idx] == _selColor) return;
+    setState(() => _grid[idx] = _selColor);
     _emit();
   }
 
-  void _setGrid(String hex) {
-    setState(() => _grid = hex.split(''));
+  void _setGrid(String gridStr) {
+    setState(() => _grid = PixelGrid.parseOrBlank(gridStr));
     _emit();
   }
 
@@ -137,8 +155,7 @@ class _PixelArtEditorState extends State<PixelArtEditor> {
                           mainAxisSpacing: 0.5,
                         ),
                     itemBuilder: (context, i) {
-                      final ci = int.parse(_grid[i], radix: 16);
-                      return Container(color: PixelArtAvatar.palette[ci]);
+                      return Container(color: WkPalette.colorAt(_grid[i]));
                     },
                   ),
                 );
@@ -162,7 +179,7 @@ class _PixelArtEditorState extends State<PixelArtEditor> {
               width: 18,
               height: 18,
               decoration: BoxDecoration(
-                color: PixelArtAvatar.palette[_selColor],
+                color: WkPalette.colorAt(_selColor),
                 border: Border.all(color: t.textPrimary, width: 1.5),
                 shape: BoxShape.circle,
               ),
@@ -170,28 +187,18 @@ class _PixelArtEditorState extends State<PixelArtEditor> {
           ],
         ),
         const SizedBox(height: 12),
-        Wrap(
-          alignment: WrapAlignment.center,
-          spacing: 8,
-          runSpacing: 8,
-          children: List.generate(16, (i) {
-            final sel = _selColor == i;
-            return GestureDetector(
-              onTap: () => setState(() => _selColor = i),
-              child: Container(
-                width: 24,
-                height: 24,
-                decoration: BoxDecoration(
-                  color: PixelArtAvatar.palette[i],
-                  border: Border.all(
-                    color: sel ? t.action : t.border,
-                    width: sel ? 2.0 : 1.0,
-                  ),
-                  shape: BoxShape.circle,
-                ),
-              ),
-            );
-          }),
+        // Swatches grouped by palette set. Multiple sets scroll within a
+        // bounded box so a growing registry never blows out the dialog height.
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxHeight: 168),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (final set in WkPalette.authoringSets) _swatchSet(t, set),
+              ],
+            ),
+          ),
         ),
         const SizedBox(height: 14),
         Wrap(
@@ -207,7 +214,11 @@ class _PixelArtEditorState extends State<PixelArtEditor> {
                   PixelArtAvatar.generateIdenticon(widget.identiconSeed!),
                 ),
               ),
-            _chip(t, l10n.settingsProfileChipClear, () => _setGrid('0' * 100)),
+            _chip(
+              t,
+              l10n.settingsProfileChipClear,
+              () => _setGrid(PixelGrid.blank),
+            ),
             _chip(
               t,
               l10n.settingsProfileChipRandom,
@@ -216,6 +227,73 @@ class _PixelArtEditorState extends State<PixelArtEditor> {
           ],
         ),
       ],
+    );
+  }
+
+  Widget _swatchSet(WiltkeyTokens t, WkPaletteSet set) {
+    final locked = !WkPalette.canAuthor(set);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Set label only shown once there's more than one set to disambiguate.
+          if (WkPalette.authoringSets.length > 1)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    t.uppercaseLabels ? set.name.toUpperCase() : set.name,
+                    style: t.dataMono.copyWith(
+                      color: t.textSecondary,
+                      fontSize: 10,
+                    ),
+                  ),
+                  if (locked) ...[
+                    const SizedBox(width: 4),
+                    Icon(Icons.lock, size: 11, color: t.textSecondary),
+                  ],
+                ],
+              ),
+            ),
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (int i = set.start; i < set.end && i < WkPalette.length; i++)
+                _swatch(t, i, locked),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _swatch(WiltkeyTokens t, int i, bool locked) {
+    final sel = _selColor == i;
+    return GestureDetector(
+      onTap: locked ? null : () => setState(() => _selColor = i),
+      child: Opacity(
+        opacity: locked ? 0.45 : 1.0,
+        child: Container(
+          width: 24,
+          height: 24,
+          decoration: BoxDecoration(
+            color: WkPalette.colorAt(i),
+            border: Border.all(
+              color: sel ? t.action : t.border,
+              width: sel ? 2.0 : 1.0,
+            ),
+            shape: BoxShape.circle,
+          ),
+          child: locked
+              ? Icon(Icons.lock, size: 11, color: t.textPrimary)
+              : null,
+        ),
+      ),
     );
   }
 
@@ -231,7 +309,7 @@ class _PixelArtEditorState extends State<PixelArtEditor> {
 }
 
 /// Presents the [PixelArtEditor] as a Save/Cancel modal. Returns the resulting
-/// 100-char hex grid, or null if the user cancelled.
+/// grid string, or null if the user cancelled.
 Future<String?> showPixelArtEditor(
   BuildContext context, {
   required String initialHex,

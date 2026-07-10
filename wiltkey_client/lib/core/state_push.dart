@@ -48,6 +48,28 @@ extension AppStatePush on AppState {
     }
   }
 
+  /// One-time upgrade healing. Users who ran the OLD foreground-service "Instant"
+  /// mode and updated in place to the FCM-backed build keep their stored
+  /// `notificationMode == instant`, but the FCM wake-up was never wired up — that
+  /// only ever happened inside [setNotificationMode], which they never re-ran.
+  /// So Instant looked selected yet no push arrived until they toggled the mode
+  /// off, killed the app, and back on by hand.
+  ///
+  /// This re-runs that same setup exactly once — request the notification
+  /// permission and register the FCM token — then records that it's done. A no-op
+  /// on the FOSS flavor (no FCM at all) and on every launch after the first.
+  Future<void> reconcileInstantModeAfterUpgrade() async {
+    if (!kFcmEnabled) return;
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool(kPrefPushMigrationDone) == true) return;
+    if (notificationMode == NotificationMode.instant) {
+      await WiltkeyNotifications.requestPermission();
+      await registerPushToken();
+      log('[Push] Auto-wired FCM Instant after in-place upgrade.');
+    }
+    await prefs.setBool(kPrefPushMigrationDone, true);
+  }
+
   Future<void> _postPush(String action, Map<String, dynamic> body) async {
     try {
       final base = Uri.parse(activeRelayUrl);

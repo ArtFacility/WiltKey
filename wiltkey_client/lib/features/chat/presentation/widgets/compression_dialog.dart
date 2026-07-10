@@ -3,12 +3,18 @@ import 'package:wiltkey_client/l10n/app_localizations.dart';
 import '../../../../core/state.dart';
 import '../../../../core/theme/wk.dart';
 
-/// Result of the compression dialog: the chosen quality (0.1-1.0) and whether
-/// the image should be sent hidden (tap-to-reveal spoiler).
+/// Result of the compression dialog: the chosen quality (0.1-1.0), whether the
+/// image should be sent hidden (tap-to-reveal spoiler), and whether the
+/// recipient is allowed to save/download it to their gallery.
 class CompressionResult {
   final double quality;
   final bool hidden;
-  const CompressionResult({required this.quality, required this.hidden});
+  final bool allowSave;
+  const CompressionResult({
+    required this.quality,
+    required this.hidden,
+    required this.allowSave,
+  });
 }
 
 class CompressionDialog extends StatefulWidget {
@@ -34,6 +40,7 @@ class CompressionDialog extends StatefulWidget {
 class _CompressionDialogState extends State<CompressionDialog> {
   double quality = 0.5;
   bool hidden = false;
+  bool allowSave = false;
 
   @override
   Widget build(BuildContext context) {
@@ -156,6 +163,31 @@ class _CompressionDialogState extends State<CompressionDialog> {
               ),
             ],
           ),
+          // Opt-in: let the recipient save this image to their gallery. Off by
+          // default — images are view-only unless the sender allows a download.
+          Row(
+            children: [
+              Icon(
+                allowSave
+                    ? Icons.download_outlined
+                    : Icons.file_download_off_outlined,
+                color: allowSave ? t.action : t.textTertiary,
+                size: 18,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  l10n.chatImageCompressionAllowDownload,
+                  style: t.body.copyWith(fontSize: 12),
+                ),
+              ),
+              Switch(
+                value: allowSave,
+                activeThumbColor: t.action,
+                onChanged: (val) => setState(() => allowSave = val),
+              ),
+            ],
+          ),
         ],
       ),
       actions: [
@@ -169,7 +201,11 @@ class _CompressionDialogState extends State<CompressionDialog> {
         ElevatedButton(
           onPressed: () => Navigator.pop(
             context,
-            CompressionResult(quality: quality, hidden: hidden),
+            CompressionResult(
+              quality: quality,
+              hidden: hidden,
+              allowSave: allowSave,
+            ),
           ),
           style: ElevatedButton.styleFrom(
             backgroundColor: t.action,

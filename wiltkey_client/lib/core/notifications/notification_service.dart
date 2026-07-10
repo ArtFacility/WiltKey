@@ -45,6 +45,11 @@ enum NotificationMode {
 
 // --- Shared keys/ids (also referenced from the background isolates) ----------
 const String kPrefNotificationMode = 'wk_notification_mode';
+/// Set once the app has (re)configured the notification mode for this install —
+/// either the user picked one, or the one-time upgrade migration ran. Its absence
+/// is how we detect a user who carried a stored `instant` mode across an in-place
+/// update from the old foreground-service build to the FCM build.
+const String kPrefPushMigrationDone = 'wk_push_migration_done';
 const String kPrefBgRelayUrl = 'wk_bg_relay_url';
 const String kPrefBgUserId = 'wk_bg_user_id';
 const String kPrefBgPubKey = 'wk_bg_pubkey';

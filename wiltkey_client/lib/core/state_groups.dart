@@ -519,6 +519,7 @@ extension AppStateGroups on AppState {
   Future<String?> sendGroupMessage(
     String text, {
     String contentType = 'text',
+    bool allowSave = false,
   }) async {
     if (activeContact == null ||
         !activeContact!.isGroup ||
@@ -561,6 +562,7 @@ extension AppStateGroups on AppState {
         isSentByMe: true,
         isPending: true,
         decodedImageBytes: isImage ? base64Decode(text) : null,
+        allowSave: allowSave,
         decodedAudioBytes: isVoice ? base64Decode(text) : null,
         decryptedText: text,
       );
@@ -674,6 +676,7 @@ extension AppStateGroups on AppState {
       // with the message through resync, so ordering is stable even when delivery
       // is out of order.
       'ts': sentTs,
+      if (allowSave) 'dl': true,
     });
 
     final bool socketConnected = WebSocketClient().isConnected;
@@ -717,6 +720,7 @@ extension AppStateGroups on AppState {
           contentType: contentType,
           timestamp: DateTime.fromMillisecondsSinceEpoch(sentTs),
           isSentByMe: true,
+          allowSave: allowSave,
           decryptedText: text,
         );
     newMessage.text = base64Encode(cipherBytes);

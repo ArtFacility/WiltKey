@@ -80,7 +80,7 @@ class _ChatsTabState extends State<ChatsTab> {
         builder: (_) =>
             c.isGroup ? const GroupChatScreen() : const ChatScreen(),
       ),
-    );
+    ).then((_) => _appState.clearVisibleChatIfCurrent(c.id));
   }
 
   /// Long-press actions on a chat row. Live chats can be archived (drop the OTP

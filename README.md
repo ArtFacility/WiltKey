@@ -4,7 +4,7 @@
 
 **A private messenger for people who'd rather be off their phone. Make friends you actually see IRL**
 
-`v1.0.0` · Android · MPL-2.0 · made by [ArtFacility](https://github.com/ArtFacility)
+`v1.0.1` · Android · MPL-2.0 · made by [ArtFacility](https://github.com/ArtFacility)
 
 </div>
 
@@ -59,7 +59,8 @@ And the whole thing is designed to *not* hold your attention. No infinite feed, 
 </div>
 
 - **Group chats** that work over the same in-person trust model.
-- **Image sending** with a compression slider so you can see exactly what a picture will "cost" before it goes, plus a *send hidden* option for spoiler/tap-to-reveal pics.
+- **Image sending** with a compression slider so you can see exactly what a picture will "cost" before it goes, plus a *send hidden* option for spoiler/tap-to-reveal pics. Tap a received image to zoom and pan it full-screen, and the sender can optionally let you **save it to your gallery** (in JPEG, PNG or WebP).
+- **Message reactions** — react to any message with an emoji, your custom ones included.
 - **Custom emojis per chat** — make a `:pepesad:` or a `:mogged:`, use it inline with `:name:`.
 - **Voice messages** — hold to record and pick the quality before you send, from crisp down to charmingly lo-fi. They ride the same one-time pad as everything else, and each theme plays them back its own way.
 - **Nuke a chat** from both sides — wipes the messages and the keys, on your device and theirs.
@@ -104,7 +105,6 @@ The Go relay lives in `wiltkey_server/` if you want to run your own instead of t
 I'd say it's a rough **1.0.0** — the first version I'm comfortable letting other people poke at. Core messaging, groups, theming, and the security basics are in and working. Plenty is still planned:
 
 - 💥 **Self-destruct messages & images** — set something to vanish after it's read.
-- 😄 **Message reactions** — quick emoji reactions instead of a full reply.
 - 📍 **Meetup discovery** — create/join small local events near you so people with shared interests can actually meet up in person.
 - …and a steady stream of smaller stuff: more themes, polish, and the special-action animations that are still stubbed out.
 

@@ -850,6 +850,13 @@ class AppLocalizationsPl extends AppLocalizations {
   String get groupCreateButton => 'Utwórz grupę';
 
   @override
+  String get groupCreateProgressTitle => 'Tworzenie grupy…';
+
+  @override
+  String get groupCreateProgressSubtitle =>
+      'Przygotowywanie zapasu szyfrującego grupy i pojemności członków. To może chwilę potrwać — cierpliwości.';
+
+  @override
   String groupCreateFailedSnackBar(String error) {
     return 'Nie udało się utworzyć grupy: $error';
   }
@@ -1230,4 +1237,33 @@ class AppLocalizationsPl extends AppLocalizations {
   @override
   String get themePaperinkDesc =>
       'Ciepły papier washi, rozcieńczenia tuszu sumi, cynobrowa pieczęć hanko.';
+
+  @override
+  String get accessibilityWarningTitle => 'Usługa ułatwień dostępu aktywna';
+
+  @override
+  String accessibilityWarningBody(String names) {
+    return 'Aktywna jest usługa ułatwień dostępu, która może odczytywać zawartość ekranu: $names. To normalne w przypadku narzędzi takich jak czytniki ekranu lub menedżery haseł. Jeśli nie włączyłeś żadnej, sprawdź ustawienia ułatwień dostępu.';
+  }
+
+  @override
+  String get accessibilityWarningDismiss => 'Zamknij';
+
+  @override
+  String get accessibilityWarningOpenSettings => 'Sprawdź ustawienia';
+
+  @override
+  String get chatImageCompressionAllowDownload => 'Zezwól na zapis w galerii';
+
+  @override
+  String get chatImageDownload => 'Pobierz';
+
+  @override
+  String get chatImageSaveAs => 'Zapisz jako';
+
+  @override
+  String get chatImageSavedToGallery => 'Zapisano w galerii';
+
+  @override
+  String get chatImageSaveFailed => 'Nie udało się zapisać obrazu';
 }

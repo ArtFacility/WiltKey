@@ -1,9 +1,13 @@
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
+import 'pixel_palette.dart';
 
+/// Renders a 10x10 pixel-art grid. [hexString] is the grid in either supported
+/// encoding (legacy 100-char hex or `v2:`+base64 — see [PixelGrid]); invalid or
+/// empty values render as a blank (all-background) grid.
 class PixelArtAvatar extends StatelessWidget {
-  final String hexString; // 100 chars, e.g. "0123..."
+  final String hexString;
   final double size;
 
   const PixelArtAvatar({
@@ -12,38 +16,20 @@ class PixelArtAvatar extends StatelessWidget {
     required this.size,
   });
 
-  // Curated 16-color palette
-  static const List<Color> palette = [
-    Color(0xFF0F172A), // 0: Dark slate/Black (background)
-    Color(0xFFFFFFFF), // 1: White
-    Color(0xFFFF3366), // 2: Neon Pink
-    Color(0xFFFF6600), // 3: Orange
-    Color(0xFFFFCC00), // 4: Yellow
-    Color(0xFF33CC66), // 5: Green
-    Color(0xFF0099FF), // 6: Blue
-    Color(0xFF9933FF), // 7: Purple
-    Color(0xFFFF99CC), // 8: Light Pink
-    Color(0xFFCCFF33), // 9: Lime
-    Color(0xFF33FFFF), // A: Cyan
-    Color(0xFF996633), // B: Brown
-    Color(0xFF45A29E), // C: Dark Teal
-    Color(0xFFCCCCCC), // D: Light Gray
-    Color(0xFF66FCF1), // E: Wiltkey Bright Teal
-    Color(0xFFFF3333), // F: Neon Red
-  ];
+  /// Back-compat alias for the classic 16 colours. New code should use
+  /// [WkPalette.colors] / [WkPalette.colorAt].
+  static List<Color> get palette => WkPalette.colors;
 
   @override
   Widget build(BuildContext context) {
-    final String cleanHex = (hexString.length == 100 && _isValidHex(hexString))
-        ? hexString
-        : '0' * 100;
+    final indices = PixelGrid.parseOrBlank(hexString);
 
     return Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
         border: Border.all(
-          color: const Color(0xFF45A29E).withOpacity(0.3),
+          color: const Color(0xFF45A29E).withValues(alpha: 0.3),
           width: 1,
         ),
         borderRadius: BorderRadius.circular(4),
@@ -52,57 +38,65 @@ class PixelArtAvatar extends StatelessWidget {
         borderRadius: BorderRadius.circular(3),
         child: CustomPaint(
           size: Size(size, size),
-          painter: _PixelArtPainter(cleanHex),
+          painter: _PixelArtPainter(indices),
         ),
       ),
     );
   }
 
-  bool _isValidHex(String hex) {
-    final hexRegex = RegExp(r'^[0-9a-fA-F]{100}$');
-    return hexRegex.hasMatch(hex);
-  }
-
+  /// Deterministic, horizontally-symmetric identicon derived from [key], drawn
+  /// from the current authoring palette (so auto-avatars match the live colour
+  /// system). Regenerated on the fly — no stored data depends on its encoding.
   static String generateIdenticon(String key) {
-    if (key.isEmpty) return '0' * 100;
+    if (key.isEmpty) return PixelGrid.blank;
 
-    // Symmetric identicon generator
     final hash = sha256.convert(utf8.encode(key)).bytes;
-    final List<String> grid = List.filled(100, '0');
+    final grid = List<int>.filled(PixelGrid.cells, 0);
 
-    // Choose 2 distinct colors from the palette to use in this identicon
-    final int idx1 = (hash[0] % 15) + 1;
-    int idx2 = (hash[1] % 15) + 1;
-    if (idx1 == idx2) {
-      idx2 = (idx2 % 15) + 1;
+    // Colour choices: every authoring-palette index (background excluded). Falls
+    // back to the whole registry if no authoring set is available.
+    final choices = <int>[];
+    for (final s in WkPalette.authoringSets) {
+      for (int i = s.start; i < s.end && i < WkPalette.length; i++) {
+        if (i != 0) choices.add(i);
+      }
+    }
+    if (choices.isEmpty) {
+      for (int i = 1; i < WkPalette.length; i++) {
+        choices.add(i);
+      }
     }
 
-    final color1Char = idx1.toRadixString(16);
-    final color2Char = idx2.toRadixString(16);
+    // Two distinct non-background colours, deterministic from the hash.
+    final int idx1 = choices[hash[0] % choices.length];
+    int idx2 = choices[hash[1] % choices.length];
+    if (idx1 == idx2) {
+      idx2 = choices[(hash[1] + 1) % choices.length];
+    }
 
     for (int y = 0; y < 10; y++) {
       for (int x = 0; x < 5; x++) {
         final byteIdx = (y * 5 + x) % hash.length;
         final val = hash[byteIdx];
 
-        String colorChar = '0';
+        int colorIdx = 0;
         if (val % 3 == 1) {
-          colorChar = color1Char;
+          colorIdx = idx1;
         } else if (val % 3 == 2) {
-          colorChar = color2Char;
+          colorIdx = idx2;
         }
 
-        grid[y * 10 + x] = colorChar;
-        grid[y * 10 + (9 - x)] = colorChar;
+        grid[y * 10 + x] = colorIdx;
+        grid[y * 10 + (9 - x)] = colorIdx;
       }
     }
-    return grid.join();
+    return PixelGrid.encode(grid);
   }
 }
 
 class _PixelArtPainter extends CustomPainter {
-  final String hex;
-  _PixelArtPainter(this.hex);
+  final List<int> indices;
+  _PixelArtPainter(this.indices);
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -112,9 +106,7 @@ class _PixelArtPainter extends CustomPainter {
     for (int y = 0; y < 10; y++) {
       for (int x = 0; x < 10; x++) {
         final int index = y * 10 + x;
-        final char = hex[index];
-        final int colorIndex = int.parse(char, radix: 16);
-        paint.color = PixelArtAvatar.palette[colorIndex];
+        paint.color = WkPalette.colorAt(indices[index]);
         canvas.drawRect(
           Rect.fromLTWH(
             x * pixelSize,
@@ -130,6 +122,11 @@ class _PixelArtPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _PixelArtPainter oldDelegate) {
-    return oldDelegate.hex != hex;
+    if (identical(oldDelegate.indices, indices)) return false;
+    if (oldDelegate.indices.length != indices.length) return true;
+    for (int i = 0; i < indices.length; i++) {
+      if (oldDelegate.indices[i] != indices[i]) return true;
+    }
+    return false;
   }
 }

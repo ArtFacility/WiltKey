@@ -81,16 +81,10 @@ class _SettingsScreenState extends State<SettingsScreen>
     _relayController = TextEditingController(text: _appState.localDevRelayUrl);
     _useDevRelay = _appState.useLocalDevRelay;
 
-    final hex =
-        _appState.profileImageB64.length == 100 &&
-            _isValidHex(_appState.profileImageB64)
+    final hex = PixelArtEditor.isValidHex(_appState.profileImageB64)
         ? _appState.profileImageB64
         : PixelArtAvatar.generateIdenticon(_appState.userId);
     _pixelGrid = hex.split('');
-  }
-
-  bool _isValidHex(String hex) {
-    return RegExp(r'^[0-9a-fA-F]{100}$').hasMatch(hex);
   }
 
   void _updateStateFromModel() {

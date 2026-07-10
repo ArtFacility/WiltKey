@@ -83,7 +83,14 @@ class _PinLockScreenState extends State<PinLockScreen>
         builder: (_) => Positioned.fill(
           child: Theme(
             data: themeData,
-            child: wkc.unlockTransition(onDone: () => entry.remove()),
+            // A transparent Material gives the transition a real DefaultTextStyle
+            // (Theme alone doesn't). Without it, glyph text drawn by a theme's
+            // unlock effect — e.g. Paper & Ink's 枯/鍵 kanji — inherits
+            // WidgetsApp's debug double-yellow-underline style.
+            child: Material(
+              type: MaterialType.transparency,
+              child: wkc.unlockTransition(onDone: () => entry.remove()),
+            ),
           ),
         ),
       );

@@ -414,6 +414,8 @@
   "groupCreatePolicyAllowImagesSub": "Allow members to send photos",
   "groupCreatePolicyPayloadSize": "Max message size",
   "groupCreateButton": "Create Group",
+  "groupCreateProgressTitle": "Creating group…",
+  "groupCreateProgressSubtitle": "Preparing your group's encryption pad and member capacity. This can take a moment — hang tight.",
   "groupCreateFailedSnackBar": "Failed to create group: {error}",
   "@groupCreateFailedSnackBar": {
     "placeholders": {
@@ -652,5 +654,21 @@
   "themeGardenName": "Dusk Garden",
   "themeGardenDesc": "Soft soil tones, warm linen, petals for your budget.",
   "themePaperinkName": "Paper & Ink",
-  "themePaperinkDesc": "Warm washi paper, sumi ink dilutions, vermilion hanko seal."
+  "themePaperinkDesc": "Warm washi paper, sumi ink dilutions, vermilion hanko seal.",
+  "accessibilityWarningTitle": "Accessibility service active",
+  "accessibilityWarningBody": "An accessibility service that can read on-screen content is active: {names}. This is normal for tools like screen readers or password managers. If you didn't turn one on, review your accessibility settings.",
+  "@accessibilityWarningBody": {
+    "placeholders": {
+      "names": {
+        "type": "String"
+      }
+    }
+  },
+  "accessibilityWarningDismiss": "Dismiss",
+  "accessibilityWarningOpenSettings": "Review settings",
+  "chatImageCompressionAllowDownload": "Allow saving to gallery",
+  "chatImageDownload": "Download",
+  "chatImageSaveAs": "Save as",
+  "chatImageSavedToGallery": "Saved to gallery",
+  "chatImageSaveFailed": "Couldn't save the image"
 }

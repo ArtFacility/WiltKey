@@ -247,6 +247,8 @@
   "groupCreatePolicyAllowImagesSub": "Zezwalaj członkom na wysyłanie zdjęć",
   "groupCreatePolicyPayloadSize": "Maksymalny rozmiar wiadomości",
   "groupCreateButton": "Utwórz grupę",
+  "groupCreateProgressTitle": "Tworzenie grupy…",
+  "groupCreateProgressSubtitle": "Przygotowywanie zapasu szyfrującego grupy i pojemności członków. To może chwilę potrwać — cierpliwości.",
   "groupCreateFailedSnackBar": "Nie udało się utworzyć grupy: {error}",
   "pairSyncingAwaitingApproval": "Oczekiwanie na akceptację znajomego...",
   "pairSyncingCoordinating": "Przygotowywanie wymiany kluczy...",
@@ -363,5 +365,14 @@
   "themeGardenName": "Ogród o Zmierzchu",
   "themeGardenDesc": "Miękkie odcienie gleby, ciepły len, płatki na twój budżet.",
   "themePaperinkName": "Papier i Tusz",
-  "themePaperinkDesc": "Ciepły papier washi, rozcieńczenia tuszu sumi, cynobrowa pieczęć hanko."
+  "themePaperinkDesc": "Ciepły papier washi, rozcieńczenia tuszu sumi, cynobrowa pieczęć hanko.",
+  "accessibilityWarningTitle": "Usługa ułatwień dostępu aktywna",
+  "accessibilityWarningBody": "Aktywna jest usługa ułatwień dostępu, która może odczytywać zawartość ekranu: {names}. To normalne w przypadku narzędzi takich jak czytniki ekranu lub menedżery haseł. Jeśli nie włączyłeś żadnej, sprawdź ustawienia ułatwień dostępu.",
+  "accessibilityWarningDismiss": "Zamknij",
+  "accessibilityWarningOpenSettings": "Sprawdź ustawienia",
+  "chatImageCompressionAllowDownload": "Zezwól na zapis w galerii",
+  "chatImageDownload": "Pobierz",
+  "chatImageSaveAs": "Zapisz jako",
+  "chatImageSavedToGallery": "Zapisano w galerii",
+  "chatImageSaveFailed": "Nie udało się zapisać obrazu"
 }

@@ -136,6 +136,7 @@ class _PaperinkUnlockSequenceState extends State<PaperinkUnlockSequence>
                 color: Color(0xFFC12A23),
                 height: 1.1,
                 letterSpacing: -1.0,
+                decoration: TextDecoration.none,
               ),
             ),
             Transform.translate(
@@ -149,6 +150,7 @@ class _PaperinkUnlockSequenceState extends State<PaperinkUnlockSequence>
                   color: Color(0xFFC12A23),
                   height: 1.1,
                   letterSpacing: -1.0,
+                  decoration: TextDecoration.none,
                 ),
               ),
             ),
