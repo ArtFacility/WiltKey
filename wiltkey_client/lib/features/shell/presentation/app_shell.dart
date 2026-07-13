@@ -11,6 +11,7 @@ import '../../../core/theme/wk.dart';
 import '../../dashboard/presentation/chats_tab.dart';
 import '../../chat/presentation/chat_screen.dart';
 import '../../chat/presentation/group_chat_screen.dart';
+import '../../chat/presentation/widgets/screenshot_ui.dart';
 import '../../proximity/presentation/pairing_screen.dart';
 import '../../settings/presentation/settings_screen.dart';
 import 'wk_bottom_nav.dart';
@@ -61,6 +62,17 @@ class _AppShellState extends State<AppShell>
     // One-shot heads-up if a third-party accessibility service can read the
     // screen (informational, not a block).
     WidgetsBinding.instance.addPostFrameCallback((_) => _maybeWarnAccessibility());
+    // A peer asking to screenshot a chat with us → show the Allow/Deny prompt
+    // here (works regardless of which tab/screen is on top).
+    _appState.incomingScreenshotRequest.addListener(_onScreenshotRequest);
+  }
+
+  /// Peer requested consent for a screenshot → surface the dialog once.
+  void _onScreenshotRequest() {
+    final req = _appState.incomingScreenshotRequest.value;
+    if (req == null || !mounted) return;
+    _appState.incomingScreenshotRequest.value = null;
+    showScreenshotConsentDialog(context, req);
   }
 
   @override
@@ -73,6 +85,9 @@ class _AppShellState extends State<AppShell>
       // The user may have enabled an accessibility service while away.
       WidgetsBinding.instance
           .addPostFrameCallback((_) => _maybeWarnAccessibility());
+      // Re-arm wilting countdowns (timers don't survive backgrounding) and wilt
+      // anything whose lifetime elapsed while we were away.
+      _appState.sweepAndArmWilting(force: true);
     }
   }
 
@@ -152,6 +167,7 @@ class _AppShellState extends State<AppShell>
   @override
   void dispose() {
     _appState.removeListener(_onState);
+    _appState.incomingScreenshotRequest.removeListener(_onScreenshotRequest);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }

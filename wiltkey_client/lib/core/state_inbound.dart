@@ -239,6 +239,21 @@ extension AppStateInbound on AppState {
       return;
     }
 
+    if (contentType == 'screenshot_request') {
+      await _handleScreenshotRequest(senderId, envelope);
+      return;
+    }
+
+    if (contentType == 'screenshot_response') {
+      await _handleScreenshotResponse(senderId, envelope);
+      return;
+    }
+
+    if (contentType == 'wilt_done') {
+      await _handleWiltDone(senderId, envelope);
+      return;
+    }
+
     Map<String, dynamic>? envelopeJson;
     try {
       envelopeJson = jsonDecode(envelope) as Map<String, dynamic>;
@@ -285,6 +300,21 @@ extension AppStateInbound on AppState {
 
       if (contentType == 'group_reaction') {
         await _handleGroupReaction(contact, senderId, envelopeJson!);
+        return;
+      }
+
+      if (contentType == 'group_wilt_done') {
+        await _handleGroupWiltDone(contact, senderId, envelopeJson!);
+        return;
+      }
+
+      if (contentType == 'group_screenshot_request') {
+        await _handleGroupScreenshotRequest(contact, senderId, envelopeJson!);
+        return;
+      }
+
+      if (contentType == 'group_screenshot_response') {
+        await _handleGroupScreenshotResponse(contact, senderId, envelopeJson!);
         return;
       }
 
@@ -555,6 +585,8 @@ extension AppStateInbound on AppState {
       String? decryptedPlaintext;
       String messageId = DateTime.now().toString();
       bool allowSave = false;
+      bool ephemeral = false;
+      int ttlSeconds = 0;
 
       try {
         if (envelopeJson != null) {
@@ -563,6 +595,8 @@ extension AppStateInbound on AppState {
           offset = envelopeJson['offset'] as int? ?? 0;
           messageId = envelopeJson['id'] as String? ?? messageId;
           allowSave = envelopeJson['dl'] == true;
+          ephemeral = envelopeJson['eph'] == 1;
+          ttlSeconds = envelopeJson['ttl'] as int? ?? 0;
         }
 
         final cipherBytes = base64Decode(rawContent);
@@ -611,6 +645,8 @@ extension AppStateInbound on AppState {
         isSentByMe: false,
         offset: offset,
         allowSave: allowSave,
+        ephemeral: ephemeral,
+        ttlSeconds: ephemeral ? ttlSeconds : 0,
         decryptedText: decryptedPlaintext,
         decodedImageBytes:
             (resolvedContentType == 'image' && decryptedPlaintext != null)
@@ -676,6 +712,8 @@ extension AppStateInbound on AppState {
       final dataB64 = envelopeJson?['d'] as String?;
       final innerType = envelopeJson?['t'] as String? ?? 'text';
       final bool allowSave = envelopeJson?['dl'] == true;
+      final bool ephemeral = envelopeJson?['eph'] == 1;
+      final int ttlSeconds = envelopeJson?['ttl'] as int? ?? 0;
       final messageId =
           envelopeJson?['id'] as String? ?? DateTime.now().toString();
       final tsMillis = envelopeJson?['ts'] as int?;
@@ -824,6 +862,8 @@ extension AppStateInbound on AppState {
         isSentByMe: innerSenderId == userId,
         offset: offset,
         allowSave: allowSave,
+        ephemeral: ephemeral,
+        ttlSeconds: ephemeral ? ttlSeconds : 0,
         decryptedText: decryptedText,
         decodedImageBytes: (innerType == 'image')
             ? base64Decode(decryptedText)
@@ -1237,6 +1277,11 @@ extension AppStateInbound on AppState {
       );
       for (final msg in inRange) {
         if (msg.isSystem) continue;
+        // A wilted message has no recoverable body left — never resurrect it via
+        // resync (its ciphertext was destroyed on wilt).
+        if (msg.wilted) continue;
+        // Screenshot-request cards are local control records, not pad content.
+        if (msg.contentType == 'screenshot_request') continue;
         // msg.text is already the base64 ciphertext positioned at msg.offset
         // for both 1-on-1 and group chats — forward it as-is.
         missingMessages.add({
@@ -1250,6 +1295,8 @@ extension AppStateInbound on AppState {
           'isSentByMe': msg.isSentByMe,
           'offset': msg.offset,
           'allowSave': msg.allowSave,
+          if (msg.ephemeral) 'ephemeral': true,
+          if (msg.ephemeral) 'ttlSeconds': msg.ttlSeconds,
         });
       }
 
@@ -1356,6 +1403,8 @@ extension AppStateInbound on AppState {
         final DateTime timestamp = DateTime.parse(m['timestamp'] as String);
         final bool isSentByMe = m['isSentByMe'] as bool;
         final bool allowSave = m['allowSave'] as bool? ?? false;
+        final bool ephemeral = m['ephemeral'] as bool? ?? false;
+        final int ttlSeconds = m['ttlSeconds'] as int? ?? 0;
 
         if (contact.isGroup && contentType == 'group_lane_header') {
           try {
@@ -1441,6 +1490,8 @@ extension AppStateInbound on AppState {
             isSentByMe: msgIsSentByMe,
             offset: offset,
             allowSave: allowSave,
+            ephemeral: ephemeral,
+            ttlSeconds: ephemeral ? ttlSeconds : 0,
             decryptedText: decryptedText,
             decodedImageBytes: (contentType == 'image')
                 ? base64Decode(decryptedText)

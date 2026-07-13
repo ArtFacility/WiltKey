@@ -2280,6 +2280,12 @@ abstract class AppLocalizations {
   /// **'Allow saving to gallery'**
   String get chatImageCompressionAllowDownload;
 
+  /// Toggle in the image send dialog to make the image a disappearing (wilting) one.
+  ///
+  /// In en, this message translates to:
+  /// **'Wilting image (disappears after opening)'**
+  String get chatImageCompressionWilting;
+
   /// No description provided for @chatImageDownload.
   ///
   /// In en, this message translates to:
@@ -2303,6 +2309,132 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Couldn\'t save the image'**
   String get chatImageSaveFailed;
+
+  /// No description provided for @chatImageSourceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Send a photo'**
+  String get chatImageSourceTitle;
+
+  /// No description provided for @chatImageSourceCamera.
+  ///
+  /// In en, this message translates to:
+  /// **'Take photo'**
+  String get chatImageSourceCamera;
+
+  /// No description provided for @chatImageSourceGallery.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose from gallery'**
+  String get chatImageSourceGallery;
+
+  /// No description provided for @screenshotRequestTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Request screenshot'**
+  String get screenshotRequestTooltip;
+
+  /// No description provided for @screenshotWaiting.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for approval…'**
+  String get screenshotWaiting;
+
+  /// No description provided for @screenshotConsentTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Screenshot request'**
+  String get screenshotConsentTitle;
+
+  /// No description provided for @screenshotConsentBody.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} wants to save a screenshot of this chat. Allow it?'**
+  String screenshotConsentBody(String name);
+
+  /// No description provided for @screenshotDenied.
+  ///
+  /// In en, this message translates to:
+  /// **'Screenshot request was declined.'**
+  String get screenshotDenied;
+
+  /// No description provided for @screenshotCaptureFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t capture the screenshot.'**
+  String get screenshotCaptureFailed;
+
+  /// No description provided for @screenshotWatermark.
+  ///
+  /// In en, this message translates to:
+  /// **'WiltKey — Screenshot with consent'**
+  String get screenshotWatermark;
+
+  /// Title of the in-history screenshot-request card.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} requested a screenshot'**
+  String screenshotRequestInline(String name);
+
+  /// No description provided for @screenshotRequestAllowed.
+  ///
+  /// In en, this message translates to:
+  /// **'You allowed the screenshot'**
+  String get screenshotRequestAllowed;
+
+  /// No description provided for @screenshotRequestDeclined.
+  ///
+  /// In en, this message translates to:
+  /// **'You declined the screenshot'**
+  String get screenshotRequestDeclined;
+
+  /// No description provided for @screenshotRequestExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'Screenshot request expired'**
+  String get screenshotRequestExpired;
+
+  /// Gated placeholder for a received disappearing message before it is opened.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to see wilting message'**
+  String get wiltingTapToReveal;
+
+  /// Small tag shown on your own copy of a sent disappearing message.
+  ///
+  /// In en, this message translates to:
+  /// **'Wilting message'**
+  String get wiltingMessageTag;
+
+  /// Tombstone shown once a disappearing message has expired and its content was destroyed.
+  ///
+  /// In en, this message translates to:
+  /// **'Wilted message'**
+  String get wiltedMessage;
+
+  /// Title of the sheet for composing a disappearing message.
+  ///
+  /// In en, this message translates to:
+  /// **'Wilting message'**
+  String get wiltingSheetTitle;
+
+  /// Explanation in the disappearing-message duration sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'The message disappears this many seconds after the recipient opens it.'**
+  String get wiltingSheetBody;
+
+  /// Confirm button in the disappearing-message duration sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Send wilting message'**
+  String get wiltingSheetSend;
+
+  /// Tooltip on the send button hinting the long-press to send a disappearing message.
+  ///
+  /// In en, this message translates to:
+  /// **'Hold to send a wilting message'**
+  String get wiltingHoldToSendHint;
 }
 
 class _AppLocalizationsDelegate

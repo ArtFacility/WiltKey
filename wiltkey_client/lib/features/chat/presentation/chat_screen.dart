@@ -7,7 +7,9 @@ import 'package:wiltkey_client/l10n/app_localizations.dart';
 import '../../../core/state.dart';
 import '../../../core/models.dart';
 import '../../../core/custom_emoji.dart';
-import '../../../core/image_utils.dart';
+import 'widgets/image_source_sheet.dart';
+import 'widgets/screenshot_ui.dart';
+import 'widgets/wilt_duration_sheet.dart';
 import '../../../core/pixel_art_avatar.dart';
 import '../../../core/theme/wk.dart';
 import '../../../core/theme/wiltkey_tokens.dart';
@@ -46,6 +48,9 @@ class _ChatScreenState extends State<ChatScreen>
   bool _isAtBottom = true;
   bool _showScrollDownArrow = false;
   final Set<String> _revealedMessageIds = {};
+
+  // Wraps the message list so a consented screenshot can render it to an image.
+  final GlobalKey _captureBoundaryKey = GlobalKey();
 
   // The chat this screen opened with — used to release the "visible chat" flag on
   // dispose only if a newer chat hasn't taken over (see [AppState.visibleChatId]).
@@ -89,6 +94,8 @@ class _ChatScreenState extends State<ChatScreen>
     _appState.addListener(_updateState);
     _messageController.addListener(_updateCharCount);
     _scrollController.addListener(_scrollListener);
+    _appState.screenshotCaptureSignal.addListener(_onScreenshotCaptureSignal);
+    _appState.screenshotDeniedSignal.addListener(_onScreenshotDeniedSignal);
 
     final contact = _appState.activeContact;
     if (contact != null) {
@@ -130,6 +137,8 @@ class _ChatScreenState extends State<ChatScreen>
     if (_appState.visibleChatId == _openChatId) _appState.visibleChatId = null;
     _sendBloom.dispose();
     _appState.removeListener(_updateState);
+    _appState.screenshotCaptureSignal.removeListener(_onScreenshotCaptureSignal);
+    _appState.screenshotDeniedSignal.removeListener(_onScreenshotDeniedSignal);
     _messageController.removeListener(_updateCharCount);
     _scrollController.removeListener(_scrollListener);
     _messageController.dispose();
@@ -137,6 +146,49 @@ class _ChatScreenState extends State<ChatScreen>
     _inputFocus.dispose();
     disposeVoiceRecording();
     super.dispose();
+  }
+
+  /// Enough peers approved our request → render this chat to an image + open it.
+  void _onScreenshotCaptureSignal() {
+    if (!mounted) return;
+    if (_appState.screenshotCaptureSignal.value != _appState.activeContact?.id) {
+      return;
+    }
+    _appState.screenshotCaptureSignal.value = null;
+    captureChatAndOpen(context, _captureBoundaryKey);
+  }
+
+  void _onScreenshotDeniedSignal() {
+    if (!mounted) return;
+    if (_appState.screenshotDeniedSignal.value != _appState.activeContact?.id) {
+      return;
+    }
+    _appState.screenshotDeniedSignal.value = null;
+    final l10n = AppLocalizations.of(context)!;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(l10n.screenshotDenied)));
+  }
+
+  Future<void> _requestScreenshot(Contact contact) async {
+    await _appState.requestScreenshot(contact);
+    if (!mounted) return;
+    final l10n = AppLocalizations.of(context)!;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(l10n.screenshotWaiting)));
+  }
+
+  /// One row of the header overflow menu: accent icon + label.
+  Widget _menuRow(WiltkeyTokens t, IconData icon, String label) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, color: t.action, size: 18),
+        const SizedBox(width: 12),
+        Text(label, style: t.body),
+      ],
+    );
   }
 
   /// Fires on every viewport metrics change, including each frame the soft
@@ -334,7 +386,14 @@ class _ChatScreenState extends State<ChatScreen>
     );
   }
 
-  Future<void> _pickAndSendImage() async {
+  /// Tapping the image button: choose camera vs gallery, then run the send flow.
+  Future<void> _onImageButton() async {
+    final src = await showImageSourceSheet(context);
+    if (src == null || !mounted) return;
+    await _pickAndSendImage(src);
+  }
+
+  Future<void> _pickAndSendImage(ImageSource source) async {
     final contact = _appState.activeContact;
     if (contact == null) return;
 
@@ -342,28 +401,24 @@ class _ChatScreenState extends State<ChatScreen>
     XFile? image;
     try {
       _appState.isPickingMedia = true;
-      image = await picker.pickImage(source: ImageSource.gallery);
+      image = await picker.pickImage(source: source);
     } finally {
       _appState.isPickingMedia = false;
     }
     if (image == null) return;
 
     final originalBytes = await image.readAsBytes();
-    final originalSize = originalBytes.length;
 
     if (!mounted) return;
+    // The dialog compresses live and returns the exact bytes it showed a size
+    // for — so we send those directly instead of recompressing (and guessing).
     final CompressionResult? choice = await CompressionDialog.show(
       context,
-      originalSize,
+      originalBytes,
     );
     if (choice == null) return;
 
-    final imageBytes = await ImageUtils.prepareForSend(
-      originalBytes,
-      quality: (choice.quality * 100).toInt(),
-    );
-
-    final base64Data = base64Encode(imageBytes);
+    final base64Data = base64Encode(choice.bytes);
     final byteCost = base64Data.length + 73;
     final String contentType = choice.hidden ? 'image_hidden' : 'image';
 
@@ -388,6 +443,8 @@ class _ChatScreenState extends State<ChatScreen>
       contentType: contentType,
       mimeType: 'image/webp',
       allowSave: choice.allowSave,
+      ephemeral: choice.ephemeral,
+      ttlSeconds: choice.ttlSeconds,
     );
     if (error != null) {
       _errorSnack(error);
@@ -424,6 +481,28 @@ class _ChatScreenState extends State<ChatScreen>
       _errorSnack(error);
       // A pre-flight failure (e.g. out of keystream) leaves no bubble — restore
       // the draft so the user doesn't lose it.
+      _messageController.text = text;
+    }
+  }
+
+  /// Long-press on the send button → compose a wilting (disappearing) message.
+  /// Picks a lifetime, then sends with ephemeral flags. Backing out sends nothing
+  /// (a normal message still goes on a plain tap).
+  void _handleSendWilting() async {
+    final text = _messageController.text.trim();
+    if (text.isEmpty) return;
+    final secs = await showWiltDurationSheet(context);
+    if (secs == null || !mounted) return;
+    _sendBloom.forward(from: 0);
+    _messageController.clear();
+    _scrollToBottom();
+    final error = await _appState.sendMessage(
+      text,
+      ephemeral: true,
+      ttlSeconds: secs,
+    );
+    if (error != null && mounted) {
+      _errorSnack(error);
       _messageController.text = text;
     }
   }
@@ -581,32 +660,62 @@ class _ChatScreenState extends State<ChatScreen>
                 ],
               ),
               actions: [
-                // Manual message reconciliation. Always available (so the user can
-                // pull messages they suspect they're missing). When we detect a
-                // likely stuck delivery the glyph switches to the "sync problem"
-                // variant — attention is conveyed by the icon shape rather than a
-                // colour, so it reads the same on the dark (cyberpunk/garden) and
-                // light (paperink) themes. Tinted with the shared [action] accent,
-                // matching every other header icon.
-                IconButton(
+                // Overflow menu keeps the header uncluttered: only the budget
+                // glyph stays inline; sync / screenshot / debug live in here. The
+                // sync glyph still reflects the "sync problem" state on the button.
+                PopupMenuButton<String>(
                   icon: Icon(
-                    _needsReconcile(contact) ? Icons.sync_problem : Icons.sync,
+                    _needsReconcile(contact)
+                        ? Icons.sync_problem
+                        : Icons.more_vert,
                     color: t.action,
                     size: 20,
                   ),
-                  tooltip: l10n.chatSyncTooltip,
-                  onPressed: () => _handleSyncTap(contact),
-                ),
-                if (_appState.showDebugButtons)
-                  IconButton(
-                    icon: Icon(
-                      Icons.terminal_outlined,
-                      color: t.action,
-                      size: 20,
-                    ),
-                    tooltip: 'Debug console',
-                    onPressed: () => DebugConsoleSheet.show(context, _appState),
+                  color: t.surface,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(t.radiusControl),
+                    side: BorderSide(color: t.border, width: t.borderWidth),
                   ),
+                  onSelected: (value) {
+                    switch (value) {
+                      case 'sync':
+                        _handleSyncTap(contact);
+                      case 'screenshot':
+                        _requestScreenshot(contact);
+                      case 'debug':
+                        DebugConsoleSheet.show(context, _appState);
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    PopupMenuItem(
+                      value: 'sync',
+                      child: _menuRow(
+                        t,
+                        _needsReconcile(contact)
+                            ? Icons.sync_problem
+                            : Icons.sync,
+                        l10n.chatSyncTooltip,
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'screenshot',
+                      child: _menuRow(
+                        t,
+                        Icons.screenshot_outlined,
+                        l10n.screenshotRequestTooltip,
+                      ),
+                    ),
+                    if (_appState.showDebugButtons)
+                      PopupMenuItem(
+                        value: 'debug',
+                        child: _menuRow(
+                          t,
+                          Icons.terminal_outlined,
+                          'Debug terminal',
+                        ),
+                      ),
+                  ],
+                ),
               ],
             ),
             body: Container(
@@ -651,7 +760,11 @@ class _ChatScreenState extends State<ChatScreen>
                   Expanded(
                     child: Stack(
                       children: [
-                        ListView.builder(
+                        RepaintBoundary(
+                          key: _captureBoundaryKey,
+                          child: ColoredBox(
+                            color: t.bg,
+                            child: ListView.builder(
                       controller: _scrollController,
                       padding: const EdgeInsets.symmetric(
                         horizontal: 12,
@@ -691,6 +804,8 @@ class _ChatScreenState extends State<ChatScreen>
                           ),
                         );
                       },
+                        ),
+                        ),
                         ),
                         // Jump-to-latest pill, anchored just above the composer
                         // (bottom of the message area), centred horizontally.
@@ -828,11 +943,11 @@ class _ChatScreenState extends State<ChatScreen>
                 padding: const EdgeInsets.only(bottom: 4.0),
                 child: IconButton(
                   icon: Icon(
-                    Icons.photo_library_outlined,
+                    Icons.add_photo_alternate_outlined,
                     color: t.action,
                     size: 22,
                   ),
-                  onPressed: _pickAndSendImage,
+                  onPressed: _onImageButton,
                 ),
               ),
             ],
@@ -851,14 +966,20 @@ class _ChatScreenState extends State<ChatScreen>
                         1.0 + 0.16 * sin(v * pi); // bloom out and back
                     return Transform.scale(scale: scale, child: child);
                   },
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: t.action,
-                      borderRadius: BorderRadius.circular(t.radiusControl),
-                    ),
-                    child: IconButton(
-                      icon: Icon(Icons.send, color: t.onAction, size: 18),
-                      onPressed: _handleSend,
+                  // Tap = normal send; long-press = wilting message. InkWell
+                  // handles both gestures itself (a tooltip's own long-press
+                  // recognizer would otherwise steal it).
+                  child: Material(
+                    color: t.action,
+                    borderRadius: BorderRadius.circular(t.radiusControl),
+                    clipBehavior: Clip.antiAlias,
+                    child: InkWell(
+                      onTap: _handleSend,
+                      onLongPress: _handleSendWilting,
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Icon(Icons.send, color: t.onAction, size: 18),
+                      ),
                     ),
                   ),
                 ),

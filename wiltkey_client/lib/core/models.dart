@@ -287,6 +287,25 @@ class ChatMessage {
   // OTP append log), so — unlike the ciphertext — a persisted message can change.
   Map<String, Set<String>> reactions;
 
+  // --- Wilting (disappearing) messages ---------------------------------------
+  // A wilting message carries only its *config* on the wire (`eph`, `ttl`); the
+  // timing is resolved on the RECIPIENT's device. It reveals behind a tap, runs a
+  // countdown once opened, then "wilts": its stored ciphertext is destroyed
+  // in-place. Cooperative (like all disappearing messages) — a peer can't be
+  // cryptographically forced to wilt — but FLAG_SECURE + consensual screenshots
+  // close the usual retention routes. See [AppStateWilting].
+  //
+  // Wire (OTP envelope): eph=1, ttl=<seconds>. Everything below is LOCAL state.
+  final bool ephemeral; // is this a wilting message
+  final int ttlSeconds; // configured lifetime once opened (1..60)
+  int? openedAt; // epoch ms of first reveal (recipient) — null until opened
+  int? expiresAt; // epoch ms it wilts (openedAt + ttl*1000)
+  bool wilted; // true once destroyed; content columns are then blanked
+  // Sender-side confirmation that peers have wilted their copy: reactor identity
+  // ids (keyHash) who reported wilt. 1:1 → the single peer; group → "n/m wilted".
+  // Synced over the AES meta channel, like [reactions].
+  Set<String> wiltedBy;
+
   ChatMessage({
     required this.id,
     required this.senderId,
@@ -303,13 +322,44 @@ class ChatMessage {
     this.decodedAudioBytes,
     this.decryptedText,
     Map<String, Set<String>>? reactions,
-  }) : reactions = reactions ?? {};
+    this.ephemeral = false,
+    this.ttlSeconds = 0,
+    this.openedAt,
+    this.expiresAt,
+    this.wilted = false,
+    Set<String>? wiltedBy,
+  }) : reactions = reactions ?? {},
+       wiltedBy = wiltedBy ?? {};
 
   bool get isSystem =>
       senderId == 'system' ||
       text.startsWith('Connected. Chat session secure.');
 
   bool get hasReactions => reactions.isNotEmpty;
+
+  /// A live wilting message (ephemeral and not yet destroyed).
+  bool get isWilting => ephemeral && !wilted;
+
+  /// True once an opened wilting message has passed its expiry instant. Unopened
+  /// messages (openedAt/expiresAt null) never report expired — they persist until
+  /// the recipient taps to reveal them.
+  bool get isExpired {
+    final e = expiresAt;
+    return ephemeral && !wilted && e != null && DateTime.now().millisecondsSinceEpoch >= e;
+  }
+
+  /// Destroy this message's content *in memory* (the DB row is blanked separately
+  /// via [WiltkeyDatabase.wiltMessageRow]). Irreversible: the plaintext/ciphertext
+  /// and any decoded media are dropped and the pad offset is scrambled so a
+  /// wilted row can't be re-derived from a retained pad.
+  void wiltInMemory() {
+    wilted = true;
+    text = '';
+    decryptedText = null;
+    decodedImageBytes = null;
+    decodedAudioBytes = null;
+    offset = -1;
+  }
 
   /// Serialise [reactions] (sets → lists) to a JSON string, or null if empty.
   /// Used for the DB `reactions` column.
@@ -345,6 +395,12 @@ class ChatMessage {
     if (allowSave) 'allowSave': allowSave,
     if (reactions.isNotEmpty)
       'reactions': reactions.map((k, v) => MapEntry(k, v.toList())),
+    if (ephemeral) 'ephemeral': true,
+    if (ephemeral) 'ttlSeconds': ttlSeconds,
+    if (openedAt != null) 'openedAt': openedAt,
+    if (expiresAt != null) 'expiresAt': expiresAt,
+    if (wilted) 'wilted': true,
+    if (wiltedBy.isNotEmpty) 'wiltedBy': wiltedBy.toList(),
   };
 
   factory ChatMessage.fromJson(Map<String, dynamic> json) {
@@ -371,6 +427,14 @@ class ChatMessage {
       reactions: (json['reactions'] as Map<String, dynamic>?)?.map(
         (k, v) => MapEntry(k, {...(v as List).map((e) => e.toString())}),
       ),
+      ephemeral: json['ephemeral'] as bool? ?? false,
+      ttlSeconds: json['ttlSeconds'] as int? ?? 0,
+      openedAt: json['openedAt'] as int?,
+      expiresAt: json['expiresAt'] as int?,
+      wilted: json['wilted'] as bool? ?? false,
+      wiltedBy: (json['wiltedBy'] as List?)
+          ?.map((e) => e.toString())
+          .toSet(),
     );
   }
 }

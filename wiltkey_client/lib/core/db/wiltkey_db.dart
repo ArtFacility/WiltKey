@@ -23,7 +23,7 @@ class WiltkeyDatabase {
     final path = p.join(dbPath, 'wiltkey.db');
     _db = await openDatabase(
       path,
-      version: 7,
+      version: 8,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -70,6 +70,26 @@ class WiltkeyDatabase {
       await db.execute(
         'ALTER TABLE messages ADD COLUMN allow_save INTEGER DEFAULT 0',
       );
+    }
+    // v8: wilting (disappearing) messages. `ephemeral`/`ttl_seconds` are the
+    // sender's config (ride the OTP envelope as eph/ttl); `opened_at`/`expires_at`
+    // are recipient-local timing set on first reveal; `wilted` marks a destroyed
+    // row (its text_otp/text_encrypted_master are blanked in place); `wilted_by`
+    // is the sender-side confirmation set (JSON list of reactor ids), synced over
+    // the AES meta channel like reactions. Legacy rows default to non-ephemeral.
+    if (oldVersion < 8) {
+      await db.execute(
+        'ALTER TABLE messages ADD COLUMN ephemeral INTEGER DEFAULT 0',
+      );
+      await db.execute(
+        'ALTER TABLE messages ADD COLUMN ttl_seconds INTEGER DEFAULT 0',
+      );
+      await db.execute('ALTER TABLE messages ADD COLUMN opened_at INTEGER');
+      await db.execute('ALTER TABLE messages ADD COLUMN expires_at INTEGER');
+      await db.execute(
+        'ALTER TABLE messages ADD COLUMN wilted INTEGER DEFAULT 0',
+      );
+      await db.execute('ALTER TABLE messages ADD COLUMN wilted_by TEXT');
     }
   }
 
@@ -176,7 +196,13 @@ class WiltkeyDatabase {
         text_encrypted_master TEXT,
         is_failed INTEGER DEFAULT 0,
         reactions TEXT,
-        allow_save INTEGER DEFAULT 0
+        allow_save INTEGER DEFAULT 0,
+        ephemeral INTEGER DEFAULT 0,
+        ttl_seconds INTEGER DEFAULT 0,
+        opened_at INTEGER,
+        expires_at INTEGER,
+        wilted INTEGER DEFAULT 0,
+        wilted_by TEXT
       )
     ''');
     // Speeds windowed paging (chat_id + timestamp ORDER/LIMIT) and unread counts.
@@ -330,20 +356,47 @@ class WiltkeyDatabase {
       }
     }
 
+    // Wilt state is likewise side-metadata: never let a re-save (resync / late
+    // redelivery of the original frame) resurrect a row that has already wilted,
+    // and preserve the accumulated `wilted_by` confirmation set when the incoming
+    // copy carries none.
+    bool wilted = msg.wilted;
+    String? wiltedByJson = msg.wiltedBy.isEmpty
+        ? null
+        : jsonEncode(msg.wiltedBy.toList());
+    final priorWilt = await db.query(
+      'messages',
+      columns: ['wilted', 'wilted_by'],
+      where: 'id = ?',
+      whereArgs: [msg.id],
+      limit: 1,
+    );
+    if (priorWilt.isNotEmpty) {
+      if ((priorWilt.first['wilted'] as int? ?? 0) == 1) wilted = true;
+      wiltedByJson ??= priorWilt.first['wilted_by'] as String?;
+    }
+
     await db.insert('messages', {
       'id': msg.id,
       'chat_id': chatId,
       'sender_id': msg.senderId,
-      'text_otp': msg.text,
+      // A wilted row keeps NO recoverable body — blank both ciphertext copies.
+      'text_otp': wilted ? '' : msg.text,
       'content_type': msg.contentType,
       'timestamp': msg.timestamp.toIso8601String(),
       'is_sent_by_me': msg.isSentByMe ? 1 : 0,
-      'offset': msg.offset,
+      'offset': wilted ? -1 : msg.offset,
       'is_delivered': msg.isDelivered ? 1 : 0,
-      'text_encrypted_master': textEncryptedMaster,
+      'text_encrypted_master': wilted ? null : textEncryptedMaster,
       'is_failed': msg.isFailed ? 1 : 0,
       'reactions': reactionsJson,
       'allow_save': msg.allowSave ? 1 : 0,
+      'ephemeral': msg.ephemeral ? 1 : 0,
+      'ttl_seconds': msg.ttlSeconds,
+      'opened_at': msg.openedAt,
+      'expires_at': msg.expiresAt,
+      'wilted': wilted ? 1 : 0,
+      'wilted_by': wiltedByJson,
     }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
@@ -384,6 +437,124 @@ class WiltkeyDatabase {
     return current;
   }
 
+  // ---------------------------------------------------------------------------
+  // Wilting (disappearing) messages
+  // ---------------------------------------------------------------------------
+
+  /// Destroy a wilting message's body in place: blank both ciphertext copies,
+  /// scramble the pad offset, and flag it wilted. Irreversible — after this the
+  /// row holds no recoverable plaintext even if the OTP pad is retained.
+  Future<void> wiltMessageRow(String messageId) async {
+    final db = await _database;
+    await db.update(
+      'messages',
+      {
+        'text_otp': '',
+        'text_encrypted_master': null,
+        'offset': -1,
+        'wilted': 1,
+      },
+      where: 'id = ?',
+      whereArgs: [messageId],
+    );
+  }
+
+  /// Record the instant a recipient first revealed a wilting message and when it
+  /// will wilt. Idempotent-ish: only writes when `opened_at` is still null so a
+  /// re-reveal can't restart the countdown.
+  Future<void> markMessageOpened(
+    String messageId,
+    int openedAtMs,
+    int expiresAtMs,
+  ) async {
+    final db = await _database;
+    await db.update(
+      'messages',
+      {'opened_at': openedAtMs, 'expires_at': expiresAtMs},
+      where: 'id = ? AND opened_at IS NULL',
+      whereArgs: [messageId],
+    );
+  }
+
+  /// Read-modify-write the sender-side `wilted_by` confirmation set. Returns the
+  /// updated set, or null if the target message isn't stored (a confirmation can
+  /// outrun store-and-forward). Mirrors [mutateMessageReaction].
+  Future<Set<String>?> addWiltedBy(String messageId, String reactorId) async {
+    final db = await _database;
+    final rows = await db.query(
+      'messages',
+      columns: ['wilted_by'],
+      where: 'id = ?',
+      whereArgs: [messageId],
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    final set = _decodeWiltedBy(rows.first['wilted_by'] as String?)..add(reactorId);
+    await db.update(
+      'messages',
+      {'wilted_by': jsonEncode(set.toList())},
+      where: 'id = ?',
+      whereArgs: [messageId],
+    );
+    return set;
+  }
+
+  /// Resolve a stored screenshot-request card: overwrite its control payload and
+  /// clear the ephemeral/expiry bookkeeping so the wilt sweep won't later flip a
+  /// now-answered card into "expired".
+  Future<void> resolveControlMessageRow(String id, String newTextOtp) async {
+    final db = await _database;
+    await db.update(
+      'messages',
+      {'text_otp': newTextOtp, 'ephemeral': 0, 'expires_at': null},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  /// Whether a message is an ephemeral one we *received* (not authored) — used to
+  /// decide whether wilting it should emit a `wilt_done` confirmation to the
+  /// sender. Returns false if the row is gone. Safe to call after the body has
+  /// been blanked (is_sent_by_me / ephemeral survive wilting).
+  Future<bool> isReceivedEphemeral(String messageId) async {
+    final db = await _database;
+    final rows = await db.query(
+      'messages',
+      columns: ['ephemeral', 'is_sent_by_me', 'content_type'],
+      where: 'id = ?',
+      whereArgs: [messageId],
+      limit: 1,
+    );
+    if (rows.isEmpty) return false;
+    // Control cards (e.g. screenshot_request) are ephemeral for expiry but must
+    // NOT emit a wilt confirmation to a peer — only real message content does.
+    if (rows.first['content_type'] == 'screenshot_request') return false;
+    return (rows.first['ephemeral'] as int? ?? 0) == 1 &&
+        (rows.first['is_sent_by_me'] as int? ?? 0) == 0;
+  }
+
+  /// All not-yet-wilted ephemeral messages, for the start-up / resume sweep:
+  /// returns `id`, `chat_id` and `expires_at` (null while unopened). Callers wilt
+  /// the already-expired ones and arm timers for the rest.
+  Future<List<({String id, String chatId, int? expiresAt})>>
+  getPendingWiltMessages() async {
+    final db = await _database;
+    final rows = await db.query(
+      'messages',
+      columns: ['id', 'chat_id', 'expires_at'],
+      where: 'ephemeral = 1 AND wilted = 0',
+    );
+    return rows
+        .map(
+          (r) => (
+            id: r['id'] as String,
+            chatId: r['chat_id'] as String,
+            expiresAt: r['expires_at'] as int?,
+          ),
+        )
+        .toList();
+  }
+
   /// Decodes a raw `messages` row into a [ChatMessage], decrypting the body from
   /// the master-key copy when [masterKeyHex] is given (system lines store
   /// plaintext in text_otp). Pass a null key to skip decryption — fine for
@@ -393,9 +564,12 @@ class WiltkeyDatabase {
     final textOtp = row['text_otp'] as String;
     final textEncryptedMaster = row['text_encrypted_master'] as String?;
     final contentType = row['content_type'] as String;
+    final wilted = (row['wilted'] as int? ?? 0) == 1;
 
     String? decryptedText;
-    if (senderId == 'system') {
+    if (wilted) {
+      // Destroyed content — nothing to decrypt or decode.
+    } else if (senderId == 'system') {
       decryptedText = textOtp;
     } else if (textEncryptedMaster != null && masterKeyHex != null) {
       try {
@@ -424,7 +598,23 @@ class WiltkeyDatabase {
           ? base64Decode(decryptedText)
           : null,
       reactions: ChatMessage.decodeReactions(row['reactions'] as String?),
+      ephemeral: (row['ephemeral'] as int? ?? 0) == 1,
+      ttlSeconds: row['ttl_seconds'] as int? ?? 0,
+      openedAt: row['opened_at'] as int?,
+      expiresAt: row['expires_at'] as int?,
+      wilted: wilted,
+      wiltedBy: _decodeWiltedBy(row['wilted_by'] as String?),
     );
+  }
+
+  /// Decodes the JSON list stored in `wilted_by` (peers who confirmed wilt).
+  static Set<String> _decodeWiltedBy(String? s) {
+    if (s == null || s.isEmpty) return {};
+    try {
+      return {...(jsonDecode(s) as List).map((e) => e.toString())};
+    } catch (_) {
+      return {};
+    }
   }
 
   /// Loads a page of a chat's messages, newest-first window returned in ASC

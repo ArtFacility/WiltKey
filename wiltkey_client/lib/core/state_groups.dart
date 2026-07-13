@@ -520,6 +520,8 @@ extension AppStateGroups on AppState {
     String text, {
     String contentType = 'text',
     bool allowSave = false,
+    bool ephemeral = false,
+    int ttlSeconds = 0,
   }) async {
     if (activeContact == null ||
         !activeContact!.isGroup ||
@@ -565,6 +567,8 @@ extension AppStateGroups on AppState {
         allowSave: allowSave,
         decodedAudioBytes: isVoice ? base64Decode(text) : null,
         decryptedText: text,
+        ephemeral: ephemeral,
+        ttlSeconds: ephemeral ? ttlSeconds : 0,
       );
       appendLoadedMessage(contact.id, placeholder);
       notifyListeners();
@@ -677,6 +681,8 @@ extension AppStateGroups on AppState {
       // is out of order.
       'ts': sentTs,
       if (allowSave) 'dl': true,
+      if (ephemeral) 'eph': 1,
+      if (ephemeral) 'ttl': ttlSeconds,
     });
 
     final bool socketConnected = WebSocketClient().isConnected;

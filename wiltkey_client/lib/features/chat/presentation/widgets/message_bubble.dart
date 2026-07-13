@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
@@ -269,6 +270,20 @@ class MessageBubble extends StatelessWidget {
     final t = context.wk;
     final l10n = AppLocalizations.of(context)!;
 
+    // Screenshot-request card: an in-history control message (Accept/Decline),
+    // expires into "request expired" via the wilt engine. Handled first so a
+    // wilted request renders its own expired state, not the generic tombstone.
+    if (message.contentType == 'screenshot_request') {
+      return _buildScreenshotCard(t, l10n);
+    }
+
+    // Wilting (disappearing) messages. Handled BEFORE the decrypt block so a
+    // received message we haven't revealed is never decrypted — it stays a gate.
+    if (message.wilted) return _buildWiltedTombstone(t, l10n);
+    if (message.ephemeral && !isMe && message.openedAt == null) {
+      return _buildWiltGate(t, l10n);
+    }
+
     if (message.decryptedText == null && !message.isFailed) {
       appState.decryptMessage(contact, message);
 
@@ -364,21 +379,26 @@ class MessageBubble extends StatelessWidget {
 
       if (imageBytes != null) {
         final bytes = imageBytes;
-        return GestureDetector(
-          onTap: () => ImageViewerScreen.open(
-            context,
-            imageBytes: bytes,
-            allowSave: message.allowSave,
-          ),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxHeight: 300, maxWidth: 280),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(t.radiusControl),
-              child: Image.memory(
-                bytes,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) =>
-                    _imageError(t, l10n),
+        return _wrapWilting(
+          t,
+          l10n,
+          GestureDetector(
+            onTap: () => ImageViewerScreen.open(
+              context,
+              imageBytes: bytes,
+              // A wilting image is never downloadable, regardless of allowSave.
+              allowSave: message.allowSave && !message.ephemeral,
+            ),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 300, maxWidth: 280),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(t.radiusControl),
+                child: Image.memory(
+                  bytes,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) =>
+                      _imageError(t, l10n),
+                ),
               ),
             ),
           ),
@@ -394,32 +414,140 @@ class MessageBubble extends StatelessWidget {
     // Sticker: render the single emoji / custom token large and on its own.
     final sticker = stickerPayload(decryptedText);
     if (sticker != null) {
-      return _buildSticker(sticker, textColor, scale);
+      return _wrapWilting(t, l10n, _buildSticker(sticker, textColor, scale));
     }
 
     final jumbo = jumboEmojiCount(decryptedText, emojiMap);
     if (jumbo != null) {
       final base = jumbo == 1 ? 40.0 : (jumbo <= 3 ? 34.0 : 26.0);
-      return EmojiText(
+      return _wrapWilting(
+        t,
+        l10n,
+        EmojiText(
+          text: decryptedText,
+          emojiMap: emojiMap,
+          style: t.body.copyWith(
+            color: textColor,
+            fontSize: base * scale,
+            height: 1.15,
+          ),
+          emojiSize: base * 1.25 * scale,
+        ),
+      );
+    }
+    return _wrapWilting(
+      t,
+      l10n,
+      EmojiText(
         text: decryptedText,
         emojiMap: emojiMap,
         style: t.body.copyWith(
           color: textColor,
-          fontSize: base * scale,
-          height: 1.15,
+          fontSize: 13 * scale,
+          height: 1.4,
         ),
-        emojiSize: base * 1.25 * scale,
+        emojiSize: 20 * scale,
+      ),
+    );
+  }
+
+  // --- Wilting message UI ----------------------------------------------------
+
+  /// Wraps a revealed wilting message's [content] with its countdown footer (a
+  /// received message that's been opened) or a small "wilting" tag (our own copy,
+  /// which wilts on the peer's confirmation rather than a timer). Non-ephemeral
+  /// messages pass through untouched.
+  Widget _wrapWilting(
+    WiltkeyTokens t,
+    AppLocalizations l10n,
+    Widget content,
+  ) {
+    if (!message.isWilting) return content;
+    final accent = isMe ? t.bubbleMeText : t.action;
+    final Widget footer;
+    if (message.openedAt != null && message.expiresAt != null) {
+      footer = _WiltCountdownBar(
+        openedAt: message.openedAt!,
+        expiresAt: message.expiresAt!,
+        color: accent,
+      );
+    } else {
+      // Our own copy (or an opened-timer not yet stamped): a static tag.
+      footer = Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.local_florist_outlined, size: 11, color: accent.withValues(alpha: 0.7)),
+          const SizedBox(width: 4),
+          Text(
+            t.uppercaseLabels
+                ? l10n.wiltingMessageTag.toUpperCase()
+                : l10n.wiltingMessageTag,
+            style: t.dataMono.copyWith(fontSize: 9, color: accent.withValues(alpha: 0.7)),
+          ),
+        ],
       );
     }
-    return EmojiText(
-      text: decryptedText,
-      emojiMap: emojiMap,
-      style: t.body.copyWith(
-        color: textColor,
-        fontSize: 13 * scale,
-        height: 1.4,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [content, const SizedBox(height: 5), footer],
+    );
+  }
+
+  /// The gated placeholder for a received, not-yet-revealed wilting message. Tap
+  /// reveals it (stamping the countdown) via [AppStateWilting.revealEphemeral].
+  Widget _buildWiltGate(WiltkeyTokens t, AppLocalizations l10n) {
+    final secs = message.ttlSeconds <= 0 ? 5 : message.ttlSeconds;
+    return GestureDetector(
+      onTap: () => appState.revealEphemeral(contact, message),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+        decoration: BoxDecoration(
+          color: t.action.withValues(alpha: 0.08),
+          border: Border.all(color: t.action.withValues(alpha: 0.35), width: 1),
+          borderRadius: BorderRadius.circular(t.radiusControl),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.local_florist_outlined, color: t.action, size: 16),
+            const SizedBox(width: 8),
+            Text(
+              t.uppercaseLabels
+                  ? l10n.wiltingTapToReveal.toUpperCase()
+                  : l10n.wiltingTapToReveal,
+              style: t.dataMono.copyWith(color: t.action, fontSize: 11),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              '${secs}s',
+              style: t.dataMono.copyWith(color: t.textTertiary, fontSize: 10),
+            ),
+          ],
+        ),
       ),
-      emojiSize: 20 * scale,
+    );
+  }
+
+  /// The tombstone left after a message has wilted (content destroyed).
+  Widget _buildWiltedTombstone(WiltkeyTokens t, AppLocalizations l10n) {
+    final color = isMe ? t.bubbleMeText.withValues(alpha: 0.6) : t.textTertiary;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Icons.local_florist_outlined, size: 14, color: color),
+        const SizedBox(width: 6),
+        Text(
+          t.uppercaseLabels
+              ? l10n.wiltedMessage.toUpperCase()
+              : l10n.wiltedMessage,
+          style: t.dataMono.copyWith(
+            fontSize: 11.5,
+            color: color,
+            fontStyle: FontStyle.italic,
+          ),
+        ),
+      ],
     );
   }
 
@@ -451,6 +579,134 @@ class MessageBubble extends StatelessWidget {
     );
   }
 
+  // --- Screenshot-request card ----------------------------------------------
+
+  Widget _buildScreenshotCard(WiltkeyTokens t, AppLocalizations l10n) {
+    Map<String, dynamic> p = {};
+    try {
+      p = jsonDecode(message.text) as Map<String, dynamic>;
+    } catch (_) {}
+    final rawName = (p['requester_name'] as String?)?.trim();
+    final name = (rawName == null || rawName.isEmpty) ? contact.name : rawName;
+    final status = message.wilted
+        ? 'expired'
+        : (p['status'] as String? ?? 'pending');
+
+    if (status == 'pending') return _buildScreenshotPending(t, l10n, name);
+
+    // Resolved / expired → a compact muted row.
+    late final IconData icon;
+    late final String label;
+    late final Color color;
+    switch (status) {
+      case 'accepted':
+        icon = Icons.check_circle_outline;
+        color = t.action;
+        label = l10n.screenshotRequestAllowed;
+        break;
+      case 'declined':
+        icon = Icons.cancel_outlined;
+        color = t.textTertiary;
+        label = l10n.screenshotRequestDeclined;
+        break;
+      default: // expired
+        icon = Icons.timer_off_outlined;
+        color = t.textTertiary;
+        label = l10n.screenshotRequestExpired;
+    }
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 15, color: color),
+        const SizedBox(width: 6),
+        Flexible(
+          child: Text(
+            label,
+            style: t.dataMono.copyWith(fontSize: 11.5, color: color),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildScreenshotPending(
+    WiltkeyTokens t,
+    AppLocalizations l10n,
+    String name,
+  ) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: t.action.withValues(alpha: 0.06),
+        border: Border.all(color: t.action.withValues(alpha: 0.3)),
+        borderRadius: BorderRadius.circular(t.radiusControl),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.screenshot_monitor_outlined, size: 16, color: t.action),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  l10n.screenshotRequestInline(name),
+                  style: t.body.copyWith(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (message.openedAt != null && message.expiresAt != null) ...[
+            const SizedBox(height: 7),
+            _WiltCountdownBar(
+              openedAt: message.openedAt!,
+              expiresAt: message.expiresAt!,
+              color: t.action,
+            ),
+          ],
+          const SizedBox(height: 9),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              OutlinedButton(
+                onPressed: () =>
+                    appState.respondToScreenshotCard(contact, message, false),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: t.textSecondary,
+                  side: BorderSide(color: t.border),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(t.radiusControl),
+                  ),
+                ),
+                child: Text(l10n.pairRequestReject),
+              ),
+              const SizedBox(width: 8),
+              ElevatedButton(
+                onPressed: () =>
+                    appState.respondToScreenshotCard(contact, message, true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: t.action,
+                  foregroundColor: t.onAction,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(t.radiusControl),
+                  ),
+                ),
+                child: Text(l10n.pairRequestAccept),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _imageError(WiltkeyTokens t, AppLocalizations l10n) {
     return Container(
       padding: const EdgeInsets.all(12),
@@ -470,6 +726,89 @@ class MessageBubble extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// A self-ticking draining bar for an opened wilting message: full at open,
+/// empty at expiry. Purely visual — the actual destruction is driven by the
+/// [AppStateWilting] timer, which rebuilds this bubble into a tombstone. Ticks a
+/// few times a second and stops itself once drained.
+class _WiltCountdownBar extends StatefulWidget {
+  final int openedAt;
+  final int expiresAt;
+  final Color color;
+  const _WiltCountdownBar({
+    required this.openedAt,
+    required this.expiresAt,
+    required this.color,
+  });
+
+  @override
+  State<_WiltCountdownBar> createState() => _WiltCountdownBarState();
+}
+
+class _WiltCountdownBarState extends State<_WiltCountdownBar> {
+  Timer? _ticker;
+
+  @override
+  void initState() {
+    super.initState();
+    _ticker = Timer.periodic(const Duration(milliseconds: 200), (t) {
+      if (!mounted || _fraction() <= 0) {
+        t.cancel();
+        return;
+      }
+      setState(() {});
+    });
+  }
+
+  double _fraction() {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final span = widget.expiresAt - widget.openedAt;
+    if (span <= 0) return 0;
+    return ((widget.expiresAt - now) / span).clamp(0.0, 1.0);
+  }
+
+  int _secondsLeft() {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    return ((widget.expiresAt - now) / 1000).ceil().clamp(0, 999);
+  }
+
+  @override
+  void dispose() {
+    _ticker?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final frac = _fraction();
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          width: 90,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(3),
+            child: LinearProgressIndicator(
+              value: frac,
+              minHeight: 4,
+              backgroundColor: widget.color.withValues(alpha: 0.15),
+              valueColor: AlwaysStoppedAnimation<Color>(widget.color),
+            ),
+          ),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          '${_secondsLeft()}s',
+          style: TextStyle(
+            fontSize: 9,
+            color: widget.color.withValues(alpha: 0.8),
+            fontFeatures: const [FontFeature.tabularFigures()],
+          ),
+        ),
+      ],
     );
   }
 }

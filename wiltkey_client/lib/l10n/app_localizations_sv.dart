@@ -1251,6 +1251,10 @@ class AppLocalizationsSv extends AppLocalizations {
       'Tillåt att spara i galleriet';
 
   @override
+  String get chatImageCompressionWilting =>
+      'Vissnande bild (försvinner efter öppning)';
+
+  @override
   String get chatImageDownload => 'Ladda ner';
 
   @override
@@ -1261,4 +1265,73 @@ class AppLocalizationsSv extends AppLocalizations {
 
   @override
   String get chatImageSaveFailed => 'Det gick inte att spara bilden';
+
+  @override
+  String get chatImageSourceTitle => 'Skicka ett foto';
+
+  @override
+  String get chatImageSourceCamera => 'Ta foto';
+
+  @override
+  String get chatImageSourceGallery => 'Välj från galleriet';
+
+  @override
+  String get screenshotRequestTooltip => 'Begär skärmbild';
+
+  @override
+  String get screenshotWaiting => 'Väntar på godkännande…';
+
+  @override
+  String get screenshotConsentTitle => 'Begäran om skärmbild';
+
+  @override
+  String screenshotConsentBody(String name) {
+    return '$name vill spara en skärmbild av den här chatten. Tillåta?';
+  }
+
+  @override
+  String get screenshotDenied => 'Begäran om skärmbild avvisades.';
+
+  @override
+  String get screenshotCaptureFailed => 'Det gick inte att ta skärmbilden.';
+
+  @override
+  String get screenshotWatermark => 'WiltKey — Skärmbild med samtycke';
+
+  @override
+  String screenshotRequestInline(String name) {
+    return '$name begärde en skärmbild';
+  }
+
+  @override
+  String get screenshotRequestAllowed => 'Du tillät skärmbilden';
+
+  @override
+  String get screenshotRequestDeclined => 'Du nekade skärmbilden';
+
+  @override
+  String get screenshotRequestExpired => 'Skärmbildsbegäran har löpt ut';
+
+  @override
+  String get wiltingTapToReveal => 'Tryck för att se det vissnande meddelandet';
+
+  @override
+  String get wiltingMessageTag => 'Vissnande meddelande';
+
+  @override
+  String get wiltedMessage => 'Vissnat meddelande';
+
+  @override
+  String get wiltingSheetTitle => 'Vissnande meddelande';
+
+  @override
+  String get wiltingSheetBody =>
+      'Meddelandet försvinner så här många sekunder efter att mottagaren öppnat det.';
+
+  @override
+  String get wiltingSheetSend => 'Skicka vissnande meddelande';
+
+  @override
+  String get wiltingHoldToSendHint =>
+      'Håll in för att skicka ett vissnande meddelande';
 }

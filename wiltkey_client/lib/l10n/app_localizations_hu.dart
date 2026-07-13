@@ -1259,6 +1259,10 @@ class AppLocalizationsHu extends AppLocalizations {
       'Mentés engedélyezése a galériába';
 
   @override
+  String get chatImageCompressionWilting =>
+      'Elhervadó kép (megnyitás után eltűnik)';
+
+  @override
   String get chatImageDownload => 'Letöltés';
 
   @override
@@ -1269,4 +1273,75 @@ class AppLocalizationsHu extends AppLocalizations {
 
   @override
   String get chatImageSaveFailed => 'A kép mentése nem sikerült';
+
+  @override
+  String get chatImageSourceTitle => 'Fotó küldése';
+
+  @override
+  String get chatImageSourceCamera => 'Fotó készítése';
+
+  @override
+  String get chatImageSourceGallery => 'Választás a galériából';
+
+  @override
+  String get screenshotRequestTooltip => 'Képernyőkép kérése';
+
+  @override
+  String get screenshotWaiting => 'Várakozás jóváhagyásra…';
+
+  @override
+  String get screenshotConsentTitle => 'Képernyőkép kérése';
+
+  @override
+  String screenshotConsentBody(String name) {
+    return '$name el szeretné menteni a beszélgetés képernyőképét. Engedélyezed?';
+  }
+
+  @override
+  String get screenshotDenied => 'A képernyőkép kérését elutasították.';
+
+  @override
+  String get screenshotCaptureFailed =>
+      'A képernyőkép elkészítése nem sikerült.';
+
+  @override
+  String get screenshotWatermark => 'WiltKey — Képernyőkép beleegyezéssel';
+
+  @override
+  String screenshotRequestInline(String name) {
+    return '$name képernyőképet kért';
+  }
+
+  @override
+  String get screenshotRequestAllowed => 'Engedélyezted a képernyőképet';
+
+  @override
+  String get screenshotRequestDeclined => 'Elutasítottad a képernyőképet';
+
+  @override
+  String get screenshotRequestExpired => 'A képernyőkép-kérés lejárt';
+
+  @override
+  String get wiltingTapToReveal =>
+      'Koppints az elhervadó üzenet megtekintéséhez';
+
+  @override
+  String get wiltingMessageTag => 'Elhervadó üzenet';
+
+  @override
+  String get wiltedMessage => 'Elhervadt üzenet';
+
+  @override
+  String get wiltingSheetTitle => 'Elhervadó üzenet';
+
+  @override
+  String get wiltingSheetBody =>
+      'Az üzenet ennyi másodperccel azután tűnik el, hogy a címzett megnyitotta.';
+
+  @override
+  String get wiltingSheetSend => 'Elhervadó üzenet küldése';
+
+  @override
+  String get wiltingHoldToSendHint =>
+      'Tartsd nyomva elhervadó üzenet küldéséhez';
 }

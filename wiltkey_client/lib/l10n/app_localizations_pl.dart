@@ -1256,6 +1256,10 @@ class AppLocalizationsPl extends AppLocalizations {
   String get chatImageCompressionAllowDownload => 'Zezwól na zapis w galerii';
 
   @override
+  String get chatImageCompressionWilting =>
+      'Znikający obraz (znika po otwarciu)';
+
+  @override
   String get chatImageDownload => 'Pobierz';
 
   @override
@@ -1266,4 +1270,73 @@ class AppLocalizationsPl extends AppLocalizations {
 
   @override
   String get chatImageSaveFailed => 'Nie udało się zapisać obrazu';
+
+  @override
+  String get chatImageSourceTitle => 'Wyślij zdjęcie';
+
+  @override
+  String get chatImageSourceCamera => 'Zrób zdjęcie';
+
+  @override
+  String get chatImageSourceGallery => 'Wybierz z galerii';
+
+  @override
+  String get screenshotRequestTooltip => 'Poproś o zrzut ekranu';
+
+  @override
+  String get screenshotWaiting => 'Oczekiwanie na zgodę…';
+
+  @override
+  String get screenshotConsentTitle => 'Prośba o zrzut ekranu';
+
+  @override
+  String screenshotConsentBody(String name) {
+    return '$name chce zapisać zrzut ekranu tego czatu. Zezwolić?';
+  }
+
+  @override
+  String get screenshotDenied => 'Prośba o zrzut ekranu została odrzucona.';
+
+  @override
+  String get screenshotCaptureFailed => 'Nie udało się wykonać zrzutu ekranu.';
+
+  @override
+  String get screenshotWatermark => 'WiltKey — Zrzut ekranu za zgodą';
+
+  @override
+  String screenshotRequestInline(String name) {
+    return '$name poprosił(a) o zrzut ekranu';
+  }
+
+  @override
+  String get screenshotRequestAllowed => 'Zezwolono na zrzut ekranu';
+
+  @override
+  String get screenshotRequestDeclined => 'Odrzucono zrzut ekranu';
+
+  @override
+  String get screenshotRequestExpired => 'Prośba o zrzut ekranu wygasła';
+
+  @override
+  String get wiltingTapToReveal => 'Dotknij, aby zobaczyć znikającą wiadomość';
+
+  @override
+  String get wiltingMessageTag => 'Znikająca wiadomość';
+
+  @override
+  String get wiltedMessage => 'Zwiędła wiadomość';
+
+  @override
+  String get wiltingSheetTitle => 'Znikająca wiadomość';
+
+  @override
+  String get wiltingSheetBody =>
+      'Wiadomość znika tyle sekund po otwarciu jej przez odbiorcę.';
+
+  @override
+  String get wiltingSheetSend => 'Wyślij znikającą wiadomość';
+
+  @override
+  String get wiltingHoldToSendHint =>
+      'Przytrzymaj, aby wysłać znikającą wiadomość';
 }

@@ -1255,6 +1255,10 @@ class AppLocalizationsDe extends AppLocalizations {
       'Speichern in Galerie erlauben';
 
   @override
+  String get chatImageCompressionWilting =>
+      'Welkendes Bild (verschwindet nach dem Öffnen)';
+
+  @override
   String get chatImageDownload => 'Herunterladen';
 
   @override
@@ -1265,4 +1269,74 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get chatImageSaveFailed => 'Bild konnte nicht gespeichert werden';
+
+  @override
+  String get chatImageSourceTitle => 'Foto senden';
+
+  @override
+  String get chatImageSourceCamera => 'Foto aufnehmen';
+
+  @override
+  String get chatImageSourceGallery => 'Aus Galerie wählen';
+
+  @override
+  String get screenshotRequestTooltip => 'Screenshot anfragen';
+
+  @override
+  String get screenshotWaiting => 'Warten auf Zustimmung…';
+
+  @override
+  String get screenshotConsentTitle => 'Screenshot-Anfrage';
+
+  @override
+  String screenshotConsentBody(String name) {
+    return '$name möchte einen Screenshot dieses Chats speichern. Erlauben?';
+  }
+
+  @override
+  String get screenshotDenied => 'Screenshot-Anfrage wurde abgelehnt.';
+
+  @override
+  String get screenshotCaptureFailed =>
+      'Screenshot konnte nicht erstellt werden.';
+
+  @override
+  String get screenshotWatermark => 'WiltKey — Screenshot mit Zustimmung';
+
+  @override
+  String screenshotRequestInline(String name) {
+    return '$name hat einen Screenshot angefordert';
+  }
+
+  @override
+  String get screenshotRequestAllowed => 'Du hast den Screenshot erlaubt';
+
+  @override
+  String get screenshotRequestDeclined => 'Du hast den Screenshot abgelehnt';
+
+  @override
+  String get screenshotRequestExpired => 'Screenshot-Anfrage abgelaufen';
+
+  @override
+  String get wiltingTapToReveal => 'Tippen, um die welkende Nachricht zu sehen';
+
+  @override
+  String get wiltingMessageTag => 'Welkende Nachricht';
+
+  @override
+  String get wiltedMessage => 'Verwelkte Nachricht';
+
+  @override
+  String get wiltingSheetTitle => 'Welkende Nachricht';
+
+  @override
+  String get wiltingSheetBody =>
+      'Die Nachricht verschwindet so viele Sekunden, nachdem der Empfänger sie geöffnet hat.';
+
+  @override
+  String get wiltingSheetSend => 'Welkende Nachricht senden';
+
+  @override
+  String get wiltingHoldToSendHint =>
+      'Halten, um eine welkende Nachricht zu senden';
 }

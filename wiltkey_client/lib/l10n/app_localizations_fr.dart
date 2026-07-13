@@ -1258,6 +1258,10 @@ class AppLocalizationsFr extends AppLocalizations {
       'Autoriser l\'enregistrement dans la galerie';
 
   @override
+  String get chatImageCompressionWilting =>
+      'Image éphémère (disparaît après ouverture)';
+
+  @override
   String get chatImageDownload => 'Télécharger';
 
   @override
@@ -1268,4 +1272,75 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get chatImageSaveFailed => 'Impossible d\'enregistrer l\'image';
+
+  @override
+  String get chatImageSourceTitle => 'Envoyer une photo';
+
+  @override
+  String get chatImageSourceCamera => 'Prendre une photo';
+
+  @override
+  String get chatImageSourceGallery => 'Choisir dans la galerie';
+
+  @override
+  String get screenshotRequestTooltip => 'Demander une capture';
+
+  @override
+  String get screenshotWaiting => 'En attente d\'approbation…';
+
+  @override
+  String get screenshotConsentTitle => 'Demande de capture d\'écran';
+
+  @override
+  String screenshotConsentBody(String name) {
+    return '$name veut enregistrer une capture de cette discussion. Autoriser ?';
+  }
+
+  @override
+  String get screenshotDenied => 'La demande de capture a été refusée.';
+
+  @override
+  String get screenshotCaptureFailed => 'Impossible de réaliser la capture.';
+
+  @override
+  String get screenshotWatermark => 'WiltKey — Capture avec consentement';
+
+  @override
+  String screenshotRequestInline(String name) {
+    return '$name a demandé une capture d\'écran';
+  }
+
+  @override
+  String get screenshotRequestAllowed =>
+      'Vous avez autorisé la capture d\'écran';
+
+  @override
+  String get screenshotRequestDeclined =>
+      'Vous avez refusé la capture d\'écran';
+
+  @override
+  String get screenshotRequestExpired => 'Demande de capture expirée';
+
+  @override
+  String get wiltingTapToReveal => 'Appuyez pour voir le message éphémère';
+
+  @override
+  String get wiltingMessageTag => 'Message éphémère';
+
+  @override
+  String get wiltedMessage => 'Message fané';
+
+  @override
+  String get wiltingSheetTitle => 'Message éphémère';
+
+  @override
+  String get wiltingSheetBody =>
+      'Le message disparaît ce nombre de secondes après que le destinataire l\'a ouvert.';
+
+  @override
+  String get wiltingSheetSend => 'Envoyer un message éphémère';
+
+  @override
+  String get wiltingHoldToSendHint =>
+      'Maintenez pour envoyer un message éphémère';
 }

@@ -117,6 +117,8 @@ extension AppStateChats on AppState {
     String contentType = 'text',
     String? mimeType,
     bool allowSave = false,
+    bool ephemeral = false,
+    int ttlSeconds = 0,
   }) async {
     log('sendMessage starting. type: $contentType, len: ${text.length}');
     if (activeContact == null || status == AppStatus.nuked) {
@@ -174,6 +176,8 @@ extension AppStateChats on AppState {
       allowSave: allowSave,
       decodedAudioBytes: contentType == 'voice' ? base64Decode(text) : null,
       decryptedText: text, // original plaintext cached in-memory
+      ephemeral: ephemeral,
+      ttlSeconds: ephemeral ? ttlSeconds : 0,
     );
     appendLoadedMessage(contact.id, newMessage);
     notifyListeners();
@@ -236,6 +240,10 @@ extension AppStateChats on AppState {
       };
       if (mimeType != null) envelope['mime'] = mimeType;
       if (allowSave) envelope['dl'] = true;
+      if (ephemeral) {
+        envelope['eph'] = 1;
+        envelope['ttl'] = ttlSeconds;
+      }
       final envelopeStr = jsonEncode(envelope);
 
       // Send payload over WebSocket
@@ -336,6 +344,8 @@ extension AppStateChats on AppState {
       'offset': message.offset,
       'id': message.id,
       if (message.allowSave) 'dl': true,
+      if (message.ephemeral) 'eph': 1,
+      if (message.ephemeral) 'ttl': message.ttlSeconds,
     };
     final envelopeStr = jsonEncode(envelope);
 

@@ -32,6 +32,8 @@ part 'state_inbound.dart';
 part 'state_groups.dart';
 part 'state_push.dart';
 part 'state_reactions.dart';
+part 'state_screenshot.dart';
+part 'state_wilting.dart';
 
 enum AppStatus { normal, nuked }
 
@@ -204,6 +206,18 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   final ValueNotifier<InAppMessageAlert?> messageAlert = ValueNotifier(null);
   int _messageAlertSeq = 0;
 
+  // --- Consensual screenshots (see state_screenshot.dart) ---
+  // A peer asked us to consent → the shell shows an Allow/Deny dialog.
+  final ValueNotifier<ScreenshotRequestEvent?> incomingScreenshotRequest =
+      ValueNotifier(null);
+  // Enough peers approved OUR request → carries the Contact.id whose chat screen
+  // should now render itself to an image and open it in the viewer.
+  final ValueNotifier<String?> screenshotCaptureSignal = ValueNotifier(null);
+  // A request we sent was declined / timed out → carries the Contact.id (toast).
+  final ValueNotifier<String?> screenshotDeniedSignal = ValueNotifier(null);
+  // Our in-flight requests, keyed by request id (requester side only).
+  final Map<String, ScreenshotSession> screenshotSessions = {};
+
   /// Emit an in-app heads-up cue for [contact], unless the user is already in
   /// that chat, the app is backgrounded/locked, or we're replaying frames the
   /// background socket buffered while away (those were already tray-notified).
@@ -274,6 +288,13 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
 
   // Per-group fallback timers for host-first metadata sync (groupId -> active timer)
   final Map<String, Timer> groupMetaSyncTimers = {};
+
+  // Live countdown timers for opened wilting messages (message id -> timer). Armed
+  // on reveal and by the start-up/resume sweep; fire → the message wilts. See
+  // [AppStateWilting]. Kept off the extension because extensions can't hold state.
+  final Map<String, Timer> wiltTimers = {};
+  // Guards the one-shot global wilt sweep so it runs once per unlock, not per chat.
+  bool wiltSwept = false;
 
   // Debounce for group auto-sync (groupId -> last sweep time)
   final Map<String, DateTime> lastGroupAutoSync = {};
@@ -359,6 +380,7 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     activeContact = null;
     shortNick = '';
     profileImageB64 = '';
+    cancelAllWiltTimers();
   }
 
   // Signs a message string using our private key and returns signature in hex

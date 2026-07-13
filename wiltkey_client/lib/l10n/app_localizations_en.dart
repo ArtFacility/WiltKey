@@ -1241,6 +1241,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatImageCompressionAllowDownload => 'Allow saving to gallery';
 
   @override
+  String get chatImageCompressionWilting =>
+      'Wilting image (disappears after opening)';
+
+  @override
   String get chatImageDownload => 'Download';
 
   @override
@@ -1251,4 +1255,72 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatImageSaveFailed => 'Couldn\'t save the image';
+
+  @override
+  String get chatImageSourceTitle => 'Send a photo';
+
+  @override
+  String get chatImageSourceCamera => 'Take photo';
+
+  @override
+  String get chatImageSourceGallery => 'Choose from gallery';
+
+  @override
+  String get screenshotRequestTooltip => 'Request screenshot';
+
+  @override
+  String get screenshotWaiting => 'Waiting for approval…';
+
+  @override
+  String get screenshotConsentTitle => 'Screenshot request';
+
+  @override
+  String screenshotConsentBody(String name) {
+    return '$name wants to save a screenshot of this chat. Allow it?';
+  }
+
+  @override
+  String get screenshotDenied => 'Screenshot request was declined.';
+
+  @override
+  String get screenshotCaptureFailed => 'Couldn\'t capture the screenshot.';
+
+  @override
+  String get screenshotWatermark => 'WiltKey — Screenshot with consent';
+
+  @override
+  String screenshotRequestInline(String name) {
+    return '$name requested a screenshot';
+  }
+
+  @override
+  String get screenshotRequestAllowed => 'You allowed the screenshot';
+
+  @override
+  String get screenshotRequestDeclined => 'You declined the screenshot';
+
+  @override
+  String get screenshotRequestExpired => 'Screenshot request expired';
+
+  @override
+  String get wiltingTapToReveal => 'Tap to see wilting message';
+
+  @override
+  String get wiltingMessageTag => 'Wilting message';
+
+  @override
+  String get wiltedMessage => 'Wilted message';
+
+  @override
+  String get wiltingSheetTitle => 'Wilting message';
+
+  @override
+  String get wiltingSheetBody =>
+      'The message disappears this many seconds after the recipient opens it.';
+
+  @override
+  String get wiltingSheetSend => 'Send wilting message';
+
+  @override
+  String get wiltingHoldToSendHint => 'Hold to send a wilting message';
 }

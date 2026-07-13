@@ -1195,6 +1195,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatImageCompressionAllowDownload => '允许保存到相册';
 
   @override
+  String get chatImageCompressionWilting => '凋零图片（打开后消失）';
+
+  @override
   String get chatImageDownload => '下载';
 
   @override
@@ -1205,4 +1208,71 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatImageSaveFailed => '无法保存图片';
+
+  @override
+  String get chatImageSourceTitle => '发送照片';
+
+  @override
+  String get chatImageSourceCamera => '拍照';
+
+  @override
+  String get chatImageSourceGallery => '从相册选择';
+
+  @override
+  String get screenshotRequestTooltip => '请求截图';
+
+  @override
+  String get screenshotWaiting => '等待批准…';
+
+  @override
+  String get screenshotConsentTitle => '截图请求';
+
+  @override
+  String screenshotConsentBody(String name) {
+    return '$name 想保存此聊天的截图。允许吗？';
+  }
+
+  @override
+  String get screenshotDenied => '截图请求被拒绝。';
+
+  @override
+  String get screenshotCaptureFailed => '无法生成截图。';
+
+  @override
+  String get screenshotWatermark => 'WiltKey — 经同意的截图';
+
+  @override
+  String screenshotRequestInline(String name) {
+    return '$name 请求截图';
+  }
+
+  @override
+  String get screenshotRequestAllowed => '你已允许截图';
+
+  @override
+  String get screenshotRequestDeclined => '你已拒绝截图';
+
+  @override
+  String get screenshotRequestExpired => '截图请求已过期';
+
+  @override
+  String get wiltingTapToReveal => '点按查看凋零消息';
+
+  @override
+  String get wiltingMessageTag => '凋零消息';
+
+  @override
+  String get wiltedMessage => '已凋零的消息';
+
+  @override
+  String get wiltingSheetTitle => '凋零消息';
+
+  @override
+  String get wiltingSheetBody => '收件人打开后，消息将在这么多秒后消失。';
+
+  @override
+  String get wiltingSheetSend => '发送凋零消息';
+
+  @override
+  String get wiltingHoldToSendHint => '长按以发送凋零消息';
 }

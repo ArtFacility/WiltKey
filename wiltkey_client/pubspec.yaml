@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.0.1+10
+version: 1.0.2+11
 
 environment:
   sdk: ^3.12.0
@@ -82,6 +82,10 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
+  # App icon, loaded at runtime for the consensual-screenshot banner watermark.
+  assets:
+    - assets/icon/icon.png
 
   # Bundled theme fonts (offline; OFL — see assets/fonts/OFL-*.txt).
   # Sora = UI, Spectral = serif titles, IBM Plex Mono = byte counts / crypto.

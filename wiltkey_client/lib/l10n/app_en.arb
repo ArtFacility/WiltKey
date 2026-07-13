@@ -667,8 +667,69 @@
   "accessibilityWarningDismiss": "Dismiss",
   "accessibilityWarningOpenSettings": "Review settings",
   "chatImageCompressionAllowDownload": "Allow saving to gallery",
+  "chatImageCompressionWilting": "Wilting image (disappears after opening)",
+  "@chatImageCompressionWilting": {
+    "description": "Toggle in the image send dialog to make the image a disappearing (wilting) one."
+  },
   "chatImageDownload": "Download",
   "chatImageSaveAs": "Save as",
   "chatImageSavedToGallery": "Saved to gallery",
-  "chatImageSaveFailed": "Couldn't save the image"
+  "chatImageSaveFailed": "Couldn't save the image",
+  "chatImageSourceTitle": "Send a photo",
+  "chatImageSourceCamera": "Take photo",
+  "chatImageSourceGallery": "Choose from gallery",
+  "screenshotRequestTooltip": "Request screenshot",
+  "screenshotWaiting": "Waiting for approval…",
+  "screenshotConsentTitle": "Screenshot request",
+  "screenshotConsentBody": "{name} wants to save a screenshot of this chat. Allow it?",
+  "@screenshotConsentBody": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "screenshotDenied": "Screenshot request was declined.",
+  "screenshotCaptureFailed": "Couldn't capture the screenshot.",
+  "screenshotWatermark": "WiltKey — Screenshot with consent",
+  "screenshotRequestInline": "{name} requested a screenshot",
+  "@screenshotRequestInline": {
+    "description": "Title of the in-history screenshot-request card.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "screenshotRequestAllowed": "You allowed the screenshot",
+  "screenshotRequestDeclined": "You declined the screenshot",
+  "screenshotRequestExpired": "Screenshot request expired",
+  "wiltingTapToReveal": "Tap to see wilting message",
+  "@wiltingTapToReveal": {
+    "description": "Gated placeholder for a received disappearing message before it is opened."
+  },
+  "wiltingMessageTag": "Wilting message",
+  "@wiltingMessageTag": {
+    "description": "Small tag shown on your own copy of a sent disappearing message."
+  },
+  "wiltedMessage": "Wilted message",
+  "@wiltedMessage": {
+    "description": "Tombstone shown once a disappearing message has expired and its content was destroyed."
+  },
+  "wiltingSheetTitle": "Wilting message",
+  "@wiltingSheetTitle": {
+    "description": "Title of the sheet for composing a disappearing message."
+  },
+  "wiltingSheetBody": "The message disappears this many seconds after the recipient opens it.",
+  "@wiltingSheetBody": {
+    "description": "Explanation in the disappearing-message duration sheet."
+  },
+  "wiltingSheetSend": "Send wilting message",
+  "@wiltingSheetSend": {
+    "description": "Confirm button in the disappearing-message duration sheet."
+  },
+  "wiltingHoldToSendHint": "Hold to send a wilting message",
+  "@wiltingHoldToSendHint": {
+    "description": "Tooltip on the send button hinting the long-press to send a disappearing message."
+  }
 }

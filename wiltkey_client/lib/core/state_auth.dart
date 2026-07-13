@@ -164,6 +164,10 @@ extension AppStateAuth on AppState {
     // rolls its keystream back and removes the dead "undelivered" bubble.
     await autoRefundAbandonedFailures();
 
+    // Wilting messages: destroy any whose countdown elapsed while the app was
+    // closed, and re-arm live countdowns for the rest.
+    await sweepAndArmWilting();
+
     // Reclaim disk: delete any pad with no live (non-archived) contact. This
     // self-heals the cases where a pad can outlive its chat — incomplete/failed
     // pairings, a peer nuke that arrived while we were offline, or a crashed
