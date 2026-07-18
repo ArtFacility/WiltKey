@@ -13,6 +13,7 @@ import '../../../core/state.dart';
 import '../../../core/models.dart';
 import '../../../core/crypto/otp_service.dart';
 import '../../../core/db/wiltkey_db.dart';
+import '../../../core/pad_tiers.dart';
 import '../../../core/pixel_art_avatar.dart';
 import '../../../core/theme/wiltkey_components.dart';
 
@@ -68,6 +69,19 @@ class BlePairingManager extends ChangeNotifier {
   double syncProgress = 0.0;
   String syncStepText = 'Idle';
 
+  /// True while the OTP pad is being written to disk — the slow tail of pairing.
+  /// The UI shows a "keep the app open" caution during this phase, because
+  /// quitting mid-generation leaves a half-written pad and a one-sided chat.
+  bool isGeneratingPad = false;
+
+  /// Live pad-generation byte counters (for the localized progress label).
+  int padWrittenBytes = 0;
+  int padTotalBytes = 0;
+
+  /// Fraction of the progress bar reserved for the handshake steps; the rest
+  /// (this → 1.0) is driven by real pad-generation bytes.
+  static const double _kGenPhaseStart = 0.35;
+
   List<DiscoveredBleDevice> discoveredDevices = [];
   final Map<String, String> resolvedNames = {};
   final List<String> terminalLogs = [
@@ -78,15 +92,11 @@ class BlePairingManager extends ChangeNotifier {
   String agreedSeed = 'Initializing...';
   String randomBytesHex = 'Generating key bytes...';
   double flashOpacity = 0.0;
-  double sliderValue = 3.0; // Default to 10MB index
+  /// Selected pad tier (an index into [WkPadTiers.values]). Only meaningful on
+  /// the initiating side — the responder's copy is synced for display only.
+  double sliderValue = WkPadTiers.defaultIndex.toDouble();
 
-  final List<int> sliderByteValues = [
-    100000,
-    1000000,
-    5000000,
-    10000000,
-    20000000,
-  ];
+  final List<int> sliderByteValues = WkPadTiers.values;
 
   DiscoveredBleDevice? selectedDevice;
   BluetoothDevice? activeConnection;
@@ -762,7 +772,13 @@ class BlePairingManager extends ChangeNotifier {
     _evictionTimer?.cancel();
     stopAdvertising();
 
-    final int byteSize = sliderByteValues[sliderValue.round()];
+    // The initiator picks the size, so this is the enforcement point for the
+    // larger-pads unlock. Clamped (not just gated in the slider UI) so a stale
+    // selection from a lapsed entitlement can never send an oversized request.
+    // The responder honours whatever byte count arrives — only ONE side needs
+    // the unlock for a big pad.
+    final int byteSize =
+        WkPadTiers.bytesAt(WkPadTiers.clampToAllowed(sliderValue.round()));
 
     isScanning = false;
     isSyncing = true;
@@ -924,29 +940,45 @@ class BlePairingManager extends ChangeNotifier {
 
     int stepIndex = 0;
     _syncTimer = Timer.periodic(const Duration(milliseconds: 700), (timer) {
-      syncProgress += (1.0 / steps.length);
       if (stepIndex < steps.length) {
         syncStepText = steps[stepIndex];
+        // Handshake steps animate the bar to _kGenPhaseStart only; the pad
+        // generation that follows owns the remainder, so a big pad no longer
+        // shows a full bar while it's actually still working.
+        syncProgress = _kGenPhaseStart * ((stepIndex + 1) / steps.length);
         stepIndex++;
+        notifyListeners();
+        return;
       }
+
+      timer.cancel();
+      _hexAnimationTimer?.cancel();
+      syncProgress = _kGenPhaseStart;
       notifyListeners();
 
-      if (syncProgress >= 0.99) {
-        syncProgress = 1.0;
-        timer.cancel();
-        _hexAnimationTimer?.cancel();
-
-        _finalizeHandshake(
-          peerId: peerId,
-          peerName: peerName,
-          bufferBytes: bufferBytes,
-          derivedSeed: derivedSeed,
-          peerShortNick: peerShortNick,
-          peerProfileImage: peerProfileImage,
-          deviceToDisconnect: deviceToDisconnect,
-        );
-      }
+      _finalizeHandshake(
+        peerId: peerId,
+        peerName: peerName,
+        bufferBytes: bufferBytes,
+        derivedSeed: derivedSeed,
+        peerShortNick: peerShortNick,
+        peerProfileImage: peerProfileImage,
+        deviceToDisconnect: deviceToDisconnect,
+      );
     });
+  }
+
+  /// Maps pad-generation bytes into the [_kGenPhaseStart, 1.0] band of the bar,
+  /// throttled to ~1% steps so a 500 MB pad doesn't spam notifyListeners.
+  void _onPadProgress(int written, int total) {
+    if (total <= 0) return;
+    final frac = written / total;
+    final mapped = _kGenPhaseStart + (1.0 - _kGenPhaseStart) * frac;
+    if (mapped - syncProgress < 0.01 && written < total) return;
+    syncProgress = mapped;
+    padWrittenBytes = written;
+    padTotalBytes = total;
+    notifyListeners();
   }
 
   Future<void> _finalizeHandshake({
@@ -960,6 +992,7 @@ class BlePairingManager extends ChangeNotifier {
   }) async {
     try {
       syncStepText = 'Generating keystream file...';
+      isGeneratingPad = true;
       notifyListeners();
 
       if (groupToInvite != null) {
@@ -1004,6 +1037,7 @@ class BlePairingManager extends ChangeNotifier {
           hostName: meta['hostName'] as String,
           groupIconHex: meta['groupIcon'] as String?,
           maxMembers: meta['maxMembers'] as int?,
+          onPadProgress: _onPadProgress,
         );
 
         appState.requestGroupMetadata(
@@ -1020,6 +1054,7 @@ class BlePairingManager extends ChangeNotifier {
           derivedSeed,
           shortNick: peerShortNick,
           profileImage: peerProfileImage,
+          onPadProgress: _onPadProgress,
         );
         log('[Pairing] Contact created successfully for $peerName ($peerId)');
       }
@@ -1031,6 +1066,8 @@ class BlePairingManager extends ChangeNotifier {
       deviceToDisconnect.disconnect();
     }
 
+    isGeneratingPad = false;
+    syncProgress = 1.0;
     isSyncing = false;
     isSuccess = true;
     notifyListeners();
@@ -1039,6 +1076,7 @@ class BlePairingManager extends ChangeNotifier {
   void resetState() {
     isSuccess = false;
     isSyncing = false;
+    isGeneratingPad = false;
     syncProgress = 0.0;
     syncStepText = 'Idle';
     selectedDevice = null;

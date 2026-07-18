@@ -62,6 +62,7 @@ extension AppStateLifecycle on AppState {
       });
       try {
         if (contact.isGroup) {
+          WiltkeyOtpService.clearGroupSeed(contact.keyHash);
           WiltkeyOtpService.deleteGroupKeystreamFile(contact.keyHash);
         } else {
           WiltkeyOtpService.deleteKeystreamFile(contact.keyHash);
@@ -111,6 +112,7 @@ extension AppStateLifecycle on AppState {
       }
       try {
         if (isGroup) {
+          WiltkeyOtpService.clearGroupSeed(contactKeyHash);
           await WiltkeyOtpService.deleteGroupKeystreamFile(contactKeyHash);
           await GroupDatabase.instance.deleteGroup(contactKeyHash);
           await CustomEmojiStore.clear(contactKeyHash);
@@ -132,6 +134,7 @@ extension AppStateLifecycle on AppState {
       // retry arrived). We don't know the kind, so best-effort delete both pad
       // name forms — each is a no-op if the file isn't there.
       try {
+        WiltkeyOtpService.clearGroupSeed(contactKeyHash);
         await WiltkeyOtpService.deleteKeystreamFile(contactKeyHash);
         await WiltkeyOtpService.deleteGroupKeystreamFile(contactKeyHash);
       } catch (e) {
@@ -249,6 +252,7 @@ extension AppStateLifecycle on AppState {
     //    emoji. Custom emoji are intentionally kept (like on recharge).
     try {
       if (contact.isGroup) {
+        WiltkeyOtpService.clearGroupSeed(contact.keyHash);
         await WiltkeyOtpService.deleteGroupKeystreamFile(contact.keyHash);
       } else {
         await WiltkeyOtpService.deleteKeystreamFile(contact.keyHash);
@@ -333,6 +337,7 @@ extension AppStateLifecycle on AppState {
     int? maxMembers,
     int? maxMessageSize,
     bool? imagesAllowed,
+    void Function(int written, int total)? onPadProgress,
   }) async {
     // Reset nuke status if re-pairing after a nuke — the user is starting fresh
     if (status == AppStatus.nuked) {
@@ -345,11 +350,12 @@ extension AppStateLifecycle on AppState {
     // master-key copies. No-op for a brand-new pairing.
     await _preserveMessagesBeforePadReset(keyHash);
 
-    // Generate the keystream file locally
+    // Generate the keystream file locally (progress bubbles up to the pairing UI).
     await WiltkeyOtpService.generateKeystreamFile(
       keyHash,
       derivedSeed,
       bufferBytes,
+      onProgress: onPadProgress,
     );
 
     // Provision the 1-on-1 metadata-channel key. One-way derivation from the

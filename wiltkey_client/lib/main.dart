@@ -7,9 +7,11 @@ import 'features/onboarding/presentation/onboarding_screen.dart';
 import 'features/auth/presentation/pin_lock_screen.dart';
 import 'core/state.dart';
 import 'core/theme/theme_controller.dart';
+import 'core/cosmetics/avatar_border_controller.dart';
 import 'core/localization/locale_controller.dart';
 import 'core/notifications/background_handler.dart';
 import 'core/notifications/notification_service.dart';
+import 'core/entitlements/entitlement_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -22,9 +24,16 @@ void main() async {
   await Workmanager().initialize(callbackDispatcher);
   await WiltkeyNotifications.initLocalNotifications();
 
-  // Read the persisted theme and locale before the first frame.
+  // Read the persisted theme, locale and equipped avatar border before the
+  // first frame.
   await ThemeController().load();
   await LocaleController().load();
+  await AvatarBorderController().load();
+
+  // Load cached entitlements (instant/offline) and, on the Play build only,
+  // kick off a background Billing refresh. No-op / Google-free on FOSS.
+  await EntitlementService().load();
+
   runApp(const WiltkeyApp());
 }
 

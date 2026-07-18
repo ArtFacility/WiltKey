@@ -2435,6 +2435,354 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Hold to send a wilting message'**
   String get wiltingHoldToSendHint;
+
+  /// Author label in a reply quote when quoting the local user's own message.
+  ///
+  /// In en, this message translates to:
+  /// **'You'**
+  String get replyYou;
+
+  /// Fallback author label in a reply quote when the sender's name can't be resolved.
+  ///
+  /// In en, this message translates to:
+  /// **'Someone'**
+  String get replySomeone;
+
+  /// One-line preview shown in a reply quote when the quoted message is an image.
+  ///
+  /// In en, this message translates to:
+  /// **'📷 Photo'**
+  String get replyPreviewImage;
+
+  /// One-line preview shown in a reply quote when the quoted message is a voice note.
+  ///
+  /// In en, this message translates to:
+  /// **'🎤 Voice message'**
+  String get replyPreviewVoice;
+
+  /// Generic one-line preview in a reply quote when there's no showable text.
+  ///
+  /// In en, this message translates to:
+  /// **'Message'**
+  String get replyPreviewMessage;
+
+  /// Shown in a reply quote when the parent message can't be found (not loaded / wilted).
+  ///
+  /// In en, this message translates to:
+  /// **'Original message unavailable'**
+  String get replyUnavailable;
+
+  /// Settings row label opening the shop, on the Play build.
+  ///
+  /// In en, this message translates to:
+  /// **'Shop & WiltKey Plus'**
+  String get shopEntryTitle;
+
+  /// Settings row subtitle under the shop entry, on the Play build.
+  ///
+  /// In en, this message translates to:
+  /// **'Themes, unlocks & Plus'**
+  String get shopEntrySubtitle;
+
+  /// Settings row label opening the support page, on the FOSS build.
+  ///
+  /// In en, this message translates to:
+  /// **'Support the project'**
+  String get supportEntryTitle;
+
+  /// Settings row subtitle under the support entry, on the FOSS build.
+  ///
+  /// In en, this message translates to:
+  /// **'Help keep WiltKey running'**
+  String get supportEntrySubtitle;
+
+  /// App bar title of the shop screen (Play build).
+  ///
+  /// In en, this message translates to:
+  /// **'Shop'**
+  String get shopTitle;
+
+  /// App bar title of the support screen (FOSS build).
+  ///
+  /// In en, this message translates to:
+  /// **'Support WiltKey'**
+  String get supportTitle;
+
+  /// Section header for the subscription in the shop.
+  ///
+  /// In en, this message translates to:
+  /// **'WiltKey Plus'**
+  String get shopPlusSection;
+
+  /// Section header for one-time cosmetic unlocks in the shop.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlocks'**
+  String get shopUnlocksSection;
+
+  /// One-line description of the WiltKey Plus subscription.
+  ///
+  /// In en, this message translates to:
+  /// **'Longer offline message hold and bigger file transfers.'**
+  String get shopPlusTagline;
+
+  /// Title of the shop empty state when no products are available.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing here yet'**
+  String get shopEmptyTitle;
+
+  /// Body of the shop empty state when no products are available.
+  ///
+  /// In en, this message translates to:
+  /// **'Products are on the way — check back soon.'**
+  String get shopEmptyBody;
+
+  /// Button that re-queries and restores prior purchases.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore purchases'**
+  String get shopRestoreButton;
+
+  /// Snackbar shown after a successful restore.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchases restored'**
+  String get shopRestoredSnack;
+
+  /// Button to purchase a shop product.
+  ///
+  /// In en, this message translates to:
+  /// **'Buy'**
+  String get shopBuyButton;
+
+  /// Badge on a one-time product the user already owns.
+  ///
+  /// In en, this message translates to:
+  /// **'Owned'**
+  String get shopOwnedLabel;
+
+  /// Badge on the subscription when it is currently active.
+  ///
+  /// In en, this message translates to:
+  /// **'Active'**
+  String get shopActiveLabel;
+
+  /// Hint under an active subscription pointing to Play to manage it.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage in Google Play'**
+  String get shopManageNote;
+
+  /// Snackbar when a purchase is awaiting payment confirmation.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchase pending…'**
+  String get shopPurchasePendingSnack;
+
+  /// Snackbar when a purchase attempt fails.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchase couldn\'t be completed'**
+  String get shopPurchaseFailedSnack;
+
+  /// Intro paragraph on the FOSS support page.
+  ///
+  /// In en, this message translates to:
+  /// **'WiltKey is free and open source, and this build unlocks every cosmetic for free. If you\'d like to support development and the official relay, visit the page below.'**
+  String get supportIntro;
+
+  /// Button that opens the external support/donate URL.
+  ///
+  /// In en, this message translates to:
+  /// **'Open support page'**
+  String get supportOpenButton;
+
+  /// Reassurance note on the FOSS support page that cosmetics are free.
+  ///
+  /// In en, this message translates to:
+  /// **'All cosmetics are unlocked in this build.'**
+  String get supportFreeNote;
+
+  /// Shop tab label for colour palette packs.
+  ///
+  /// In en, this message translates to:
+  /// **'Palettes'**
+  String get shopTabPalettes;
+
+  /// Shop tab label for premium themes.
+  ///
+  /// In en, this message translates to:
+  /// **'Themes'**
+  String get shopTabThemes;
+
+  /// Shop tab label for avatar borders.
+  ///
+  /// In en, this message translates to:
+  /// **'Borders'**
+  String get shopTabBorders;
+
+  /// Shop tab label for the WiltKey Plus subscription.
+  ///
+  /// In en, this message translates to:
+  /// **'Plus'**
+  String get shopTabPlus;
+
+  /// Shop tab label for promo code redemption.
+  ///
+  /// In en, this message translates to:
+  /// **'Promo'**
+  String get shopTabPromo;
+
+  /// Intro paragraph on the shop's palettes tab explaining the render-free rule.
+  ///
+  /// In en, this message translates to:
+  /// **'Extra colours for drawing your avatar and group icons. Art you receive always renders in full — a pack only unlocks drawing with those colours yourself.'**
+  String get shopPalettesIntro;
+
+  /// Subtitle on a palette pack card stating how many colours it adds.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} extra colours'**
+  String shopPaletteColorCount(int count);
+
+  /// Title of the themes tab empty state when no premium themes are listed.
+  ///
+  /// In en, this message translates to:
+  /// **'No themes yet'**
+  String get shopThemesEmptyTitle;
+
+  /// Body of the themes tab empty state.
+  ///
+  /// In en, this message translates to:
+  /// **'Premium themes are on the way — the three built-in themes are free forever.'**
+  String get shopThemesEmptyBody;
+
+  /// Title of the avatar borders tab placeholder.
+  ///
+  /// In en, this message translates to:
+  /// **'Borders are coming'**
+  String get shopBordersSoonTitle;
+
+  /// Body of the avatar borders tab placeholder.
+  ///
+  /// In en, this message translates to:
+  /// **'Decorative frames for your avatar that everyone you chat with can see. In the works.'**
+  String get shopBordersSoonBody;
+
+  /// Section header above the WiltKey Plus benefit list.
+  ///
+  /// In en, this message translates to:
+  /// **'What you get'**
+  String get shopPlusBenefitsSection;
+
+  /// Plus benefit: longer offline message hold.
+  ///
+  /// In en, this message translates to:
+  /// **'Your messages wait 72 hours on the relay instead of 24 while you\'re offline.'**
+  String get shopPlusBenefitHold;
+
+  /// Plus benefit: future perks included.
+  ///
+  /// In en, this message translates to:
+  /// **'Send large files — up to 50 MB per message, past the 5 MB free limit.'**
+  String get shopPlusBenefitFiles;
+
+  /// Plus benefit: supporting the project.
+  ///
+  /// In en, this message translates to:
+  /// **'You keep the relay running and WiltKey independent.'**
+  String get shopPlusBenefitSupport;
+
+  /// Button to start the WiltKey Plus subscription.
+  ///
+  /// In en, this message translates to:
+  /// **'Subscribe'**
+  String get shopSubscribeButton;
+
+  /// Shown in place of a price when the product isn't available from Google Play.
+  ///
+  /// In en, this message translates to:
+  /// **'Unavailable'**
+  String get shopPriceUnavailable;
+
+  /// Intro paragraph on the promo code tab.
+  ///
+  /// In en, this message translates to:
+  /// **'Got a promo code? Enter it below and Google Play will apply it to your account.'**
+  String get shopPromoIntro;
+
+  /// Placeholder text in the promo code input field.
+  ///
+  /// In en, this message translates to:
+  /// **'PROMO CODE'**
+  String get shopPromoHint;
+
+  /// Button that opens the Google Play redeem flow with the entered code.
+  ///
+  /// In en, this message translates to:
+  /// **'Redeem in Google Play'**
+  String get shopPromoRedeemButton;
+
+  /// Footnote on the promo tab explaining that redemption happens in Play.
+  ///
+  /// In en, this message translates to:
+  /// **'Codes are redeemed in the Play Store. Once applied, your unlock appears here automatically.'**
+  String get shopPromoNote;
+
+  /// Tappable hint under the pairing pad-size slider offering the larger tiers.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock larger pads — up to {max}'**
+  String pairLargerPadsUpsell(String max);
+
+  /// Warning when the device can't fit the OTP pad the pairing would create.
+  ///
+  /// In en, this message translates to:
+  /// **'Not enough free space — this chat needs {needed} and you have {free}.'**
+  String pairNotEnoughSpace(String needed, String free);
+
+  /// Progress label while the OTP pad file is being written during pairing.
+  ///
+  /// In en, this message translates to:
+  /// **'Generating keystream… {written} / {total}'**
+  String pairSyncingGenerating(String written, String total);
+
+  /// Caution shown while the OTP pad generates, warning not to quit the app.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep the app open — the secure pad is still being created.'**
+  String get pairKeepAppOpen;
+
+  /// Tappable hint under the group total-size slider offering the larger tiers.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock larger group pads — up to {max}'**
+  String groupLargerPadsUpsell(String max);
+
+  /// Label above the avatar-border picker in Settings.
+  ///
+  /// In en, this message translates to:
+  /// **'Avatar border'**
+  String get settingsBorderSection;
+
+  /// Intro paragraph on the shop's avatar-borders tab.
+  ///
+  /// In en, this message translates to:
+  /// **'Frames and accessories for your avatar. Everyone you chat with sees your border — a locked one only stops you equipping it, never how it renders.'**
+  String get shopBordersIntro;
+
+  /// Subtitle on an avatar-border shop card.
+  ///
+  /// In en, this message translates to:
+  /// **'Avatar border'**
+  String get shopBorderSubtitle;
+
+  /// Badge on a cosmetic that's free for everyone.
+  ///
+  /// In en, this message translates to:
+  /// **'Free'**
+  String get shopFreeLabel;
 }
 
 class _AppLocalizationsDelegate

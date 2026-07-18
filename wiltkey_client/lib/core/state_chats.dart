@@ -119,6 +119,7 @@ extension AppStateChats on AppState {
     bool allowSave = false,
     bool ephemeral = false,
     int ttlSeconds = 0,
+    String? replyToId,
   }) async {
     log('sendMessage starting. type: $contentType, len: ${text.length}');
     if (activeContact == null || status == AppStatus.nuked) {
@@ -139,7 +140,12 @@ extension AppStateChats on AppState {
       return 'Out of keystream — asked your peer for more bytes. Try again in a moment.';
     }
 
-    final payloadBytes = utf8.encode(text).length;
+    // A reply embeds the parent id in the OTP body (hidden from the blind relay),
+    // so it costs a few extra pad bytes vs a plain message. Non-replies are
+    // unchanged. The in-memory/DB copies keep the original text + replyToId; only
+    // the encrypted wire body carries the framed form.
+    final String wireText = ChatMessage.buildReplyBody(replyToId, text);
+    final payloadBytes = utf8.encode(wireText).length;
 
     // Pick where to encrypt: our primary sending lane first, otherwise a
     // disjoint range the peer donated to us (borrowed keystream). If nothing
@@ -178,6 +184,7 @@ extension AppStateChats on AppState {
       decryptedText: text, // original plaintext cached in-memory
       ephemeral: ephemeral,
       ttlSeconds: ephemeral ? ttlSeconds : 0,
+      replyToId: replyToId,
     );
     appendLoadedMessage(contact.id, newMessage);
     notifyListeners();
@@ -187,7 +194,7 @@ extension AppStateChats on AppState {
 
     List<int> cipherBytes;
     try {
-      final rawBytes = utf8.encode(text);
+      final rawBytes = utf8.encode(wireText);
       cipherBytes = await WiltkeyOtpService.xorWithKeystream(
         contact.keyHash,
         rawBytes,
@@ -244,6 +251,8 @@ extension AppStateChats on AppState {
         envelope['eph'] = 1;
         envelope['ttl'] = ttlSeconds;
       }
+      // NOTE: reply target is NOT here — it's embedded in the encrypted body
+      // (wireText) so the relay never sees the reply relationship.
       final envelopeStr = jsonEncode(envelope);
 
       // Send payload over WebSocket
@@ -346,6 +355,7 @@ extension AppStateChats on AppState {
       if (message.allowSave) 'dl': true,
       if (message.ephemeral) 'eph': 1,
       if (message.ephemeral) 'ttl': message.ttlSeconds,
+      // Reply target rides inside the already-encrypted body (message.text).
     };
     final envelopeStr = jsonEncode(envelope);
 

@@ -8,6 +8,7 @@ import 'package:wiltkey_client/l10n/app_localizations.dart';
 import '../../../core/state.dart';
 import '../../../core/models.dart';
 import '../../../core/pixel_art_avatar.dart';
+import '../../../core/cosmetics/avatar_border_controller.dart';
 import '../../../core/custom_emoji.dart';
 import 'widgets/image_source_sheet.dart';
 import '../../../core/theme/wk.dart';
@@ -23,6 +24,8 @@ import 'widgets/reactions.dart';
 import 'widgets/image_viewer.dart';
 import 'widgets/screenshot_ui.dart';
 import 'widgets/wilt_duration_sheet.dart';
+import 'widgets/reply_preview.dart';
+import 'widgets/swipe_to_reply.dart';
 import '../../groups/presentation/group_settings_screen.dart';
 import '../../groups/presentation/group_invite_screen.dart';
 
@@ -71,6 +74,9 @@ class _GroupChatScreenState extends State<GroupChatScreen>
   bool _isAtBottom = true;
   bool _showScrollDownArrow = false;
   final Set<String> _revealedImageIds = {};
+
+  // The message the composer is currently replying to (null = normal send).
+  ChatMessage? _replyingTo;
 
   // Wraps the message list so a consented screenshot can render it to an image.
   final GlobalKey _captureBoundaryKey = GlobalKey();
@@ -392,6 +398,39 @@ class _GroupChatScreenState extends State<GroupChatScreen>
     if (_showEmoji) setState(() => _showEmoji = false);
   }
 
+  void _startReply(ChatMessage message) {
+    if (message.isSystem ||
+        message.isPending ||
+        message.wilted ||
+        message.contentType == 'screenshot_request' ||
+        message.contentType == 'refill_request') {
+      return;
+    }
+    setState(() => _replyingTo = message);
+    _inputFocus.requestFocus();
+  }
+
+  void _cancelReply() {
+    if (_replyingTo != null) setState(() => _replyingTo = null);
+  }
+
+  bool _canReply(ChatMessage m) =>
+      !m.isSystem &&
+      !m.isPending &&
+      !m.wilted &&
+      m.contentType != 'screenshot_request' &&
+      m.contentType != 'refill_request';
+
+  /// Small left→right nudge (resistance + haptic + spring-back) to reply.
+  /// See [SwipeToReply].
+  Widget _wrapSwipeToReply(ChatMessage message, Widget child) {
+    return SwipeToReply(
+      enabled: _canReply(message),
+      onReply: () => _startReply(message),
+      child: child,
+    );
+  }
+
   void _handleSend() async {
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
@@ -400,10 +439,12 @@ class _GroupChatScreenState extends State<GroupChatScreen>
 
     // Clear the field instantly — the bubble shows immediately as a pending
     // "Encrypting…" placeholder while the send completes in the background.
+    final replyId = _replyingTo?.id;
     _messageController.clear();
+    _cancelReply();
     _scrollToBottom();
 
-    final error = await _appState.sendGroupMessage(text);
+    final error = await _appState.sendGroupMessage(text, replyToId: replyId);
     if (error != null) {
       _appState.log('[GroupChat] Send failed: $error');
       if (mounted) {
@@ -422,12 +463,15 @@ class _GroupChatScreenState extends State<GroupChatScreen>
     final secs = await showWiltDurationSheet(context);
     if (secs == null || !mounted) return;
     _sendBloom.forward(from: 0);
+    final replyId = _replyingTo?.id;
     _messageController.clear();
+    _cancelReply();
     _scrollToBottom();
     final error = await _appState.sendGroupMessage(
       text,
       ephemeral: true,
       ttlSeconds: secs,
+      replyToId: replyId,
     );
     if (error != null) {
       _appState.log('[GroupChat] Wilting send failed: $error');
@@ -882,6 +926,15 @@ class _GroupChatScreenState extends State<GroupChatScreen>
                                             message.senderId,
                                           )));
 
+                        // Equipped avatar border: our own comes from the local
+                        // controller (solo-visible instantly); a peer's rides
+                        // their group_member_profile broadcast into the cache.
+                        final String? avatarBorderId = isMe
+                            ? AvatarBorderController.instance.borderId
+                            : (memberProfile != null
+                                  ? memberProfile['avatar_border']
+                                  : null);
+
                         // Self uses the action accent; the host uses the identity
                         // accent; every other member gets their own stable colour
                         // (the same one as their flower/bar slice) so messages are
@@ -939,6 +992,13 @@ class _GroupChatScreenState extends State<GroupChatScreen>
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
+                              buildReplyQuoteFor(
+                                    context,
+                                    _appState,
+                                    contact,
+                                    message,
+                                  ) ??
+                                  const SizedBox.shrink(),
                               _buildGroupContent(
                                 t,
                                 message,
@@ -1015,7 +1075,7 @@ class _GroupChatScreenState extends State<GroupChatScreen>
                           ),
                         );
 
-                        return Row(
+                        final Widget row = Row(
                           mainAxisAlignment: isMe
                               ? MainAxisAlignment.end
                               : MainAxisAlignment.start,
@@ -1026,6 +1086,7 @@ class _GroupChatScreenState extends State<GroupChatScreen>
                                   ? PixelArtAvatar(
                                       hexString: avatarHex,
                                       size: 28,
+                                      borderId: avatarBorderId,
                                     )
                                   : const SizedBox(width: 28),
                               const SizedBox(width: 8),
@@ -1088,11 +1149,13 @@ class _GroupChatScreenState extends State<GroupChatScreen>
                                   ? PixelArtAvatar(
                                       hexString: avatarHex,
                                       size: 28,
+                                      borderId: avatarBorderId,
                                     )
                                   : const SizedBox(width: 28),
                             ],
                           ],
                         );
+                        return _wrapSwipeToReply(message, row);
                       },
                         ),
                         ),
@@ -1309,6 +1372,15 @@ class _GroupChatScreenState extends State<GroupChatScreen>
     final int cost = _charCount > 0 ? _charCount + 73 : 0;
     return Column(
       children: [
+        if (_replyingTo != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: ReplyQuote(
+              author: replyAuthorName(_replyingTo!, contact, _appState, l10n),
+              preview: replyPreviewText(_replyingTo!, l10n),
+              onClose: _cancelReply,
+            ),
+          ),
         EmojiAutocompleteBar(
           controller: _messageController,
           emojiMap: CustomEmojiStore.cachedMap(contact.keyHash),
@@ -1757,6 +1829,9 @@ class _GroupChatScreenState extends State<GroupChatScreen>
         : (cachedImage != null && cachedImage.isNotEmpty
               ? cachedImage
               : PixelArtAvatar.generateIdenticon(keyHash));
+    final String? avatarBorderId = isSelf
+        ? AvatarBorderController.instance.borderId
+        : _appState.groupProfilesCache[contact.id]?[keyHash]?['avatar_border'];
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -1776,7 +1851,11 @@ class _GroupChatScreenState extends State<GroupChatScreen>
         children: [
           Row(
             children: [
-              PixelArtAvatar(hexString: avatarHex, size: 40),
+              PixelArtAvatar(
+                hexString: avatarHex,
+                size: 40,
+                borderId: avatarBorderId,
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -1894,6 +1973,33 @@ class _GroupChatScreenState extends State<GroupChatScreen>
     Map<String, CustomEmoji> emojiMap,
     bool isMe,
   ) {
+    // Wilting (disappearing) messages. The group screen renders its own bubbles
+    // (it does NOT use MessageBubble), so it must reproduce the three wilt
+    // states itself to match 1-on-1: destroyed → tombstone; a received-but-
+    // unopened ephemeral → a tap-to-reveal gate (never decrypted until
+    // revealed); an opened/own ephemeral → normal content with a countdown /
+    // "wilting" footer. The engine, send and receive paths already carry these
+    // (state_wilting.dart, sendGroupMessage, _handleGroupPayload) — only this UI
+    // was missing.
+    if (message.wilted) return _buildGroupWiltedTombstone(t, isMe);
+    if (message.ephemeral && !isMe && message.openedAt == null) {
+      return _buildGroupWiltGate(t, message);
+    }
+    return _wrapGroupWilting(
+      t,
+      message,
+      isMe,
+      _buildGroupContentInner(t, message, displayText, emojiMap, isMe),
+    );
+  }
+
+  Widget _buildGroupContentInner(
+    WiltkeyTokens t,
+    ChatMessage message,
+    String displayText,
+    Map<String, CustomEmoji> emojiMap,
+    bool isMe,
+  ) {
     final ct = message.contentType;
     if (ct == 'image' || ct == 'image_hidden') {
       return _buildGroupImage(t, message);
@@ -1959,6 +2065,120 @@ class _GroupChatScreenState extends State<GroupChatScreen>
         height: 1.4,
       ),
       emojiSize: 20 * scale,
+    );
+  }
+
+  // --- Wilting message UI (group) -------------------------------------------
+  // Mirrors MessageBubble's 1-on-1 wilt widgets; kept local to the group screen
+  // so the shipped 1-on-1 path is untouched.
+
+  /// Tombstone left after a group message's content has been destroyed.
+  Widget _buildGroupWiltedTombstone(WiltkeyTokens t, bool isMe) {
+    final l10n = AppLocalizations.of(context)!;
+    final color = isMe ? t.bubbleMeText.withValues(alpha: 0.6) : t.textTertiary;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Icons.local_florist_outlined, size: 14, color: color),
+        const SizedBox(width: 6),
+        Text(
+          t.uppercaseLabels
+              ? l10n.wiltedMessage.toUpperCase()
+              : l10n.wiltedMessage,
+          style: t.dataMono.copyWith(
+            fontSize: 11.5,
+            color: color,
+            fontStyle: FontStyle.italic,
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Tap-to-reveal gate for a received, not-yet-opened wilting group message.
+  /// Tapping stamps the countdown via [AppStateWilting.revealEphemeral].
+  Widget _buildGroupWiltGate(WiltkeyTokens t, ChatMessage message) {
+    final l10n = AppLocalizations.of(context)!;
+    final secs = message.ttlSeconds <= 0 ? 5 : message.ttlSeconds;
+    return GestureDetector(
+      onTap: () {
+        final contact = _appState.activeContact;
+        if (contact != null) _appState.revealEphemeral(contact, message);
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+        decoration: BoxDecoration(
+          color: t.action.withValues(alpha: 0.08),
+          border: Border.all(color: t.action.withValues(alpha: 0.35), width: 1),
+          borderRadius: BorderRadius.circular(t.radiusControl),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.local_florist_outlined, color: t.action, size: 16),
+            const SizedBox(width: 8),
+            Text(
+              t.uppercaseLabels
+                  ? l10n.wiltingTapToReveal.toUpperCase()
+                  : l10n.wiltingTapToReveal,
+              style: t.dataMono.copyWith(color: t.action, fontSize: 11),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              '${secs}s',
+              style: t.dataMono.copyWith(color: t.textTertiary, fontSize: 10),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Wraps opened/own wilting content with its countdown bar (an opened received
+  /// message) or a static "wilting" tag (our own copy, which wilts on the peers'
+  /// confirmation rather than a local timer). Non-wilting content passes through.
+  Widget _wrapGroupWilting(
+    WiltkeyTokens t,
+    ChatMessage message,
+    bool isMe,
+    Widget content,
+  ) {
+    if (!message.isWilting) return content;
+    final l10n = AppLocalizations.of(context)!;
+    final accent = isMe ? t.bubbleMeText : t.action;
+    final Widget footer;
+    if (message.openedAt != null && message.expiresAt != null) {
+      footer = _GroupWiltCountdownBar(
+        openedAt: message.openedAt!,
+        expiresAt: message.expiresAt!,
+        color: accent,
+      );
+    } else {
+      footer = Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.local_florist_outlined,
+            size: 11,
+            color: accent.withValues(alpha: 0.7),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            t.uppercaseLabels
+                ? l10n.wiltingMessageTag.toUpperCase()
+                : l10n.wiltingMessageTag,
+            style: t.dataMono.copyWith(
+              fontSize: 9,
+              color: accent.withValues(alpha: 0.7),
+            ),
+          ),
+        ],
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [content, const SizedBox(height: 5), footer],
     );
   }
 
@@ -2088,6 +2308,88 @@ class _GroupChatScreenState extends State<GroupChatScreen>
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Self-ticking draining bar for an opened wilting group message (a local mirror
+/// of MessageBubble's 1-on-1 countdown, kept here so the group screen doesn't
+/// depend on that widget's private class). Purely visual — the AppStateWilting
+/// timer drives the actual destruction and rebuilds the bubble into a tombstone.
+class _GroupWiltCountdownBar extends StatefulWidget {
+  final int openedAt;
+  final int expiresAt;
+  final Color color;
+  const _GroupWiltCountdownBar({
+    required this.openedAt,
+    required this.expiresAt,
+    required this.color,
+  });
+
+  @override
+  State<_GroupWiltCountdownBar> createState() => _GroupWiltCountdownBarState();
+}
+
+class _GroupWiltCountdownBarState extends State<_GroupWiltCountdownBar> {
+  Timer? _ticker;
+
+  @override
+  void initState() {
+    super.initState();
+    _ticker = Timer.periodic(const Duration(milliseconds: 200), (t) {
+      if (!mounted || _fraction() <= 0) {
+        t.cancel();
+        return;
+      }
+      setState(() {});
+    });
+  }
+
+  double _fraction() {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final span = widget.expiresAt - widget.openedAt;
+    if (span <= 0) return 0;
+    return ((widget.expiresAt - now) / span).clamp(0.0, 1.0);
+  }
+
+  int _secondsLeft() {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    return ((widget.expiresAt - now) / 1000).ceil().clamp(0, 999);
+  }
+
+  @override
+  void dispose() {
+    _ticker?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final frac = _fraction();
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          width: 90,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(3),
+            child: LinearProgressIndicator(
+              value: frac,
+              minHeight: 4,
+              backgroundColor: widget.color.withValues(alpha: 0.15),
+              valueColor: AlwaysStoppedAnimation<Color>(widget.color),
+            ),
+          ),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          '${_secondsLeft()}s',
+          style: TextStyle(
+            fontSize: 9,
+            color: widget.color.withValues(alpha: 0.8),
+          ),
+        ),
+      ],
     );
   }
 }

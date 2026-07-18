@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 
+import 'entitlements/entitlement_service.dart';
+
 /// Central pixel-art format + palette registry for WiltKey avatars, group icons
 /// and identicons.
 ///
@@ -177,7 +179,72 @@ class WkPalette {
     Color(0xFF008080), // 29: Deep Teal
     Color(0xFF36454F), // 30: Charcoal
     Color(0xFFFFFDD0), // 31: Cream
-    // Future premium sets append here at index 32+.
+    // ── Set "saturated" (32–51) — PREMIUM. The vivid, high-chroma look of the
+    //    original palette, brought back as a drawable set (the legacy "classic"
+    //    set is render-only). Includes white, which the free pastel set lacks.
+    Color(0xFFFF3366), // 32: Neon Pink
+    Color(0xFFFF00A0), // 33: Hot Magenta
+    Color(0xFFB026FF), // 34: Electric Purple
+    Color(0xFF7C3AED), // 35: Vivid Violet
+    Color(0xFF0066FF), // 36: Electric Blue
+    Color(0xFF00A3FF), // 37: Azure
+    Color(0xFF00E5FF), // 38: Cyan
+    Color(0xFF00FFD1), // 39: Aqua
+    Color(0xFF00FF87), // 40: Spring Green
+    Color(0xFF22DD44), // 41: Vivid Green
+    Color(0xFFCCFF00), // 42: Lime
+    Color(0xFF9EFF00), // 43: Chartreuse
+    Color(0xFFFFE500), // 44: Yellow
+    Color(0xFFFFB300), // 45: Amber
+    Color(0xFFFF6A00), // 46: Orange
+    Color(0xFFFF3D00), // 47: Vermilion
+    Color(0xFFFF1744), // 48: Neon Red
+    Color(0xFFE5004C), // 49: Crimson
+    Color(0xFFFF4D8D), // 50: Rose
+    Color(0xFFFFFFFF), // 51: White
+    // ── Set "edgy" (52–71) — PREMIUM. Dark greys/blacks with strong reds.
+    Color(0xFF08090B), // 52: Near Black
+    Color(0xFF121317), // 53: Ink
+    Color(0xFF1C1F26), // 54: Gunmetal
+    Color(0xFF2A2E37), // 55: Charcoal
+    Color(0xFF3A404B), // 56: Slate
+    Color(0xFF4E5561), // 57: Steel
+    Color(0xFF6B7280), // 58: Ash
+    Color(0xFF9199A5), // 59: Smoke
+    Color(0xFFD5D9E0), // 60: Bone
+    Color(0xFF4A0008), // 61: Blood
+    Color(0xFF6B0010), // 62: Dried Blood
+    Color(0xFF8A0F1E), // 63: Oxblood
+    Color(0xFFA80B22), // 64: Crimson
+    Color(0xFFC1121F), // 65: Blood Red
+    Color(0xFFE01E37), // 66: Strong Red
+    Color(0xFFFF2D3F), // 67: Scarlet
+    Color(0xFFFF5C4D), // 68: Ember
+    Color(0xFF8B3A2E), // 69: Rust
+    Color(0xFFB45B3E), // 70: Copper
+    Color(0xFF3D1E3C), // 71: Bruise
+    // ── Set "grasstoucher" (72–91) — PREMIUM. Nature: foliage, earth, water.
+    Color(0xFF14301F), // 72: Deep Forest
+    Color(0xFF1E4A2E), // 73: Pine
+    Color(0xFF2F6B3A), // 74: Moss
+    Color(0xFF3E8E4F), // 75: Fern
+    Color(0xFF4CAF50), // 76: Grass
+    Color(0xFF7CC96B), // 77: Spring Leaf
+    Color(0xFFA8DE8B), // 78: Young Shoot
+    Color(0xFFCDE9A8), // 79: Pale Leaf
+    Color(0xFF4A3728), // 80: Bark
+    Color(0xFF6B4F35), // 81: Earth
+    Color(0xFF8B6B4A), // 82: Clay
+    Color(0xFFC2A878), // 83: Sand
+    Color(0xFFE4D2A8), // 84: Wheat
+    Color(0xFF9AD1F0), // 85: Open Sky
+    Color(0xFF4A90A4), // 86: River
+    Color(0xFF27596B), // 87: Deep Water
+    Color(0xFF7D8471), // 88: Stone
+    Color(0xFFA3B18A), // 89: Lichen
+    Color(0xFFE8A0BF), // 90: Bloom
+    Color(0xFFF2C6DE), // 91: Petal
+    // Future premium sets append here at index 92+.
   ];
 
   static const List<WkPaletteSet> sets = [
@@ -187,8 +254,32 @@ class WkPalette {
     // can no longer be drawn with these — see [authoringSets].
     WkPaletteSet(id: 'classic', name: 'Classic', start: 0, count: 16, legacy: true),
     WkPaletteSet(id: 'pastel', name: 'Pastel', start: 16, count: 16),
-    // WkPaletteSet(id: 'neon-pro', name: 'Neon Pro', start: 32, count: 16,
-    //   premium: true, sku: 'wk_palette_neon_pro'),  ← example future SKU
+    // Premium packs. Each `sku` MUST equal WkProducts.palettePack(id) —
+    // 'wk_palette_<id>' — since canAuthor resolves ownership by set id.
+    WkPaletteSet(
+      id: 'saturated',
+      name: 'Saturated',
+      start: 32,
+      count: 20,
+      premium: true,
+      sku: 'wk_palette_saturated',
+    ),
+    WkPaletteSet(
+      id: 'edgy',
+      name: 'Edgy',
+      start: 52,
+      count: 20,
+      premium: true,
+      sku: 'wk_palette_edgy',
+    ),
+    WkPaletteSet(
+      id: 'grasstoucher',
+      name: 'Grasstoucher',
+      start: 72,
+      count: 20,
+      premium: true,
+      sku: 'wk_palette_grasstoucher',
+    ),
   ];
 
   static int get length => colors.length;
@@ -224,9 +315,14 @@ class WkPalette {
 
   /// Whether the local user may *author* (draw) with [set].
   ///
-  /// Rendering is never gated — only authoring. Today there is no entitlement
-  /// system, so free sets are always allowed and premium sets are locked. When
-  /// monetization (#7) lands, replace the `!set.premium` branch with a
-  /// server-authoritative entitlement check keyed on [WkPaletteSet.sku].
-  static bool canAuthor(WkPaletteSet set) => !set.premium;
+  /// Rendering is never gated — only authoring. Free sets are always allowed;
+  /// premium sets resolve through [EntitlementService], which applies the flavor
+  /// rules: on the Play build the pack must be purchased, on the FOSS build every
+  /// pack is free (palettes are "just adjustments" already in the open source).
+  /// Client-side by design — a premium colour only ever affects the buyer's own
+  /// art, and every build renders every index regardless.
+  static bool canAuthor(WkPaletteSet set) {
+    if (!set.premium) return true;
+    return EntitlementService.instance.palettePackUnlocked(set.id);
+  }
 }

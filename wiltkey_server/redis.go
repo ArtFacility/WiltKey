@@ -58,6 +58,7 @@ type RedisClient struct {
 	memoryTunnelBytes map[string]int64
 	memoryNukes       map[string]ipFail
 	memoryPushTokens  map[string]string
+	memoryEntitlements map[string]string
 	mu                sync.RWMutex
 }
 
@@ -93,6 +94,7 @@ func NewRedisClient(addr string) (*RedisClient, error) {
 			memoryTunnelBytes: make(map[string]int64),
 			memoryNukes:       make(map[string]ipFail),
 			memoryPushTokens:  make(map[string]string),
+			memoryEntitlements: make(map[string]string),
 		}, nil
 	}
 	return &RedisClient{rdb: rdb}, nil
@@ -119,6 +121,7 @@ func (r *RedisClient) FlushAll() error {
 		r.memoryTunnels = make(map[string]string)
 		r.memoryTunnelBytes = make(map[string]int64)
 		r.memoryPushTokens = make(map[string]string)
+		r.memoryEntitlements = make(map[string]string)
 		return nil
 	}
 	return r.rdb.FlushAll(ctx).Err()
@@ -731,4 +734,36 @@ func (r *RedisClient) DeleteTunnel(pubkeyA string, pubkeyB string) error {
 	pipe.Del(ctx, fmt.Sprintf("tunnel_bytes:%s:%s", pubkeyB, pubkeyA))
 	_, err := pipe.Exec(ctx)
 	return err
+}
+
+// StoreEntitlement caches user's Google subscription key hash in Redis.
+func (r *RedisClient) StoreEntitlement(userID string, hash string, ttl time.Duration) error {
+	if r.isMemory {
+		r.mu.Lock()
+		defer r.mu.Unlock()
+		r.memoryEntitlements[userID] = hash
+		r.memoryBlocks["entitlement:"+userID] = time.Now().Add(ttl)
+		return nil
+	}
+	key := fmt.Sprintf("entitlement:%s", userID)
+	return r.rdb.Set(ctx, key, hash, ttl).Err()
+}
+
+// GetEntitlementHash retrieves the cached subscription key hash from Redis if valid.
+func (r *RedisClient) GetEntitlementHash(userID string) (string, error) {
+	if r.isMemory {
+		r.mu.RLock()
+		defer r.mu.RUnlock()
+		expiry, exists := r.memoryBlocks["entitlement:"+userID]
+		if !exists || expiry.Before(time.Now()) {
+			return "", nil
+		}
+		return r.memoryEntitlements[userID], nil
+	}
+	key := fmt.Sprintf("entitlement:%s", userID)
+	val, err := r.rdb.Get(ctx, key).Result()
+	if err == redis.Nil {
+		return "", nil
+	}
+	return val, err
 }

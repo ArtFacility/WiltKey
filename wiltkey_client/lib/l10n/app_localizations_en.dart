@@ -1323,4 +1323,200 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get wiltingHoldToSendHint => 'Hold to send a wilting message';
+
+  @override
+  String get replyYou => 'You';
+
+  @override
+  String get replySomeone => 'Someone';
+
+  @override
+  String get replyPreviewImage => '📷 Photo';
+
+  @override
+  String get replyPreviewVoice => '🎤 Voice message';
+
+  @override
+  String get replyPreviewMessage => 'Message';
+
+  @override
+  String get replyUnavailable => 'Original message unavailable';
+
+  @override
+  String get shopEntryTitle => 'Shop & WiltKey Plus';
+
+  @override
+  String get shopEntrySubtitle => 'Themes, unlocks & Plus';
+
+  @override
+  String get supportEntryTitle => 'Support the project';
+
+  @override
+  String get supportEntrySubtitle => 'Help keep WiltKey running';
+
+  @override
+  String get shopTitle => 'Shop';
+
+  @override
+  String get supportTitle => 'Support WiltKey';
+
+  @override
+  String get shopPlusSection => 'WiltKey Plus';
+
+  @override
+  String get shopUnlocksSection => 'Unlocks';
+
+  @override
+  String get shopPlusTagline =>
+      'Longer offline message hold and bigger file transfers.';
+
+  @override
+  String get shopEmptyTitle => 'Nothing here yet';
+
+  @override
+  String get shopEmptyBody => 'Products are on the way — check back soon.';
+
+  @override
+  String get shopRestoreButton => 'Restore purchases';
+
+  @override
+  String get shopRestoredSnack => 'Purchases restored';
+
+  @override
+  String get shopBuyButton => 'Buy';
+
+  @override
+  String get shopOwnedLabel => 'Owned';
+
+  @override
+  String get shopActiveLabel => 'Active';
+
+  @override
+  String get shopManageNote => 'Manage in Google Play';
+
+  @override
+  String get shopPurchasePendingSnack => 'Purchase pending…';
+
+  @override
+  String get shopPurchaseFailedSnack => 'Purchase couldn\'t be completed';
+
+  @override
+  String get supportIntro =>
+      'WiltKey is free and open source, and this build unlocks every cosmetic for free. If you\'d like to support development and the official relay, visit the page below.';
+
+  @override
+  String get supportOpenButton => 'Open support page';
+
+  @override
+  String get supportFreeNote => 'All cosmetics are unlocked in this build.';
+
+  @override
+  String get shopTabPalettes => 'Palettes';
+
+  @override
+  String get shopTabThemes => 'Themes';
+
+  @override
+  String get shopTabBorders => 'Borders';
+
+  @override
+  String get shopTabPlus => 'Plus';
+
+  @override
+  String get shopTabPromo => 'Promo';
+
+  @override
+  String get shopPalettesIntro =>
+      'Extra colours for drawing your avatar and group icons. Art you receive always renders in full — a pack only unlocks drawing with those colours yourself.';
+
+  @override
+  String shopPaletteColorCount(int count) {
+    return '$count extra colours';
+  }
+
+  @override
+  String get shopThemesEmptyTitle => 'No themes yet';
+
+  @override
+  String get shopThemesEmptyBody =>
+      'Premium themes are on the way — the three built-in themes are free forever.';
+
+  @override
+  String get shopBordersSoonTitle => 'Borders are coming';
+
+  @override
+  String get shopBordersSoonBody =>
+      'Decorative frames for your avatar that everyone you chat with can see. In the works.';
+
+  @override
+  String get shopPlusBenefitsSection => 'What you get';
+
+  @override
+  String get shopPlusBenefitHold =>
+      'Your messages wait 72 hours on the relay instead of 24 while you\'re offline.';
+
+  @override
+  String get shopPlusBenefitFiles =>
+      'Send large files — up to 50 MB per message, past the 5 MB free limit.';
+
+  @override
+  String get shopPlusBenefitSupport =>
+      'You keep the relay running and WiltKey independent.';
+
+  @override
+  String get shopSubscribeButton => 'Subscribe';
+
+  @override
+  String get shopPriceUnavailable => 'Unavailable';
+
+  @override
+  String get shopPromoIntro =>
+      'Got a promo code? Enter it below and Google Play will apply it to your account.';
+
+  @override
+  String get shopPromoHint => 'PROMO CODE';
+
+  @override
+  String get shopPromoRedeemButton => 'Redeem in Google Play';
+
+  @override
+  String get shopPromoNote =>
+      'Codes are redeemed in the Play Store. Once applied, your unlock appears here automatically.';
+
+  @override
+  String pairLargerPadsUpsell(String max) {
+    return 'Unlock larger pads — up to $max';
+  }
+
+  @override
+  String pairNotEnoughSpace(String needed, String free) {
+    return 'Not enough free space — this chat needs $needed and you have $free.';
+  }
+
+  @override
+  String pairSyncingGenerating(String written, String total) {
+    return 'Generating keystream… $written / $total';
+  }
+
+  @override
+  String get pairKeepAppOpen =>
+      'Keep the app open — the secure pad is still being created.';
+
+  @override
+  String groupLargerPadsUpsell(String max) {
+    return 'Unlock larger group pads — up to $max';
+  }
+
+  @override
+  String get settingsBorderSection => 'Avatar border';
+
+  @override
+  String get shopBordersIntro =>
+      'Frames and accessories for your avatar. Everyone you chat with sees your border — a locked one only stops you equipping it, never how it renders.';
+
+  @override
+  String get shopBorderSubtitle => 'Avatar border';
+
+  @override
+  String get shopFreeLabel => 'Free';
 }

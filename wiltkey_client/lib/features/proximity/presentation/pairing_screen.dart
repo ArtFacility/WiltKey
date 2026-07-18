@@ -5,6 +5,9 @@ import 'package:wiltkey_client/l10n/app_localizations.dart';
 import 'package:wiltkey_client/features/shell/presentation/app_shell.dart';
 import '../../../../core/state.dart';
 import '../../../../core/network/pairing_service.dart';
+import 'package:wiltkey_client/features/shop/presentation/shop_screen.dart';
+import '../../../../core/pad_tiers.dart';
+import '../../../../core/storage_space.dart';
 import '../../../../core/theme/wk.dart';
 import '../../../../core/theme/wiltkey_tokens.dart';
 import '../../../../core/theme/wiltkey_components.dart';
@@ -107,14 +110,26 @@ class _PairingScreenState extends State<PairingScreen>
     });
   }
 
-  void _showIncomingPairDialog({
+  Future<void> _showIncomingPairDialog({
     required String peerId,
     required String peerPubKey,
     required int bufferBytes,
     required String peerName,
     required String peerShortNick,
     required String peerProfileImage,
-  }) {
+  }) async {
+    // Check we can actually fit the pad BEFORE offering Accept. Generating a pad
+    // that runs out of disk fails mid-write, after the initiator has already
+    // committed — leaving a chat that exists on one side only. Fails open if the
+    // platform can't report free space.
+    final freeBytes = await WkStorageSpace.usableSpaceBytes();
+    final requiredBytes = WkStorageSpace.requiredFor(bufferBytes);
+    final enoughSpace = freeBytes == null || freeBytes >= requiredBytes;
+    // Resolved here so the dialog never has to reason about a nullable probe.
+    final freeLabel =
+        freeBytes == null ? '?' : AppState.formatBytes(freeBytes);
+    if (!mounted) return;
+
     final t = context.wk;
     final l10n = AppLocalizations.of(context)!;
     showDialog(
@@ -141,12 +156,46 @@ class _PairingScreenState extends State<PairingScreen>
               ),
             ],
           ),
-          content: Text(
-            l10n.pairRequestDialogBody(
-              peerName,
-              AppState.formatBytes(bufferBytes),
-            ),
-            style: t.bodySecondary,
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                l10n.pairRequestDialogBody(
+                  peerName,
+                  AppState.formatBytes(bufferBytes),
+                ),
+                style: t.bodySecondary,
+              ),
+              if (!enoughSpace) ...[
+                const SizedBox(height: 14),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: t.bg,
+                    border: Border.all(color: t.danger),
+                    borderRadius: BorderRadius.circular(t.radiusControl),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.sd_card_alert_outlined,
+                          color: t.danger, size: 16),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          l10n.pairNotEnoughSpace(
+                            AppState.formatBytes(requiredBytes),
+                            freeLabel,
+                          ),
+                          style: t.bodySecondary.copyWith(color: t.danger),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
           ),
           actions: [
             TextButton(
@@ -168,27 +217,54 @@ class _PairingScreenState extends State<PairingScreen>
               ),
             ),
             TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-                _manager.respondToPairRequest(
-                  peerId,
-                  peerPubKey,
-                  bufferBytes,
-                  true,
-                  peerName,
-                  peerShortNick,
-                  peerProfileImage,
-                );
-              },
+              // Disabled when the pad can't fit — accepting would fail mid-write
+              // and strand the initiator with a one-sided chat.
+              onPressed: !enoughSpace
+                  ? null
+                  : () {
+                      Navigator.pop(context);
+                      _manager.respondToPairRequest(
+                        peerId,
+                        peerPubKey,
+                        bufferBytes,
+                        true,
+                        peerName,
+                        peerShortNick,
+                        peerProfileImage,
+                      );
+                    },
               child: Text(
                 l10n.pairRequestAccept,
-                style: TextStyle(color: t.action),
+                style: TextStyle(
+                  color: enoughSpace ? t.action : t.textTertiary,
+                ),
               ),
             ),
           ],
         );
       },
     );
+  }
+
+  /// Initiator-side guard: refuse to start a sync we can't store. The responder
+  /// runs the same check before its Accept lights up, so neither side can commit
+  /// to a pad that won't fit.
+  Future<void> _startSyncChecked() async {
+    final padBytes = WkPadTiers.bytesAt(_manager.sliderValue.round());
+    final freeBytes = await WkStorageSpace.usableSpaceBytes();
+    if (!mounted) return;
+    if (freeBytes != null &&
+        freeBytes < WkStorageSpace.requiredFor(padBytes)) {
+      final l10n = AppLocalizations.of(context)!;
+      _showErrorSnackBar(
+        l10n.pairNotEnoughSpace(
+          AppState.formatBytes(WkStorageSpace.requiredFor(padBytes)),
+          AppState.formatBytes(freeBytes),
+        ),
+      );
+      return;
+    }
+    _manager.startSyncProcess(_relayController.text.trim());
   }
 
   void _showErrorSnackBar(String message) {
@@ -621,11 +697,17 @@ class _PairingScreenState extends State<PairingScreen>
           ChargeSlider(
             value: _manager.sliderValue,
             onChanged: (val) => _manager.updateSlider(val),
+            onLockedTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const ShopScreen(initialTab: ShopTab.plus),
+              ),
+            ),
           ),
           const SizedBox(height: 20),
           ElevatedButton.icon(
             onPressed: _manager.selectedDevice != null
-                ? () => _manager.startSyncProcess(_relayController.text.trim())
+                ? () => _startSyncChecked()
                 : null,
             icon: const Icon(Icons.sync_lock, size: 16),
             label: Text(l10n.pairDirectSyncFormSyncButton),
@@ -803,7 +885,12 @@ class _PairingScreenState extends State<PairingScreen>
           ),
           const SizedBox(height: 12),
           Text(
-            _localizeSyncStep(_manager.syncStepText, l10n),
+            _manager.isGeneratingPad
+                ? l10n.pairSyncingGenerating(
+                    AppState.formatBytes(_manager.padWrittenBytes),
+                    AppState.formatBytes(_manager.padTotalBytes),
+                  )
+                : _localizeSyncStep(_manager.syncStepText, l10n),
             textAlign: TextAlign.center,
             style: t.dataMono.copyWith(color: t.textSecondary),
           ),
@@ -819,6 +906,22 @@ class _PairingScreenState extends State<PairingScreen>
               ),
             ),
           ),
+          if (_manager.isGeneratingPad) ...[
+            const SizedBox(height: 14),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.warning_amber_rounded, color: t.warning, size: 15),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    l10n.pairKeepAppOpen,
+                    style: t.bodySecondary.copyWith(color: t.warning),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );

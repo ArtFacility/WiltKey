@@ -40,6 +40,10 @@ class Contact {
   // Profile metadata sync
   String? shortNick;
   String? profileImageB64; // Stored as a 100-character hex matrix for pixel art
+  // The peer's equipped avatar border id (see WkAvatarBorderRegistry), synced
+  // over the 1-on-1 metadata channel like the avatar/nick. Cosmetic broadcast
+  // art — always renders for everyone; null/'none' = no border.
+  String? avatarBorderId;
 
   // OTP partition offsets
   int outgoingOffset;
@@ -73,6 +77,7 @@ class Contact {
     this.joinedAt,
     this.shortNick,
     this.profileImageB64,
+    this.avatarBorderId,
     this.outgoingOffset = 0,
     this.outgoingMaxOffset = 0,
     this.incomingOffset = 0,
@@ -110,6 +115,7 @@ class Contact {
     DateTime? joinedAt,
     String? shortNick,
     String? profileImageB64,
+    String? avatarBorderId,
     int? outgoingOffset,
     int? outgoingMaxOffset,
     int? incomingOffset,
@@ -147,6 +153,7 @@ class Contact {
       joinedAt: joinedAt ?? this.joinedAt,
       shortNick: shortNick ?? this.shortNick,
       profileImageB64: profileImageB64 ?? this.profileImageB64,
+      avatarBorderId: avatarBorderId ?? this.avatarBorderId,
       outgoingOffset: outgoingOffset ?? this.outgoingOffset,
       outgoingMaxOffset: outgoingMaxOffset ?? this.outgoingMaxOffset,
       incomingOffset: incomingOffset ?? this.incomingOffset,
@@ -197,6 +204,7 @@ class Contact {
     'joinedAt': joinedAt?.toIso8601String(),
     'shortNick': shortNick,
     'profileImageB64': profileImageB64,
+    'avatarBorderId': avatarBorderId,
     'outgoingOffset': outgoingOffset,
     'outgoingMaxOffset': outgoingMaxOffset,
     'incomingOffset': incomingOffset,
@@ -241,6 +249,7 @@ class Contact {
           : null,
       shortNick: json['shortNick'] as String?,
       profileImageB64: json['profileImageB64'] as String?,
+      avatarBorderId: json['avatarBorderId'] as String?,
       outgoingOffset: json['outgoingOffset'] as int? ?? 0,
       outgoingMaxOffset: json['outgoingMaxOffset'] as int? ?? maxBuffer ~/ 2,
       incomingOffset: json['incomingOffset'] as int? ?? maxBuffer ~/ 2,
@@ -275,6 +284,12 @@ class ChatMessage {
   // rendering stays backward compatible. Absent on legacy/older-peer images →
   // defaults false (treat as non-downloadable).
   final bool allowSave;
+  // Reply target: the (cross-peer-stable) id of the message this one quotes, or
+  // null for a normal message. Immutable content metadata — rides the message
+  // envelope as `re` (like `dl`/`eph`), threaded through send/inbound/resync/DB.
+  // The quoted preview is rendered from the locally-stored parent, so only the id
+  // travels. See [MessageBubble] reply rendering.
+  final String? replyToId;
   // In-memory decoded voice payload (VoiceHeader + container'd audio), set when a
   // 'voice' message is sent or its ciphertext is decrypted. Never persisted (the
   // DB keeps the base64 ciphertext in `text`, like images).
@@ -319,6 +334,7 @@ class ChatMessage {
     this.isPending = false,
     this.decodedImageBytes,
     this.allowSave = false,
+    this.replyToId,
     this.decodedAudioBytes,
     this.decryptedText,
     Map<String, Set<String>>? reactions,
@@ -336,6 +352,26 @@ class ChatMessage {
       text.startsWith('Connected. Chat session secure.');
 
   bool get hasReactions => reactions.isNotEmpty;
+
+  /// Reply framing lives in the OTP-encrypted body (never the relay-visible
+  /// envelope), so the reply relationship never leaves the pad — at the cost of a
+  /// few extra pad bytes. A reply body is `<DELIM><parentId><DELIM><text>`; a normal
+  /// body is unchanged. The delimiter is the SOH control byte (U+0001), which never
+  /// occurs in real text or base64 image/voice payloads.
+  static final String _replyDelim = String.fromCharCode(1);
+
+  static String buildReplyBody(String? replyToId, String text) => replyToId == null
+      ? text
+      : '$_replyDelim$replyToId$_replyDelim$text';
+
+  /// Inverse of [buildReplyBody]: returns (parentId, strippedText), or (null, body)
+  /// when there's no reply header.
+  static (String?, String) parseReplyBody(String body) {
+    if (body.isEmpty || body.codeUnitAt(0) != 1) return (null, body);
+    final end = body.indexOf(_replyDelim, 1);
+    if (end < 1) return (null, body);
+    return (body.substring(1, end), body.substring(end + 1));
+  }
 
   /// A live wilting message (ephemeral and not yet destroyed).
   bool get isWilting => ephemeral && !wilted;
@@ -393,6 +429,7 @@ class ChatMessage {
     'offset': offset,
     'isDelivered': isDelivered,
     if (allowSave) 'allowSave': allowSave,
+    if (replyToId != null) 'replyToId': replyToId,
     if (reactions.isNotEmpty)
       'reactions': reactions.map((k, v) => MapEntry(k, v.toList())),
     if (ephemeral) 'ephemeral': true,
@@ -423,6 +460,7 @@ class ChatMessage {
       offset: offset,
       isDelivered: json['isDelivered'] as bool? ?? false,
       allowSave: json['allowSave'] as bool? ?? false,
+      replyToId: json['replyToId'] as String?,
       decryptedText: isSystem ? text : null,
       reactions: (json['reactions'] as Map<String, dynamic>?)?.map(
         (k, v) => MapEntry(k, {...(v as List).map((e) => e.toString())}),

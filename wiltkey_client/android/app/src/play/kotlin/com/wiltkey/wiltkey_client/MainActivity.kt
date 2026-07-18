@@ -22,6 +22,10 @@ class MainActivity : SecureFlutterActivity() {
     // Set from the launch/tap intent extra; consumed once by takePendingChat.
     private var pendingChat: String? = null
 
+    // Google Play Billing bridge (wiltkey/billing). Play-flavor only; the FOSS
+    // MainActivity has no equivalent and the FOSS Dart side no-ops.
+    private var billingBridge: BillingBridge? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         capturePendingChat(intent)
@@ -40,6 +44,10 @@ class MainActivity : SecureFlutterActivity() {
 
     override fun configureFlutterEngine(@NonNull flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+
+        // Stand up the Play Billing bridge (wiltkey/billing) alongside the push channel.
+        billingBridge = BillingBridge(this, flutterEngine.dartExecutor.binaryMessenger)
+
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "wiltkey/push")
             .setMethodCallHandler { call, result ->
                 when (call.method) {
@@ -65,5 +73,11 @@ class MainActivity : SecureFlutterActivity() {
                     else -> result.notImplemented()
                 }
             }
+    }
+
+    override fun onDestroy() {
+        billingBridge?.dispose()
+        billingBridge = null
+        super.onDestroy()
     }
 }

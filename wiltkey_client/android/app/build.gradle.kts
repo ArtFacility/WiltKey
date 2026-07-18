@@ -114,6 +114,12 @@ dependencies {
     // service + push MethodChannel live under src/play/ to match.
     "playImplementation"(platform("com.google.firebase:firebase-bom:33.5.1"))
     "playImplementation"("com.google.firebase:firebase-messaging")
+
+    // Google Play Billing — PLAY flavor ONLY (flavor-scoped `playImplementation`),
+    // so the FOSS build never links Google Billing and stays Play-Services-free.
+    // The native billing bridge + the `wiltkey/billing` MethodChannel live under
+    // src/play/ to match (see BillingBridge.kt); the FOSS Dart side no-ops.
+    "playImplementation"("com.android.billingclient:billing-ktx:7.1.1")
 }
 
 // Apply the Google Services plugin ONLY when building the Play flavor. It requires

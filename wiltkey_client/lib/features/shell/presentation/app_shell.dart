@@ -392,7 +392,11 @@ class _MessageBannerHostState extends State<_MessageBannerHost>
                 ),
                 child: Row(
                   children: [
-                    PixelArtAvatar(hexString: _avatarHex(c), size: 38),
+                    PixelArtAvatar(
+                      hexString: _avatarHex(c),
+                      size: 38,
+                      borderId: c.avatarBorderId,
+                    ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(

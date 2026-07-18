@@ -23,7 +23,7 @@ class WiltkeyDatabase {
     final path = p.join(dbPath, 'wiltkey.db');
     _db = await openDatabase(
       path,
-      version: 8,
+      version: 11,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -91,6 +91,25 @@ class WiltkeyDatabase {
       );
       await db.execute('ALTER TABLE messages ADD COLUMN wilted_by TEXT');
     }
+    // v9: reply-to. Optional id of the message this one quotes. Immutable content
+    // metadata that rides the message envelope (`re`), threaded through
+    // send/inbound/resync like `allow_save`. Legacy rows default null (not a reply).
+    if (oldVersion < 9) {
+      await db.execute('ALTER TABLE messages ADD COLUMN reply_to_id TEXT');
+    }
+    // v10: a peer's equipped avatar border id, synced over the 1-on-1 metadata
+    // channel alongside their avatar/nick. Legacy rows default null (no border).
+    if (oldVersion < 10) {
+      await db.execute('ALTER TABLE contacts ADD COLUMN avatar_border TEXT');
+    }
+    // v11: a group member's equipped avatar border id, synced over the
+    // full-mesh group_member_profile channel alongside their avatar/nick.
+    // Legacy rows default null (no border).
+    if (oldVersion < 11) {
+      await db.execute(
+        'ALTER TABLE group_profiles ADD COLUMN avatar_border TEXT',
+      );
+    }
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -136,6 +155,7 @@ class WiltkeyDatabase {
         profile_image TEXT,
         arrival_order INTEGER,
         permissions TEXT DEFAULT '',
+        avatar_border TEXT,
         UNIQUE(group_id, member_key_hash),
         FOREIGN KEY (group_id) REFERENCES group_info(group_id) ON DELETE CASCADE
       )
@@ -169,6 +189,7 @@ class WiltkeyDatabase {
         joined_at TEXT,
         short_nick TEXT,
         profile_image_b64 TEXT,
+        avatar_border TEXT,
         outgoing_offset INTEGER,
         outgoing_max_offset INTEGER,
         incoming_offset INTEGER,
@@ -202,7 +223,8 @@ class WiltkeyDatabase {
         opened_at INTEGER,
         expires_at INTEGER,
         wilted INTEGER DEFAULT 0,
-        wilted_by TEXT
+        wilted_by TEXT,
+        reply_to_id TEXT
       )
     ''');
     // Speeds windowed paging (chat_id + timestamp ORDER/LIMIT) and unread counts.
@@ -245,6 +267,7 @@ class WiltkeyDatabase {
       'joined_at': contact.joinedAt?.toIso8601String(),
       'short_nick': contact.shortNick,
       'profile_image_b64': contact.profileImageB64,
+      'avatar_border': contact.avatarBorderId,
       'outgoing_offset': contact.outgoingOffset,
       'outgoing_max_offset': contact.outgoingMaxOffset,
       'incoming_offset': contact.incomingOffset,
@@ -293,6 +316,7 @@ class WiltkeyDatabase {
             : null,
         shortNick: row['short_nick'] as String?,
         profileImageB64: row['profile_image_b64'] as String?,
+        avatarBorderId: row['avatar_border'] as String?,
         outgoingOffset: row['outgoing_offset'] as int? ?? 0,
         outgoingMaxOffset: row['outgoing_max_offset'] as int? ?? 0,
         incomingOffset: row['incoming_offset'] as int? ?? 0,
@@ -397,6 +421,7 @@ class WiltkeyDatabase {
       'expires_at': msg.expiresAt,
       'wilted': wilted ? 1 : 0,
       'wilted_by': wiltedByJson,
+      'reply_to_id': msg.replyToId,
     }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
@@ -604,6 +629,7 @@ class WiltkeyDatabase {
       expiresAt: row['expires_at'] as int?,
       wilted: wilted,
       wiltedBy: _decodeWiltedBy(row['wilted_by'] as String?),
+      replyToId: row['reply_to_id'] as String?,
     );
   }
 
@@ -1011,14 +1037,26 @@ class WiltkeyDatabase {
     required String name,
     required String profileImage,
     required int arrivalOrder,
+    String? avatarBorder,
   }) async {
     final db = await _database;
+    // avatar_border is known only to the member themselves (it rides the
+    // group_member_profile channel), so authoritative writers — lane-header
+    // parses and the host's group_info_update — pass null. This is a full-row
+    // ConflictAlgorithm.replace, so preserve any already-known border instead
+    // of letting those writers blank it.
+    String? border = avatarBorder;
+    if (border == null) {
+      final existing = await getProfile(groupId, memberKeyHash);
+      border = existing?['avatar_border'] as String?;
+    }
     await db.insert('group_profiles', {
       'group_id': groupId,
       'member_key_hash': memberKeyHash,
       'name': name,
       'profile_image': profileImage,
       'arrival_order': arrivalOrder,
+      'avatar_border': border,
     }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 

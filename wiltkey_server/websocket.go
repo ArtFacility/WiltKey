@@ -1,11 +1,14 @@
 package main
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"io"
 	"log"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -82,27 +85,92 @@ func (h *Hub) Run() {
 }
 
 func (h *Hub) deliverOfflineQueue(client *Client) {
+	// 1. Deliver from Redis
 	messages, err := h.rdb.FetchAndClearQueue(client.id)
 	if err != nil {
-		log.Printf("Error fetching offline queue for %s: %v", client.id, err)
+		log.Printf("Error fetching offline queue from Redis for %s: %v", client.id, err)
+	}
+	if len(messages) > 0 {
+		log.Printf("Delivering %d offline messages from Redis to %s", len(messages), client.id)
+		for _, msg := range messages {
+			senderID := msg["sender_id"]
+			envelope := msg["envelope"]
+			contentType := msg["content_type"]
+
+			client.SendJSON(WSMessage{
+				Type:        "NEW_MESSAGE",
+				SenderID:    senderID,
+				Envelope:    envelope,
+				ContentType: contentType,
+			})
+		}
+	}
+
+	// 2. Deliver from Postgres
+	if pg == nil {
 		return
 	}
-	if len(messages) == 0 {
+	pgMsgs, err := pg.GetPendingMessages(client.id)
+	if err != nil {
+		log.Printf("Error fetching offline messages from Postgres for %s: %v", client.id, err)
 		return
 	}
 
-	log.Printf("Delivering %d offline messages to %s", len(messages), client.id)
-	for _, msg := range messages {
-		senderID := msg["sender_id"]
-		envelope := msg["envelope"]
-		contentType := msg["content_type"]
+	if len(pgMsgs) > 0 {
+		log.Printf("Delivering %d offline messages from Postgres to %s", len(pgMsgs), client.id)
+		for _, msg := range pgMsgs {
+			var envelope string
+			if msg.Envelope != nil {
+				// Inline message
+				envelope = *msg.Envelope
+			} else if msg.BucketURL != nil {
+				// Storage bucket message -> download it
+				var key string
+				rawURL := *msg.BucketURL
+				if strings.HasPrefix(rawURL, "local://") {
+					key = strings.TrimPrefix(rawURL, "local://")
+				} else {
+					parts := strings.Split(rawURL, "/")
+					if len(parts) > 0 {
+						key = parts[len(parts)-1]
+					}
+				}
 
-		client.SendJSON(WSMessage{
-			Type:        "NEW_MESSAGE",
-			SenderID:    senderID,
-			Envelope:    envelope,
-			ContentType: contentType,
-		})
+				if key != "" {
+					reader, err := storage.Download(context.Background(), key)
+					if err != nil {
+						log.Printf("Error downloading object %s from storage: %v", key, err)
+						continue
+					}
+					contentBytes, err := io.ReadAll(reader)
+					reader.Close()
+					if err != nil {
+						log.Printf("Error reading downloaded object %s: %v", key, err)
+						continue
+					}
+					envelope = string(contentBytes)
+				}
+			}
+
+			var msgID string
+			if msg.BucketURL != nil {
+				msgID = msg.ID
+			}
+
+			client.SendJSON(WSMessage{
+				Type:        "NEW_MESSAGE",
+				SenderID:    msg.SenderID,
+				Envelope:    envelope,
+				ContentType: msg.ContentType,
+				MessageID:   msgID,
+			})
+		}
+
+		// Delete inline messages from Postgres immediately (bucket files stay until ACK)
+		err = pg.DeleteInlineMessages(client.id)
+		if err != nil {
+			log.Printf("Failed to delete delivered inline Postgres messages for %s: %v", client.id, err)
+		}
 	}
 }
 
@@ -153,6 +221,7 @@ type WSMessage struct {
 	Message         string            `json:"message,omitempty"`
 	NukeEnvelope    string            `json:"nuke_envelope,omitempty"`
 	EphemeralPubkey string            `json:"ephemeral_pubkey,omitempty"`
+	MessageID       string            `json:"message_id,omitempty"`
 }
 
 // readPump pumps messages from the websocket connection to the hub.
@@ -257,6 +326,8 @@ func (c *Client) handleWSMessage(msg WSMessage) {
 		c.handleNukeRecipient(msg)
 	case "ACK_NUKE":
 		c.handleAckNuke(msg)
+	case "FILE_RECEIVED":
+		c.handleFileReceived(msg)
 	default:
 		log.Printf("[WebSocket] Unhandled message type: %s", msg.Type)
 	}

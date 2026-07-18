@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'themes/cyberpunk_theme.dart';
 import 'themes/garden_theme.dart';
 import 'themes/paperink_theme.dart';
+import 'premium/premium_themes.dart';
+import '../build_flavor.dart';
+import '../entitlements/product_ids.dart';
 import 'package:wiltkey_client/l10n/app_localizations.dart';
 
 /// Describes one selectable theme. Everything the picker and controller need
@@ -24,6 +27,13 @@ class WiltkeyThemeDescriptor {
 
   final ThemeData Function() build;
 
+  /// True for a paid theme. Premium themes are only ever listed on the official
+  /// Play build (see [WiltkeyThemeRegistry.all]); the picker shows them with a
+  /// lock until [EntitlementService.premiumThemeUnlocked] says otherwise. A theme
+  /// is purely local UI — it never crosses the wire — so this gates *selecting*
+  /// it, nothing about how anyone's messages render.
+  final bool premium;
+
   const WiltkeyThemeDescriptor({
     required this.id,
     required this.displayName,
@@ -31,7 +41,11 @@ class WiltkeyThemeDescriptor {
     required this.previewSwatchA,
     required this.previewSwatchB,
     required this.build,
+    this.premium = false,
   });
+
+  /// The Play product id that unlocks this theme (premium themes only).
+  String get sku => WkProducts.premiumTheme(id);
 }
 
 class WiltkeyThemeRegistry {
@@ -67,8 +81,22 @@ class WiltkeyThemeRegistry {
     build: buildPaperinkTheme,
   );
 
-  /// All selectable themes, in display order.
-  static const List<WiltkeyThemeDescriptor> all = [cyberpunk, garden, paperink];
+  /// All selectable themes, in display order. Premium themes are appended only on
+  /// the official Play build ([kPlayStore]); the FOSS build and any public fork see
+  /// just the three base themes (premium source isn't in the public repo). Whether a
+  /// listed premium theme is *usable* is a separate entitlement check (see the
+  /// theme picker + EntitlementService) — a theme still renders locally regardless.
+  static final List<WiltkeyThemeDescriptor> all = [
+    cyberpunk,
+    garden,
+    paperink,
+    if (kPlayStore) ...premiumThemes(),
+  ];
+
+  /// Every listed premium theme (empty on FOSS and on any public fork, where the
+  /// premium source isn't present). Drives the Shop's Themes tab.
+  static List<WiltkeyThemeDescriptor> get premium =>
+      all.where((t) => t.premium).toList(growable: false);
 
   static WiltkeyThemeDescriptor byId(String? id) {
     return all.firstWhere((t) => t.id == id, orElse: () => cyberpunk);

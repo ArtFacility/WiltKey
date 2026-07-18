@@ -1,8 +1,12 @@
 package main
 
 import (
+	"context"
 	"log"
+	"strings"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 // handleSendMessage routes a standard encrypted 1-on-1 message.
@@ -27,6 +31,91 @@ func (c *Client) handleSendMessage(msg WSMessage) {
 		return
 	}
 
+	payloadSize := int64(len(msg.Envelope))
+
+	// 0. Hard size ceiling — reject oversized payloads outright (storage/DoS guard).
+	if payloadSize > plusMaxPayload {
+		c.SendJSON(WSMessage{Type: "ERROR", Message: "Payload exceeds the 50MB maximum"})
+		return
+	}
+
+	// 1. Google subscriptions check for >= 5MB payloads (sender must be premium).
+	if payloadSize >= freeMaxPayload {
+		hasSub, err := checkPremiumSubscription(c.id)
+		if err != nil || !hasSub {
+			c.SendJSON(WSMessage{Type: "ERROR", Message: "Payload >= 5MB requires an active premium subscription"})
+			return
+		}
+	}
+
+	// Offline-hold TTL is keyed on the recipient's own subscription.
+	holdTTL := holdTTLForRecipient(msg.RecipientID)
+
+	// 2. Large file routing (>= 500KB) -> storage bucket + Postgres
+	if payloadSize >= 500*1024 {
+		if pg == nil {
+			c.SendJSON(WSMessage{Type: "ERROR", Message: "Postgres and storage must be configured to process large payloads"})
+			return
+		}
+		storageKey := uuid.New().String()
+		bucketURL, err := storage.Upload(context.Background(), storageKey, strings.NewReader(msg.Envelope), payloadSize, "application/octet-stream")
+		if err != nil {
+			log.Printf("Failed to upload payload to storage: %v", err)
+			c.SendJSON(WSMessage{Type: "ERROR", Message: "Failed to upload large file to storage"})
+			return
+		}
+
+		// Store link in postgres
+		messageID, err := pg.StoreMessage(msg.RecipientID, c.id, nil, &bucketURL, msg.ContentType, holdTTL)
+		if err != nil {
+			storage.Delete(context.Background(), storageKey) // rollback storage
+			log.Printf("Failed to store message metadata in Postgres: %v", err)
+			c.SendJSON(WSMessage{Type: "ERROR", Message: "Failed to store message metadata in database"})
+			return
+		}
+
+		// Deliver directly if online
+		target, ok := c.hub.getClient(msg.RecipientID)
+		if ok {
+			target.SendJSON(WSMessage{
+				Type:        "NEW_MESSAGE",
+				SenderID:    c.id,
+				Envelope:    msg.Envelope,
+				ContentType: msg.ContentType,
+				MessageID:   messageID,
+			})
+		} else {
+			go c.hub.sendWakePush(msg.RecipientID, c.id, msg.ContentType)
+		}
+		return
+	}
+
+	// 3. High RAM check -> Postgres inline (under 500KB)
+	if pg != nil && isHighRAMLoad() {
+		messageID, err := pg.StoreMessage(msg.RecipientID, c.id, &msg.Envelope, nil, msg.ContentType, holdTTL)
+		if err != nil {
+			log.Printf("Failed to store message in Postgres under high memory: %v", err)
+			c.SendJSON(WSMessage{Type: "ERROR", Message: "Failed to store message in database"})
+			return
+		}
+
+		target, ok := c.hub.getClient(msg.RecipientID)
+		if ok {
+			target.SendJSON(WSMessage{
+				Type:        "NEW_MESSAGE",
+				SenderID:    c.id,
+				Envelope:    msg.Envelope,
+				ContentType: msg.ContentType,
+			})
+			// Delete inline message immediately from DB once sent
+			pg.DeleteMessage(messageID)
+		} else {
+			go c.hub.sendWakePush(msg.RecipientID, c.id, msg.ContentType)
+		}
+		return
+	}
+
+	// 4. Normal routing (under 500KB, normal RAM) -> Redis
 	target, ok := c.hub.getClient(msg.RecipientID)
 	if ok {
 		log.Printf("[Relay] Routing message directly to online client %s", msg.RecipientID)
@@ -37,16 +126,13 @@ func (c *Client) handleSendMessage(msg WSMessage) {
 			ContentType: msg.ContentType,
 		})
 	} else {
-		log.Printf("[Relay] Client %s offline. Queuing message in Redis with 24h TTL.", msg.RecipientID)
-		err := c.hub.rdb.AddMessageToQueue(msg.RecipientID, c.id, msg.Envelope, msg.ContentType, 24*time.Hour)
+		log.Printf("[Relay] Client %s offline. Queuing message in Redis with %s TTL.", msg.RecipientID, holdTTL)
+		err := c.hub.rdb.AddMessageToQueue(msg.RecipientID, c.id, msg.Envelope, msg.ContentType, holdTTL)
 		if err != nil {
 			log.Printf("[Relay Error] Failed to queue offline message for %s in Redis: %v", msg.RecipientID, err)
 			c.SendJSON(WSMessage{Type: "ERROR", Message: "Failed to queue message offline"})
 			return
 		}
-		// Recipient is offline: if they run the Play flavor and registered an FCM
-		// token, fire a content-free wake-up ping so their app surfaces the alert
-		// without holding a background socket. Best-effort, off the critical path.
 		go c.hub.sendWakePush(msg.RecipientID, c.id, msg.ContentType)
 	}
 }
@@ -119,6 +205,74 @@ func (c *Client) handleAckNuke(msg WSMessage) {
 		c.SendJSON(WSMessage{Type: "ERROR", Message: "Failed to unblock queue"})
 	} else {
 		c.SendJSON(WSMessage{Type: "STATUS", Message: "Queue unblocked successfully"})
+	}
+}
+
+// handleFileReceived processes WebSocket file acknowledgment signals from clients.
+func (c *Client) handleFileReceived(msg WSMessage) {
+	if msg.MessageID == "" {
+		log.Println("[Relay Warning] FILE_RECEIVED frame missing message_id")
+		return
+	}
+
+	if pg == nil {
+		log.Println("[Relay Error] Postgres client is nil on handleFileReceived")
+		return
+	}
+
+	// Fetch message from Postgres to verify ownership
+	rows, err := pg.db.Query("SELECT id, recipient_id, bucket_url FROM messages WHERE id = $1", msg.MessageID)
+	if err != nil {
+		log.Printf("[Relay Error] Database error checking message ownership: %v", err)
+		return
+	}
+	defer rows.Close()
+
+	if !rows.Next() {
+		log.Printf("[Relay Warning] Message ID %s not found in Postgres for deletion", msg.MessageID)
+		return
+	}
+
+	var id, recipientID, bucketURL string
+	if err := rows.Scan(&id, &recipientID, &bucketURL); err != nil {
+		log.Printf("[Relay Error] Error scanning message fields: %v", err)
+		return
+	}
+
+	// Safety check: ensure current client is the recipient of the file
+	if recipientID != c.id {
+		log.Printf("[Relay Warning] Client %s unauthorized to acknowledge message %s (recipient is %s)", c.id, id, recipientID)
+		c.SendJSON(WSMessage{Type: "ERROR", Message: "Unauthorized to acknowledge this file"})
+		return
+	}
+
+	// Extract key from bucketURL
+	var key string
+	if strings.HasPrefix(bucketURL, "local://") {
+		key = strings.TrimPrefix(bucketURL, "local://")
+	} else {
+		parts := strings.Split(bucketURL, "/")
+		if len(parts) > 0 {
+			key = parts[len(parts)-1]
+		}
+	}
+
+	// Delete from storage
+	if key != "" {
+		err = storage.Delete(context.Background(), key)
+		if err != nil {
+			log.Printf("[Storage Error] Failed to delete object %s: %v", key, err)
+		} else {
+			log.Printf("[Storage] Deleted object %s successfully", key)
+		}
+	}
+
+	// Delete from Postgres
+	err = pg.DeleteMessage(id)
+	if err != nil {
+		log.Printf("[Relay Error] Failed to delete Postgres message %s: %v", id, err)
+	} else {
+		log.Printf("[Relay] File message %s successfully acknowledged and cleared from database", id)
 	}
 }
 

@@ -6,12 +6,14 @@ import '../../../../core/state.dart';
 import '../../../../core/models.dart';
 import '../../../../core/custom_emoji.dart';
 import '../../../../core/pixel_art_avatar.dart';
+import '../../../../core/cosmetics/avatar_border_controller.dart';
 import '../../../../core/theme/wk.dart';
 import '../../../../core/theme/wiltkey_tokens.dart';
 import 'package:wiltkey_client/l10n/app_localizations.dart';
 import 'voice_message_player.dart';
 import 'reactions.dart';
 import 'image_viewer.dart';
+import 'reply_preview.dart';
 
 class MessageBubble extends StatelessWidget {
   final ChatMessage message;
@@ -128,6 +130,8 @@ class MessageBubble extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          buildReplyQuoteFor(context, appState, contact, message) ??
+              const SizedBox.shrink(),
           _buildMessageContent(context),
           const SizedBox(height: 4),
           message.isPending
@@ -221,6 +225,7 @@ class MessageBubble extends StatelessWidget {
                       ? contact.profileImageB64!
                       : PixelArtAvatar.generateIdenticon(contact.keyHash),
                   size: 28,
+                  borderId: contact.avatarBorderId,
                 )
               : const SizedBox(width: 28),
           const SizedBox(width: 8),
@@ -259,6 +264,7 @@ class MessageBubble extends StatelessWidget {
                       ? appState.profileImageB64
                       : PixelArtAvatar.generateIdenticon(appState.userId),
                   size: 28,
+                  borderId: AvatarBorderController.instance.borderId,
                 )
               : const SizedBox(width: 28),
         ],

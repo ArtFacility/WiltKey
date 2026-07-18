@@ -21,6 +21,8 @@ import 'build_flavor.dart';
 import 'notifications/notification_service.dart';
 import 'notifications/pending_inbox.dart';
 import 'notifications/push_channel.dart';
+import 'entitlements/entitlement_service.dart';
+import 'cosmetics/avatar_border_controller.dart';
 
 part 'state_auth.dart';
 part 'state_chats.dart';
@@ -31,6 +33,7 @@ part 'state_lifecycle.dart';
 part 'state_inbound.dart';
 part 'state_groups.dart';
 part 'state_push.dart';
+part 'state_entitlement.dart';
 part 'state_reactions.dart';
 part 'state_screenshot.dart';
 part 'state_wilting.dart';
@@ -238,6 +241,26 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     messages[chatId] = [...(messages[chatId] ?? []), msg];
   }
 
+  /// Best display name for the author of [msg] in [contact]'s chat, used by reply
+  /// quotes. Null when unresolvable (caller falls back). Not for the local user —
+  /// callers handle `isSentByMe` themselves.
+  String? peerNameForMessage(Contact contact, ChatMessage msg) {
+    if (!contact.isGroup) return contact.name;
+    final name = groupProfilesCache[contact.id]?[msg.senderId]?['name'];
+    return (name != null && name.isNotEmpty) ? name : null;
+  }
+
+  /// The loaded copy of a message by id in [chatId] (for resolving a reply's
+  /// quoted parent). Null if it isn't in the in-memory window.
+  ChatMessage? loadedMessageById(String chatId, String id) {
+    final list = messages[chatId];
+    if (list == null) return null;
+    for (final m in list) {
+      if (m.id == id) return m;
+    }
+    return null;
+  }
+
   String get activeRelayUrl =>
       useLocalDevRelay ? localDevRelayUrl : productionRelayUrl;
 
@@ -327,6 +350,9 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
         // Play flavor: (re)assert our FCM wake-up token now that we have a live,
         // authenticated link (also covers token rotation after a reconnect).
         refreshPushRegistration();
+        // Play flavor: tell the relay we're a Plus subscriber (grants the 72h hold
+        // + large-file transfers). Cheap no-op when not subscribed / on FOSS.
+        syncPlusEntitlement();
       }
       notifyListeners();
     };
@@ -463,6 +489,11 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     } else if (lifecycleState == AppLifecycleState.resumed) {
       // We own the socket again — stand down any background workers.
       WiltkeyNotifications.onAppForegrounded();
+      // Re-check Play entitlements on resume (a purchase/renewal may have
+      // happened while backgrounded, e.g. via the Play Store app). No-op on FOSS.
+      // Re-sync to the relay afterwards in case Plus was just acquired while the
+      // socket stayed live (the on-connect sync wouldn't have re-fired).
+      EntitlementService.instance.refresh().then((_) => syncPlusEntitlement());
       // If we're back in the foreground and still unlocked, make sure the socket
       // is live again immediately (don't wait for the next watchdog tick).
       if (!isLocked && masterKeyHex != null) {

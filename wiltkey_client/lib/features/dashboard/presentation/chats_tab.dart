@@ -500,7 +500,11 @@ class _ContactRow extends StatelessWidget {
         ),
         child: Row(
           children: [
-            PixelArtAvatar(hexString: _avatarHex(c), size: 44),
+            PixelArtAvatar(
+              hexString: _avatarHex(c),
+              size: 44,
+              borderId: c.avatarBorderId,
+            ),
             const SizedBox(width: 13),
             Expanded(
               child: Column(

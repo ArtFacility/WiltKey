@@ -1343,4 +1343,201 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get wiltingHoldToSendHint =>
       'Maintenez pour envoyer un message éphémère';
+
+  @override
+  String get replyYou => 'Vous';
+
+  @override
+  String get replySomeone => 'Quelqu\'un';
+
+  @override
+  String get replyPreviewImage => '📷 Photo';
+
+  @override
+  String get replyPreviewVoice => '🎤 Message vocal';
+
+  @override
+  String get replyPreviewMessage => 'Message';
+
+  @override
+  String get replyUnavailable => 'Message d\'origine indisponible';
+
+  @override
+  String get shopEntryTitle => 'Boutique & WiltKey Plus';
+
+  @override
+  String get shopEntrySubtitle => 'Thèmes, contenus & Plus';
+
+  @override
+  String get supportEntryTitle => 'Soutenir le projet';
+
+  @override
+  String get supportEntrySubtitle => 'Aidez à faire vivre WiltKey';
+
+  @override
+  String get shopTitle => 'Boutique';
+
+  @override
+  String get supportTitle => 'Soutenir WiltKey';
+
+  @override
+  String get shopPlusSection => 'WiltKey Plus';
+
+  @override
+  String get shopUnlocksSection => 'Déblocages';
+
+  @override
+  String get shopPlusTagline =>
+      'Conservation hors ligne prolongée des messages et transferts de fichiers plus volumineux.';
+
+  @override
+  String get shopEmptyTitle => 'Rien pour l\'instant';
+
+  @override
+  String get shopEmptyBody => 'Des produits arrivent — revenez bientôt.';
+
+  @override
+  String get shopRestoreButton => 'Restaurer les achats';
+
+  @override
+  String get shopRestoredSnack => 'Achats restaurés';
+
+  @override
+  String get shopBuyButton => 'Acheter';
+
+  @override
+  String get shopOwnedLabel => 'Acquis';
+
+  @override
+  String get shopActiveLabel => 'Actif';
+
+  @override
+  String get shopManageNote => 'Gérer dans Google Play';
+
+  @override
+  String get shopPurchasePendingSnack => 'Achat en attente…';
+
+  @override
+  String get shopPurchaseFailedSnack => 'L\'achat n\'a pas pu être finalisé';
+
+  @override
+  String get supportIntro =>
+      'WiltKey est gratuit et open source, et cette version débloque tous les éléments cosmétiques gratuitement. Si vous souhaitez soutenir le développement et le relais officiel, visitez la page ci-dessous.';
+
+  @override
+  String get supportOpenButton => 'Ouvrir la page de soutien';
+
+  @override
+  String get supportFreeNote =>
+      'Tous les éléments cosmétiques sont débloqués dans cette version.';
+
+  @override
+  String get shopTabPalettes => 'Palettes';
+
+  @override
+  String get shopTabThemes => 'Thèmes';
+
+  @override
+  String get shopTabBorders => 'Cadres';
+
+  @override
+  String get shopTabPlus => 'Plus';
+
+  @override
+  String get shopTabPromo => 'Promo';
+
+  @override
+  String get shopPalettesIntro =>
+      'Des couleurs supplémentaires pour dessiner votre avatar et vos icônes de groupe. Les créations reçues s\'affichent toujours intégralement — un pack débloque seulement le fait de dessiner vous-même avec ces couleurs.';
+
+  @override
+  String shopPaletteColorCount(int count) {
+    return '$count couleurs supplémentaires';
+  }
+
+  @override
+  String get shopThemesEmptyTitle => 'Pas encore de thèmes';
+
+  @override
+  String get shopThemesEmptyBody =>
+      'Les thèmes premium arrivent — les trois thèmes intégrés restent gratuits pour toujours.';
+
+  @override
+  String get shopBordersSoonTitle => 'Les cadres arrivent';
+
+  @override
+  String get shopBordersSoonBody =>
+      'Des cadres décoratifs pour votre avatar, visibles par toutes les personnes avec qui vous discutez. En cours de développement.';
+
+  @override
+  String get shopPlusBenefitsSection => 'Ce que vous obtenez';
+
+  @override
+  String get shopPlusBenefitHold =>
+      'Vos messages attendent 72 heures sur le relais au lieu de 24 pendant que vous êtes hors ligne.';
+
+  @override
+  String get shopPlusBenefitFiles =>
+      'Envoyez de gros fichiers — jusqu\'à 50 Mo par message, au-delà de la limite gratuite de 5 Mo.';
+
+  @override
+  String get shopPlusBenefitSupport =>
+      'Vous faites vivre le relais et gardez WiltKey indépendant.';
+
+  @override
+  String get shopSubscribeButton => 'S\'abonner';
+
+  @override
+  String get shopPriceUnavailable => 'Indisponible';
+
+  @override
+  String get shopPromoIntro =>
+      'Vous avez un code promo ? Saisissez-le ci-dessous et Google Play l\'appliquera à votre compte.';
+
+  @override
+  String get shopPromoHint => 'CODE PROMO';
+
+  @override
+  String get shopPromoRedeemButton => 'Utiliser dans Google Play';
+
+  @override
+  String get shopPromoNote =>
+      'Les codes s\'utilisent dans le Play Store. Une fois appliqué, votre déblocage apparaît ici automatiquement.';
+
+  @override
+  String pairLargerPadsUpsell(String max) {
+    return 'Débloquer des blocs plus grands — jusqu\'à $max';
+  }
+
+  @override
+  String pairNotEnoughSpace(String needed, String free) {
+    return 'Espace libre insuffisant — cette conversation nécessite $needed et vous avez $free.';
+  }
+
+  @override
+  String pairSyncingGenerating(String written, String total) {
+    return 'Génération du keystream… $written / $total';
+  }
+
+  @override
+  String get pairKeepAppOpen =>
+      'Garde l\'application ouverte — le bloc sécurisé est encore en cours de création.';
+
+  @override
+  String groupLargerPadsUpsell(String max) {
+    return 'Débloquer des blocs de groupe plus grands — jusqu\'à $max';
+  }
+
+  @override
+  String get settingsBorderSection => 'Cadre d\'avatar';
+
+  @override
+  String get shopBordersIntro =>
+      'Cadres et accessoires pour votre avatar. Tous ceux avec qui vous discutez voient votre cadre — un cadre verrouillé vous empêche seulement de l\'équiper, jamais de l\'afficher.';
+
+  @override
+  String get shopBorderSubtitle => 'Cadre d\'avatar';
+
+  @override
+  String get shopFreeLabel => 'Gratuit';
 }

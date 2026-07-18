@@ -1344,4 +1344,202 @@ class AppLocalizationsHu extends AppLocalizations {
   @override
   String get wiltingHoldToSendHint =>
       'Tartsd nyomva elhervadó üzenet küldéséhez';
+
+  @override
+  String get replyYou => 'Te';
+
+  @override
+  String get replySomeone => 'Valaki';
+
+  @override
+  String get replyPreviewImage => '📷 Fotó';
+
+  @override
+  String get replyPreviewVoice => '🎤 Hangüzenet';
+
+  @override
+  String get replyPreviewMessage => 'Üzenet';
+
+  @override
+  String get replyUnavailable => 'Az eredeti üzenet nem érhető el';
+
+  @override
+  String get shopEntryTitle => 'Bolt és WiltKey Plus';
+
+  @override
+  String get shopEntrySubtitle => 'Témák, tartalmak és Plus';
+
+  @override
+  String get supportEntryTitle => 'Támogasd a projektet';
+
+  @override
+  String get supportEntrySubtitle => 'Segíts fenntartani a WiltKey-t';
+
+  @override
+  String get shopTitle => 'Bolt';
+
+  @override
+  String get supportTitle => 'WiltKey támogatása';
+
+  @override
+  String get shopPlusSection => 'WiltKey Plus';
+
+  @override
+  String get shopUnlocksSection => 'Tartalmak';
+
+  @override
+  String get shopPlusTagline =>
+      'Hosszabb offline üzenettárolás és nagyobb fájlküldés.';
+
+  @override
+  String get shopEmptyTitle => 'Itt még nincs semmi';
+
+  @override
+  String get shopEmptyBody =>
+      'A termékek hamarosan érkeznek — nézz vissza később.';
+
+  @override
+  String get shopRestoreButton => 'Vásárlások visszaállítása';
+
+  @override
+  String get shopRestoredSnack => 'Vásárlások visszaállítva';
+
+  @override
+  String get shopBuyButton => 'Megvásárlás';
+
+  @override
+  String get shopOwnedLabel => 'Megvéve';
+
+  @override
+  String get shopActiveLabel => 'Aktív';
+
+  @override
+  String get shopManageNote => 'Kezelés a Google Play-ben';
+
+  @override
+  String get shopPurchasePendingSnack => 'Vásárlás folyamatban…';
+
+  @override
+  String get shopPurchaseFailedSnack => 'A vásárlás nem sikerült';
+
+  @override
+  String get supportIntro =>
+      'A WiltKey ingyenes és nyílt forráskódú, és ebben a változatban minden kozmetikai elem ingyenesen elérhető. Ha szeretnéd támogatni a fejlesztést és a hivatalos relayt, látogasd meg az alábbi oldalt.';
+
+  @override
+  String get supportOpenButton => 'Támogatói oldal megnyitása';
+
+  @override
+  String get supportFreeNote =>
+      'Ebben a változatban minden kozmetikai elem fel van oldva.';
+
+  @override
+  String get shopTabPalettes => 'Paletták';
+
+  @override
+  String get shopTabThemes => 'Témák';
+
+  @override
+  String get shopTabBorders => 'Keretek';
+
+  @override
+  String get shopTabPlus => 'Plus';
+
+  @override
+  String get shopTabPromo => 'Promó';
+
+  @override
+  String get shopPalettesIntro =>
+      'Extra színek az avatarod és a csoportikonok rajzolásához. A kapott képek mindig teljesen megjelennek — a csomag csak azt oldja fel, hogy te is rajzolhass ezekkel a színekkel.';
+
+  @override
+  String shopPaletteColorCount(int count) {
+    return '$count extra szín';
+  }
+
+  @override
+  String get shopThemesEmptyTitle => 'Még nincsenek témák';
+
+  @override
+  String get shopThemesEmptyBody =>
+      'A prémium témák hamarosan érkeznek — a három beépített téma örökre ingyenes.';
+
+  @override
+  String get shopBordersSoonTitle => 'A keretek hamarosan jönnek';
+
+  @override
+  String get shopBordersSoonBody =>
+      'Dekoratív keretek az avatarodhoz, amiket mindenki lát, akivel csevegsz. Fejlesztés alatt.';
+
+  @override
+  String get shopPlusBenefitsSection => 'Amit kapsz';
+
+  @override
+  String get shopPlusBenefitHold =>
+      'Az üzeneteid 72 órán át várnak a relayen 24 helyett, amíg offline vagy.';
+
+  @override
+  String get shopPlusBenefitFiles =>
+      'Küldj nagy fájlokat – üzenetenként akár 50 MB, az ingyenes 5 MB-os korlát felett.';
+
+  @override
+  String get shopPlusBenefitSupport =>
+      'Te tartod életben a relayt és teszed függetlenné a WiltKey-t.';
+
+  @override
+  String get shopSubscribeButton => 'Előfizetés';
+
+  @override
+  String get shopPriceUnavailable => 'Nem elérhető';
+
+  @override
+  String get shopPromoIntro =>
+      'Van promóciós kódod? Írd be alább, és a Google Play alkalmazza a fiókodra.';
+
+  @override
+  String get shopPromoHint => 'PROMÓCIÓS KÓD';
+
+  @override
+  String get shopPromoRedeemButton => 'Beváltás a Google Play-ben';
+
+  @override
+  String get shopPromoNote =>
+      'A kódokat a Play Áruházban lehet beváltani. Az alkalmazás után a feloldás automatikusan megjelenik itt.';
+
+  @override
+  String pairLargerPadsUpsell(String max) {
+    return 'Nagyobb padok feloldása — akár $max';
+  }
+
+  @override
+  String pairNotEnoughSpace(String needed, String free) {
+    return 'Nincs elég szabad hely — ehhez a csevegéshez $needed kell, neked pedig $free van.';
+  }
+
+  @override
+  String pairSyncingGenerating(String written, String total) {
+    return 'Kulcsfolyam generálása… $written / $total';
+  }
+
+  @override
+  String get pairKeepAppOpen =>
+      'Hagyd nyitva az alkalmazást — a biztonságos pad még készül.';
+
+  @override
+  String groupLargerPadsUpsell(String max) {
+    return 'Nagyobb csoportpadok feloldása — akár $max';
+  }
+
+  @override
+  String get settingsBorderSection => 'Avatar keret';
+
+  @override
+  String get shopBordersIntro =>
+      'Keretek és kiegészítők az avatarodhoz. Mindenki látja a kereted, akivel csevegsz — a zárolt csak azt gátolja, hogy te felvedd, a megjelenítést soha.';
+
+  @override
+  String get shopBorderSubtitle => 'Avatar keret';
+
+  @override
+  String get shopFreeLabel => 'Ingyenes';
 }

@@ -204,6 +204,7 @@ class _ChatDetailsScreenState extends State<ChatDetailsScreen> {
                         ? contact.profileImageB64!
                         : PixelArtAvatar.generateIdenticon(contact.keyHash),
                     size: 64,
+                    borderId: contact.avatarBorderId,
                   ),
                   const SizedBox(height: 12),
                   Text(

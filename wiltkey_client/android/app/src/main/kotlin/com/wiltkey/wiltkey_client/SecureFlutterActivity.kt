@@ -93,10 +93,24 @@ open class SecureFlutterActivity : FlutterFragmentActivity() {
                     else -> result.notImplemented()
                 }
             }
+
+        // Free-space probe used before generating an OTP pad. `File.getUsableSpace()`
+        // needs NO permission — it reports bytes actually available to this app on
+        // the volume, already accounting for reserved/quota space. filesDir is on the
+        // same internal volume path_provider hands Dart, which is where the .pad
+        // files are written, so this measures the right volume.
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, STORAGE_CHANNEL)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "usableSpace" -> result.success(filesDir.usableSpace)
+                    else -> result.notImplemented()
+                }
+            }
     }
 
     companion object {
         private const val SECURITY_CHANNEL = "wiltkey/security"
+        private const val STORAGE_CHANNEL = "wiltkey/storage"
 
         // System-trusted screen readers we never flag. Everything else (password
         // managers, clipboard tools, remappers, real spyware) is surfaced to the

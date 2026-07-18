@@ -10,6 +10,8 @@ import '../../../core/custom_emoji.dart';
 import 'widgets/image_source_sheet.dart';
 import 'widgets/screenshot_ui.dart';
 import 'widgets/wilt_duration_sheet.dart';
+import 'widgets/reply_preview.dart';
+import 'widgets/swipe_to_reply.dart';
 import '../../../core/pixel_art_avatar.dart';
 import '../../../core/theme/wk.dart';
 import '../../../core/theme/wiltkey_tokens.dart';
@@ -48,6 +50,9 @@ class _ChatScreenState extends State<ChatScreen>
   bool _isAtBottom = true;
   bool _showScrollDownArrow = false;
   final Set<String> _revealedMessageIds = {};
+
+  // The message the composer is currently replying to (null = normal send).
+  ChatMessage? _replyingTo;
 
   // Wraps the message list so a consented screenshot can render it to an image.
   final GlobalKey _captureBoundaryKey = GlobalKey();
@@ -465,6 +470,40 @@ class _ChatScreenState extends State<ChatScreen>
     if (_showEmoji) setState(() => _showEmoji = false);
   }
 
+  /// Begin replying to [message] — a swipe-to-reply on its bubble. Ignores
+  /// messages there's nothing sensible to quote (system lines, screenshot cards,
+  /// wilted tombstones, and still-encrypting placeholders).
+  void _startReply(ChatMessage message) {
+    if (message.isSystem ||
+        message.isPending ||
+        message.wilted ||
+        message.contentType == 'screenshot_request') {
+      return;
+    }
+    setState(() => _replyingTo = message);
+    _inputFocus.requestFocus();
+  }
+
+  void _cancelReply() {
+    if (_replyingTo != null) setState(() => _replyingTo = null);
+  }
+
+  bool _canReply(ChatMessage m) =>
+      !m.isSystem &&
+      !m.isPending &&
+      !m.wilted &&
+      m.contentType != 'screenshot_request';
+
+  /// Wraps a bubble so a small left→right nudge (with resistance + haptic +
+  /// spring-back) starts a reply. See [SwipeToReply].
+  Widget _wrapSwipeToReply(ChatMessage message, Widget child) {
+    return SwipeToReply(
+      enabled: _canReply(message),
+      onReply: () => _startReply(message),
+      child: child,
+    );
+  }
+
   void _handleSend() async {
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
@@ -473,10 +512,12 @@ class _ChatScreenState extends State<ChatScreen>
 
     // Clear the field instantly — the bubble shows immediately as a pending
     // "Encrypting…" placeholder while the send completes in the background.
+    final replyId = _replyingTo?.id;
     _messageController.clear();
+    _cancelReply();
     _scrollToBottom();
 
-    final error = await _appState.sendMessage(text);
+    final error = await _appState.sendMessage(text, replyToId: replyId);
     if (error != null && mounted) {
       _errorSnack(error);
       // A pre-flight failure (e.g. out of keystream) leaves no bubble — restore
@@ -494,12 +535,15 @@ class _ChatScreenState extends State<ChatScreen>
     final secs = await showWiltDurationSheet(context);
     if (secs == null || !mounted) return;
     _sendBloom.forward(from: 0);
+    final replyId = _replyingTo?.id;
     _messageController.clear();
+    _cancelReply();
     _scrollToBottom();
     final error = await _appState.sendMessage(
       text,
       ephemeral: true,
       ttlSeconds: secs,
+      replyToId: replyId,
     );
     if (error != null && mounted) {
       _errorSnack(error);
@@ -606,6 +650,7 @@ class _ChatScreenState extends State<ChatScreen>
                                   contact.keyHash,
                                 ),
                           size: 34,
+                          borderId: contact.avatarBorderId,
                         ),
                         const SizedBox(width: 10),
                       ],
@@ -782,25 +827,30 @@ class _ChatScreenState extends State<ChatScreen>
                                 message.isSentByMe) ||
                             messageList[index - 1].isSystem;
 
-                        return MessageBubble(
-                          message: message,
-                          displayText: displayText,
-                          contact: contact,
-                          appState: _appState,
-                          emojiMap: CustomEmojiStore.cachedMap(contact.keyHash),
-                          isMe: message.isSentByMe,
-                          isFirstInBatch: isFirstInBatch,
-                          isRevealed: _revealedMessageIds.contains(message.id),
-                          onRevealTap: () {
-                            setState(() {
-                              _revealedMessageIds.add(message.id);
-                            });
-                          },
-                          onFailedTap: () => FailedActionsDialog.show(
-                            context,
-                            contact,
-                            message,
-                            _appState,
+                        return _wrapSwipeToReply(
+                          message,
+                          MessageBubble(
+                            message: message,
+                            displayText: displayText,
+                            contact: contact,
+                            appState: _appState,
+                            emojiMap: CustomEmojiStore.cachedMap(
+                              contact.keyHash,
+                            ),
+                            isMe: message.isSentByMe,
+                            isFirstInBatch: isFirstInBatch,
+                            isRevealed: _revealedMessageIds.contains(message.id),
+                            onRevealTap: () {
+                              setState(() {
+                                _revealedMessageIds.add(message.id);
+                              });
+                            },
+                            onFailedTap: () => FailedActionsDialog.show(
+                              context,
+                              contact,
+                              message,
+                              _appState,
+                            ),
                           ),
                         );
                       },
@@ -877,6 +927,15 @@ class _ChatScreenState extends State<ChatScreen>
     final overBudget = cost > contact.remainingBufferBytes;
     return Column(
       children: [
+        if (_replyingTo != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: ReplyQuote(
+              author: replyAuthorName(_replyingTo!, contact, _appState, l10n),
+              preview: replyPreviewText(_replyingTo!, l10n),
+              onClose: _cancelReply,
+            ),
+          ),
         EmojiAutocompleteBar(
           controller: _messageController,
           emojiMap: CustomEmojiStore.cachedMap(contact.keyHash),

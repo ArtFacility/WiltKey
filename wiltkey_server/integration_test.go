@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -425,5 +427,237 @@ func TestGroupChatHubAndSpoke(t *testing.T) {
 	}
 	if charlieRecv.Envelope != "re_encrypted_charlie_envelope" || charlieRecv.SenderID != aliceID {
 		t.Errorf("Charlie received wrong envelope: %v", charlieRecv)
+	}
+}
+
+func TestStorageAndSubscriptions(t *testing.T) {
+	// 0. Setup Keys
+	alicePub, alicePriv, _ := ed25519.GenerateKey(rand.Reader)
+	aliceID := GenerateUserID(alicePub)
+	alicePubHex := hex.EncodeToString(alicePub)
+
+	bobPub, bobPriv, _ := ed25519.GenerateKey(rand.Reader)
+	bobID := GenerateUserID(bobPub)
+	bobPubHex := hex.EncodeToString(bobPub)
+
+	// Try to connect to Redis
+	testRdb, err := NewRedisClient("localhost:6379")
+	if err != nil || testRdb.IsMemory() {
+		t.Skip("Skipping integration test: Redis not running on localhost:6379")
+		return
+	}
+	defer testRdb.Close()
+	rdb = testRdb
+
+	// Try to connect to Postgres
+	pgURL := os.Getenv("POSTGRES_URL")
+	if pgURL == "" {
+		pgURL = "postgres://wiltkey:wiltkey@localhost:5432/wiltkey?sslmode=disable"
+	}
+	testPg, err := NewPostgresClient(pgURL)
+	if err != nil {
+		t.Skipf("Skipping storage and subscription integration test: Postgres not running (%v)", err)
+		return
+	}
+	defer testPg.Close()
+	pg = testPg
+
+	// Set up local storage fallback
+	localDir := "./test_storage_dir"
+	storage, err = NewLocalStorage(localDir)
+	if err != nil {
+		t.Fatalf("failed to setup local storage: %v", err)
+	}
+	defer os.RemoveAll(localDir)
+
+	// Clean DB
+	rdb.FlushAll()
+	pg.db.Exec("DELETE FROM messages")
+	pg.db.Exec("DELETE FROM entitlements")
+
+	hub := NewHub(rdb, NewPushSender())
+	go hub.Run()
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/v1/queue/post", rateLimitMiddleware(handlePostQueue(hub)))
+	mux.HandleFunc("/api/v1/entitlement", rateLimitMiddleware(handlePostEntitlement))
+	mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+		ServeWS(hub, w, r)
+	})
+
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	// Helper to dial WS
+	dialWS := func(pubHex string, priv ed25519.PrivateKey) *websocket.Conn {
+		wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
+		conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+		if err != nil {
+			t.Fatalf("failed to dial WS: %v", err)
+		}
+		var challenge WSMessage
+		if err := conn.ReadJSON(&challenge); err != nil {
+			t.Fatalf("failed to read challenge: %v", err)
+		}
+		sig := ed25519.Sign(priv, []byte(challenge.Challenge))
+		authMsg := WSMessage{
+			Type:      "AUTH",
+			Pubkey:    pubHex,
+			Signature: hex.EncodeToString(sig),
+		}
+		if err := conn.WriteJSON(authMsg); err != nil {
+			t.Fatalf("failed to send AUTH: %v", err)
+		}
+		var authOk WSMessage
+		if err := conn.ReadJSON(&authOk); err != nil || authOk.Type != "AUTH_OK" {
+			t.Fatalf("auth failed: %v", err)
+		}
+		return conn
+	}
+
+	// 1. Test High RAM fallback (route small message to Postgres instead of Redis)
+	os.Setenv("HIGH_RAM_THRESHOLD_PERCENT", "0.0") // Force high memory load condition
+	defer os.Unsetenv("HIGH_RAM_THRESHOLD_PERCENT")
+
+	aliceConn := dialWS(alicePubHex, alicePriv)
+	defer aliceConn.Close()
+
+	// Send a 10KB message to Bob who is offline
+	msg10K := strings.Repeat("A", 10*1024)
+	sendMsg := WSMessage{
+		Type:        "SEND_MESSAGE",
+		RecipientID: bobID,
+		Envelope:    msg10K,
+		ContentType: "text",
+	}
+	if err := aliceConn.WriteJSON(sendMsg); err != nil {
+		t.Fatalf("failed to send WS message: %v", err)
+	}
+
+	// Verify it was stored in Postgres database (since high RAM load is active)
+	var count int
+	err = pg.db.QueryRow("SELECT COUNT(*) FROM messages WHERE recipient_id = $1", bobID).Scan(&count)
+	if err != nil || count != 1 {
+		t.Errorf("expected 1 message in postgres under high RAM load, got %d, err: %v", count, err)
+	}
+
+	// Reset RAM threshold
+	os.Setenv("HIGH_RAM_THRESHOLD_PERCENT", "100.0")
+
+	// 2. Test Large file routing (>= 500KB) -> S3/Local storage + Postgres with client ACK
+	msg600K := strings.Repeat("B", 600*1024)
+	sendMsgLarge := WSMessage{
+		Type:        "SEND_MESSAGE",
+		RecipientID: bobID,
+		Envelope:    msg600K,
+		ContentType: "file",
+	}
+	if err := aliceConn.WriteJSON(sendMsgLarge); err != nil {
+		t.Fatalf("failed to send large WS message: %v", err)
+	}
+
+	// Verify it was uploaded to storage and metadata stored in Postgres
+	var dbMsg PGMessage
+	err = pg.db.QueryRow("SELECT id, bucket_url FROM messages WHERE recipient_id = $1 AND envelope IS NULL", bobID).Scan(&dbMsg.ID, &dbMsg.BucketURL)
+	if err != nil || dbMsg.BucketURL == nil {
+		t.Fatalf("expected message to be stored in Postgres with bucket URL: %v", err)
+	}
+
+	// Verify local storage has the file
+	storageKey := strings.TrimPrefix(*dbMsg.BucketURL, "local://")
+	_, err = os.Stat(filepath.Join(localDir, storageKey))
+	if err != nil {
+		t.Errorf("expected storage file to exist: %v", err)
+	}
+
+	// 3. Bob comes online and delivers messages
+	bobConn := dialWS(bobPubHex, bobPriv)
+	defer bobConn.Close()
+
+	// Bob should receive 2 messages:
+	// Message 1: 10KB message (inline, from Postgres)
+	var recv1 WSMessage
+	if err := bobConn.ReadJSON(&recv1); err != nil || recv1.Envelope != msg10K {
+		t.Fatalf("Bob failed to receive first message: %v", err)
+	}
+
+	// Message 2: 600KB message (bucket-backed, from Postgres)
+	var recv2 WSMessage
+	if err := bobConn.ReadJSON(&recv2); err != nil || recv2.Envelope != msg600K {
+		t.Fatalf("Bob failed to receive second message: %v", err)
+	}
+	if recv2.MessageID != dbMsg.ID {
+		t.Errorf("expected message_id %s, got %s", dbMsg.ID, recv2.MessageID)
+	}
+
+	// Verify the inline message is deleted from Postgres immediately
+	pg.db.QueryRow("SELECT COUNT(*) FROM messages WHERE envelope IS NOT NULL").Scan(&count)
+	if count != 0 {
+		t.Errorf("expected 0 inline messages left in Postgres, got %d", count)
+	}
+
+	// Verify the bucket message is STILL in Postgres and storage (not acknowledged yet)
+	pg.db.QueryRow("SELECT COUNT(*) FROM messages WHERE id = $1", dbMsg.ID).Scan(&count)
+	if count != 1 {
+		t.Errorf("expected large message to still exist in database, got %d", count)
+	}
+
+	// Bob acknowledges receipt
+	ackMsg := WSMessage{
+		Type:      "FILE_RECEIVED",
+		MessageID: dbMsg.ID,
+	}
+	if err := bobConn.WriteJSON(ackMsg); err != nil {
+		t.Fatalf("failed to send FILE_RECEIVED ack: %v", err)
+	}
+
+	// Give a bit of time for async delete processing
+	time.Sleep(100 * time.Millisecond)
+
+	// Verify the message and file are deleted
+	pg.db.QueryRow("SELECT COUNT(*) FROM messages WHERE id = $1", dbMsg.ID).Scan(&count)
+	if count != 0 {
+		t.Errorf("expected database message to be deleted, got %d", count)
+	}
+	_, err = os.Stat(filepath.Join(localDir, storageKey))
+	if !os.IsNotExist(err) {
+		t.Errorf("expected storage file to be deleted, got: %v", err)
+	}
+
+	// 4. Test Premium verification (>= 5MB)
+	msg6M := strings.Repeat("C", 6*1024*1024)
+	sendMsg6M := WSMessage{
+		Type:        "SEND_MESSAGE",
+		RecipientID: bobID,
+		Envelope:    msg6M,
+		ContentType: "file",
+	}
+	// Alice is not premium yet. She sends it.
+	if err := aliceConn.WriteJSON(sendMsg6M); err != nil {
+		t.Fatalf("failed to send: %v", err)
+	}
+
+	// Should receive ERROR from server
+	var errResp WSMessage
+	if err := aliceConn.ReadJSON(&errResp); err != nil || errResp.Type != "ERROR" {
+		t.Fatalf("expected ERROR frame, got: %v", errResp)
+	}
+	if !strings.Contains(errResp.Message, "requires an active premium subscription") {
+		t.Errorf("unexpected error message: %s", errResp.Message)
+	}
+
+	// Register Alice's entitlement
+	pg.StoreEntitlement(aliceID, "alicetokenhash", time.Now().Add(time.Hour))
+
+	// Alice sends it again
+	if err := aliceConn.WriteJSON(sendMsg6M); err != nil {
+		t.Fatalf("failed to send: %v", err)
+	}
+
+	// Verification: should go through successfully (check database count of bucket message)
+	var count6M int
+	err = pg.db.QueryRow("SELECT COUNT(*) FROM messages WHERE recipient_id = $1 AND envelope IS NULL", bobID).Scan(&count6M)
+	if err != nil || count6M != 1 {
+		t.Errorf("expected 1 premium 6MB message stored in db, got %d, err: %v", count6M, err)
 	}
 }

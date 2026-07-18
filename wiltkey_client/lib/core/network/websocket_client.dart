@@ -250,10 +250,17 @@ class WebSocketClient {
           final senderId = jsonMap['sender_id'] as String;
           final envelope = jsonMap['envelope'] as String;
           final contentType = jsonMap['content_type'] ?? 'text';
+          final messageId = jsonMap['message_id'] as String?;
 
           _log('[WebSocket] Received NEW_MESSAGE from $senderId');
           if (onMessageReceived != null) {
             onMessageReceived!(senderId, envelope, contentType);
+          }
+          if (messageId != null) {
+            sendWSMessage({
+              'type': 'FILE_RECEIVED',
+              'message_id': messageId,
+            });
           }
           break;
         case 'SPOKE_REQUEST_ORDER':

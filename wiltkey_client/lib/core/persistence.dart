@@ -194,6 +194,41 @@ class WiltkeyPersistence {
     return prefs.getString(_keyLocale);
   }
 
+  // --- Equipped avatar border (cosmetic) ---
+  // Same rationale as the theme id: cosmetic, reveals nothing sensitive, and NOT
+  // wiped by clearAll() so a self-destruct doesn't strip the user's chosen look.
+  static const String _keyAvatarBorder = 'wk_avatar_border';
+
+  Future<String?> loadAvatarBorderId() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_keyAvatarBorder);
+  }
+
+  Future<void> saveAvatarBorderId(String id) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyAvatarBorder, id);
+  }
+
+  // --- Entitlement cache (monetization) ---
+  // Last-known set of owned Play product ids, so premium perks stay unlocked on
+  // an offline launch (before billing re-queries). Advisory only for local
+  // cosmetics; the server-side perk (message hold) is always re-verified by the
+  // relay. Like the theme id this is cosmetic and intentionally NOT wiped by
+  // clearAll(): a self-destruct must not cost the user their purchases (Play also
+  // restores them from the Google account regardless). Do not move into the wipe
+  // list.
+  static const String _keyEntitlements = 'wk_entitlements';
+
+  Future<List<String>> loadEntitlements() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getStringList(_keyEntitlements) ?? const [];
+  }
+
+  Future<void> saveEntitlements(List<String> productIds) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_keyEntitlements, productIds);
+  }
+
   Future<void> saveLocale(String localeCode) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyLocale, localeCode);

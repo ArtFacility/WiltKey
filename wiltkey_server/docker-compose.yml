@@ -9,6 +9,13 @@ services:
     environment:
       - PORT=8000
       - REDIS_ADDR=redis:6379
+      - POSTGRES_URL=postgres://wiltkey:wiltkey@postgres:5432/wiltkey?sslmode=disable
+      - BUCKET_ENDPOINT=minio:9000
+      - BUCKET_ACCESS_KEY=minioadmin
+      - BUCKET_SECRET_KEY=minioadmin
+      - BUCKET_NAME=wiltkey-files
+      - BUCKET_USE_SSL=false
+      - HIGH_RAM_THRESHOLD_PERCENT=80.0
       # FCM wake-up push (Play flavor). Points at the mounted service-account
       # JSON below. Leave the file absent + this unset to run push-disabled.
       - FCM_CREDENTIALS_FILE=/app/fcm-service-account.json
@@ -19,6 +26,8 @@ services:
       - ./fcm-service-account.json:/app/fcm-service-account.json:ro
     depends_on:
       - redis
+      - postgres
+      - minio
     restart: unless-stopped
     networks:
       - wiltkey-net
@@ -31,6 +40,41 @@ services:
     restart: unless-stopped
     networks:
       - wiltkey-net
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: wiltkey_postgres
+    environment:
+      - POSTGRES_USER=wiltkey
+      - POSTGRES_PASSWORD=wiltkey
+      - POSTGRES_DB=wiltkey
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+    networks:
+      - wiltkey-net
+
+  minio:
+    image: minio/minio:latest
+    container_name: wiltkey_minio
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    volumes:
+      - miniodata:/data
+    restart: unless-stopped
+    networks:
+      - wiltkey-net
+
+volumes:
+  pgdata:
+  miniodata:
 
 networks:
   wiltkey-net:

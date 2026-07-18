@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'dart:math';
 import 'package:wiltkey_client/l10n/app_localizations.dart';
+import 'package:wiltkey_client/features/shop/presentation/shop_screen.dart';
 import '../../../core/state.dart';
+import '../../../core/entitlements/entitlement_service.dart';
 import '../../../core/pixel_art_avatar.dart';
 import '../../../core/pixel_art_editor.dart';
 import '../../../core/theme/wk.dart';
@@ -35,9 +37,28 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
   // spawn duplicate groups) and show a blocking progress dialog meanwhile.
   bool _creating = false;
 
-  final List<double> _totalGroupSizeOptions = [5.0, 10.0, 20.0, 50.0, 100.0];
+  // Pad-generation progress for the "forging the pad" dialog (0..1). A big group
+  // pad (up to 500 MB) would otherwise show a frozen-looking indeterminate bar.
+  double _createProgress = 0.0;
+  final ValueNotifier<double> _createProgressNotifier = ValueNotifier(0.0);
+
+  // Group total-pad tiers. The first [_freeGroupSizeCount] are free for everyone;
+  // the larger ones need the larger-pads unlock (only the CREATOR — the host —
+  // needs it; members just receive whatever total the host set). Append-only in
+  // spirit, though a group's total is fixed at creation so nothing persisted
+  // depends on this list's indices.
+  final List<double> _totalGroupSizeOptions = [
+    5.0, 10.0, 20.0, 50.0, 100.0, // free
+    150.0, 200.0, 300.0, 400.0, 500.0, // premium
+  ];
+  static const int _freeGroupSizeCount = 5; // indices 0..4 (5–100 MB) are free
   final List<double> _laneSizeOptions = [1.0, 2.0, 5.0, 10.0];
   final List<double> _messageSizeOptions = [0.5, 1.0, 2.0, 5.0, 10.0];
+
+  /// Highest total-pad index the user may select (gated on the larger-pads unlock).
+  int get _maxGroupSizeIndex => EntitlementService.instance.largerPadsUnlocked
+      ? _totalGroupSizeOptions.length - 1
+      : _freeGroupSizeCount - 1;
 
   int get _calculatedMaxMembers {
     final totalBytes = (_totalGroupSizeMb * 1024 * 1024).toInt();
@@ -56,6 +77,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
   @override
   void dispose() {
     _nameController.dispose();
+    _createProgressNotifier.dispose();
     super.dispose();
   }
 
@@ -124,7 +146,14 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
         .map((b) => b.toRadixString(16).padLeft(2, '0'))
         .join();
 
-    final totalGroupBytes = (_totalGroupSizeMb * 1024 * 1024).toInt();
+    // Enforcement: clamp to what this user may actually create, so a premium
+    // tier can never slip through from a stale selection (the host is the only
+    // one who needs the unlock — members just receive the total).
+    final clampedIndex = _totalGroupSizeOptions
+        .indexOf(_totalGroupSizeMb)
+        .clamp(0, _maxGroupSizeIndex);
+    final totalGroupBytes =
+        (_totalGroupSizeOptions[clampedIndex] * 1024 * 1024).toInt();
     final laneBytes = (_laneSizeMb * 1024 * 1024).toInt();
 
     try {
@@ -137,6 +166,13 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
         groupIconHex: groupIconHex,
         maxMembers: _calculatedMaxMembers,
         groupSeed: groupSeed,
+        onPadProgress: (written, total) {
+          if (total <= 0) return;
+          final frac = written / total;
+          if (frac - _createProgress < 0.01 && written < total) return;
+          _createProgress = frac;
+          _createProgressNotifier.value = frac;
+        },
       );
 
       final newGroup = _appState.contacts.firstWhere(
@@ -212,12 +248,35 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                   style: t.bodySecondary,
                 ),
                 const SizedBox(height: 16),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(t.radiusPill),
-                  child: LinearProgressIndicator(
-                    minHeight: 6,
-                    backgroundColor: t.budgetEmpty,
-                    valueColor: AlwaysStoppedAnimation<Color>(t.identity),
+                // Determinate for big pads (up to 500 MB now) — an indeterminate
+                // bar there reads as "frozen". Falls back to indeterminate until
+                // the first progress tick lands.
+                ValueListenableBuilder<double>(
+                  valueListenable: _createProgressNotifier,
+                  builder: (context, progress, _) => Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(t.radiusPill),
+                        child: LinearProgressIndicator(
+                          value: progress > 0 ? progress : null,
+                          minHeight: 6,
+                          backgroundColor: t.budgetEmpty,
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(t.identity),
+                        ),
+                      ),
+                      if (progress > 0) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          '${(progress * 100).toInt()}%',
+                          style: t.dataMono.copyWith(
+                            color: t.identity,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
               ],
@@ -373,10 +432,11 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                       Slider(
                         value: _totalGroupSizeOptions
                             .indexOf(_totalGroupSizeMb)
+                            .clamp(0, _maxGroupSizeIndex)
                             .toDouble(),
                         min: 0,
-                        max: (_totalGroupSizeOptions.length - 1).toDouble(),
-                        divisions: _totalGroupSizeOptions.length - 1,
+                        max: _maxGroupSizeIndex.toDouble(),
+                        divisions: _maxGroupSizeIndex,
                         activeColor: t.identity,
                         inactiveColor: t.budgetEmpty,
                         onChanged: (val) {
@@ -392,6 +452,38 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                           });
                         },
                       ),
+                      if (!EntitlementService.instance.largerPadsUnlocked) ...[
+                        const SizedBox(height: 4),
+                        InkWell(
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const ShopScreen(
+                                initialTab: ShopTab.plus,
+                              ),
+                            ),
+                          ),
+                          borderRadius: BorderRadius.circular(t.radiusControl),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 6),
+                            child: Row(
+                              children: [
+                                Icon(Icons.lock_open, size: 13, color: t.action),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    l10n.groupLargerPadsUpsell('500 MB'),
+                                    style: t.bodySecondary
+                                        .copyWith(color: t.action),
+                                  ),
+                                ),
+                                Icon(Icons.chevron_right,
+                                    size: 14, color: t.action),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),

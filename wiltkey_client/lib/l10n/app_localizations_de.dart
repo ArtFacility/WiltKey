@@ -1339,4 +1339,203 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get wiltingHoldToSendHint =>
       'Halten, um eine welkende Nachricht zu senden';
+
+  @override
+  String get replyYou => 'Du';
+
+  @override
+  String get replySomeone => 'Jemand';
+
+  @override
+  String get replyPreviewImage => '📷 Foto';
+
+  @override
+  String get replyPreviewVoice => '🎤 Sprachnachricht';
+
+  @override
+  String get replyPreviewMessage => 'Nachricht';
+
+  @override
+  String get replyUnavailable => 'Originalnachricht nicht verfügbar';
+
+  @override
+  String get shopEntryTitle => 'Shop & WiltKey Plus';
+
+  @override
+  String get shopEntrySubtitle => 'Themes, Inhalte & Plus';
+
+  @override
+  String get supportEntryTitle => 'Projekt unterstützen';
+
+  @override
+  String get supportEntrySubtitle => 'Hilf, WiltKey am Laufen zu halten';
+
+  @override
+  String get shopTitle => 'Shop';
+
+  @override
+  String get supportTitle => 'WiltKey unterstützen';
+
+  @override
+  String get shopPlusSection => 'WiltKey Plus';
+
+  @override
+  String get shopUnlocksSection => 'Freischaltungen';
+
+  @override
+  String get shopPlusTagline =>
+      'Längere Offline-Speicherung von Nachrichten und größere Dateiübertragungen.';
+
+  @override
+  String get shopEmptyTitle => 'Hier ist noch nichts';
+
+  @override
+  String get shopEmptyBody =>
+      'Produkte sind unterwegs – schau bald wieder vorbei.';
+
+  @override
+  String get shopRestoreButton => 'Käufe wiederherstellen';
+
+  @override
+  String get shopRestoredSnack => 'Käufe wiederhergestellt';
+
+  @override
+  String get shopBuyButton => 'Kaufen';
+
+  @override
+  String get shopOwnedLabel => 'Gekauft';
+
+  @override
+  String get shopActiveLabel => 'Aktiv';
+
+  @override
+  String get shopManageNote => 'In Google Play verwalten';
+
+  @override
+  String get shopPurchasePendingSnack => 'Kauf ausstehend…';
+
+  @override
+  String get shopPurchaseFailedSnack =>
+      'Kauf konnte nicht abgeschlossen werden';
+
+  @override
+  String get supportIntro =>
+      'WiltKey ist kostenlos und quelloffen, und in dieser Version sind alle kosmetischen Inhalte kostenlos freigeschaltet. Wenn du die Entwicklung und den offiziellen Relay unterstützen möchtest, besuche die Seite unten.';
+
+  @override
+  String get supportOpenButton => 'Support-Seite öffnen';
+
+  @override
+  String get supportFreeNote =>
+      'In dieser Version sind alle kosmetischen Inhalte freigeschaltet.';
+
+  @override
+  String get shopTabPalettes => 'Paletten';
+
+  @override
+  String get shopTabThemes => 'Themes';
+
+  @override
+  String get shopTabBorders => 'Rahmen';
+
+  @override
+  String get shopTabPlus => 'Plus';
+
+  @override
+  String get shopTabPromo => 'Promo';
+
+  @override
+  String get shopPalettesIntro =>
+      'Zusätzliche Farben zum Zeichnen deines Avatars und deiner Gruppensymbole. Empfangene Bilder werden immer vollständig dargestellt — ein Paket schaltet nur das eigene Zeichnen mit diesen Farben frei.';
+
+  @override
+  String shopPaletteColorCount(int count) {
+    return '$count zusätzliche Farben';
+  }
+
+  @override
+  String get shopThemesEmptyTitle => 'Noch keine Themes';
+
+  @override
+  String get shopThemesEmptyBody =>
+      'Premium-Themes sind unterwegs – die drei eingebauten Themes bleiben für immer kostenlos.';
+
+  @override
+  String get shopBordersSoonTitle => 'Rahmen kommen bald';
+
+  @override
+  String get shopBordersSoonBody =>
+      'Dekorative Rahmen für deinen Avatar, die alle sehen, mit denen du chattest. In Arbeit.';
+
+  @override
+  String get shopPlusBenefitsSection => 'Das bekommst du';
+
+  @override
+  String get shopPlusBenefitHold =>
+      'Deine Nachrichten warten 72 Stunden statt 24 auf dem Relay, während du offline bist.';
+
+  @override
+  String get shopPlusBenefitFiles =>
+      'Sende große Dateien – bis zu 50 MB pro Nachricht, über das kostenlose 5-MB-Limit hinaus.';
+
+  @override
+  String get shopPlusBenefitSupport =>
+      'Du hältst den Relay am Laufen und WiltKey unabhängig.';
+
+  @override
+  String get shopSubscribeButton => 'Abonnieren';
+
+  @override
+  String get shopPriceUnavailable => 'Nicht verfügbar';
+
+  @override
+  String get shopPromoIntro =>
+      'Du hast einen Promo-Code? Gib ihn unten ein, und Google Play wendet ihn auf dein Konto an.';
+
+  @override
+  String get shopPromoHint => 'PROMO-CODE';
+
+  @override
+  String get shopPromoRedeemButton => 'In Google Play einlösen';
+
+  @override
+  String get shopPromoNote =>
+      'Codes werden im Play Store eingelöst. Nach der Anwendung erscheint deine Freischaltung hier automatisch.';
+
+  @override
+  String pairLargerPadsUpsell(String max) {
+    return 'Größere Pads freischalten – bis zu $max';
+  }
+
+  @override
+  String pairNotEnoughSpace(String needed, String free) {
+    return 'Nicht genug freier Speicher – dieser Chat benötigt $needed, du hast $free.';
+  }
+
+  @override
+  String pairSyncingGenerating(String written, String total) {
+    return 'Keystream wird erzeugt… $written / $total';
+  }
+
+  @override
+  String get pairKeepAppOpen =>
+      'Lass die App geöffnet — das sichere Pad wird noch erstellt.';
+
+  @override
+  String groupLargerPadsUpsell(String max) {
+    return 'Größere Gruppen-Pads freischalten – bis zu $max';
+  }
+
+  @override
+  String get settingsBorderSection => 'Avatar-Rahmen';
+
+  @override
+  String get shopBordersIntro =>
+      'Rahmen und Accessoires für deinen Avatar. Alle, mit denen du chattest, sehen deinen Rahmen — ein gesperrter verhindert nur das Anlegen, nie die Darstellung.';
+
+  @override
+  String get shopBorderSubtitle => 'Avatar-Rahmen';
+
+  @override
+  String get shopFreeLabel => 'Gratis';
 }

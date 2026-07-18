@@ -1,19 +1,31 @@
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'pixel_palette.dart';
+import 'cosmetics/avatar_border_registry.dart';
 
 /// Renders a 10x10 pixel-art grid. [hexString] is the grid in either supported
 /// encoding (legacy 100-char hex or `v2:`+base64 — see [PixelGrid]); invalid or
 /// empty values render as a blank (all-background) grid.
+///
+/// When [borderId] names an equipped avatar border, the pixel body is inset to
+/// 80% and the border's SVG is overlaid on top (design canvas 100x100, avatar in
+/// the centre 80%). A peer's border comes from their broadcast profile; the local
+/// user's from [AvatarBorderController]. Null/none = the plain framed avatar.
 class PixelArtAvatar extends StatelessWidget {
   final String hexString;
   final double size;
+
+  /// Equipped border id (see [WkAvatarBorderRegistry]). Null or 'none' → no
+  /// overlay, and the classic thin teal frame is kept.
+  final String? borderId;
 
   const PixelArtAvatar({
     super.key,
     required this.hexString,
     required this.size,
+    this.borderId,
   });
 
   /// Back-compat alias for the classic 16 colours. New code should use
@@ -22,22 +34,53 @@ class PixelArtAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final indices = PixelGrid.parseOrBlank(hexString);
+    final border = WkAvatarBorderRegistry.byId(borderId);
+    final asset = border.assetPath;
 
-    return Container(
+    // No border equipped → the original framed avatar, unchanged.
+    if (asset == null) return _pixelBody(size, framed: true);
+
+    // Border equipped → inset the (unframed) avatar to 80% and overlay the SVG.
+    final inner = size * 0.8;
+    return SizedBox(
       width: size,
       height: size,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          _pixelBody(inner, framed: false),
+          Positioned.fill(
+            child: SvgPicture.asset(
+              asset,
+              fit: BoxFit.contain,
+              // A missing premium asset (fork without the private repo) just
+              // renders nothing rather than throwing.
+              placeholderBuilder: (_) => const SizedBox.shrink(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _pixelBody(double s, {required bool framed}) {
+    final indices = PixelGrid.parseOrBlank(hexString);
+    return Container(
+      width: s,
+      height: s,
       decoration: BoxDecoration(
-        border: Border.all(
-          color: const Color(0xFF45A29E).withValues(alpha: 0.3),
-          width: 1,
-        ),
+        border: framed
+            ? Border.all(
+                color: const Color(0xFF45A29E).withValues(alpha: 0.3),
+                width: 1,
+              )
+            : null,
         borderRadius: BorderRadius.circular(4),
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(3),
         child: CustomPaint(
-          size: Size(size, size),
+          size: Size(s, s),
           painter: _PixelArtPainter(indices),
         ),
       ),

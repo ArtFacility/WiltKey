@@ -2,6 +2,13 @@
     xmlns:tools="http://schemas.android.com/tools">
     <!-- Play-flavor additions, merged into the main manifest. FCM wake-up push. -->
 
+    <!-- Google Play Billing. The billing library merges this permission in on its
+         own, but we declare it explicitly (Play flavor only) so the Play Console
+         reliably detects it — the Console won't let you create in-app products or
+         subscriptions until an uploaded build declares BILLING. The FOSS flavor
+         never sees this (or the billing library), keeping FOSS Google-free. -->
+    <uses-permission android:name="com.android.vending.BILLING" />
+
     <!-- The Play build uses FCM, never the foreground-service socket, so the
          dataSync foreground-service permission (declared in the shared main
          manifest for the FOSS build) is unjustified here — strip it so Google

@@ -13,7 +13,11 @@ import '../../../core/pixel_art_editor.dart';
 import '../../../core/theme/wk.dart';
 import '../../../core/theme/wiltkey_tokens.dart';
 import '../../../core/localization/locale_controller.dart';
+import '../../../core/entitlements/entitlement_service.dart';
+import '../../../core/cosmetics/avatar_border_controller.dart';
+import '../../shop/presentation/shop_screen.dart';
 import 'widgets/theme_picker.dart';
+import 'widgets/border_picker.dart';
 import 'change_pin_screen.dart';
 
 /// Publisher shown in the Settings "About" footer. The version string itself is
@@ -65,6 +69,9 @@ class _SettingsScreenState extends State<SettingsScreen>
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
     _appState.addListener(_updateStateFromModel);
+    // Equipping/removing an avatar border is a profile change → announce it to
+    // peers (like editing the avatar or nick), so their copy of us updates.
+    AvatarBorderController.instance.addListener(_onBorderChanged);
 
     BiometricAuth.isAvailable().then((available) {
       if (mounted) setState(() => _biometricAvailable = available);
@@ -95,11 +102,14 @@ class _SettingsScreenState extends State<SettingsScreen>
     }
   }
 
+  void _onBorderChanged() => _appState.broadcastProfileUpdate();
+
   @override
   void dispose() {
     _debounceTimer?.cancel();
     _hideIndicatorTimer?.cancel();
     _appState.removeListener(_updateStateFromModel);
+    AvatarBorderController.instance.removeListener(_onBorderChanged);
     _tabController.dispose();
     _usernameController.dispose();
     _shortNickController.dispose();
@@ -359,6 +369,10 @@ class _SettingsScreenState extends State<SettingsScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Shop / Support entry (Play: purchases; FOSS: support the project).
+          _buildShopEntry(t, l10n),
+          const SizedBox(height: 20),
+
           // Appearance / theme picker (real, live-preview cards).
           _section(t, l10n.settingsProfileSectionAppearance),
           const SizedBox(height: 8),
@@ -513,34 +527,49 @@ class _SettingsScreenState extends State<SettingsScreen>
           _section(t, l10n.settingsProfileSectionAvatar),
           const SizedBox(height: 12),
 
-          // Avatar preview — tap "Edit avatar" to open the shared editor popup.
-          Center(
-            child: Column(
-              children: [
-                GestureDetector(
-                  onTap: _editAvatar,
-                  child: PixelArtAvatar(
-                    hexString: _pixelGrid.join(),
-                    size: 140,
+          // Avatar preview (with the equipped border) — tap "Edit avatar" to
+          // open the shared editor popup. Rebuilds live when the border changes.
+          ListenableBuilder(
+            listenable: AvatarBorderController.instance,
+            builder: (context, _) => Center(
+              child: Column(
+                children: [
+                  GestureDetector(
+                    onTap: _editAvatar,
+                    child: PixelArtAvatar(
+                      hexString: _pixelGrid.join(),
+                      size: 140,
+                      borderId: AvatarBorderController.instance.borderId,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                OutlinedButton.icon(
-                  onPressed: _editAvatar,
-                  icon: Icon(Icons.edit, size: 16, color: t.action),
-                  label: Text(
-                    t.uppercaseLabels
-                        ? l10n.avatarEditButton.toUpperCase()
-                        : l10n.avatarEditButton,
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    onPressed: _editAvatar,
+                    icon: Icon(Icons.edit, size: 16, color: t.action),
+                    label: Text(
+                      t.uppercaseLabels
+                          ? l10n.avatarEditButton.toUpperCase()
+                          : l10n.avatarEditButton,
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: t.action,
+                      side: BorderSide(color: t.positive),
+                    ),
                   ),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: t.action,
-                    side: BorderSide(color: t.positive),
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
+          const SizedBox(height: 16),
+          Text(
+            l10n.settingsBorderSection,
+            style: t.dataMono.copyWith(
+              color: t.textSecondary,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          BorderPicker(sampleHex: _pixelGrid.join()),
           Divider(color: t.border, height: 32),
 
           _section(t, l10n.settingsProfileSectionProfile),
@@ -1031,6 +1060,53 @@ class _SettingsScreenState extends State<SettingsScreen>
           },
         );
       },
+    );
+  }
+
+  // Shop / Support entry card at the top of the Profile tab. Play builds route to
+  // the purchasable shop; FOSS builds to the "Support the project" page. Both use
+  // the same ShopScreen, which picks its face from the flavor.
+  Widget _buildShopEntry(WiltkeyTokens t, AppLocalizations l10n) {
+    final isPlay = EntitlementService.instance.billingAvailable;
+    final title = isPlay ? l10n.shopEntryTitle : l10n.supportEntryTitle;
+    final subtitle =
+        isPlay ? l10n.shopEntrySubtitle : l10n.supportEntrySubtitle;
+    final icon = isPlay ? Icons.storefront : Icons.volunteer_activism;
+    return InkWell(
+      borderRadius: BorderRadius.circular(t.radiusControl),
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const ShopScreen()),
+      ),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        decoration: BoxDecoration(
+          color: t.surface,
+          border: Border.all(color: t.action),
+          borderRadius: BorderRadius.circular(t.radiusControl),
+          boxShadow: t.glow(t.action),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: t.action, size: 24),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: t.body.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(subtitle, style: t.bodySecondary),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right, color: t.textTertiary, size: 20),
+          ],
+        ),
+      ),
     );
   }
 

@@ -22,6 +22,7 @@ extension AppStateChatMeta on AppState {
       'name': effectiveDeviceName,
       'short_nick': effectiveShortNick,
       'profile_image': profileImageB64,
+      'avatar_border': AvatarBorderController.instance.borderId,
       'images_allowed': contact.imagesAllowed ?? true,
       'relay_url': activeRelayUrl, // advertise our relay for peer fallback
       'v': 1,
@@ -130,6 +131,7 @@ extension AppStateChatMeta on AppState {
       final name = (p['name'] as String?)?.trim();
       final nick = (p['short_nick'] as String?)?.trim();
       final img = (p['profile_image'] as String?)?.trim();
+      final border = (p['avatar_border'] as String?)?.trim();
       final imagesAllowed = p['images_allowed'] as bool?;
 
       // Remember the peer's relay as a connection fallback (filtered + persisted).
@@ -139,6 +141,8 @@ extension AppStateChatMeta on AppState {
         name: (name != null && name.isNotEmpty) ? name : null,
         shortNick: (nick != null && nick.isNotEmpty) ? nick : null,
         profileImageB64: (img != null && img.isNotEmpty) ? img : null,
+        // 'none' (a real value) unequips; absent/empty (old peer) keeps current.
+        avatarBorderId: (border != null && border.isNotEmpty) ? border : null,
         imagesAllowed: imagesAllowed,
       );
       contacts[idx] = updated;

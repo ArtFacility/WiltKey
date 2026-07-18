@@ -67,3 +67,17 @@ desktop.ini
 # Relay release build artifacts (upload to GitHub Releases, not git)
 wiltkey_server/dist/
 wiltkey_server/linux_wiltkey_server
+
+# Premium theme content is private (lives in a separate private repo cloned into
+# this dir on the official build machine). Only the committed stub is public, so
+# forks build with the free base themes and never receive premium theme source.
+wiltkey_client/lib/core/theme/premium/*
+!wiltkey_client/lib/core/theme/premium/premium_themes.dart
+
+# Premium avatar-border code + SVG art is private (same private-repo model as
+# premium themes). Only the committed stub + the free tinfoil border are public;
+# the premium dirs keep just a .gitkeep so the asset path exists on every build.
+wiltkey_client/lib/core/cosmetics/premium/*
+!wiltkey_client/lib/core/cosmetics/premium/premium_borders.dart
+wiltkey_client/assets/borders/premium/*
+!wiltkey_client/assets/borders/premium/.gitkeep

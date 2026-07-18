@@ -289,6 +289,7 @@ extension AppStateInbound on AppState {
             memberKeyHash: senderId,
             name: (p['name'] as String?)?.trim(),
             profileImage: (p['profile_image'] as String?)?.trim(),
+            avatarBorder: (p['avatar_border'] as String?)?.trim(),
           );
           // Refresh the in-memory cache the chat UI reads from (+ notify).
           updateGroupMembersMetadata(contact);
@@ -587,6 +588,7 @@ extension AppStateInbound on AppState {
       bool allowSave = false;
       bool ephemeral = false;
       int ttlSeconds = 0;
+      String? replyToId;
 
       try {
         if (envelopeJson != null) {
@@ -605,7 +607,11 @@ extension AppStateInbound on AppState {
           cipherBytes,
           offset,
         );
-        decryptedPlaintext = utf8.decode(plainBytes);
+        // The reply target (if any) is framed into the decrypted body, not the
+        // envelope — strip it back out here.
+        final parsed = ChatMessage.parseReplyBody(utf8.decode(plainBytes));
+        replyToId = parsed.$1;
+        decryptedPlaintext = parsed.$2;
       } catch (e) {
         log(
           '[WebSocket Error] Failed to parse or decrypt incoming message: $e',
@@ -647,6 +653,7 @@ extension AppStateInbound on AppState {
         allowSave: allowSave,
         ephemeral: ephemeral,
         ttlSeconds: ephemeral ? ttlSeconds : 0,
+        replyToId: replyToId,
         decryptedText: decryptedPlaintext,
         decodedImageBytes:
             (resolvedContentType == 'image' && decryptedPlaintext != null)
@@ -714,6 +721,9 @@ extension AppStateInbound on AppState {
       final bool allowSave = envelopeJson?['dl'] == true;
       final bool ephemeral = envelopeJson?['eph'] == 1;
       final int ttlSeconds = envelopeJson?['ttl'] as int? ?? 0;
+      // Reply target is framed into the encrypted body (parsed after decrypt),
+      // not carried in the envelope.
+      String? replyToId;
       final messageId =
           envelopeJson?['id'] as String? ?? DateTime.now().toString();
       final tsMillis = envelopeJson?['ts'] as int?;
@@ -786,7 +796,9 @@ extension AppStateInbound on AppState {
       }
 
       // --- regular chat message ---
-      final decryptedText = utf8.decode(plainBytes);
+      final parsed = ChatMessage.parseReplyBody(utf8.decode(plainBytes));
+      replyToId = parsed.$1;
+      final decryptedText = parsed.$2;
 
       // Dedupe before any mutation so retries/resyncs don't double-advance lanes.
       // Checks the DB (not just the loaded window) so windowing can't reintroduce
@@ -864,6 +876,7 @@ extension AppStateInbound on AppState {
         allowSave: allowSave,
         ephemeral: ephemeral,
         ttlSeconds: ephemeral ? ttlSeconds : 0,
+        replyToId: replyToId,
         decryptedText: decryptedText,
         decodedImageBytes: (innerType == 'image')
             ? base64Decode(decryptedText)
@@ -1297,6 +1310,7 @@ extension AppStateInbound on AppState {
           'allowSave': msg.allowSave,
           if (msg.ephemeral) 'ephemeral': true,
           if (msg.ephemeral) 'ttlSeconds': msg.ttlSeconds,
+          // Reply target rides inside the forwarded ciphertext (msg.text).
         });
       }
 
@@ -1405,6 +1419,8 @@ extension AppStateInbound on AppState {
         final bool allowSave = m['allowSave'] as bool? ?? false;
         final bool ephemeral = m['ephemeral'] as bool? ?? false;
         final int ttlSeconds = m['ttlSeconds'] as int? ?? 0;
+        // Reply target is framed into the encrypted body (parsed after decrypt).
+        String? replyToId;
 
         if (contact.isGroup && contentType == 'group_lane_header') {
           try {
@@ -1471,6 +1487,10 @@ extension AppStateInbound on AppState {
             );
             decryptedText = utf8.decode(plainBytes);
           }
+          // Strip the reply header framed into the body (if any).
+          final parsedReply = ChatMessage.parseReplyBody(decryptedText);
+          replyToId = parsedReply.$1;
+          decryptedText = parsedReply.$2;
 
           // For groups, attribution is decided by the real key hash, not the peer's
           // perspective flag (otherwise a peer's own messages arrive flagged "mine").
@@ -1492,6 +1512,7 @@ extension AppStateInbound on AppState {
             allowSave: allowSave,
             ephemeral: ephemeral,
             ttlSeconds: ephemeral ? ttlSeconds : 0,
+            replyToId: replyToId,
             decryptedText: decryptedText,
             decodedImageBytes: (contentType == 'image')
                 ? base64Decode(decryptedText)

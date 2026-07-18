@@ -160,6 +160,7 @@ class _MessageTaskHandler extends TaskHandler {
           final senderId = msg['sender_id'] as String? ?? '';
           final envelope = msg['envelope'] as String? ?? '';
           final contentType = msg['content_type'] as String? ?? 'text';
+          final messageId = msg['message_id'] as String?;
           // Buffer the raw frame so the main isolate can decrypt + store it on
           // unlock (the server has already removed it from the offline queue).
           PendingInbox.append(
@@ -167,6 +168,14 @@ class _MessageTaskHandler extends TaskHandler {
             envelope: envelope,
             contentType: contentType,
           );
+          if (messageId != null) {
+            _socket?.add(
+              jsonEncode({
+                'type': 'FILE_RECEIVED',
+                'message_id': messageId,
+              }),
+            );
+          }
           if (_notifyContentTypes.contains(contentType)) {
             // sender_id is the 1:1 peer's keyHash, enabling a deep-link on tap.
             // (Group frames carry a member id, which won't resolve to a chat —

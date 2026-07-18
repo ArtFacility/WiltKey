@@ -1339,4 +1339,201 @@ class AppLocalizationsPl extends AppLocalizations {
   @override
   String get wiltingHoldToSendHint =>
       'Przytrzymaj, aby wysłać znikającą wiadomość';
+
+  @override
+  String get replyYou => 'Ty';
+
+  @override
+  String get replySomeone => 'Ktoś';
+
+  @override
+  String get replyPreviewImage => '📷 Zdjęcie';
+
+  @override
+  String get replyPreviewVoice => '🎤 Wiadomość głosowa';
+
+  @override
+  String get replyPreviewMessage => 'Wiadomość';
+
+  @override
+  String get replyUnavailable => 'Oryginalna wiadomość niedostępna';
+
+  @override
+  String get shopEntryTitle => 'Sklep i WiltKey Plus';
+
+  @override
+  String get shopEntrySubtitle => 'Motywy, dodatki i Plus';
+
+  @override
+  String get supportEntryTitle => 'Wesprzyj projekt';
+
+  @override
+  String get supportEntrySubtitle => 'Pomóż utrzymać WiltKey';
+
+  @override
+  String get shopTitle => 'Sklep';
+
+  @override
+  String get supportTitle => 'Wesprzyj WiltKey';
+
+  @override
+  String get shopPlusSection => 'WiltKey Plus';
+
+  @override
+  String get shopUnlocksSection => 'Odblokowania';
+
+  @override
+  String get shopPlusTagline =>
+      'Dłuższe przechowywanie wiadomości offline i większe transfery plików.';
+
+  @override
+  String get shopEmptyTitle => 'Jeszcze nic tu nie ma';
+
+  @override
+  String get shopEmptyBody => 'Produkty są w drodze — zajrzyj wkrótce.';
+
+  @override
+  String get shopRestoreButton => 'Przywróć zakupy';
+
+  @override
+  String get shopRestoredSnack => 'Zakupy przywrócone';
+
+  @override
+  String get shopBuyButton => 'Kup';
+
+  @override
+  String get shopOwnedLabel => 'Posiadane';
+
+  @override
+  String get shopActiveLabel => 'Aktywne';
+
+  @override
+  String get shopManageNote => 'Zarządzaj w Google Play';
+
+  @override
+  String get shopPurchasePendingSnack => 'Zakup w toku…';
+
+  @override
+  String get shopPurchaseFailedSnack => 'Nie udało się dokończyć zakupu';
+
+  @override
+  String get supportIntro =>
+      'WiltKey jest darmowy i open source, a ta wersja odblokowuje wszystkie elementy kosmetyczne za darmo. Jeśli chcesz wesprzeć rozwój i oficjalny serwer relay, odwiedź stronę poniżej.';
+
+  @override
+  String get supportOpenButton => 'Otwórz stronę wsparcia';
+
+  @override
+  String get supportFreeNote =>
+      'W tej wersji wszystkie elementy kosmetyczne są odblokowane.';
+
+  @override
+  String get shopTabPalettes => 'Palety';
+
+  @override
+  String get shopTabThemes => 'Motywy';
+
+  @override
+  String get shopTabBorders => 'Ramki';
+
+  @override
+  String get shopTabPlus => 'Plus';
+
+  @override
+  String get shopTabPromo => 'Promo';
+
+  @override
+  String get shopPalettesIntro =>
+      'Dodatkowe kolory do rysowania awatara i ikon grup. Otrzymane prace zawsze wyświetlają się w pełni — pakiet odblokowuje tylko rysowanie tymi kolorami przez Ciebie.';
+
+  @override
+  String shopPaletteColorCount(int count) {
+    return '$count dodatkowych kolorów';
+  }
+
+  @override
+  String get shopThemesEmptyTitle => 'Jeszcze brak motywów';
+
+  @override
+  String get shopThemesEmptyBody =>
+      'Motywy premium są w drodze — trzy wbudowane motywy pozostaną darmowe na zawsze.';
+
+  @override
+  String get shopBordersSoonTitle => 'Ramki są w drodze';
+
+  @override
+  String get shopBordersSoonBody =>
+      'Ozdobne ramki do awatara, widoczne dla wszystkich, z którymi rozmawiasz. W przygotowaniu.';
+
+  @override
+  String get shopPlusBenefitsSection => 'Co otrzymujesz';
+
+  @override
+  String get shopPlusBenefitHold =>
+      'Twoje wiadomości czekają na serwerze 72 godziny zamiast 24, gdy jesteś offline.';
+
+  @override
+  String get shopPlusBenefitFiles =>
+      'Wysyłaj duże pliki — do 50 MB na wiadomość, ponad darmowy limit 5 MB.';
+
+  @override
+  String get shopPlusBenefitSupport =>
+      'Utrzymujesz serwer i niezależność WiltKey.';
+
+  @override
+  String get shopSubscribeButton => 'Subskrybuj';
+
+  @override
+  String get shopPriceUnavailable => 'Niedostępne';
+
+  @override
+  String get shopPromoIntro =>
+      'Masz kod promocyjny? Wpisz go poniżej, a Google Play zastosuje go na Twoim koncie.';
+
+  @override
+  String get shopPromoHint => 'KOD PROMOCYJNY';
+
+  @override
+  String get shopPromoRedeemButton => 'Zrealizuj w Google Play';
+
+  @override
+  String get shopPromoNote =>
+      'Kody realizuje się w Sklepie Play. Po zastosowaniu odblokowanie pojawi się tutaj automatycznie.';
+
+  @override
+  String pairLargerPadsUpsell(String max) {
+    return 'Odblokuj większe pady — do $max';
+  }
+
+  @override
+  String pairNotEnoughSpace(String needed, String free) {
+    return 'Za mało wolnego miejsca — ten czat wymaga $needed, a masz $free.';
+  }
+
+  @override
+  String pairSyncingGenerating(String written, String total) {
+    return 'Generowanie strumienia klucza… $written / $total';
+  }
+
+  @override
+  String get pairKeepAppOpen =>
+      'Nie zamykaj aplikacji — bezpieczny pad wciąż jest tworzony.';
+
+  @override
+  String groupLargerPadsUpsell(String max) {
+    return 'Odblokuj większe pady grupowe — do $max';
+  }
+
+  @override
+  String get settingsBorderSection => 'Ramka awatara';
+
+  @override
+  String get shopBordersIntro =>
+      'Ramki i akcesoria do awatara. Wszyscy, z którymi rozmawiasz, widzą Twoją ramkę — zablokowana uniemożliwia tylko jej założenie, nigdy wyświetlanie.';
+
+  @override
+  String get shopBorderSubtitle => 'Ramka awatara';
+
+  @override
+  String get shopFreeLabel => 'Za darmo';
 }

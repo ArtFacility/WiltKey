@@ -209,6 +209,7 @@ extension AppStateGroups on AppState {
     String? name,
     String? profileImage,
     int? arrivalOrder,
+    String? avatarBorder,
   }) async {
     final existing = await GroupDatabase.instance.getProfile(
       groupId,
@@ -229,6 +230,9 @@ extension AppStateGroups on AppState {
       name: mergedName,
       profileImage: mergedImage,
       arrivalOrder: mergedOrder,
+      // Null preserves the stored value (see upsertProfile); a concrete id
+      // (including 'none' to unequip) overwrites it.
+      avatarBorder: avatarBorder,
     );
   }
 
@@ -328,6 +332,7 @@ extension AppStateGroups on AppState {
     final payload = jsonEncode({
       'name': effectiveDeviceName,
       'profile_image': profileImageB64,
+      'avatar_border': AvatarBorderController.instance.borderId,
       'v': 1,
     });
     final enc = WiltkeyPersistence().encryptString(payload, keyHex);
@@ -522,6 +527,7 @@ extension AppStateGroups on AppState {
     bool allowSave = false,
     bool ephemeral = false,
     int ttlSeconds = 0,
+    String? replyToId,
   }) async {
     if (activeContact == null ||
         !activeContact!.isGroup ||
@@ -539,7 +545,11 @@ extension AppStateGroups on AppState {
     final bool isVoice = contentType == 'voice';
     final bool isEmojiCtl =
         contentType == 'emoji_def' || contentType == 'emoji_delete';
-    final payloadBytes = utf8.encode(text).length;
+    // Replies embed the parent id in the OTP body (hidden from the relay), so the
+    // encrypted/counted payload is the framed form; the visible copies keep the
+    // original text + replyToId.
+    final String wireText = ChatMessage.buildReplyBody(replyToId, text);
+    final payloadBytes = utf8.encode(wireText).length;
     if (!isImage &&
         !isVoice &&
         !isEmojiCtl &&
@@ -569,6 +579,7 @@ extension AppStateGroups on AppState {
         decryptedText: text,
         ephemeral: ephemeral,
         ttlSeconds: ephemeral ? ttlSeconds : 0,
+        replyToId: replyToId,
       );
       appendLoadedMessage(contact.id, placeholder);
       notifyListeners();
@@ -660,7 +671,7 @@ extension AppStateGroups on AppState {
       );
     }
 
-    final rawBytes = utf8.encode(text);
+    final rawBytes = utf8.encode(wireText);
     final writeOffset = startOffset + currentWriteOffset;
     final cipherBytes = await WiltkeyOtpService.xorWithGroupKeystream(
       groupId,
@@ -683,6 +694,7 @@ extension AppStateGroups on AppState {
       if (allowSave) 'dl': true,
       if (ephemeral) 'eph': 1,
       if (ephemeral) 'ttl': ttlSeconds,
+      // Reply target is embedded in the encrypted body, not the envelope.
     });
 
     final bool socketConnected = WebSocketClient().isConnected;
@@ -896,6 +908,7 @@ extension AppStateGroups on AppState {
         cachedGroupProfiles[memberHash] = {
           'name': p['name'] as String? ?? '',
           'profile_image': p['profile_image'] as String? ?? '',
+          'avatar_border': p['avatar_border'] as String? ?? '',
         };
       }
       // Keyed by the local contact id to match the UI read sites
@@ -965,12 +978,14 @@ extension AppStateGroups on AppState {
     required String groupIconHex,
     required int maxMembers,
     required String groupSeed,
+    void Function(int written, int total)? onPadProgress,
   }) async {
-    await WiltkeyOtpService.generateGroupKeystream(
-      groupId,
-      groupSeed,
-      totalGroupSize,
-    );
+    // Groups no longer pre-generate a giant on-disk pad — the keystream is
+    // computed on demand from the seed (see WiltkeyOtpService.keystreamRange).
+    // Just cache the seed and report the (now-instant) "generation" as complete
+    // so any progress UI closes immediately.
+    WiltkeyOtpService.cacheGroupSeed(groupId, groupSeed, totalGroupSize);
+    onPadProgress?.call(totalGroupSize, totalGroupSize);
 
     await GroupDatabase.instance.init();
     await GroupDatabase.instance.upsertGroupInfo(
@@ -1084,12 +1099,13 @@ extension AppStateGroups on AppState {
     required String hostName,
     String? groupIconHex,
     int? maxMembers,
+    void Function(int written, int total)? onPadProgress,
   }) async {
-    await WiltkeyOtpService.generateGroupKeystream(
-      groupId,
-      groupSeed,
-      totalSize,
-    );
+    // Compute-on-demand: cache the seed instead of writing a physical pad file
+    // (same as the host path in addGroupChat). Report generation complete so the
+    // join progress UI closes immediately.
+    WiltkeyOtpService.cacheGroupSeed(groupId, groupSeed, totalSize);
+    onPadProgress?.call(totalSize, totalSize);
 
     await GroupDatabase.instance.init();
     await GroupDatabase.instance.upsertGroupInfo(

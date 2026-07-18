@@ -1275,4 +1275,191 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get wiltingHoldToSendHint => '长按以发送凋零消息';
+
+  @override
+  String get replyYou => '你';
+
+  @override
+  String get replySomeone => '某人';
+
+  @override
+  String get replyPreviewImage => '📷 照片';
+
+  @override
+  String get replyPreviewVoice => '🎤 语音消息';
+
+  @override
+  String get replyPreviewMessage => '消息';
+
+  @override
+  String get replyUnavailable => '原始消息不可用';
+
+  @override
+  String get shopEntryTitle => '商店与 WiltKey Plus';
+
+  @override
+  String get shopEntrySubtitle => '主题、解锁与 Plus';
+
+  @override
+  String get supportEntryTitle => '支持项目';
+
+  @override
+  String get supportEntrySubtitle => '帮助 WiltKey 持续运行';
+
+  @override
+  String get shopTitle => '商店';
+
+  @override
+  String get supportTitle => '支持 WiltKey';
+
+  @override
+  String get shopPlusSection => 'WiltKey Plus';
+
+  @override
+  String get shopUnlocksSection => '解锁内容';
+
+  @override
+  String get shopPlusTagline => '更长的离线消息保留时间及更大的文件传输。';
+
+  @override
+  String get shopEmptyTitle => '这里还没有内容';
+
+  @override
+  String get shopEmptyBody => '商品即将上线，请稍后再来。';
+
+  @override
+  String get shopRestoreButton => '恢复购买';
+
+  @override
+  String get shopRestoredSnack => '购买已恢复';
+
+  @override
+  String get shopBuyButton => '购买';
+
+  @override
+  String get shopOwnedLabel => '已拥有';
+
+  @override
+  String get shopActiveLabel => '生效中';
+
+  @override
+  String get shopManageNote => '在 Google Play 中管理';
+
+  @override
+  String get shopPurchasePendingSnack => '购买处理中…';
+
+  @override
+  String get shopPurchaseFailedSnack => '购买未能完成';
+
+  @override
+  String get supportIntro =>
+      'WiltKey 是免费且开源的，此版本免费解锁所有装饰内容。如果你愿意支持开发和官方中继服务器，请访问下方页面。';
+
+  @override
+  String get supportOpenButton => '打开支持页面';
+
+  @override
+  String get supportFreeNote => '此版本已解锁所有装饰内容。';
+
+  @override
+  String get shopTabPalettes => '调色板';
+
+  @override
+  String get shopTabThemes => '主题';
+
+  @override
+  String get shopTabBorders => '边框';
+
+  @override
+  String get shopTabPlus => 'Plus';
+
+  @override
+  String get shopTabPromo => 'promo';
+
+  @override
+  String get shopPalettesIntro =>
+      '用于绘制头像和群组图标的额外颜色。收到的作品始终完整显示——色板仅解锁你自己用这些颜色作画的能力。';
+
+  @override
+  String shopPaletteColorCount(int count) {
+    return '$count 种额外颜色';
+  }
+
+  @override
+  String get shopThemesEmptyTitle => '暂无主题';
+
+  @override
+  String get shopThemesEmptyBody => '高级主题即将推出——三款内置主题永久免费。';
+
+  @override
+  String get shopBordersSoonTitle => '边框即将推出';
+
+  @override
+  String get shopBordersSoonBody => '为你的头像添加装饰边框，与你聊天的所有人都能看到。正在开发中。';
+
+  @override
+  String get shopPlusBenefitsSection => '你将获得';
+
+  @override
+  String get shopPlusBenefitHold => '离线时，你的消息在中继服务器上保留 72 小时，而非 24 小时。';
+
+  @override
+  String get shopPlusBenefitFiles => '发送大文件——每条消息最多 50 MB，突破免费的 5 MB 限制。';
+
+  @override
+  String get shopPlusBenefitSupport => '你让中继服务器持续运行，并保持 WiltKey 的独立性。';
+
+  @override
+  String get shopSubscribeButton => '订阅';
+
+  @override
+  String get shopPriceUnavailable => '不可用';
+
+  @override
+  String get shopPromoIntro => '有促销代码吗？在下方输入，Google Play 会将其应用到你的账号。';
+
+  @override
+  String get shopPromoHint => '促销代码';
+
+  @override
+  String get shopPromoRedeemButton => '在 Google Play 中兑换';
+
+  @override
+  String get shopPromoNote => '代码在 Play 商店中兑换。应用后，解锁内容会自动显示在这里。';
+
+  @override
+  String pairLargerPadsUpsell(String max) {
+    return '解锁更大的密码本——最高 $max';
+  }
+
+  @override
+  String pairNotEnoughSpace(String needed, String free) {
+    return '可用空间不足——此聊天需要 $needed，而你只有 $free。';
+  }
+
+  @override
+  String pairSyncingGenerating(String written, String total) {
+    return '正在生成密钥流……$written / $total';
+  }
+
+  @override
+  String get pairKeepAppOpen => '请保持应用开启——安全密码本仍在创建中。';
+
+  @override
+  String groupLargerPadsUpsell(String max) {
+    return '解锁更大的群组密码本——最高 $max';
+  }
+
+  @override
+  String get settingsBorderSection => '头像边框';
+
+  @override
+  String get shopBordersIntro =>
+      '为你的头像添加边框和配饰。与你聊天的所有人都能看到你的边框——锁定只会阻止你装备它，绝不影响其显示。';
+
+  @override
+  String get shopBorderSubtitle => '头像边框';
+
+  @override
+  String get shopFreeLabel => '免费';
 }

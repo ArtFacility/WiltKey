@@ -151,6 +151,26 @@ extension AppStateAuth on AppState {
     // Initialize WiltkeyDatabase
     await WiltkeyDatabase.instance.init();
     contacts = await WiltkeyDatabase.instance.getAllContacts();
+
+    // Group keystreams are computed on demand from the stored seed (no giant
+    // on-disk pad). Cache every group's seed up front so the invariant holds —
+    // "every group in `contacts` has its seed cached" — meaning group decrypt
+    // never misses. Then lazy-delete any leftover group `.pad` from an older
+    // build (redundant now; a no-op if already gone) to reclaim the disk.
+    for (final c in contacts) {
+      if (c.isGroup && (c.groupSeed?.isNotEmpty ?? false)) {
+        WiltkeyOtpService.cacheGroupSeed(
+          c.keyHash,
+          c.groupSeed!,
+          c.totalGroupSize ?? c.maxBufferBytes,
+        );
+        try {
+          await WiltkeyOtpService.deleteGroupKeystreamFile(c.keyHash);
+        } catch (e) {
+          log('[GroupPad] Could not remove legacy pad for ${c.keyHash}: $e');
+        }
+      }
+    }
     // Messages are loaded lazily per-chat (newest page on open, older on
     // scroll-back) — see loadInitialMessages/loadOlderMessages. Unlock stays fast
     // and memory stays bounded regardless of total history. We only precompute

@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.0.2+11
+version: 1.0.4+13
 
 environment:
   sdk: ^3.12.0
@@ -57,6 +57,8 @@ dependencies:
   local_auth: ^2.3.0 # Optional fingerprint/biometric unlock (bypasses the PIN within a 4h window)
   record: ^7.1.1
   just_audio: ^0.10.6
+  url_launcher: ^6.3.0 # Open the "Support the project" link on the FOSS build (Android intent; no Google Play Services)
+  flutter_svg: ^2.0.10 # Render SVG avatar borders (vector, scales to every avatar size)
 
 dev_dependencies:
   flutter_test:
@@ -86,6 +88,11 @@ flutter:
   # App icon, loaded at runtime for the consensual-screenshot banner watermark.
   assets:
     - assets/icon/icon.png
+    # Avatar borders (SVG). The free tinfoil hat is public; premium border art is
+    # cloned into assets/borders/premium/ from a private repo on the official
+    # build machine (gitignored — the dir keeps a .gitkeep so the path resolves).
+    - assets/borders/
+    - assets/borders/premium/
 
   # Bundled theme fonts (offline; OFL — see assets/fonts/OFL-*.txt).
   # Sora = UI, Spectral = serif titles, IBM Plex Mono = byte counts / crypto.

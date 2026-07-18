@@ -1334,4 +1334,201 @@ class AppLocalizationsSv extends AppLocalizations {
   @override
   String get wiltingHoldToSendHint =>
       'Håll in för att skicka ett vissnande meddelande';
+
+  @override
+  String get replyYou => 'Du';
+
+  @override
+  String get replySomeone => 'Någon';
+
+  @override
+  String get replyPreviewImage => '📷 Foto';
+
+  @override
+  String get replyPreviewVoice => '🎤 Röstmeddelande';
+
+  @override
+  String get replyPreviewMessage => 'Meddelande';
+
+  @override
+  String get replyUnavailable => 'Originalmeddelandet är inte tillgängligt';
+
+  @override
+  String get shopEntryTitle => 'Butik & WiltKey Plus';
+
+  @override
+  String get shopEntrySubtitle => 'Teman, upplåsningar & Plus';
+
+  @override
+  String get supportEntryTitle => 'Stöd projektet';
+
+  @override
+  String get supportEntrySubtitle => 'Hjälp till att hålla WiltKey igång';
+
+  @override
+  String get shopTitle => 'Butik';
+
+  @override
+  String get supportTitle => 'Stöd WiltKey';
+
+  @override
+  String get shopPlusSection => 'WiltKey Plus';
+
+  @override
+  String get shopUnlocksSection => 'Upplåsningar';
+
+  @override
+  String get shopPlusTagline =>
+      'Längre offline-lagring av meddelanden och större filöverföringar.';
+
+  @override
+  String get shopEmptyTitle => 'Inget här ännu';
+
+  @override
+  String get shopEmptyBody => 'Produkter är på väg — kom tillbaka snart.';
+
+  @override
+  String get shopRestoreButton => 'Återställ köp';
+
+  @override
+  String get shopRestoredSnack => 'Köp återställda';
+
+  @override
+  String get shopBuyButton => 'Köp';
+
+  @override
+  String get shopOwnedLabel => 'Ägs';
+
+  @override
+  String get shopActiveLabel => 'Aktiv';
+
+  @override
+  String get shopManageNote => 'Hantera i Google Play';
+
+  @override
+  String get shopPurchasePendingSnack => 'Köp väntar…';
+
+  @override
+  String get shopPurchaseFailedSnack => 'Köpet kunde inte slutföras';
+
+  @override
+  String get supportIntro =>
+      'WiltKey är gratis och öppen källkod, och den här versionen låser upp alla kosmetiska tillägg gratis. Om du vill stödja utvecklingen och den officiella relayen, besök sidan nedan.';
+
+  @override
+  String get supportOpenButton => 'Öppna stödsidan';
+
+  @override
+  String get supportFreeNote =>
+      'Alla kosmetiska tillägg är upplåsta i den här versionen.';
+
+  @override
+  String get shopTabPalettes => 'Paletter';
+
+  @override
+  String get shopTabThemes => 'Teman';
+
+  @override
+  String get shopTabBorders => 'Ramar';
+
+  @override
+  String get shopTabPlus => 'Plus';
+
+  @override
+  String get shopTabPromo => 'Promo';
+
+  @override
+  String get shopPalettesIntro =>
+      'Extra färger för att rita din avatar och dina gruppikoner. Mottagen konst visas alltid fullständigt — ett paket låser bara upp att du själv ritar med färgerna.';
+
+  @override
+  String shopPaletteColorCount(int count) {
+    return '$count extra färger';
+  }
+
+  @override
+  String get shopThemesEmptyTitle => 'Inga teman ännu';
+
+  @override
+  String get shopThemesEmptyBody =>
+      'Premiumteman är på väg — de tre inbyggda temana är gratis för alltid.';
+
+  @override
+  String get shopBordersSoonTitle => 'Ramar kommer snart';
+
+  @override
+  String get shopBordersSoonBody =>
+      'Dekorativa ramar till din avatar som alla du chattar med kan se. Under arbete.';
+
+  @override
+  String get shopPlusBenefitsSection => 'Det här får du';
+
+  @override
+  String get shopPlusBenefitHold =>
+      'Dina meddelanden väntar 72 timmar på relayen i stället för 24 medan du är offline.';
+
+  @override
+  String get shopPlusBenefitFiles =>
+      'Skicka stora filer – upp till 50 MB per meddelande, bortom gränsen på 5 MB gratis.';
+
+  @override
+  String get shopPlusBenefitSupport =>
+      'Du håller relayen igång och WiltKey oberoende.';
+
+  @override
+  String get shopSubscribeButton => 'Prenumerera';
+
+  @override
+  String get shopPriceUnavailable => 'Inte tillgänglig';
+
+  @override
+  String get shopPromoIntro =>
+      'Har du en kampanjkod? Ange den nedan så tillämpar Google Play den på ditt konto.';
+
+  @override
+  String get shopPromoHint => 'KAMPANJKOD';
+
+  @override
+  String get shopPromoRedeemButton => 'Lös in i Google Play';
+
+  @override
+  String get shopPromoNote =>
+      'Koder löses in i Play Butik. När koden tillämpats visas din upplåsning här automatiskt.';
+
+  @override
+  String pairLargerPadsUpsell(String max) {
+    return 'Lås upp större pads — upp till $max';
+  }
+
+  @override
+  String pairNotEnoughSpace(String needed, String free) {
+    return 'Inte tillräckligt med ledigt utrymme — den här chatten kräver $needed och du har $free.';
+  }
+
+  @override
+  String pairSyncingGenerating(String written, String total) {
+    return 'Genererar nyckelström… $written / $total';
+  }
+
+  @override
+  String get pairKeepAppOpen =>
+      'Håll appen öppen — den säkra padden skapas fortfarande.';
+
+  @override
+  String groupLargerPadsUpsell(String max) {
+    return 'Lås upp större grupp-pads — upp till $max';
+  }
+
+  @override
+  String get settingsBorderSection => 'Avatarram';
+
+  @override
+  String get shopBordersIntro =>
+      'Ramar och tillbehör till din avatar. Alla du chattar med ser din ram — en låst hindrar bara dig från att använda den, aldrig hur den visas.';
+
+  @override
+  String get shopBorderSubtitle => 'Avatarram';
+
+  @override
+  String get shopFreeLabel => 'Gratis';
 }
