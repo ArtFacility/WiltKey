@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/joho/godotenv"
 	"github.com/shirou/gopsutil/v3/mem"
 )
 
@@ -837,6 +838,15 @@ func handlePostEntitlement(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	// Best-effort load of a `.env` in the working directory. Never overrides vars
+	// already set in the environment (so pm2/ecosystem values win), and a missing
+	// file is fine — self-hosters can configure via real env vars instead.
+	if err := godotenv.Load(); err != nil {
+		log.Printf("[env] no .env loaded (%v) — using process environment only", err)
+	} else {
+		log.Printf("[env] loaded .env from working directory")
+	}
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8000"
@@ -860,10 +870,15 @@ func main() {
 	if postgresURL != "" {
 		pg, err = NewPostgresClient(postgresURL)
 		if err != nil {
-			log.Fatalf("Failed to initialize Postgres: %v", err)
+			// Non-fatal: a bad/missing DB must not crash-loop the whole relay.
+			// Offline queueing falls back to Redis; large files + Plus perks are
+			// unavailable until the DB is reachable. Fix the DB and restart.
+			log.Printf("WARNING: Postgres init failed (%v) — continuing with Postgres DISABLED (Redis-only queue; no large-file bucket routing or Plus entitlements).", err)
+			pg = nil
+		} else {
+			defer pg.Close()
+			log.Println("Connected to Postgres database successfully")
 		}
-		defer pg.Close()
-		log.Println("Connected to Postgres database successfully")
 	} else {
 		log.Println("Warning: POSTGRES_URL not configured. Postgres message queue and entitlement support is disabled.")
 	}
@@ -879,14 +894,22 @@ func main() {
 	useSSLStr := os.Getenv("BUCKET_USE_SSL")
 	useSSL := useSSLStr == "true"
 
+	localDir := "./wiltkey_local_storage"
 	if bucketEndpoint != "" && bucketAccessKey != "" && bucketSecretKey != "" {
 		storage, err = NewS3Storage(bucketEndpoint, bucketAccessKey, bucketSecretKey, bucketName, useSSL)
 		if err != nil {
-			log.Fatalf("Failed to initialize S3 storage: %v", err)
+			// Non-fatal: fall back to local disk rather than crash-loop the relay
+			// (e.g. wrong BUCKET_USE_SSL, unreachable endpoint, or missing bucket
+			// perms). Large payloads persist to disk until the bucket is fixed.
+			log.Printf("WARNING: S3 storage init failed (%v) — falling back to LOCAL disk storage at %s.", err, localDir)
+			storage, err = NewLocalStorage(localDir)
+			if err != nil {
+				log.Fatalf("Failed to initialize local storage fallback: %v", err)
+			}
+		} else {
+			log.Printf("Connected to S3 storage at %s, bucket %s", bucketEndpoint, bucketName)
 		}
-		log.Printf("Connected to S3 storage at %s, bucket %s", bucketEndpoint, bucketName)
 	} else {
-		localDir := "./wiltkey_local_storage"
 		storage, err = NewLocalStorage(localDir)
 		if err != nil {
 			log.Fatalf("Failed to initialize local storage fallback: %v", err)

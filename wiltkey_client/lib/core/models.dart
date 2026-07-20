@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'custom_emoji.dart' show stickerPayload;
+
 class Contact {
   final String id;
   final String name;
@@ -356,8 +358,14 @@ class ChatMessage {
   /// Reply framing lives in the OTP-encrypted body (never the relay-visible
   /// envelope), so the reply relationship never leaves the pad — at the cost of a
   /// few extra pad bytes. A reply body is `<DELIM><parentId><DELIM><text>`; a normal
-  /// body is unchanged. The delimiter is the SOH control byte (U+0001), which never
-  /// occurs in real text or base64 image/voice payloads.
+  /// body is unchanged. The delimiter is the SOH control byte (U+0001), chosen
+  /// because it never occurs in real text or base64 image/voice payloads.
+  ///
+  /// ⚠️ Stickers ([kStickerMarker] = `\x01stk\x01…`) predate this feature and are
+  /// wrapped in the SAME SOH byte, so [parseReplyBody] must explicitly exclude a
+  /// sticker body — otherwise a plain sticker is mis-read as a reply to a phantom
+  /// parent `"stk"` on the recipient (the sender never re-parses its own body, so
+  /// only the recipient saw the bogus quote).
   static final String _replyDelim = String.fromCharCode(1);
 
   static String buildReplyBody(String? replyToId, String text) => replyToId == null
@@ -368,6 +376,9 @@ class ChatMessage {
   /// when there's no reply header.
   static (String?, String) parseReplyBody(String body) {
     if (body.isEmpty || body.codeUnitAt(0) != 1) return (null, body);
+    // A sticker shares the SOH sentinel but is NOT a reply — leave it whole so it
+    // still renders as a sticker (see the delimiter note above).
+    if (stickerPayload(body) != null) return (null, body);
     final end = body.indexOf(_replyDelim, 1);
     if (end < 1) return (null, body);
     return (body.substring(1, end), body.substring(end + 1));
