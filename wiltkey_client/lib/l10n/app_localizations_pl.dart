@@ -206,6 +206,15 @@ class AppLocalizationsPl extends AppLocalizations {
   String get settingsProfileSectionProfile => 'Ustawienia profilu';
 
   @override
+  String get settingsProfileSectionOtherVisuals => 'Inne wizualne';
+
+  @override
+  String get settingsThemeLabel => 'Motyw';
+
+  @override
+  String get settingsPixelArtEditor => 'Edytor pixel art';
+
+  @override
   String get settingsProfileBrushColor => 'Kolor pędzla';
 
   @override
@@ -1477,6 +1486,10 @@ class AppLocalizationsPl extends AppLocalizations {
       'Wysyłaj duże pliki — do 50 MB na wiadomość, ponad darmowy limit 5 MB.';
 
   @override
+  String get shopPlusBenefitPads =>
+      'Twórz większe pady — do 200 MB dla czatu i 500 MB dla grupy.';
+
+  @override
   String get shopPlusBenefitSupport =>
       'Utrzymujesz serwer i niezależność WiltKey.';
 
@@ -1502,7 +1515,7 @@ class AppLocalizationsPl extends AppLocalizations {
 
   @override
   String pairLargerPadsUpsell(String max) {
-    return 'Odblokuj większe pady — do $max';
+    return 'Większe pady z Plus — do $max';
   }
 
   @override
@@ -1521,7 +1534,7 @@ class AppLocalizationsPl extends AppLocalizations {
 
   @override
   String groupLargerPadsUpsell(String max) {
-    return 'Odblokuj większe pady grupowe — do $max';
+    return 'Większe pady grupowe z Plus — do $max';
   }
 
   @override

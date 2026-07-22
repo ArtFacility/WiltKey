@@ -88,11 +88,11 @@ class _ShopScreenState extends State<ShopScreen>
     if (mounted) setState(() {});
   }
 
-  /// Every product id the shop can sell: the Plus subscription, the larger-pads
-  /// unlock, one per premium palette pack, one per premium theme.
+  /// Every product id the shop can sell: the Plus subscription (which also
+  /// carries the larger pad sizes), one per premium palette pack, one per
+  /// premium theme.
   List<String> _catalogIds() => <String>[
         WkProducts.plusSubscription,
-        WkProducts.largerPads,
         for (final s in WkPalette.sets)
           if (s.premium && s.sku != null) s.sku!,
         for (final t in WiltkeyThemeRegistry.premium) t.sku,
@@ -478,6 +478,7 @@ class _ShopScreenState extends State<ShopScreen>
         const SizedBox(height: 10),
         _benefit(t, Icons.schedule, l10n.shopPlusBenefitHold),
         _benefit(t, Icons.cloud_upload_outlined, l10n.shopPlusBenefitFiles),
+        _benefit(t, Icons.sd_storage_outlined, l10n.shopPlusBenefitPads),
         _benefit(t, Icons.favorite_outline, l10n.shopPlusBenefitSupport),
         const SizedBox(height: 24),
         if (active) ...[

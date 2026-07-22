@@ -18,7 +18,11 @@ if (keystorePropertiesFile.exists()) {
 
 android {
     namespace = "com.wiltkey.wiltkey_client"
-    compileSdk = flutter.compileSdkVersion
+    // Pinned to 36 for Play's Aug-2026 API-level requirement. Must be >= targetSdk
+    // (you can't target higher than you compile) and >= the level Play Billing 8
+    // needs; overrides flutter.compileSdkVersion so the gate doesn't depend on the
+    // installed Flutter's default. Needs Android SDK Platform 36 installed.
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -37,7 +41,8 @@ android {
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
-        targetSdk = 35
+        // Play requires apps to target API 36 to publish/update from Aug 2026.
+        targetSdk = 36
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
@@ -119,7 +124,7 @@ dependencies {
     // so the FOSS build never links Google Billing and stays Play-Services-free.
     // The native billing bridge + the `wiltkey/billing` MethodChannel live under
     // src/play/ to match (see BillingBridge.kt); the FOSS Dart side no-ops.
-    "playImplementation"("com.android.billingclient:billing-ktx:7.1.1")
+    "playImplementation"("com.android.billingclient:billing-ktx:8.0.0")
 }
 
 // Apply the Google Services plugin ONLY when building the Play flavor. It requires

@@ -14,12 +14,16 @@
 class WkProducts {
   WkProducts._();
 
-  /// The "WiltKey Plus" recurring subscription — the only server-cost perk
-  /// (72h offline hold vs 24h free; future capacity perks extend the same sub).
+  /// The "WiltKey Plus" recurring subscription — every capacity/server-cost
+  /// perk lives here: the 72h offline hold (vs 24h free), 50MB file sends (vs
+  /// 5MB), and the larger pad sizes at pairing / group creation.
+  ///
+  /// Larger pads were briefly designed as a separate one-time SKU
+  /// (`wk_pads_large`); that product was **never created in the Play Console**
+  /// and the id is intentionally left unused — Play keys ownership by product
+  /// id forever, so an id that never shipped is far cheaper than one retired
+  /// later. Do not resurrect it.
   static const String plusSubscription = 'wk_plus';
-
-  /// One-time unlock for the larger OTP pad size at BLE pairing.
-  static const String largerPads = 'wk_pads_large';
 
   /// Managed product id for a premium theme, derived from its registry id.
   static String premiumTheme(String themeId) => 'wk_theme_$themeId';

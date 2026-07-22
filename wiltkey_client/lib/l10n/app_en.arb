@@ -66,6 +66,9 @@
   "settingsProfileSectionAppearance": "Appearance",
   "settingsProfileSectionAvatar": "Pixel Art Avatar",
   "settingsProfileSectionProfile": "Profile Settings",
+  "settingsProfileSectionOtherVisuals": "Other Visuals",
+  "settingsThemeLabel": "Theme",
+  "settingsPixelArtEditor": "Pixel Art Editor",
   "settingsProfileBrushColor": "Brush color",
   "settingsProfileChipIdenticon": "Identicon",
   "settingsProfileChipClear": "Clear",
@@ -905,6 +908,10 @@
   "@shopPlusBenefitFiles": {
     "description": "Plus benefit: future perks included."
   },
+  "shopPlusBenefitPads": "Create bigger pads — up to 200 MB for a chat and 500 MB for a group.",
+  "@shopPlusBenefitPads": {
+    "description": "Plus benefit: larger OTP pad sizes at pairing and group creation."
+  },
   "shopPlusBenefitSupport": "You keep the relay running and WiltKey independent.",
   "@shopPlusBenefitSupport": {
     "description": "Plus benefit: supporting the project."
@@ -933,7 +940,7 @@
   "@shopPromoNote": {
     "description": "Footnote on the promo tab explaining that redemption happens in Play."
   },
-  "pairLargerPadsUpsell": "Unlock larger pads — up to {max}",
+  "pairLargerPadsUpsell": "Larger pads with Plus — up to {max}",
   "@pairLargerPadsUpsell": {
     "description": "Tappable hint under the pairing pad-size slider offering the larger tiers.",
     "placeholders": {
@@ -970,7 +977,7 @@
   "@pairKeepAppOpen": {
     "description": "Caution shown while the OTP pad generates, warning not to quit the app."
   },
-  "groupLargerPadsUpsell": "Unlock larger group pads — up to {max}",
+  "groupLargerPadsUpsell": "Larger group pads with Plus — up to {max}",
   "@groupLargerPadsUpsell": {
     "description": "Tappable hint under the group total-size slider offering the larger tiers.",
     "placeholders": {

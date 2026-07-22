@@ -58,10 +58,13 @@ class EntitlementService extends ChangeNotifier {
   bool get plusActive =>
       kPlayStore && _owned.contains(WkProducts.plusSubscription);
 
-  /// Larger OTP pad size at pairing. Free on FOSS ("just an adjustment");
-  /// a one-time unlock on Play.
-  bool get largerPadsUnlocked =>
-      !kPlayStore || _owned.contains(WkProducts.largerPads);
+  /// Larger OTP pad size at pairing and larger group pads. Free on FOSS ("just
+  /// an adjustment"); part of the **Plus subscription** on Play.
+  ///
+  /// Note a pad, once allocated, is permanent local key material — a lapsed
+  /// subscriber keeps every pad they already paired. This only gates creating
+  /// new large ones.
+  bool get largerPadsUnlocked => !kPlayStore || plusActive;
 
   /// A palette pack for pixel-art authoring. Free on FOSS; owned check on Play.
   /// (Rendering pixel art with any palette is always free for everyone — only

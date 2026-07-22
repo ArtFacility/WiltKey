@@ -48,11 +48,26 @@ func (c *Client) handleSendMessage(msg WSMessage) {
 		}
 	}
 
+	// 1.5 Per-sender cooldown on large payloads. Checked AFTER the size/subscription
+	// gates so a rejected message never burns the sender's window, and before the
+	// expensive bucket upload + Postgres write. Fails OPEN: a Redis hiccup must not
+	// block legitimate sends.
+	if payloadSize >= largePayloadThreshold {
+		allowed, rlErr := c.hub.rdb.AllowLargeUpload(c.id, largeUploadCooldown)
+		if rlErr != nil {
+			log.Printf("[Relay Warning] large-upload rate check failed for %s: %v — allowing", c.id, rlErr)
+		} else if !allowed {
+			log.Printf("[Relay] Client %s exceeded large-upload rate (1 per %s)", c.id, largeUploadCooldown)
+			c.SendJSON(WSMessage{Type: "ERROR", Message: "Sending large files too quickly — please wait a few seconds and try again"})
+			return
+		}
+	}
+
 	// Offline-hold TTL is keyed on the recipient's own subscription.
 	holdTTL := holdTTLForRecipient(msg.RecipientID)
 
 	// 2. Large file routing (>= 500KB) -> storage bucket + Postgres
-	if payloadSize >= 500*1024 {
+	if payloadSize >= largePayloadThreshold {
 		if pg == nil {
 			c.SendJSON(WSMessage{Type: "ERROR", Message: "Postgres and storage must be configured to process large payloads"})
 			return

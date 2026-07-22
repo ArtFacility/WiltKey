@@ -468,6 +468,24 @@ abstract class AppLocalizations {
   /// **'Profile Settings'**
   String get settingsProfileSectionProfile;
 
+  /// No description provided for @settingsProfileSectionOtherVisuals.
+  ///
+  /// In en, this message translates to:
+  /// **'Other Visuals'**
+  String get settingsProfileSectionOtherVisuals;
+
+  /// No description provided for @settingsThemeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Theme'**
+  String get settingsThemeLabel;
+
+  /// No description provided for @settingsPixelArtEditor.
+  ///
+  /// In en, this message translates to:
+  /// **'Pixel Art Editor'**
+  String get settingsPixelArtEditor;
+
   /// No description provided for @settingsProfileBrushColor.
   ///
   /// In en, this message translates to:
@@ -2688,6 +2706,12 @@ abstract class AppLocalizations {
   /// **'Send large files — up to 50 MB per message, past the 5 MB free limit.'**
   String get shopPlusBenefitFiles;
 
+  /// Plus benefit: larger OTP pad sizes at pairing and group creation.
+  ///
+  /// In en, this message translates to:
+  /// **'Create bigger pads — up to 200 MB for a chat and 500 MB for a group.'**
+  String get shopPlusBenefitPads;
+
   /// Plus benefit: supporting the project.
   ///
   /// In en, this message translates to:
@@ -2733,7 +2757,7 @@ abstract class AppLocalizations {
   /// Tappable hint under the pairing pad-size slider offering the larger tiers.
   ///
   /// In en, this message translates to:
-  /// **'Unlock larger pads — up to {max}'**
+  /// **'Larger pads with Plus — up to {max}'**
   String pairLargerPadsUpsell(String max);
 
   /// Warning when the device can't fit the OTP pad the pairing would create.
@@ -2757,7 +2781,7 @@ abstract class AppLocalizations {
   /// Tappable hint under the group total-size slider offering the larger tiers.
   ///
   /// In en, this message translates to:
-  /// **'Unlock larger group pads — up to {max}'**
+  /// **'Larger group pads with Plus — up to {max}'**
   String groupLargerPadsUpsell(String max);
 
   /// Label above the avatar-border picker in Settings.

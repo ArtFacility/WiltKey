@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"math"
@@ -155,6 +156,14 @@ func handleGetChallenge(w http.ResponseWriter, r *http.Request) {
 const (
 	freeMaxPayload = 5 * 1024 * 1024  // 5 MB — free file-transfer limit
 	plusMaxPayload = 50 * 1024 * 1024 // 50 MB — hard ceiling, premium included
+)
+
+// Large payloads are the expensive path: the whole frame is buffered in RAM, then
+// uploaded to object storage and indexed in Postgres. Space them out per sender so
+// one client can't chain them back-to-back.
+const (
+	largePayloadThreshold = 500 * 1024       // ≥ this routes to bucket storage
+	largeUploadCooldown   = 15 * time.Second // min gap between large sends, per sender
 )
 
 // Offline-hold TTLs: how long a queued message waits for an offline RECIPIENT to
@@ -341,7 +350,7 @@ func handlePostQueue(hub *Hub) http.HandlerFunc {
 		}
 
 		// 2. Large file routing (>= 500KB) -> storage bucket + Postgres
-		if payloadSize >= 500*1024 {
+		if payloadSize >= largePayloadThreshold {
 			if pg == nil {
 				http.Error(w, "Postgres and storage must be configured to process large payloads", http.StatusInternalServerError)
 				return
@@ -812,14 +821,48 @@ func handlePostEntitlement(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var hashToStore string
-	if req.SubscriptionHash != "" {
-		hashToStore = req.SubscriptionHash
-	} else {
+	var expiry time.Time
+
+	if playVerifier.Enabled() {
+		// Google is the authority. The client-supplied SubscriptionHash is
+		// ignored entirely here — it's self-asserted and therefore forgeable, so
+		// accepting it would defeat the whole verification.
+		if req.PurchaseToken == "" {
+			http.Error(w, "A Play purchase token is required", http.StatusBadRequest)
+			return
+		}
+
+		verifiedExpiry, err := playVerifier.Verify(req.PurchaseToken)
+		if errors.Is(err, errPlayNotEntitled) {
+			// A definitive no from Google: forged, foreign, or lapsed token.
+			log.Printf("[Play] Rejected entitlement for %s: subscription not active", req.UserID)
+			http.Error(w, `{"error":"No active subscription for this purchase token"}`, http.StatusPaymentRequired)
+			return
+		}
+		if err != nil {
+			// We couldn't reach Google / it errored. Fail CLOSED: granting a perk
+			// on an unverifiable claim is exactly the hole this closes. The client
+			// re-syncs on every reconnect, so a transient outage self-heals.
+			log.Printf("[Play] Verification error for %s: %v", req.UserID, err)
+			http.Error(w, `{"error":"Could not verify the purchase right now, please try again"}`, http.StatusServiceUnavailable)
+			return
+		}
+
 		hash := sha256.Sum256([]byte(req.PurchaseToken))
 		hashToStore = hex.EncodeToString(hash[:])
+		expiry = verifiedExpiry
+	} else {
+		// Self-hosted / FOSS relay with no Play service account: preserve the
+		// previous trust-the-client behaviour so such a relay runs Google-free.
+		// The operator has chosen their own policy by not configuring Play.
+		if req.SubscriptionHash != "" {
+			hashToStore = req.SubscriptionHash
+		} else {
+			hash := sha256.Sum256([]byte(req.PurchaseToken))
+			hashToStore = hex.EncodeToString(hash[:])
+		}
+		expiry = time.Now().Add(30 * 24 * time.Hour)
 	}
-
-	expiry := time.Now().Add(30 * 24 * time.Hour)
 	err = pg.StoreEntitlement(req.UserID, hashToStore, expiry)
 	if err != nil {
 		log.Printf("Failed to store entitlement: %v", err)
@@ -827,9 +870,13 @@ func handlePostEntitlement(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = rdb.StoreEntitlement(req.UserID, hashToStore, 30*24*time.Hour)
-	if err != nil {
-		log.Printf("Failed to store entitlement in Redis: %v", err)
+	// The Redis copy is a read-through CACHE that checkPremiumSubscription trusts
+	// without re-checking Postgres, so its TTL must never outlive the real expiry
+	// — otherwise a lapsed subscription keeps its perks until the cache dies.
+	if cacheTTL := time.Until(expiry); cacheTTL > 0 {
+		if err = rdb.StoreEntitlement(req.UserID, hashToStore, cacheTTL); err != nil {
+			log.Printf("Failed to store entitlement in Redis: %v", err)
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -925,6 +972,10 @@ func main() {
 	// FCM wake-up push sender (Play flavor). Disabled/no-op unless
 	// FCM_CREDENTIALS_FILE points at a Firebase service-account JSON.
 	push := NewPushSender()
+
+	// Google Play purchase-token verification. Disabled/no-op unless
+	// PLAY_CREDENTIALS_FILE points at a Play Developer API service-account JSON.
+	playVerifier = NewPlayVerifier()
 
 	hub := NewHub(rdb, push)
 	go hub.Run()

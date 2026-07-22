@@ -199,6 +199,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsProfileSectionProfile => '个人资料设置';
 
   @override
+  String get settingsProfileSectionOtherVisuals => '其他视觉设置';
+
+  @override
+  String get settingsThemeLabel => '主题';
+
+  @override
+  String get settingsPixelArtEditor => '像素画编辑器';
+
+  @override
   String get settingsProfileBrushColor => '画笔颜色';
 
   @override
@@ -1407,6 +1416,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get shopPlusBenefitFiles => '发送大文件——每条消息最多 50 MB，突破免费的 5 MB 限制。';
 
   @override
+  String get shopPlusBenefitPads => '创建更大的密码本——单聊最高 200 MB，群组最高 500 MB。';
+
+  @override
   String get shopPlusBenefitSupport => '你让中继服务器持续运行，并保持 WiltKey 的独立性。';
 
   @override
@@ -1429,7 +1441,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String pairLargerPadsUpsell(String max) {
-    return '解锁更大的密码本——最高 $max';
+    return '使用 Plus 获得更大的密码本——最高 $max';
   }
 
   @override
@@ -1447,7 +1459,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String groupLargerPadsUpsell(String max) {
-    return '解锁更大的群组密码本——最高 $max';
+    return '使用 Plus 获得更大的群组密码本——最高 $max';
   }
 
   @override

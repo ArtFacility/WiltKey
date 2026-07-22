@@ -205,9 +205,11 @@ class BillingBridge(
             }
             val params = QueryProductDetailsParams.newBuilder()
                 .setProductList(productList).build()
-            billingClient.queryProductDetailsAsync(params) { _, details ->
+            // Billing 8.0.0: the callback now delivers a QueryProductDetailsResult
+            // (fetched list + unfetched ids) instead of a bare List<ProductDetails>.
+            billingClient.queryProductDetailsAsync(params) { _, queryResult ->
                 val out = ArrayList<Map<String, Any?>>()
-                for (d in details) {
+                for (d in queryResult.productDetailsList) {
                     productCache[d.productId] = d
                     out.add(
                         mapOf(
@@ -261,8 +263,9 @@ class BillingBridge(
                 .build()
             val params = QueryProductDetailsParams.newBuilder()
                 .setProductList(listOf(product)).build()
-            billingClient.queryProductDetailsAsync(params) { _, details ->
-                val d = details.firstOrNull()
+            // Billing 8.0.0: callback delivers QueryProductDetailsResult (see above).
+            billingClient.queryProductDetailsAsync(params) { _, queryResult ->
+                val d = queryResult.productDetailsList.firstOrNull()
                 if (d == null) {
                     onMain { result.success(unavailableMap(id)) }
                 } else {

@@ -476,6 +476,36 @@ func (r *RedisClient) AllowNuke(senderID string, limit int64) (bool, error) {
 	return incr.Val() <= limit, nil
 }
 
+// AllowLargeUpload enforces a minimum gap between large (bucket-bound) payloads
+// from the same sender, so one client can't chain expensive uploads back-to-back.
+// Returns false while the sender is still cooling down.
+//
+// Keyed on the authenticated user id, NOT the socket: a per-connection timer would
+// reset the instant a client reconnects, which is trivial to abuse. A Redis key
+// with a TTL survives reconnects. Callers should fail OPEN on error — infra
+// trouble must never block legitimate sends.
+func (r *RedisClient) AllowLargeUpload(senderID string, cooldown time.Duration) (bool, error) {
+	if r.isMemory {
+		r.mu.Lock()
+		defer r.mu.Unlock()
+		key := "largeup:" + senderID
+		if exp, ok := r.memoryBlocks[key]; ok && exp.After(time.Now()) {
+			return false, nil
+		}
+		r.memoryBlocks[key] = time.Now().Add(cooldown)
+		return true, nil
+	}
+
+	// SetNX succeeds only when no cooldown key exists → that send is allowed and
+	// starts a fresh window; a failed SetNX means one is still ticking.
+	key := fmt.Sprintf("largeup:%s", senderID)
+	ok, err := r.rdb.SetNX(ctx, key, 1, cooldown).Result()
+	if err != nil {
+		return false, err
+	}
+	return ok, nil
+}
+
 // ConsumeVoucher atomically marks a voucher (keyed by its signature) as spent so a
 // valid voucher can't be replayed to post unlimited messages. Returns false if the
 // voucher was already used or is already expired. The marker lives until the

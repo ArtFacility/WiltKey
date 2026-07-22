@@ -208,6 +208,15 @@ class AppLocalizationsSv extends AppLocalizations {
   String get settingsProfileSectionProfile => 'Profilinställningar';
 
   @override
+  String get settingsProfileSectionOtherVisuals => 'Övrig visuell';
+
+  @override
+  String get settingsThemeLabel => 'Tema';
+
+  @override
+  String get settingsPixelArtEditor => 'Pixel art-redigerare';
+
+  @override
   String get settingsProfileBrushColor => 'Penselfärg';
 
   @override
@@ -1472,6 +1481,10 @@ class AppLocalizationsSv extends AppLocalizations {
       'Skicka stora filer – upp till 50 MB per meddelande, bortom gränsen på 5 MB gratis.';
 
   @override
+  String get shopPlusBenefitPads =>
+      'Skapa större pads – upp till 200 MB för en chatt och 500 MB för en grupp.';
+
+  @override
   String get shopPlusBenefitSupport =>
       'Du håller relayen igång och WiltKey oberoende.';
 
@@ -1497,7 +1510,7 @@ class AppLocalizationsSv extends AppLocalizations {
 
   @override
   String pairLargerPadsUpsell(String max) {
-    return 'Lås upp större pads — upp till $max';
+    return 'Större pads med Plus — upp till $max';
   }
 
   @override
@@ -1516,7 +1529,7 @@ class AppLocalizationsSv extends AppLocalizations {
 
   @override
   String groupLargerPadsUpsell(String max) {
-    return 'Lås upp större grupp-pads — upp till $max';
+    return 'Större grupp-pads med Plus — upp till $max';
   }
 
   @override

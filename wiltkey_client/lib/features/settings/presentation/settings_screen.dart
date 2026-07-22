@@ -12,12 +12,14 @@ import '../../../core/pixel_art_avatar.dart';
 import '../../../core/pixel_art_editor.dart';
 import '../../../core/theme/wk.dart';
 import '../../../core/theme/wiltkey_tokens.dart';
+import '../../../core/theme/theme_controller.dart';
+import '../../../core/theme/theme_registry.dart';
 import '../../../core/localization/locale_controller.dart';
 import '../../../core/entitlements/entitlement_service.dart';
 import '../../../core/cosmetics/avatar_border_controller.dart';
 import '../../shop/presentation/shop_screen.dart';
-import 'widgets/theme_picker.dart';
 import 'widgets/border_picker.dart';
+import 'theme_selector_screen.dart';
 import 'change_pin_screen.dart';
 
 /// Publisher shown in the Settings "About" footer. The version string itself is
@@ -369,15 +371,113 @@ class _SettingsScreenState extends State<SettingsScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Shop / Support entry (Play: purchases; FOSS: support the project).
-          _buildShopEntry(t, l10n),
+          // --- Identity: avatar anchor, name, short nick, account id ---
+          // Avatar preview with the equipped border; tap to open the editor.
+          ListenableBuilder(
+            listenable: AvatarBorderController.instance,
+            builder: (context, _) => Center(
+              child: GestureDetector(
+                onTap: _editAvatar,
+                child: PixelArtAvatar(
+                  hexString: _pixelGrid.join(),
+                  size: 96,
+                  borderId: AvatarBorderController.instance.borderId,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 18),
+
+          Text(l10n.settingsProfileUsername, style: t.bodySecondary),
+          const SizedBox(height: 6),
+          TextField(
+            controller: _usernameController,
+            style: t.body.copyWith(fontSize: 13),
+            decoration: _inputDecoration(t),
+            onChanged: (_) => _saveProfile(),
+          ),
+          const SizedBox(height: 16),
+
+          Text(l10n.settingsProfileBleNick, style: t.bodySecondary),
+          const SizedBox(height: 6),
+          TextField(
+            controller: _shortNickController,
+            style: t.dataMono.copyWith(color: t.textPrimary, fontSize: 13),
+            maxLength: 5,
+            inputFormatters: [
+              LengthLimitingTextInputFormatter(5),
+              FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9]')),
+            ],
+            decoration: _inputDecoration(t).copyWith(
+              counterStyle: t.dataMono.copyWith(color: t.textTertiary),
+            ),
+            onChanged: (val) {
+              setState(() {
+                _shortNickController.text = val.toUpperCase();
+                _shortNickController.selection = TextSelection.fromPosition(
+                  TextPosition(offset: _shortNickController.text.length),
+                );
+              });
+              _saveProfile();
+            },
+          ),
+          const SizedBox(height: 8),
+
+          Text(l10n.settingsProfileKeyhash, style: t.bodySecondary),
+          const SizedBox(height: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: t.bg,
+              border: Border.all(color: t.border),
+              borderRadius: BorderRadius.circular(t.radiusControl),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    _appState.userId,
+                    style: t.dataMono.copyWith(color: t.textTertiary),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                GestureDetector(
+                  onTap: () {
+                    Clipboard.setData(ClipboardData(text: _appState.userId));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(l10n.settingsProfileKeyhashCopied),
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
+                  },
+                  child: Icon(Icons.copy, color: t.action, size: 16),
+                ),
+              ],
+            ),
+          ),
           const SizedBox(height: 20),
 
-          // Appearance / theme picker (real, live-preview cards).
-          _section(t, l10n.settingsProfileSectionAppearance),
-          const SizedBox(height: 8),
-          const ThemePicker(),
-          const SizedBox(height: 16),
+          // --- Actions: Shop + Pixel Art Editor ---
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(child: _buildShopCard(t, l10n)),
+                const SizedBox(width: 12),
+                Expanded(child: _buildPixelEditorCard(t, l10n)),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // --- Theme selector (opens its own screen) ---
+          _buildThemeCard(t, l10n),
+          Divider(color: t.border, height: 32),
+
+          // --- Other visuals ---
+          _section(t, l10n.settingsProfileSectionOtherVisuals),
+          const SizedBox(height: 12),
           Text(
             l10n.settingsLanguageLabel,
             style: t.dataMono.copyWith(
@@ -524,43 +624,7 @@ class _SettingsScreenState extends State<SettingsScreen>
           ),
           const SizedBox(height: 20),
 
-          _section(t, l10n.settingsProfileSectionAvatar),
-          const SizedBox(height: 12),
-
-          // Avatar preview (with the equipped border) — tap "Edit avatar" to
-          // open the shared editor popup. Rebuilds live when the border changes.
-          ListenableBuilder(
-            listenable: AvatarBorderController.instance,
-            builder: (context, _) => Center(
-              child: Column(
-                children: [
-                  GestureDetector(
-                    onTap: _editAvatar,
-                    child: PixelArtAvatar(
-                      hexString: _pixelGrid.join(),
-                      size: 140,
-                      borderId: AvatarBorderController.instance.borderId,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  OutlinedButton.icon(
-                    onPressed: _editAvatar,
-                    icon: Icon(Icons.edit, size: 16, color: t.action),
-                    label: Text(
-                      t.uppercaseLabels
-                          ? l10n.avatarEditButton.toUpperCase()
-                          : l10n.avatarEditButton,
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: t.action,
-                      side: BorderSide(color: t.positive),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
+          // Avatar border (equipping it is a profile change → broadcast).
           Text(
             l10n.settingsBorderSection,
             style: t.dataMono.copyWith(
@@ -570,79 +634,6 @@ class _SettingsScreenState extends State<SettingsScreen>
           ),
           const SizedBox(height: 8),
           BorderPicker(sampleHex: _pixelGrid.join()),
-          Divider(color: t.border, height: 32),
-
-          _section(t, l10n.settingsProfileSectionProfile),
-          const SizedBox(height: 12),
-
-          Text(l10n.settingsProfileUsername, style: t.bodySecondary),
-          const SizedBox(height: 6),
-          TextField(
-            controller: _usernameController,
-            style: t.body.copyWith(fontSize: 13),
-            decoration: _inputDecoration(t),
-            onChanged: (_) => _saveProfile(),
-          ),
-          const SizedBox(height: 16),
-
-          Text(l10n.settingsProfileBleNick, style: t.bodySecondary),
-          const SizedBox(height: 6),
-          TextField(
-            controller: _shortNickController,
-            style: t.dataMono.copyWith(color: t.textPrimary, fontSize: 13),
-            maxLength: 5,
-            inputFormatters: [
-              LengthLimitingTextInputFormatter(5),
-              FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9]')),
-            ],
-            decoration: _inputDecoration(t).copyWith(
-              counterStyle: t.dataMono.copyWith(color: t.textTertiary),
-            ),
-            onChanged: (val) {
-              setState(() {
-                _shortNickController.text = val.toUpperCase();
-                _shortNickController.selection = TextSelection.fromPosition(
-                  TextPosition(offset: _shortNickController.text.length),
-                );
-              });
-              _saveProfile();
-            },
-          ),
-          const SizedBox(height: 8),
-
-          Text(l10n.settingsProfileKeyhash, style: t.bodySecondary),
-          const SizedBox(height: 6),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-              color: t.bg,
-              border: Border.all(color: t.border),
-              borderRadius: BorderRadius.circular(t.radiusControl),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    _appState.userId,
-                    style: t.dataMono.copyWith(color: t.textTertiary),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                GestureDetector(
-                  onTap: () {
-                    Clipboard.setData(ClipboardData(text: _appState.userId));
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(l10n.settingsProfileKeyhashCopied),
-                        duration: const Duration(seconds: 2),
-                      ),
-                    );
-                  },
-                  child: Icon(Icons.copy, color: t.action, size: 16),
-                ),
-              ],
-            ),
-          ),
           const SizedBox(height: 16),
         ],
       ),
@@ -1063,47 +1054,111 @@ class _SettingsScreenState extends State<SettingsScreen>
     );
   }
 
-  // Shop / Support entry card at the top of the Profile tab. Play builds route to
-  // the purchasable shop; FOSS builds to the "Support the project" page. Both use
-  // the same ShopScreen, which picks its face from the flavor.
-  Widget _buildShopEntry(WiltkeyTokens t, AppLocalizations l10n) {
+  // Shop / Support action card. Play builds route to the purchasable shop; FOSS
+  // builds to the "Support the project" page — both use the same ShopScreen, which
+  // picks its face from the flavor.
+  Widget _buildShopCard(WiltkeyTokens t, AppLocalizations l10n) {
     final isPlay = EntitlementService.instance.billingAvailable;
-    final title = isPlay ? l10n.shopEntryTitle : l10n.supportEntryTitle;
-    final subtitle =
-        isPlay ? l10n.shopEntrySubtitle : l10n.supportEntrySubtitle;
-    final icon = isPlay ? Icons.storefront : Icons.volunteer_activism;
-    return InkWell(
-      borderRadius: BorderRadius.circular(t.radiusControl),
+    return _compactActionCard(
+      t,
+      icon: isPlay ? Icons.storefront : Icons.volunteer_activism,
+      label: isPlay ? l10n.shopEntryTitle : l10n.supportEntryTitle,
       onTap: () => Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => const ShopScreen()),
       ),
+    );
+  }
+
+  // Pixel-art editor action card — opens the shared avatar editor popup (same as
+  // tapping the avatar preview above).
+  Widget _buildPixelEditorCard(WiltkeyTokens t, AppLocalizations l10n) {
+    return _compactActionCard(
+      t,
+      icon: Icons.grid_on,
+      label: l10n.settingsPixelArtEditor,
+      onTap: _editAvatar,
+    );
+  }
+
+  // Theme selector button — a compact row showing the active theme; taps into the
+  // dedicated selector screen (keeps the Profile tab short as owned themes grow).
+  Widget _buildThemeCard(WiltkeyTokens t, AppLocalizations l10n) {
+    return ListenableBuilder(
+      listenable: ThemeController(),
+      builder: (context, _) {
+        final current = WiltkeyThemeRegistry.byId(ThemeController().themeId);
+        return InkWell(
+          borderRadius: BorderRadius.circular(t.radiusControl),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const ThemeSelectorScreen()),
+          ),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            decoration: BoxDecoration(
+              color: t.surface,
+              border: Border.all(color: t.border),
+              borderRadius: BorderRadius.circular(t.radiusControl),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.palette_outlined, color: t.action, size: 22),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        l10n.settingsThemeLabel,
+                        style: t.body.copyWith(fontWeight: FontWeight.w700),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        current.localizedName(context),
+                        style: t.bodySecondary,
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right, color: t.textTertiary, size: 20),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // A compact, square-ish tappable card (icon over label) used for the side-by-side
+  // Shop / Pixel-editor row. Stretches to its Row cell height via IntrinsicHeight.
+  Widget _compactActionCard(
+    WiltkeyTokens t, {
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(t.radiusControl),
+      onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
         decoration: BoxDecoration(
           color: t.surface,
           border: Border.all(color: t.action),
           borderRadius: BorderRadius.circular(t.radiusControl),
           boxShadow: t.glow(t.action),
         ),
-        child: Row(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: t.action, size: 24),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: t.body.copyWith(fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(subtitle, style: t.bodySecondary),
-                ],
-              ),
+            Icon(icon, color: t.action, size: 26),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: t.body.copyWith(fontWeight: FontWeight.w700),
             ),
-            Icon(Icons.chevron_right, color: t.textTertiary, size: 20),
           ],
         ),
       ),

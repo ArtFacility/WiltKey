@@ -231,7 +231,20 @@ func (c *Client) readPump() {
 		c.conn.Close()
 	}()
 
-	c.conn.SetReadLimit(2 * 1024 * 1024) // 2 MB max payload size
+	// Frame ceiling is tied to what THIS sender is actually allowed to post, so an
+	// anonymous/free client can never make the relay buffer a 50MB frame (anyone
+	// can self-issue a keypair and authenticate, so the ceiling — not auth — is the
+	// real memory guard). Frames carry the base64 envelope plus a little JSON
+	// overhead, hence the headroom above the payload limits.
+	//
+	// NOTE: evaluated once at connect. A user who subscribes mid-session keeps the
+	// free ceiling until their next reconnect (the client re-syncs entitlements on
+	// every connect, so this self-heals).
+	readLimit := int64(freeMaxPayload) + 2*1024*1024 // ~7 MB for free senders
+	if hasSub, err := checkPremiumSubscription(c.id); err == nil && hasSub {
+		readLimit = int64(plusMaxPayload) + 6*1024*1024 // ~56 MB for Plus senders
+	}
+	c.conn.SetReadLimit(readLimit)
 	c.conn.SetReadDeadline(time.Now().Add(60 * time.Second))
 	c.conn.SetPongHandler(func(string) error {
 		c.conn.SetReadDeadline(time.Now().Add(60 * time.Second))

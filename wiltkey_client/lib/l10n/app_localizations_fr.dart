@@ -208,6 +208,15 @@ class AppLocalizationsFr extends AppLocalizations {
   String get settingsProfileSectionProfile => 'Profil';
 
   @override
+  String get settingsProfileSectionOtherVisuals => 'Autres visuels';
+
+  @override
+  String get settingsThemeLabel => 'Thème';
+
+  @override
+  String get settingsPixelArtEditor => 'Éditeur pixel art';
+
+  @override
   String get settingsProfileBrushColor => 'Couleur du pinceau';
 
   @override
@@ -1481,6 +1490,10 @@ class AppLocalizationsFr extends AppLocalizations {
       'Envoyez de gros fichiers — jusqu\'à 50 Mo par message, au-delà de la limite gratuite de 5 Mo.';
 
   @override
+  String get shopPlusBenefitPads =>
+      'Créez des blocs plus grands — jusqu\'à 200 Mo pour une discussion et 500 Mo pour un groupe.';
+
+  @override
   String get shopPlusBenefitSupport =>
       'Vous faites vivre le relais et gardez WiltKey indépendant.';
 
@@ -1506,7 +1519,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String pairLargerPadsUpsell(String max) {
-    return 'Débloquer des blocs plus grands — jusqu\'à $max';
+    return 'Blocs plus grands avec Plus — jusqu\'à $max';
   }
 
   @override
@@ -1525,7 +1538,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String groupLargerPadsUpsell(String max) {
-    return 'Débloquer des blocs de groupe plus grands — jusqu\'à $max';
+    return 'Blocs de groupe plus grands avec Plus — jusqu\'à $max';
   }
 
   @override

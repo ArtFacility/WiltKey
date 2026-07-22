@@ -207,6 +207,15 @@ class AppLocalizationsHu extends AppLocalizations {
   String get settingsProfileSectionProfile => 'Profilbeállítások';
 
   @override
+  String get settingsProfileSectionOtherVisuals => 'Egyéb megjelenés';
+
+  @override
+  String get settingsThemeLabel => 'Téma';
+
+  @override
+  String get settingsPixelArtEditor => 'Pixelrajz-szerkesztő';
+
+  @override
   String get settingsProfileBrushColor => 'Ecset színe';
 
   @override
@@ -1483,6 +1492,10 @@ class AppLocalizationsHu extends AppLocalizations {
       'Küldj nagy fájlokat – üzenetenként akár 50 MB, az ingyenes 5 MB-os korlát felett.';
 
   @override
+  String get shopPlusBenefitPads =>
+      'Készíts nagyobb padokat – akár 200 MB egy csevegéshez és 500 MB egy csoporthoz.';
+
+  @override
   String get shopPlusBenefitSupport =>
       'Te tartod életben a relayt és teszed függetlenné a WiltKey-t.';
 
@@ -1508,7 +1521,7 @@ class AppLocalizationsHu extends AppLocalizations {
 
   @override
   String pairLargerPadsUpsell(String max) {
-    return 'Nagyobb padok feloldása — akár $max';
+    return 'Nagyobb padok Plusszal — akár $max';
   }
 
   @override
@@ -1527,7 +1540,7 @@ class AppLocalizationsHu extends AppLocalizations {
 
   @override
   String groupLargerPadsUpsell(String max) {
-    return 'Nagyobb csoportpadok feloldása — akár $max';
+    return 'Nagyobb csoportpadok Plusszal — akár $max';
   }
 
   @override
