@@ -503,7 +503,21 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsBiometricToggle => '指纹解锁';
 
   @override
-  String get settingsBiometricDescription => '用指纹代替 PIN 解锁。闲置 4 小时后仍需输入 PIN。';
+  String get settingsBiometricDescription => '用指纹代替 PIN 解锁。超过下方设置的时限后仍需输入 PIN。';
+
+  @override
+  String get settingsBiometricIdleTitle => 'PIN 回退';
+
+  @override
+  String get settingsBiometricIdleDescription => '闲置超过此时长未解锁后，需要重新输入 PIN。';
+
+  @override
+  String settingsBiometricIdleValue(int hours) {
+    return '$hours 小时';
+  }
+
+  @override
+  String get settingsBiometricIdleNever => '从不';
 
   @override
   String get settingsBiometricFailedSnackBar => '无法启用指纹解锁。';
@@ -731,6 +745,10 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatImageExceedsMaxSizeSnackBar => '图片过大，无法发送。';
+
+  @override
+  String get chatImageNeedsPlusSnackBar =>
+      '图片超出免费额度——WiltKey Plus 将上限提升至 50 MB。';
 
   @override
   String get chatTapForDetails => '轻触查看详情';
@@ -1003,6 +1021,21 @@ class AppLocalizationsZh extends AppLocalizations {
   String get groupDecryptingImage => '正在解密图片...';
 
   @override
+  String get chatFileTapToDownload => '轻触以下载';
+
+  @override
+  String get chatFileDownloadFailed => '轻触重试';
+
+  @override
+  String get chatFileKindPhoto => '照片';
+
+  @override
+  String get chatFileKindVoice => '语音消息';
+
+  @override
+  String get chatFileKindFile => '文件';
+
+  @override
   String get groupTapToRevealImage => '轻触以显示图片';
 
   @override
@@ -1135,6 +1168,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatImageCompressionMaxQuality => '最高画质';
 
   @override
+  String get chatImageCompressionUncompressed => '不压缩';
+
+  @override
   String chatImageCompressionPercentQuality(int percent) {
     return '质量: $percent%';
   }
@@ -1185,6 +1221,48 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get themePaperinkDesc => '温润的和纸，浓淡相宜的墨色，朱红印章。';
+
+  @override
+  String get themePickerPlayExclusive => '此主题为 WiltKey Play 商店版本专属。';
+
+  @override
+  String get themePreviewTooltip => '预览';
+
+  @override
+  String get themePreviewSectionDashboard => '聊天列表';
+
+  @override
+  String get themePreviewSectionChat => '对话';
+
+  @override
+  String get themePreviewSectionEffects => '特效';
+
+  @override
+  String get themePreviewPlayUnlock => '播放解锁动画';
+
+  @override
+  String get themePreviewPlayNuke => '播放自毁动画';
+
+  @override
+  String get themePreviewApply => '使用此主题';
+
+  @override
+  String get themePreviewGetInShop => '前往商店获取';
+
+  @override
+  String get themePreviewMsgThem1 => '我们的密钥本只剩 800 字节了，要不要见一面？';
+
+  @override
+  String get themePreviewMsgMe => '好啊！来我家看电影？顺便充值';
+
+  @override
+  String get themePreviewMsgThem2 => '成交，我带零食 🍿';
+
+  @override
+  String get themePreviewRowPhoto => '攀岩馆的照片 🧗';
+
+  @override
+  String get themePreviewRowLost => '密钥本用完了——见面充值吧';
 
   @override
   String get accessibilityWarningTitle => '无障碍服务已启用';

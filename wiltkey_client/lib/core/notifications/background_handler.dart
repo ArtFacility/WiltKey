@@ -160,7 +160,6 @@ class _MessageTaskHandler extends TaskHandler {
           final senderId = msg['sender_id'] as String? ?? '';
           final envelope = msg['envelope'] as String? ?? '';
           final contentType = msg['content_type'] as String? ?? 'text';
-          final messageId = msg['message_id'] as String?;
           // Buffer the raw frame so the main isolate can decrypt + store it on
           // unlock (the server has already removed it from the offline queue).
           PendingInbox.append(
@@ -168,18 +167,24 @@ class _MessageTaskHandler extends TaskHandler {
             envelope: envelope,
             contentType: contentType,
           );
-          if (messageId != null) {
-            _socket?.add(
-              jsonEncode({
-                'type': 'FILE_RECEIVED',
-                'message_id': messageId,
-              }),
-            );
-          }
+          // NOTE: no FILE_RECEIVED ack here. This isolate only buffers the frame
+          // — it can't decrypt or persist it while the app is locked — so acking
+          // would tell the relay to delete the only copy of a file we haven't
+          // actually stored yet. The main isolate acks after it stores it.
           if (_notifyContentTypes.contains(contentType)) {
             // sender_id is the 1:1 peer's keyHash, enabling a deep-link on tap.
             // (Group frames carry a member id, which won't resolve to a chat —
             // those simply fall back to the dashboard.)
+            WiltkeyNotifications.showMessageNotification(chatKey: senderId);
+          }
+          break;
+        case 'FILE_OFFER':
+          // A large file is waiting on the relay. Nothing to buffer — because we
+          // never ACK it, the relay re-offers it on the next connect, so the main
+          // isolate will pick it up when the app is unlocked. Just raise the alert.
+          final senderId = msg['sender_id'] as String? ?? '';
+          final contentType = msg['content_type'] as String? ?? 'text';
+          if (_notifyContentTypes.contains(contentType)) {
             WiltkeyNotifications.showMessageNotification(chatKey: senderId);
           }
           break;

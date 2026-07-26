@@ -11,6 +11,7 @@ import '../../../../core/theme/wk.dart';
 import '../../../../core/theme/wiltkey_tokens.dart';
 import 'package:wiltkey_client/l10n/app_localizations.dart';
 import 'voice_message_player.dart';
+import 'download_bubble.dart';
 import 'reactions.dart';
 import 'image_viewer.dart';
 import 'reply_preview.dart';
@@ -286,6 +287,20 @@ class MessageBubble extends StatelessWidget {
     // Wilting (disappearing) messages. Handled BEFORE the decrypt block so a
     // received message we haven't revealed is never decrypted — it stays a gate.
     if (message.wilted) return _buildWiltedTombstone(t, l10n);
+
+    // Large payload still parked on the relay: there IS no ciphertext to decrypt
+    // yet, so this precedes both the wilt gate (revealing would open an empty
+    // body and start its countdown) and the decrypt branch (which would spin
+    // forever). Downloading only fetches the bytes — a wilting message still has
+    // to be tapped to reveal afterwards, so the countdown is unaffected.
+    if (message.isPendingDownload) {
+      return DownloadBubble(
+        message: message,
+        contact: contact,
+        appState: appState,
+      );
+    }
+
     if (message.ephemeral && !isMe && message.openedAt == null) {
       return _buildWiltGate(t, l10n);
     }

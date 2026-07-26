@@ -273,11 +273,17 @@ class _PinLockScreenState extends State<PinLockScreen>
     final double shakeOffset =
         _shakeController.value * sin(_shakeController.value * 10 * pi);
 
+    final isPhosphor =
+        context.wkc.runtimeType.toString() == 'PhosphorComponents';
+
     return Scaffold(
       backgroundColor: t.bg,
       body: SafeArea(
-        child: Column(
+        child: Stack(
+          fit: StackFit.expand,
           children: [
+            Column(
+              children: [
             const Spacer(flex: 2),
 
             Icon(Icons.lock_outline, color: t.danger, size: 36),
@@ -451,7 +457,22 @@ class _PinLockScreenState extends State<PinLockScreen>
                 ),
               ),
             ),
-            const SizedBox(height: 10),
+                const SizedBox(height: 10),
+              ],
+            ),
+            // Phosphor is "a CRT left on": scanlines + glare over the lock
+            // screen only (one of the few screens that carries the filter).
+            if (isPhosphor)
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: CustomPaint(
+                    painter: _CrtScanlinePainter(
+                      shade: t.bg,
+                      glare: t.positive,
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
       ),
@@ -518,11 +539,15 @@ class _PinKeypadKeyState extends State<_PinKeypadKey>
       _rotation = (_random.nextDouble() * 4.0 - 2.0) * pi / 180.0;
     });
     _controller.forward();
+    // Register the digit on press-DOWN, not on tap-up: a tap-up (or InkWell tap)
+    // is cancelled the moment the finger slides past the tap slop, so a slightly
+    // draggy press would light the key but drop the digit. Pressing down should
+    // register instantly.
+    widget.onTap();
   }
 
   void _onTapUp(TapUpDetails _) {
     _controller.reverse();
-    widget.onTap();
   }
 
   void _onTapCancel() {
@@ -534,6 +559,52 @@ class _PinKeypadKeyState extends State<_PinKeypadKey>
     final t = widget.t;
     final isPaperink =
         context.wkc.runtimeType.toString() == 'PaperinkComponents';
+    final isPhosphor =
+        context.wkc.runtimeType.toString() == 'PhosphorComponents';
+
+    if (isPhosphor) {
+      // Square arcade key: chunky border, hard unblurred drop shadow; a press
+      // shifts the key down INTO its shadow (shadow shrinks as it moves).
+      return GestureDetector(
+        onTapDown: _onTapDown,
+        onTapUp: _onTapUp,
+        onTapCancel: _onTapCancel,
+        child: AnimatedBuilder(
+          animation: _controller,
+          builder: (context, _) {
+            final val = _controller.value;
+            final drop = 3.0 * (1 - val);
+            return Transform.translate(
+              offset: Offset(3.0 * val, 3.0 * val),
+              child: Container(
+                width: 60,
+                height: 60,
+                decoration: BoxDecoration(
+                  color: val > 0.5 ? t.surfacePressed : t.surface,
+                  border: Border.all(color: t.border, width: 2),
+                  borderRadius: BorderRadius.circular(t.radiusControl),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.55),
+                      offset: Offset(drop, drop),
+                    ),
+                  ],
+                ),
+                child: Center(
+                  child: Text(
+                    widget.digit,
+                    style: t.dataMono.copyWith(
+                      color: t.textPrimary,
+                      fontSize: 16,
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      );
+    }
 
     if (!isPaperink) {
       return Container(
@@ -553,7 +624,11 @@ class _PinKeypadKeyState extends State<_PinKeypadKey>
             borderRadius: BorderRadius.circular(30),
             splashColor: t.positive.withValues(alpha: 0.22),
             highlightColor: t.positive.withValues(alpha: 0.10),
-            onTap: widget.onTap,
+            // Register on press-down so a slightly draggy press still counts
+            // (onTap alone drops the digit once the finger slides). onTap kept
+            // as a no-op so the ink ripple still fires.
+            onTapDown: (_) => widget.onTap(),
+            onTap: () {},
             child: Center(
               child: Text(
                 widget.digit,
@@ -690,11 +765,12 @@ class _PinKeypadActionKeyState extends State<_PinKeypadActionKey>
       _rotation = (_random.nextDouble() * 4.0 - 2.0) * pi / 180.0;
     });
     _controller.forward();
+    // Register on press-down (see the digit key) so a draggy press still counts.
+    widget.onPressed();
   }
 
   void _onTapUp(TapUpDetails _) {
     _controller.reverse();
-    widget.onPressed();
   }
 
   void _onTapCancel() {
@@ -706,6 +782,39 @@ class _PinKeypadActionKeyState extends State<_PinKeypadActionKey>
     final t = widget.t;
     final isPaperink =
         context.wkc.runtimeType.toString() == 'PaperinkComponents';
+    final isPhosphor =
+        context.wkc.runtimeType.toString() == 'PhosphorComponents';
+
+    if (isPhosphor) {
+      // Square outline key (subtler than the digits — no fill, no shadow).
+      return GestureDetector(
+        onTapDown: _onTapDown,
+        onTapUp: _onTapUp,
+        onTapCancel: _onTapCancel,
+        child: AnimatedBuilder(
+          animation: _controller,
+          builder: (context, _) {
+            return Transform.translate(
+              offset: Offset(0, 2.0 * _controller.value),
+              child: Container(
+                width: 60,
+                height: 60,
+                decoration: BoxDecoration(
+                  border: Border.all(color: t.border, width: 2),
+                  borderRadius: BorderRadius.circular(t.radiusControl),
+                ),
+                child: Tooltip(
+                  message: widget.tooltip,
+                  child: Center(
+                    child: Icon(widget.icon, color: t.textSecondary, size: 20),
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      );
+    }
 
     if (!isPaperink) {
       return SizedBox(
@@ -715,7 +824,9 @@ class _PinKeypadActionKeyState extends State<_PinKeypadActionKey>
           color: Colors.transparent,
           child: InkWell(
             borderRadius: BorderRadius.circular(30),
-            onTap: widget.onPressed,
+            // Register on press-down (see digit key), no-op onTap keeps the ripple.
+            onTapDown: (_) => widget.onPressed(),
+            onTap: () {},
             child: Tooltip(
               message: widget.tooltip,
               child: Center(
@@ -766,4 +877,52 @@ class _PinKeypadActionKeyState extends State<_PinKeypadActionKey>
       ),
     );
   }
+}
+
+/// A generic CRT pass (horizontal scanlines + top glare + corner vignette),
+/// used by themes that want the lock screen to read as a tube. Colours come
+/// from tokens at the call site — nothing theme-specific lives here.
+class _CrtScanlinePainter extends CustomPainter {
+  /// Dark line/vignette colour (the theme's deepest background).
+  final Color shade;
+
+  /// Glare tint (a bright accent).
+  final Color glare;
+
+  _CrtScanlinePainter({required this.shade, required this.glare});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final lp = Paint()..color = shade.withValues(alpha: 0.35);
+    for (double y = 0; y < size.height; y += 3) {
+      canvas.drawRect(Rect.fromLTWH(0, y, size.width, 1), lp);
+    }
+    final glareRect = Rect.fromLTWH(0, 0, size.width, size.height * 0.35);
+    canvas.drawRect(
+      glareRect,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [glare.withValues(alpha: 0.05), glare.withValues(alpha: 0)],
+        ).createShader(glareRect),
+    );
+    canvas.drawRect(
+      Offset.zero & size,
+      Paint()
+        ..shader = RadialGradient(
+          radius: 1.15,
+          colors: [
+            shade.withValues(alpha: 0),
+            shade.withValues(alpha: 0),
+            shade.withValues(alpha: 0.5),
+          ],
+          stops: const [0, 0.65, 1],
+        ).createShader(Offset.zero & size),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _CrtScanlinePainter old) =>
+      old.shade != shade || old.glare != glare;
 }

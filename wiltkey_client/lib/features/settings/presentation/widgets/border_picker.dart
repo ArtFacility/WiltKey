@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../../../core/cosmetics/avatar_border_controller.dart';
 import '../../../../core/cosmetics/avatar_border_registry.dart';
+import '../../../../core/cosmetics/avatar_border_ticker.dart';
 import '../../../../core/entitlements/entitlement_service.dart';
 import '../../../../core/pixel_art_avatar.dart';
 import '../../../../core/theme/wk.dart';
@@ -26,7 +27,10 @@ class BorderPicker extends StatelessWidget {
       ]),
       builder: (context, _) {
         final currentId = AvatarBorderController.instance.borderId;
-        final borders = WkAvatarBorderRegistry.all;
+        // The picker lists only borders the user could equip here (free always,
+        // premium on Play). Premium borders still RENDER on peers via the full
+        // registry — they're just not offered in a FOSS user's own picker.
+        final borders = WkAvatarBorderRegistry.equippable;
         return SizedBox(
           height: 96,
           child: ListView.separated(
@@ -122,6 +126,13 @@ class BorderThumbnail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (border.isAnimated) {
+      return SizedBox(
+        width: size,
+        height: size,
+        child: AnimatedAvatarBorder(paint: border.animatedPaint!),
+      );
+    }
     final asset = border.assetPath;
     if (asset == null) return SizedBox(width: size, height: size);
     return SvgPicture.asset(

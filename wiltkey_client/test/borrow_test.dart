@@ -298,13 +298,79 @@ void main() {
         reason: 'decrypts by absolute offset',
       );
 
-      // Out-of-primary-lane offset must NOT trigger a resync, and must not corrupt
-      // the primary incoming pointer.
-      expect(
-        sent.any((m) => m['content_type'] == 'chat_resync_request'),
-        isFalse,
+      // Out-of-primary-lane offset must NOT drive gap detection, and must not
+      // corrupt the primary incoming pointer.
+      //
+      // Note we can't assert "no resync at all" any more: the primary lane
+      // [0,1000) is genuinely still empty here, so maybeAutoReconcileOnPeerMessage
+      // legitimately pulls that gap on the peer's arrival. What must never happen
+      // is a resync reaching into the range we LENT — that would mean the borrowed
+      // write was mistaken for a hole in the peer's own lane.
+      final resyncs = sent.where(
+        (m) => m['content_type'] == 'chat_resync_request',
       );
+      for (final r in resyncs) {
+        final env = jsonDecode(r['envelope'] as String) as Map<String, dynamic>;
+        expect(
+          env['end_offset'] as int,
+          lessThanOrEqualTo(1000),
+          reason: 'resync must stay inside the primary incoming lane',
+        );
+      }
       expect(contact.incomingOffset, lessThanOrEqualTo(1000));
     },
   );
+
+  // Regression: the same "is this offset in the peer's primary lane?" guard has
+  // to hold for an INITIATOR lender too. An initiator's incoming lane is the
+  // UPPER half, so a range it lends out of its own (lower) outgoing lane sits
+  // BELOW incomingMaxOffset — a top-bound-only check waved it straight through
+  // and silently drained the displayed peer budget on every borrowed write.
+  test('a borrowed-range arrival below the incoming lane is not counted', () async {
+    final keyHash = 'f' * 63 + '4'; // > userId → local is initiator/lender
+    final contact = await enroll(keyHash);
+    expect(
+      contact.outgoingOffset,
+      equals(0),
+      reason: 'local should be initiator (outgoing = lower half)',
+    );
+    expect(contact.incomingMaxOffset, equals(2000));
+    appState.activeContact = contact;
+
+    // We lend the peer the top half of our own unused outgoing lane: [500,1000).
+    contact.outgoingMaxOffset = 500;
+    final peerBudgetBefore = contact.peerRemainingBufferBytes;
+    final incomingBefore = contact.incomingOffset;
+
+    // The peer writes into the range we lent it (offset 600 — inside OUR lane,
+    // and below our incomingMaxOffset of 2000).
+    const text = 'lent bytes';
+    final cipher = await WiltkeyOtpService.xorWithKeystream(
+      keyHash,
+      utf8.encode(text),
+      600,
+    );
+    WebSocketClient().onMessageReceived!(
+      keyHash,
+      jsonEncode({
+        't': 'text',
+        'd': base64Encode(cipher),
+        'offset': 600,
+        'id': 'b2',
+      }),
+      'text',
+    );
+    await Future.delayed(const Duration(milliseconds: 200));
+
+    final got = (appState.messages[contact.id] ?? []).firstWhere(
+      (m) => m.id == 'b2',
+      orElse: () => throw 'message not appended',
+    );
+    expect(got.decryptedText, equals(text), reason: 'decrypts by absolute offset');
+
+    // The write consumed OUR lent bytes, not the peer's lane — their budget and
+    // our incoming pointer must both be untouched.
+    expect(contact.peerRemainingBufferBytes, equals(peerBudgetBefore));
+    expect(contact.incomingOffset, equals(incomingBefore));
+  });
 }

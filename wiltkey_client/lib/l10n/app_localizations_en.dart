@@ -524,7 +524,22 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsBiometricDescription =>
-      'Use your fingerprint to unlock instead of the PIN. The PIN is still required after 4 hours of inactivity.';
+      'Use your fingerprint to unlock instead of the PIN. Your PIN is still required after the fallback period below.';
+
+  @override
+  String get settingsBiometricIdleTitle => 'PIN fallback';
+
+  @override
+  String get settingsBiometricIdleDescription =>
+      'Require your PIN again after this long without unlocking.';
+
+  @override
+  String settingsBiometricIdleValue(int hours) {
+    return '$hours h';
+  }
+
+  @override
+  String get settingsBiometricIdleNever => 'Never';
 
   @override
   String get settingsBiometricFailedSnackBar =>
@@ -759,6 +774,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatImageExceedsMaxSizeSnackBar => 'Image too large to send.';
+
+  @override
+  String get chatImageNeedsPlusSnackBar =>
+      'Image too large for the free tier — WiltKey Plus raises the limit to 50 MB.';
 
   @override
   String get chatTapForDetails => 'Tap for details';
@@ -1042,6 +1061,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get groupDecryptingImage => 'Decrypting image...';
 
   @override
+  String get chatFileTapToDownload => 'Tap to download';
+
+  @override
+  String get chatFileDownloadFailed => 'Tap to retry';
+
+  @override
+  String get chatFileKindPhoto => 'Photo';
+
+  @override
+  String get chatFileKindVoice => 'Voice message';
+
+  @override
+  String get chatFileKindFile => 'File';
+
+  @override
   String get groupTapToRevealImage => 'Tap to reveal image';
 
   @override
@@ -1177,6 +1211,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatImageCompressionMaxQuality => 'Max quality';
 
   @override
+  String get chatImageCompressionUncompressed => 'Uncompressed';
+
+  @override
   String chatImageCompressionPercentQuality(int percent) {
     return '$percent% quality';
   }
@@ -1231,6 +1268,51 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get themePaperinkDesc =>
       'Warm washi paper, sumi ink dilutions, vermilion hanko seal.';
+
+  @override
+  String get themePickerPlayExclusive =>
+      'This theme is exclusive to the Play Store version of WiltKey.';
+
+  @override
+  String get themePreviewTooltip => 'Preview';
+
+  @override
+  String get themePreviewSectionDashboard => 'Chat list';
+
+  @override
+  String get themePreviewSectionChat => 'Conversation';
+
+  @override
+  String get themePreviewSectionEffects => 'Special effects';
+
+  @override
+  String get themePreviewPlayUnlock => 'Play unlock animation';
+
+  @override
+  String get themePreviewPlayNuke => 'Play self-destruct animation';
+
+  @override
+  String get themePreviewApply => 'Use this theme';
+
+  @override
+  String get themePreviewGetInShop => 'Get it in the shop';
+
+  @override
+  String get themePreviewMsgThem1 =>
+      'Only 800 bytes left on our pad, wanna meet up?';
+
+  @override
+  String get themePreviewMsgMe =>
+      'Sure! Movie night at mine? We can recharge too';
+
+  @override
+  String get themePreviewMsgThem2 => 'deal, bringing snacks 🍿';
+
+  @override
+  String get themePreviewRowPhoto => 'Photo from the bouldering gym 🧗';
+
+  @override
+  String get themePreviewRowLost => 'Out of pad — meet up to recharge';
 
   @override
   String get accessibilityWarningTitle => 'Accessibility service active';

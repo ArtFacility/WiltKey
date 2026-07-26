@@ -321,6 +321,23 @@ extension AppStateLifecycle on AppState {
     await _persistence.saveState(this);
   }
 
+  /// A collision-proof local contact id. The old scheme (`contacts.length + 1`)
+  /// reused a number after a nuke removed a contact, which could collide with an
+  /// existing contact's id — and [WiltkeyDatabase.upsertContact] uses
+  /// `ConflictAlgorithm.replace`, so the colliding row was silently overwritten
+  /// and its messages orphaned/mixed (the "empty chat after nuke + re-pair" bug).
+  /// Deriving from the current MAX id never reuses a live id. Groups keep the `g`
+  /// prefix; ids are a local primary key only (the wire uses the keyHash).
+  String _nextContactId({required bool isGroup}) {
+    int maxN = 0;
+    for (final c in contacts) {
+      final n = int.tryParse(c.id.replaceFirst(RegExp(r'^g'), '')) ?? 0;
+      if (n > maxN) maxN = n;
+    }
+    final next = maxN + 1;
+    return isGroup ? 'g$next' : '$next';
+  }
+
   // Used by BLE Sync to register/recharge contacts
   Future<void> addOrRechargeContact(
     String name,
@@ -425,9 +442,7 @@ extension AppStateLifecycle on AppState {
     } else {
       final isPrivate = _isUrlPrivate(relayUrl);
       final newContact = Contact(
-        id: isGroup
-            ? 'g${contacts.length + 1}'
-            : (contacts.length + 1).toString(),
+        id: _nextContactId(isGroup: isGroup),
         name: name,
         keyHash: keyHash,
         relayUrl: relayUrl,

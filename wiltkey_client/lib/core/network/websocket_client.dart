@@ -56,6 +56,23 @@ class WebSocketClient {
   void Function(String spokeId)? onSpokeRequestOrder;
   void Function(int sequence)? onOrderConfirmed;
   void Function(String spokeId)? onSpokeCancelIntent;
+  /// The relay has a large payload waiting for us. [meta] is the message envelope
+  /// with its ciphertext stripped (enough to place the message in a chat); the
+  /// body must be fetched with [requestFile] before it can be decrypted.
+  void Function(
+    String senderId,
+    String contentType,
+    String messageId,
+    String meta,
+    int size,
+  )?
+  onFileOffer;
+
+  /// A download token was issued (or refused, with [error] set) for [messageId].
+  void Function(String messageId, String? token, String? error)? onFileToken;
+
+  /// The relay URL currently connected to — the base for HTTP file downloads.
+  String? get activeRelayUrl => _currentUrl;
 
   void _log(String msg) {
     if (onLog != null) {
@@ -189,6 +206,19 @@ class WebSocketClient {
     _socket!.add(jsonEncode(msgMap));
   }
 
+  /// Ask the relay for a short-lived download token for a pending large file.
+  /// The answer arrives as FILE_TOKEN (or FILE_ERROR) on [onFileToken].
+  void requestFile(String messageId) {
+    sendWSMessage({'type': 'REQUEST_FILE', 'message_id': messageId});
+  }
+
+  /// Confirm a large file is fully downloaded AND stored, releasing the relay's
+  /// copy. Only ever sent after the message is persisted — see the NEW_MESSAGE
+  /// note above for why acking any earlier loses files.
+  void confirmFileReceived(String messageId) {
+    sendWSMessage({'type': 'FILE_RECEIVED', 'message_id': messageId});
+  }
+
   /// Spoke requests a sequence number from the Host for group messaging.
   void sendRequestOrder(String hostId) {
     sendWSMessage({'type': 'REQUEST_ORDER', 'host_id': hostId});
@@ -256,12 +286,43 @@ class WebSocketClient {
           if (onMessageReceived != null) {
             onMessageReceived!(senderId, envelope, contentType);
           }
+          // Legacy inline delivery of a bucket-backed message (the relay falls
+          // back to this when it can't build an offer). The ACK is deliberately
+          // NOT sent here: acknowledging at the transport layer — before the
+          // message is decrypted and written to the DB — told the relay to delete
+          // the only copy, so anything that killed the app mid-store lost the
+          // file for good. AppState acks once the message is safely persisted.
           if (messageId != null) {
-            sendWSMessage({
-              'type': 'FILE_RECEIVED',
-              'message_id': messageId,
-            });
+            _log('[WebSocket] Inline file $messageId — ack deferred to storage');
           }
+          break;
+        case 'FILE_OFFER':
+          // A large payload is waiting in the relay's bucket. We only get its
+          // routing metadata now; the body is fetched on demand.
+          final senderId = jsonMap['sender_id'] as String? ?? '';
+          final contentType = jsonMap['content_type'] as String? ?? 'text';
+          final messageId = jsonMap['message_id'] as String? ?? '';
+          final meta = jsonMap['meta'] as String? ?? '';
+          final size = (jsonMap['size'] as num?)?.toInt() ?? 0;
+          _log(
+            '[WebSocket] Received FILE_OFFER $messageId from $senderId ($size B)',
+          );
+          if (messageId.isNotEmpty) {
+            onFileOffer?.call(senderId, contentType, messageId, meta, size);
+          }
+          break;
+        case 'FILE_TOKEN':
+          onFileToken?.call(
+            jsonMap['message_id'] as String? ?? '',
+            jsonMap['token'] as String?,
+            null,
+          );
+          break;
+        case 'FILE_ERROR':
+          final messageId = jsonMap['message_id'] as String? ?? '';
+          final message = jsonMap['message'] as String? ?? 'File unavailable';
+          _log('[WebSocket] FILE_ERROR for $messageId: $message');
+          onFileToken?.call(messageId, null, message);
           break;
         case 'SPOKE_REQUEST_ORDER':
           final spokeId = jsonMap['spoke_id'] as String;

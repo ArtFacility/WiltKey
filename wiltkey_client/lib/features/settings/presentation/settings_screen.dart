@@ -386,7 +386,20 @@ class _SettingsScreenState extends State<SettingsScreen>
               ),
             ),
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 12),
+
+          // Avatar border — right under the avatar it decorates. Equipping it is
+          // a profile change → broadcast (handled by the controller listener).
+          Text(
+            l10n.settingsBorderSection,
+            style: t.dataMono.copyWith(
+              color: t.textSecondary,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          BorderPicker(sampleHex: _pixelGrid.join()),
+          const SizedBox(height: 20),
 
           Text(l10n.settingsProfileUsername, style: t.bodySecondary),
           const SizedBox(height: 6),
@@ -622,18 +635,6 @@ class _SettingsScreenState extends State<SettingsScreen>
               ],
             ),
           ),
-          const SizedBox(height: 20),
-
-          // Avatar border (equipping it is a profile change → broadcast).
-          Text(
-            l10n.settingsBorderSection,
-            style: t.dataMono.copyWith(
-              color: t.textSecondary,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 8),
-          BorderPicker(sampleHex: _pixelGrid.join()),
           const SizedBox(height: 16),
         ],
       ),
@@ -680,6 +681,59 @@ class _SettingsScreenState extends State<SettingsScreen>
                     l10n.settingsBiometricDescription,
                     style: t.bodySecondary,
                   ),
+                  // PIN-fallback window — only meaningful once fingerprint unlock
+                  // is on. 1–24 h, or the last notch = Never (fingerprint stays).
+                  if (_appState.biometricUnlockEnabled) ...[
+                    Divider(color: t.border, height: 20),
+                    Row(
+                      children: [
+                        Icon(Icons.timer_outlined,
+                            size: 16, color: t.textSecondary),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            l10n.settingsBiometricIdleTitle,
+                            style:
+                                t.body.copyWith(fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                        Text(
+                          _appState.biometricIdleHours <= 0
+                              ? l10n.settingsBiometricIdleNever
+                              : l10n.settingsBiometricIdleValue(
+                                  _appState.biometricIdleHours),
+                          style: t.dataMono.copyWith(
+                            color: t.action,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Slider(
+                      value: (_appState.biometricIdleHours <= 0
+                              ? 25
+                              : _appState.biometricIdleHours.clamp(1, 24))
+                          .toDouble(),
+                      min: 1,
+                      max: 25, // 25th notch = Never
+                      divisions: 24,
+                      activeColor: t.action,
+                      inactiveColor: t.budgetEmpty,
+                      label: _appState.biometricIdleHours <= 0
+                          ? l10n.settingsBiometricIdleNever
+                          : l10n.settingsBiometricIdleValue(
+                              _appState.biometricIdleHours),
+                      onChanged: (val) {
+                        final pos = val.round();
+                        _appState.setBiometricIdleHours(pos >= 25 ? 0 : pos);
+                        setState(() {});
+                      },
+                    ),
+                    Text(
+                      l10n.settingsBiometricIdleDescription,
+                      style: t.bodySecondary,
+                    ),
+                  ],
                 ],
               ),
             ),

@@ -323,6 +323,19 @@ class ChatMessage {
   // Synced over the AES meta channel, like [reactions].
   Set<String> wiltedBy;
 
+  // --- Pending large-file download -------------------------------------------
+  // Large payloads (>= the relay's bucket threshold) are no longer pushed down
+  // the socket: the relay sends a FILE_OFFER carrying only routing metadata, and
+  // the body stays in its bucket until we fetch it and confirm receipt. While
+  // [remoteFileId] is set this message is a placeholder — it has no ciphertext
+  // and renders as a tap-to-download bubble sized by [remoteSize]. Both fields
+  // are cleared once the body has been downloaded, decrypted and stored.
+  String? remoteFileId; // relay-side message id to request, null once fetched
+  int remoteSize; // advertised envelope size in bytes (for the visual)
+
+  /// True while the body still lives on the relay and hasn't been downloaded.
+  bool get isPendingDownload => (remoteFileId?.isNotEmpty ?? false) && !wilted;
+
   ChatMessage({
     required this.id,
     required this.senderId,
@@ -346,6 +359,8 @@ class ChatMessage {
     this.expiresAt,
     this.wilted = false,
     Set<String>? wiltedBy,
+    this.remoteFileId,
+    this.remoteSize = 0,
   }) : reactions = reactions ?? {},
        wiltedBy = wiltedBy ?? {};
 

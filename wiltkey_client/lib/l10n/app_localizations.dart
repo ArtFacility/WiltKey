@@ -1041,8 +1041,32 @@ abstract class AppLocalizations {
   /// No description provided for @settingsBiometricDescription.
   ///
   /// In en, this message translates to:
-  /// **'Use your fingerprint to unlock instead of the PIN. The PIN is still required after 4 hours of inactivity.'**
+  /// **'Use your fingerprint to unlock instead of the PIN. Your PIN is still required after the fallback period below.'**
   String get settingsBiometricDescription;
+
+  /// No description provided for @settingsBiometricIdleTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'PIN fallback'**
+  String get settingsBiometricIdleTitle;
+
+  /// No description provided for @settingsBiometricIdleDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Require your PIN again after this long without unlocking.'**
+  String get settingsBiometricIdleDescription;
+
+  /// Fingerprint idle window in hours.
+  ///
+  /// In en, this message translates to:
+  /// **'{hours} h'**
+  String settingsBiometricIdleValue(int hours);
+
+  /// PIN-fallback slider value meaning fingerprint never expires.
+  ///
+  /// In en, this message translates to:
+  /// **'Never'**
+  String get settingsBiometricIdleNever;
 
   /// No description provided for @settingsBiometricFailedSnackBar.
   ///
@@ -1445,6 +1469,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Image too large to send.'**
   String get chatImageExceedsMaxSizeSnackBar;
+
+  /// Shown when a free-tier user tries to send an image bigger than the 5 MB free limit but within the 50 MB Plus limit.
+  ///
+  /// In en, this message translates to:
+  /// **'Image too large for the free tier — WiltKey Plus raises the limit to 50 MB.'**
+  String get chatImageNeedsPlusSnackBar;
 
   /// No description provided for @chatTapForDetails.
   ///
@@ -1944,6 +1974,36 @@ abstract class AppLocalizations {
   /// **'Decrypting image...'**
   String get groupDecryptingImage;
 
+  /// No description provided for @chatFileTapToDownload.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to download'**
+  String get chatFileTapToDownload;
+
+  /// No description provided for @chatFileDownloadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to retry'**
+  String get chatFileDownloadFailed;
+
+  /// No description provided for @chatFileKindPhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Photo'**
+  String get chatFileKindPhoto;
+
+  /// No description provided for @chatFileKindVoice.
+  ///
+  /// In en, this message translates to:
+  /// **'Voice message'**
+  String get chatFileKindVoice;
+
+  /// No description provided for @chatFileKindFile.
+  ///
+  /// In en, this message translates to:
+  /// **'File'**
+  String get chatFileKindFile;
+
   /// No description provided for @groupTapToRevealImage.
   ///
   /// In en, this message translates to:
@@ -2172,6 +2232,12 @@ abstract class AppLocalizations {
   /// **'Max quality'**
   String get chatImageCompressionMaxQuality;
 
+  /// Last slider step past 100% WebP: full resolution, no downscale.
+  ///
+  /// In en, this message translates to:
+  /// **'Uncompressed'**
+  String get chatImageCompressionUncompressed;
+
   /// No description provided for @chatImageCompressionPercentQuality.
   ///
   /// In en, this message translates to:
@@ -2267,6 +2333,90 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Warm washi paper, sumi ink dilutions, vermilion hanko seal.'**
   String get themePaperinkDesc;
+
+  /// Snackbar shown on the FOSS build when tapping a locked premium theme (which can only be bought in the Play version).
+  ///
+  /// In en, this message translates to:
+  /// **'This theme is exclusive to the Play Store version of WiltKey.'**
+  String get themePickerPlayExclusive;
+
+  /// No description provided for @themePreviewTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview'**
+  String get themePreviewTooltip;
+
+  /// No description provided for @themePreviewSectionDashboard.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat list'**
+  String get themePreviewSectionDashboard;
+
+  /// No description provided for @themePreviewSectionChat.
+  ///
+  /// In en, this message translates to:
+  /// **'Conversation'**
+  String get themePreviewSectionChat;
+
+  /// No description provided for @themePreviewSectionEffects.
+  ///
+  /// In en, this message translates to:
+  /// **'Special effects'**
+  String get themePreviewSectionEffects;
+
+  /// No description provided for @themePreviewPlayUnlock.
+  ///
+  /// In en, this message translates to:
+  /// **'Play unlock animation'**
+  String get themePreviewPlayUnlock;
+
+  /// No description provided for @themePreviewPlayNuke.
+  ///
+  /// In en, this message translates to:
+  /// **'Play self-destruct animation'**
+  String get themePreviewPlayNuke;
+
+  /// No description provided for @themePreviewApply.
+  ///
+  /// In en, this message translates to:
+  /// **'Use this theme'**
+  String get themePreviewApply;
+
+  /// No description provided for @themePreviewGetInShop.
+  ///
+  /// In en, this message translates to:
+  /// **'Get it in the shop'**
+  String get themePreviewGetInShop;
+
+  /// No description provided for @themePreviewMsgThem1.
+  ///
+  /// In en, this message translates to:
+  /// **'Only 800 bytes left on our pad, wanna meet up?'**
+  String get themePreviewMsgThem1;
+
+  /// No description provided for @themePreviewMsgMe.
+  ///
+  /// In en, this message translates to:
+  /// **'Sure! Movie night at mine? We can recharge too'**
+  String get themePreviewMsgMe;
+
+  /// No description provided for @themePreviewMsgThem2.
+  ///
+  /// In en, this message translates to:
+  /// **'deal, bringing snacks 🍿'**
+  String get themePreviewMsgThem2;
+
+  /// No description provided for @themePreviewRowPhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Photo from the bouldering gym 🧗'**
+  String get themePreviewRowPhoto;
+
+  /// No description provided for @themePreviewRowLost.
+  ///
+  /// In en, this message translates to:
+  /// **'Out of pad — meet up to recharge'**
+  String get themePreviewRowLost;
 
   /// No description provided for @accessibilityWarningTitle.
   ///

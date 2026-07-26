@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -764,6 +765,56 @@ func (r *RedisClient) DeleteTunnel(pubkeyA string, pubkeyB string) error {
 	pipe.Del(ctx, fmt.Sprintf("tunnel_bytes:%s:%s", pubkeyB, pubkeyA))
 	_, err := pipe.Exec(ctx)
 	return err
+}
+
+// fileTokenTTL bounds how long a minted download token is usable. Short by
+// design: the token is handed out over the already-authenticated WebSocket right
+// before the client starts the HTTP GET, so it only needs to survive the hop.
+const fileTokenTTL = 10 * time.Minute
+
+// StoreFileToken records a one-time-ish download token → "messageID:userID". The
+// HTTP download endpoint has no signature auth of its own, so this token IS the
+// authorization: it is minted only after the WebSocket layer has verified that
+// the requesting client is the message's recipient.
+func (r *RedisClient) StoreFileToken(token, messageID, userID string) error {
+	val := messageID + ":" + userID
+	if r.isMemory {
+		r.mu.Lock()
+		defer r.mu.Unlock()
+		r.memoryTunnels["filetok:"+token] = val
+		r.memoryBlocks["filetok:"+token] = time.Now().Add(fileTokenTTL)
+		return nil
+	}
+	key := fmt.Sprintf("filetok:%s", token)
+	return r.rdb.Set(ctx, key, val, fileTokenTTL).Err()
+}
+
+// GetFileToken resolves a download token to its (messageID, userID). Returns
+// empty strings when the token is unknown or expired.
+func (r *RedisClient) GetFileToken(token string) (string, string, error) {
+	var val string
+	if r.isMemory {
+		r.mu.RLock()
+		exp, ok := r.memoryBlocks["filetok:"+token]
+		val = r.memoryTunnels["filetok:"+token]
+		r.mu.RUnlock()
+		if !ok || exp.Before(time.Now()) {
+			return "", "", nil
+		}
+	} else {
+		v, err := r.rdb.Get(ctx, fmt.Sprintf("filetok:%s", token)).Result()
+		if err == redis.Nil {
+			return "", "", nil
+		} else if err != nil {
+			return "", "", err
+		}
+		val = v
+	}
+	idx := strings.LastIndex(val, ":")
+	if idx < 0 {
+		return "", "", nil
+	}
+	return val[:idx], val[idx+1:], nil
 }
 
 // StoreEntitlement caches user's Google subscription key hash in Redis.

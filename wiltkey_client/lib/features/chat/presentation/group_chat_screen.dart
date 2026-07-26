@@ -6,6 +6,7 @@ import 'dart:typed_data';
 import 'package:image_picker/image_picker.dart';
 import 'package:wiltkey_client/l10n/app_localizations.dart';
 import '../../../core/state.dart';
+import '../../../core/payload_limits.dart';
 import '../../../core/models.dart';
 import '../../../core/pixel_art_avatar.dart';
 import '../../../core/cosmetics/avatar_border_controller.dart';
@@ -20,6 +21,7 @@ import 'widgets/emoji_picker_panel.dart';
 import 'widgets/debug_console_sheet.dart';
 import 'widgets/voice_recording_mixin.dart';
 import 'widgets/voice_message_player.dart';
+import 'widgets/download_bubble.dart';
 import 'widgets/reactions.dart';
 import 'widgets/image_viewer.dart';
 import 'widgets/screenshot_ui.dart';
@@ -537,8 +539,12 @@ class _GroupChatScreenState extends State<GroupChatScreen>
       );
       return;
     }
-    if (base64Data.length > 1400000) {
-      _errorSnack(l10n.chatImageExceedsMaxSizeSnackBar);
+    if (WkPayloadLimits.exceedsOutgoing(base64Data.length)) {
+      _errorSnack(
+        WkPayloadLimits.blockedByFreeTier(base64Data.length)
+            ? l10n.chatImageNeedsPlusSnackBar
+            : l10n.chatImageExceedsMaxSizeSnackBar,
+      );
       return;
     }
 
@@ -1982,6 +1988,17 @@ class _GroupChatScreenState extends State<GroupChatScreen>
     // (state_wilting.dart, sendGroupMessage, _handleGroupPayload) — only this UI
     // was missing.
     if (message.wilted) return _buildGroupWiltedTombstone(t, isMe);
+    // Large payload still held on the relay — fetch the body before anything can
+    // decrypt or reveal it (same ordering as MessageBubble: after the tombstone,
+    // before the wilt gate).
+    final pendingChat = _appState.activeContact;
+    if (message.isPendingDownload && pendingChat != null) {
+      return DownloadBubble(
+        message: message,
+        contact: pendingChat,
+        appState: _appState,
+      );
+    }
     if (message.ephemeral && !isMe && message.openedAt == null) {
       return _buildGroupWiltGate(t, message);
     }

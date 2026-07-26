@@ -1,5 +1,7 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import '../core/cosmetics/avatar_border_registry.dart';
+import '../core/pixel_art_avatar.dart';
 import '../core/theme/theme_registry.dart';
 import '../core/theme/wk.dart';
 import '../core/theme/wiltkey_components.dart';
@@ -92,6 +94,8 @@ class _ShowcaseScreenState extends State<ShowcaseScreen> {
                 const SizedBox(height: 16),
                 _badgesSection(context),
                 const SizedBox(height: 16),
+                _bordersSection(context),
+                const SizedBox(height: 16),
                 _pinSection(context),
                 const SizedBox(height: 16),
                 _nukeSection(context),
@@ -109,6 +113,50 @@ class _ShowcaseScreenState extends State<ShowcaseScreen> {
   }
 
   // ---- sections ------------------------------------------------------------
+
+  Widget _bordersSection(BuildContext context) {
+    final t = context.wk;
+    final sample = PixelArtAvatar.generateIdenticon('showcase-border');
+    // Every renderable border (free + premium; premium present on the overlay
+    // build). Animated ones tick off the shared AvatarBorderTicker.
+    final borders = WkAvatarBorderRegistry.all;
+    return _card(
+      context,
+      'Avatar borders  ·  static SVG + animated (●)',
+      null,
+      [
+        // Big versions so animation is easy to read.
+        Wrap(
+          spacing: 18,
+          runSpacing: 14,
+          children: [
+            for (final b in borders)
+              Column(
+                children: [
+                  PixelArtAvatar(hexString: sample, size: 96, borderId: b.id),
+                  const SizedBox(height: 4),
+                  Text(
+                    b.isAnimated ? '${b.name} ●' : b.name,
+                    style: t.dataMono.copyWith(fontSize: 9),
+                  ),
+                ],
+              ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        Text('At list-row size (44px):', style: t.bodySecondary),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: [
+            for (final b in borders)
+              PixelArtAvatar(hexString: sample, size: 44, borderId: b.id),
+          ],
+        ),
+      ],
+    );
+  }
 
   Widget _themeSwitcher(BuildContext context) {
     final t = context.wk;

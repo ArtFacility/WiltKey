@@ -4,7 +4,9 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:wiltkey_client/l10n/app_localizations.dart';
 
 import '../../../core/cosmetics/avatar_border_registry.dart';
+import '../../../core/pixel_art_avatar.dart';
 import '../../../core/state.dart';
+import '../../../core/debug_clipboard.dart';
 import '../../../core/entitlements/billing_models.dart';
 import '../../../core/entitlements/entitlement_service.dart';
 import '../../../core/entitlements/product_ids.dart';
@@ -58,6 +60,11 @@ class _ShopScreenState extends State<ShopScreen>
   /// and stays empty if the SKUs aren't configured yet.
   Map<String, BillingProduct> _products = const {};
 
+  // A stable sample avatar to preview borders against (works for painted borders
+  // that have no SVG asset).
+  late final String _previewHex =
+      PixelArtAvatar.generateIdenticon(AppState().userId);
+
   final TextEditingController _promoController = TextEditingController();
 
   @override
@@ -90,22 +97,119 @@ class _ShopScreenState extends State<ShopScreen>
 
   /// Every product id the shop can sell: the Plus subscription (which also
   /// carries the larger pad sizes), one per premium palette pack, one per
-  /// premium theme.
+  /// premium avatar border, one per premium theme.
   List<String> _catalogIds() => <String>[
         WkProducts.plusSubscription,
         for (final s in WkPalette.sets)
           if (s.premium && s.sku != null) s.sku!,
+        for (final b in WkAvatarBorderRegistry.premium) b.sku,
         for (final t in WiltkeyThemeRegistry.premium) t.sku,
       ];
 
   Future<void> _loadProducts() async {
     setState(() => _loading = true);
-    final list = await _ent.productDetails(_catalogIds());
+    final ids = _catalogIds();
+    AppState().log('[Billing] shop loading catalog (${ids.length}): '
+        '${ids.join(", ")}');
+    final list = await _ent.productDetails(ids);
     if (!mounted) return;
     setState(() {
       _products = {for (final p in list) p.id: p};
       _loading = false;
     });
+  }
+
+  // In-app billing debug console (gated behind the "debug buttons" setting).
+  // Shows the app debug log — billing lines are tagged [Billing] and highlighted —
+  // with a copy-all button and a "Reload" that re-runs the product query so you
+  // can watch the exact Play response on a real release build. This is the only
+  // way to see why cards read "unavailable" when logcat isn't reachable.
+  void _showBillingDebugConsole() {
+    final t = context.wk;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: t.bg,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(t.radiusCard)),
+      ),
+      builder: (ctx) => SizedBox(
+        height: MediaQuery.of(ctx).size.height * 0.78,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.bug_report_outlined, color: t.action, size: 20),
+                      const SizedBox(width: 8),
+                      Text('Billing debug',
+                          style: t.screenTitle.copyWith(fontSize: 15)),
+                    ],
+                  ),
+                  Row(
+                    children: [
+                      TextButton.icon(
+                        onPressed: () {
+                          AppState().log('[Billing] --- manual reload ---');
+                          _loadProducts();
+                        },
+                        icon: Icon(Icons.refresh, size: 16, color: t.action),
+                        label:
+                            Text('Reload', style: TextStyle(color: t.action)),
+                      ),
+                      CopyDebugLogButton(logs: AppState.debugLogs),
+                      IconButton(
+                        icon:
+                            Icon(Icons.close, color: t.textSecondary, size: 20),
+                        onPressed: () => Navigator.pop(ctx),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              Divider(color: t.border),
+              Expanded(
+                child: ListenableBuilder(
+                  listenable: AppState.logRevision,
+                  builder: (context, _) {
+                    final logs = AppState.debugLogs;
+                    if (logs.isEmpty) {
+                      return Center(
+                        child: Text('No log lines yet.',
+                            style: t.bodySecondary),
+                      );
+                    }
+                    return ListView.builder(
+                      itemCount: logs.length,
+                      reverse: true,
+                      itemBuilder: (context, index) {
+                        final item = logs[logs.length - 1 - index];
+                        final isBilling = item.contains('[Billing]');
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 3),
+                          child: SelectableText(
+                            item,
+                            style: t.dataMono.copyWith(
+                              color: isBilling ? t.action : t.textTertiary,
+                              fontSize: 10.5,
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _buy(String productId, {required bool subscription}) async {
@@ -186,6 +290,15 @@ class _ShopScreenState extends State<ShopScreen>
           style: t.screenTitle.copyWith(fontSize: 18),
         ),
         actions: [
+          // Billing diagnostics — visible only when "debug buttons" is enabled
+          // (Settings → Network). Lets a tester read/copy the exact Play Billing
+          // response + unfetched-product status codes on a real release build.
+          if (isPlay && AppState().showDebugButtons)
+            IconButton(
+              tooltip: 'Billing debug',
+              icon: Icon(Icons.bug_report_outlined, color: t.textTertiary),
+              onPressed: _showBillingDebugConsole,
+            ),
           if (isPlay)
             IconButton(
               tooltip: l10n.shopRestoreButton,
@@ -384,14 +497,15 @@ class _ShopScreenState extends State<ShopScreen>
     );
   }
 
+  // Previews the border over a sample avatar. Uses PixelArtAvatar (not a raw
+  // SvgPicture) so it renders BOTH svg borders (golden/laurel) AND painted /
+  // animated ones with no asset (orbit/aurora) — a bare assetPath! crashed here.
   Widget _borderRow(WiltkeyTokens t, WkAvatarBorder b) => Padding(
         padding: const EdgeInsets.only(top: 12),
-        child: SvgPicture.asset(
-          b.assetPath!,
-          width: 56,
-          height: 56,
-          fit: BoxFit.contain,
-          placeholderBuilder: (_) => const SizedBox(width: 56, height: 56),
+        child: PixelArtAvatar(
+          hexString: _previewHex,
+          size: 56,
+          borderId: b.id,
         ),
       );
 

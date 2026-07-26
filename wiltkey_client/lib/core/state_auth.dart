@@ -38,19 +38,26 @@ extension AppStateAuth on AppState {
     return true;
   }
 
-  /// Biometric idle window: after this long without an unlock, the PIN is forced
-  /// again even if fingerprint unlock is enabled.
-  static const int _biometricMaxIdleMs = 4 * 60 * 60 * 1000; // 4 hours
-
   /// Whether a fingerprint unlock may be offered right now: the user opted in AND
-  /// the last unlock was within the idle window. Safe to call before unlocking
-  /// (the flag + timestamp are loaded in [AppState._initAndLoad]).
+  /// the last unlock was within the configurable idle window ([biometricIdleHours];
+  /// 0 = never expire). Safe to call before unlocking (the flag, timestamp, and
+  /// window are loaded in [AppState._initAndLoad]).
   bool biometricAllowedNow() {
     if (!biometricUnlockEnabled) return false;
     final last = lastUnlockMs;
     if (last == null) return false;
+    final hours = biometricIdleHours;
+    if (hours <= 0) return true; // "never" — fingerprint stays available
     final age = DateTime.now().millisecondsSinceEpoch - last;
-    return age >= 0 && age < _biometricMaxIdleMs;
+    final maxIdleMs = hours * 60 * 60 * 1000;
+    return age >= 0 && age < maxIdleMs;
+  }
+
+  /// Set the fingerprint idle window (hours; 0 = never). Persists + notifies.
+  Future<void> setBiometricIdleHours(int hours) async {
+    biometricIdleHours = hours;
+    await _persistence.setBiometricIdleHours(hours);
+    notifyListeners();
   }
 
   /// Unlock with the OS biometric instead of the PIN. Releases the Keystore-stashed
@@ -151,6 +158,10 @@ extension AppStateAuth on AppState {
     // Initialize WiltkeyDatabase
     await WiltkeyDatabase.instance.init();
     contacts = await WiltkeyDatabase.instance.getAllContacts();
+    log(
+      '[Load] ${contacts.length} contact(s): '
+      '${contacts.map((c) => "${c.id}:${c.keyHash.substring(0, c.keyHash.length >= 8 ? 8 : c.keyHash.length)}").join(", ")}',
+    );
 
     // Group keystreams are computed on demand from the stored seed (no giant
     // on-disk pad). Cache every group's seed up front so the invariant holds —

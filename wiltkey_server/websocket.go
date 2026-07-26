@@ -1,14 +1,11 @@
 package main
 
 import (
-	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
-	"io"
 	"log"
 	"net/http"
-	"strings"
 	"sync"
 	"time"
 
@@ -119,50 +116,30 @@ func (h *Hub) deliverOfflineQueue(client *Client) {
 	if len(pgMsgs) > 0 {
 		log.Printf("Delivering %d offline messages from Postgres to %s", len(pgMsgs), client.id)
 		for _, msg := range pgMsgs {
-			var envelope string
-			if msg.Envelope != nil {
-				// Inline message
-				envelope = *msg.Envelope
-			} else if msg.BucketURL != nil {
-				// Storage bucket message -> download it
-				var key string
-				rawURL := *msg.BucketURL
-				if strings.HasPrefix(rawURL, "local://") {
-					key = strings.TrimPrefix(rawURL, "local://")
-				} else {
-					parts := strings.Split(rawURL, "/")
-					if len(parts) > 0 {
-						key = parts[len(parts)-1]
-					}
-				}
-
-				if key != "" {
-					reader, err := storage.Download(context.Background(), key)
-					if err != nil {
-						log.Printf("Error downloading object %s from storage: %v", key, err)
-						continue
-					}
-					contentBytes, err := io.ReadAll(reader)
-					reader.Close()
-					if err != nil {
-						log.Printf("Error reading downloaded object %s: %v", key, err)
-						continue
-					}
-					envelope = string(contentBytes)
-				}
-			}
-
-			var msgID string
 			if msg.BucketURL != nil {
-				msgID = msg.ID
+				// Large file: advertise it, don't push it. The body stays in the
+				// bucket until the client downloads it and ACKs (or the TTL
+				// expires), so a half-finished or interrupted download can always
+				// be retried instead of losing the file.
+				client.SendJSON(WSMessage{
+					Type:        "FILE_OFFER",
+					SenderID:    msg.SenderID,
+					ContentType: msg.ContentType,
+					MessageID:   msg.ID,
+					Meta:        msg.OfferMeta,
+					Size:        msg.SizeBytes,
+					ExpiresAt:   msg.ExpiresAt.Unix(),
+				})
+				continue
 			}
-
+			if msg.Envelope == nil {
+				continue
+			}
 			client.SendJSON(WSMessage{
 				Type:        "NEW_MESSAGE",
 				SenderID:    msg.SenderID,
-				Envelope:    envelope,
+				Envelope:    *msg.Envelope,
 				ContentType: msg.ContentType,
-				MessageID:   msgID,
 			})
 		}
 
@@ -222,6 +199,13 @@ type WSMessage struct {
 	NukeEnvelope    string            `json:"nuke_envelope,omitempty"`
 	EphemeralPubkey string            `json:"ephemeral_pubkey,omitempty"`
 	MessageID       string            `json:"message_id,omitempty"`
+	// Large-file (FILE_OFFER / FILE_TOKEN) fields. `Meta` is the message envelope
+	// with its big `d` ciphertext stripped, so the client can place the message in
+	// the right chat and render a placeholder before downloading the body.
+	Meta      string `json:"meta,omitempty"`
+	Size      int64  `json:"size,omitempty"`
+	Token     string `json:"token,omitempty"`
+	ExpiresAt int64  `json:"expires_at,omitempty"`
 }
 
 // readPump pumps messages from the websocket connection to the hub.
@@ -341,6 +325,8 @@ func (c *Client) handleWSMessage(msg WSMessage) {
 		c.handleAckNuke(msg)
 	case "FILE_RECEIVED":
 		c.handleFileReceived(msg)
+	case "REQUEST_FILE":
+		c.handleRequestFile(msg)
 	default:
 		log.Printf("[WebSocket] Unhandled message type: %s", msg.Type)
 	}

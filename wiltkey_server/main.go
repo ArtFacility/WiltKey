@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"math"
 	"math/big"
@@ -718,6 +719,96 @@ func isHighRAMLoad() bool {
 	return v.UsedPercent >= thresholdPercent
 }
 
+// storageKeyFromURL extracts the object key from a stored bucket URL (either a
+// `local://<key>` path or an S3-style `scheme://host/bucket/<key>` URL).
+func storageKeyFromURL(rawURL string) string {
+	if strings.HasPrefix(rawURL, "local://") {
+		return strings.TrimPrefix(rawURL, "local://")
+	}
+	parts := strings.Split(rawURL, "/")
+	if len(parts) == 0 {
+		return ""
+	}
+	return parts[len(parts)-1]
+}
+
+// handleFileDownload streams a pending large file to its recipient.
+//
+// Authorization is the short-lived token minted over the authenticated
+// WebSocket (see handleRequestFile) — this endpoint never trusts a caller-
+// supplied user id. Downloading does NOT delete: the object survives until the
+// client confirms it stored the message (FILE_RECEIVED) or the hold TTL expires,
+// so an interrupted download can simply be retried.
+func handleFileDownload(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	token := r.URL.Query().Get("token")
+	if token == "" {
+		http.Error(w, "Missing token", http.StatusBadRequest)
+		return
+	}
+	if pg == nil || storage == nil {
+		http.Error(w, "File storage is not configured", http.StatusServiceUnavailable)
+		return
+	}
+
+	messageID, userID, err := rdb.GetFileToken(token)
+	if err != nil {
+		log.Printf("[File] token lookup failed: %v", err)
+		http.Error(w, "Token lookup failed", http.StatusInternalServerError)
+		return
+	}
+	if messageID == "" || userID == "" {
+		http.Error(w, "Invalid or expired token", http.StatusForbidden)
+		return
+	}
+
+	// Re-check ownership at download time: the token alone must not outlive the
+	// message it was minted for (e.g. the file was ACKed or expired meanwhile).
+	record, err := pg.GetFileMessage(messageID, userID)
+	if err != nil {
+		log.Printf("[File] lookup failed for %s: %v", messageID, err)
+		http.Error(w, "Lookup failed", http.StatusInternalServerError)
+		return
+	}
+	if record == nil || record.BucketURL == nil {
+		http.Error(w, "File is no longer available", http.StatusNotFound)
+		return
+	}
+
+	key := storageKeyFromURL(*record.BucketURL)
+	if key == "" {
+		http.Error(w, "File is no longer available", http.StatusNotFound)
+		return
+	}
+
+	reader, err := storage.Download(r.Context(), key)
+	if err != nil {
+		log.Printf("[File] failed to open object %s: %v", key, err)
+		http.Error(w, "Failed to read file", http.StatusInternalServerError)
+		return
+	}
+	defer reader.Close()
+
+	w.Header().Set("Content-Type", "application/octet-stream")
+	// Content-Length drives the client's download progress bar.
+	if record.SizeBytes > 0 {
+		w.Header().Set("Content-Length", strconv.FormatInt(record.SizeBytes, 10))
+	}
+	w.WriteHeader(http.StatusOK)
+	written, err := io.Copy(w, reader)
+	if err != nil {
+		// Client hung up or storage stalled. The object is untouched, so the
+		// download can simply be retried — this is exactly the case the
+		// download-then-ACK design exists to survive.
+		log.Printf("[File] download of %s interrupted after %d bytes: %v", messageID, written, err)
+		return
+	}
+	log.Printf("[File] Served %d bytes of message %s to %s (awaiting ACK)", written, messageID, userID)
+}
+
 // startCleanupWorker periodically prunes expired Postgres records and deletes their S3/local files.
 func startCleanupWorker(pg *PostgresClient, storage ObjectStorage) {
 	ticker := time.NewTicker(5 * time.Minute)
@@ -735,16 +826,8 @@ func startCleanupWorker(pg *PostgresClient, storage ObjectStorage) {
 			if len(deletedURLs) > 0 {
 				log.Printf("[Cleanup] Pruned %d expired database records. Deleting associated files...", len(deletedURLs))
 				for _, rawURL := range deletedURLs {
-					var key string
-					if strings.HasPrefix(rawURL, "local://") {
-						key = strings.TrimPrefix(rawURL, "local://")
-					} else {
-						// For S3: e.g. http://minio:9000/wiltkey-files/some-uuid
-						parts := strings.Split(rawURL, "/")
-						if len(parts) > 0 {
-							key = parts[len(parts)-1]
-						}
-					}
+					// For S3: e.g. http://minio:9000/wiltkey-files/some-uuid
+					key := storageKeyFromURL(rawURL)
 					if key != "" {
 						if err := storage.Delete(context.Background(), key); err != nil {
 							log.Printf("[Cleanup Error] Failed to delete object %s from storage: %v", key, err)
@@ -990,6 +1073,7 @@ func main() {
 	http.HandleFunc("/api/v1/pair/join", rateLimitMiddleware(handlePairJoin))
 	http.HandleFunc("/api/v1/pair/poll", rateLimitMiddleware(handlePairPoll))
 	http.HandleFunc("/api/v1/entitlement", rateLimitMiddleware(handlePostEntitlement))
+	http.HandleFunc("/api/v1/file", rateLimitMiddleware(handleFileDownload))
 	http.HandleFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(`{"status":"ok"}`))

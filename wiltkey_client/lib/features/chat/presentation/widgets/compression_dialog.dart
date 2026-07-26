@@ -57,7 +57,12 @@ class CompressionDialog extends StatefulWidget {
 }
 
 class _CompressionDialogState extends State<CompressionDialog> {
-  double quality = 0.5;
+  // Slider positions: 0..9 → WebP quality 10%..100%; position 10 (_webpSteps) is
+  // the "uncompressed" step — full-resolution, quality-100 WebP with no downscale.
+  static const int _webpSteps = 10;
+  int _step = 4; // default position → 50% WebP
+  bool get _uncompressed => _step >= _webpSteps;
+  double get quality => _uncompressed ? 1.0 : (_step + 1) / 10.0;
   bool hidden = false;
   bool allowSave = false;
   bool ephemeral = false;
@@ -70,7 +75,9 @@ class _CompressionDialogState extends State<CompressionDialog> {
   Timer? _debounce;
   int _seq = 0; // guards against out-of-order slider recomputes
 
-  int get _qInt => (quality * 100).round();
+  // Cache key for the last compressed bytes. 1000 is the "uncompressed" sentinel
+  // (distinct from any real 0-100 quality and from the -1 "nothing yet" default).
+  int get _qInt => _uncompressed ? 1000 : (quality * 100).round();
 
   @override
   void initState() {
@@ -98,7 +105,10 @@ class _CompressionDialogState extends State<CompressionDialog> {
     if (mounted) setState(() => _busy = true);
     Uint8List out;
     try {
-      out = await ImageUtils.prepareForSend(widget.originalBytes, quality: q);
+      out = _uncompressed
+          ? await ImageUtils.prepareForSend(widget.originalBytes,
+              quality: 100, fullResolution: true)
+          : await ImageUtils.prepareForSend(widget.originalBytes, quality: q);
     } catch (_) {
       out = widget.originalBytes;
     }
@@ -120,7 +130,10 @@ class _CompressionDialogState extends State<CompressionDialog> {
     if (_compressed != null && _compressedForQuality == q) {
       out = _compressed!;
     } else {
-      out = await ImageUtils.prepareForSend(widget.originalBytes, quality: q);
+      out = _uncompressed
+          ? await ImageUtils.prepareForSend(widget.originalBytes,
+              quality: 100, fullResolution: true)
+          : await ImageUtils.prepareForSend(widget.originalBytes, quality: q);
     }
     if (!mounted) return;
     Navigator.pop(
@@ -229,17 +242,19 @@ class _CompressionDialogState extends State<CompressionDialog> {
           ),
           const SizedBox(height: 12),
           Slider(
-            value: quality,
-            min: 0.1,
-            max: 1.0,
-            divisions: 9,
+            value: _step.toDouble(),
+            min: 0,
+            max: _webpSteps.toDouble(), // 10 → 11 stops (0..10); 10 = uncompressed
+            divisions: _webpSteps,
             activeColor: t.action,
             inactiveColor: t.budgetEmpty,
-            label: quality == 1.0
-                ? l10n.chatImageCompressionMaxQuality
-                : '${(quality * 100).toInt()}%',
+            label: _uncompressed
+                ? l10n.chatImageCompressionUncompressed
+                : (quality == 1.0
+                    ? l10n.chatImageCompressionMaxQuality
+                    : '${(quality * 100).toInt()}%'),
             onChanged: (val) {
-              setState(() => quality = val);
+              setState(() => _step = val.round());
               _scheduleRecompute();
             },
           ),
@@ -248,11 +263,13 @@ class _CompressionDialogState extends State<CompressionDialog> {
             children: [
               Text(l10n.chatImageCompressionLowSize, style: t.bodySecondary),
               Text(
-                quality == 1.0
-                    ? l10n.chatImageCompressionMaxQuality
-                    : l10n.chatImageCompressionPercentQuality(
-                        (quality * 100).toInt(),
-                      ),
+                _uncompressed
+                    ? l10n.chatImageCompressionUncompressed
+                    : (quality == 1.0
+                        ? l10n.chatImageCompressionMaxQuality
+                        : l10n.chatImageCompressionPercentQuality(
+                            (quality * 100).toInt(),
+                          )),
                 style: t.body.copyWith(
                   color: t.action,
                   fontWeight: FontWeight.w600,

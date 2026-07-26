@@ -534,7 +534,22 @@ class AppLocalizationsHu extends AppLocalizations {
 
   @override
   String get settingsBiometricDescription =>
-      'Az ujjlenyomatoddal oldhatod fel a PIN helyett. 4 óra inaktivitás után újra a PIN szükséges.';
+      'Az ujjlenyomatoddal oldhatod fel a PIN helyett. Az alább beállított idő után újra a PIN szükséges.';
+
+  @override
+  String get settingsBiometricIdleTitle => 'PIN-tartalék';
+
+  @override
+  String get settingsBiometricIdleDescription =>
+      'Ennyi feloldás nélküli idő után újra a PIN kell.';
+
+  @override
+  String settingsBiometricIdleValue(int hours) {
+    return '$hours ó';
+  }
+
+  @override
+  String get settingsBiometricIdleNever => 'Soha';
 
   @override
   String get settingsBiometricFailedSnackBar =>
@@ -773,6 +788,10 @@ class AppLocalizationsHu extends AppLocalizations {
 
   @override
   String get chatImageExceedsMaxSizeSnackBar => 'A kép túl nagy a küldéshez.';
+
+  @override
+  String get chatImageNeedsPlusSnackBar =>
+      'A kép túl nagy az ingyenes csomaghoz — a WiltKey Plus 50 MB-ra emeli a korlátot.';
 
   @override
   String get chatTapForDetails => 'Koppints a részletekért';
@@ -1056,6 +1075,21 @@ class AppLocalizationsHu extends AppLocalizations {
   String get groupDecryptingImage => 'Kép visszafejtése...';
 
   @override
+  String get chatFileTapToDownload => 'Koppints a letöltéshez';
+
+  @override
+  String get chatFileDownloadFailed => 'Koppints az újrapróbáláshoz';
+
+  @override
+  String get chatFileKindPhoto => 'Fénykép';
+
+  @override
+  String get chatFileKindVoice => 'Hangüzenet';
+
+  @override
+  String get chatFileKindFile => 'Fájl';
+
+  @override
   String get groupTapToRevealImage => 'Koppints a kép megjelenítéséhez';
 
   @override
@@ -1193,6 +1227,9 @@ class AppLocalizationsHu extends AppLocalizations {
   String get chatImageCompressionMaxQuality => 'Legjobb minőség';
 
   @override
+  String get chatImageCompressionUncompressed => 'Tömörítetlen';
+
+  @override
   String chatImageCompressionPercentQuality(int percent) {
     return '$percent% minőség';
   }
@@ -1248,6 +1285,52 @@ class AppLocalizationsHu extends AppLocalizations {
   @override
   String get themePaperinkDesc =>
       'Meleg washi papír, sumi tinta árnyalatai, cinóbervörös hanko pecsét.';
+
+  @override
+  String get themePickerPlayExclusive =>
+      'Ez a téma csak a WiltKey Play Áruház-verziójában érhető el.';
+
+  @override
+  String get themePreviewTooltip => 'Előnézet';
+
+  @override
+  String get themePreviewSectionDashboard => 'Csevegőlista';
+
+  @override
+  String get themePreviewSectionChat => 'Beszélgetés';
+
+  @override
+  String get themePreviewSectionEffects => 'Különleges effektek';
+
+  @override
+  String get themePreviewPlayUnlock => 'Feloldó animáció lejátszása';
+
+  @override
+  String get themePreviewPlayNuke => 'Önmegsemmisítő animáció lejátszása';
+
+  @override
+  String get themePreviewApply => 'Téma használata';
+
+  @override
+  String get themePreviewGetInShop => 'Beszerzés a boltban';
+
+  @override
+  String get themePreviewMsgThem1 =>
+      'Már csak 800 bájt maradt a padunkon, találkozunk?';
+
+  @override
+  String get themePreviewMsgMe =>
+      'Persze! Filmest nálam? Közben fel is töltjük';
+
+  @override
+  String get themePreviewMsgThem2 => 'oké, viszek nasit 🍿';
+
+  @override
+  String get themePreviewRowPhoto => 'Fotó a boulderteremből 🧗';
+
+  @override
+  String get themePreviewRowLost =>
+      'Elfogyott a pad — találkozz a feltöltéshez';
 
   @override
   String get accessibilityWarningTitle => 'Kisegítő szolgáltatás aktív';

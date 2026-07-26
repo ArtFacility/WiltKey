@@ -3,7 +3,6 @@ import 'themes/cyberpunk_theme.dart';
 import 'themes/garden_theme.dart';
 import 'themes/paperink_theme.dart';
 import 'premium/premium_themes.dart';
-import '../build_flavor.dart';
 import '../entitlements/product_ids.dart';
 import 'package:wiltkey_client/l10n/app_localizations.dart';
 
@@ -27,11 +26,12 @@ class WiltkeyThemeDescriptor {
 
   final ThemeData Function() build;
 
-  /// True for a paid theme. Premium themes are only ever listed on the official
-  /// Play build (see [WiltkeyThemeRegistry.all]); the picker shows them with a
-  /// lock until [EntitlementService.premiumThemeUnlocked] says otherwise. A theme
-  /// is purely local UI — it never crosses the wire — so this gates *selecting*
-  /// it, nothing about how anyone's messages render.
+  /// True for a paid theme. Premium themes are listed on both official flavors
+  /// (see [WiltkeyThemeRegistry.all]); the picker shows them with a lock until
+  /// [EntitlementService.premiumThemeUnlocked] says otherwise — which on FOSS
+  /// is never (a permanent "Play exclusive" preview). A theme is purely local
+  /// UI — it never crosses the wire — so this gates *selecting* it, nothing
+  /// about how anyone's messages render.
   final bool premium;
 
   const WiltkeyThemeDescriptor({
@@ -81,20 +81,22 @@ class WiltkeyThemeRegistry {
     build: buildPaperinkTheme,
   );
 
-  /// All selectable themes, in display order. Premium themes are appended only on
-  /// the official Play build ([kPlayStore]); the FOSS build and any public fork see
-  /// just the three base themes (premium source isn't in the public repo). Whether a
-  /// listed premium theme is *usable* is a separate entitlement check (see the
-  /// theme picker + EntitlementService) — a theme still renders locally regardless.
+  /// All selectable themes, in display order. Premium themes are listed on BOTH
+  /// official flavors: on Play they're purchasable; on the official FOSS build
+  /// they appear as permanently locked "Play exclusive" previews (deliberate —
+  /// a FOSS user can see what the Play version offers; rendering is never
+  /// gated, only selecting). Public forks still see just the three base themes:
+  /// their `premiumThemes()` is the committed stub returning `[]` (the real
+  /// source only exists on the official build machine).
   static final List<WiltkeyThemeDescriptor> all = [
     cyberpunk,
     garden,
     paperink,
-    if (kPlayStore) ...premiumThemes(),
+    ...premiumThemes(),
   ];
 
-  /// Every listed premium theme (empty on FOSS and on any public fork, where the
-  /// premium source isn't present). Drives the Shop's Themes tab.
+  /// Every listed premium theme (empty on any public fork, where only the stub
+  /// is present). Drives the Shop's Themes tab (Play build).
   static List<WiltkeyThemeDescriptor> get premium =>
       all.where((t) => t.premium).toList(growable: false);
 

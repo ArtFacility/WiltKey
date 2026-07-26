@@ -25,6 +25,15 @@ class BillingChannel {
   /// purchase). Set by [EntitlementService] to trigger a refresh.
   static void Function()? onPurchasesChanged;
 
+  /// Optional sink for billing diagnostics — connection results, query response
+  /// codes, and (Billing 8) the per-product "unfetched" status codes that explain
+  /// why a product came back empty. Wired to the app debug log by
+  /// [EntitlementService], surfaced in the Shop's debug console. Both the native
+  /// bridge (via the `onBillingLog` reverse call) and this Dart side feed it.
+  static void Function(String message)? onLog;
+
+  static void _log(String m) => onLog?.call(m);
+
   static bool _handlerInstalled = false;
 
   /// True only when a real Play Billing backend is present (official Play build).
@@ -38,6 +47,8 @@ class BillingChannel {
     _channel.setMethodCallHandler((call) async {
       if (call.method == 'onPurchasesChanged') {
         onPurchasesChanged?.call();
+      } else if (call.method == 'onBillingLog') {
+        _log(call.arguments as String? ?? '');
       }
       return null;
     });
@@ -76,17 +87,25 @@ class BillingChannel {
     List<String> productIds,
   ) async {
     if (!available || productIds.isEmpty) return const [];
+    _log('queryProducts requesting ${productIds.length}: ${productIds.join(", ")}');
     try {
       final raw = await _channel.invokeMethod<List<dynamic>>(
         'queryProducts',
         {'ids': productIds},
       );
-      if (raw == null) return const [];
-      return raw
+      if (raw == null) {
+        _log('queryProducts returned null');
+        return const [];
+      }
+      final products = raw
           .whereType<Map>()
           .map((m) => BillingProduct.fromMap(m))
           .toList();
-    } catch (_) {
+      _log('queryProducts got ${products.length}: '
+          '${products.map((p) => p.id).join(", ")}');
+      return products;
+    } catch (e) {
+      _log('queryProducts channel error: $e');
       return const [];
     }
   }
@@ -101,16 +120,22 @@ class BillingChannel {
     if (!available) {
       return const PurchaseResult(PurchaseOutcome.unavailable);
     }
+    _log('buy $productId (subscription=$subscription)');
     try {
       final raw = await _channel.invokeMethod<Map<dynamic, dynamic>>(
         'buy',
         {'id': productId, 'subscription': subscription},
       );
       if (raw == null) {
+        _log('buy $productId returned null');
         return PurchaseResult(PurchaseOutcome.error, productId: productId);
       }
-      return PurchaseResult.fromMap(raw);
-    } catch (_) {
+      final r = PurchaseResult.fromMap(raw);
+      _log('buy $productId outcome=${r.outcome.name}'
+          '${r.message != null ? " (${r.message})" : ""}');
+      return r;
+    } catch (e) {
+      _log('buy $productId channel error: $e');
       return PurchaseResult(PurchaseOutcome.error, productId: productId);
     }
   }

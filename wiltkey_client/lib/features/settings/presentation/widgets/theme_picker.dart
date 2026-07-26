@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:wiltkey_client/l10n/app_localizations.dart';
 import '../../../../core/entitlements/entitlement_service.dart';
 import '../../../../core/theme/theme_controller.dart';
 import '../../../../core/theme/theme_registry.dart';
 import '../../../../core/theme/wk.dart';
 import '../../../../core/theme/wiltkey_components.dart';
-import '../../../shop/presentation/shop_screen.dart';
+import '../theme_preview_screen.dart';
 
 /// The real "Appearance" theme picker: one card per registered theme, each
 /// rendered with THAT theme's own tokens (a live preview), driven entirely by
@@ -24,6 +25,7 @@ class ThemePicker extends StatelessWidget {
           listenable: EntitlementService.instance,
           builder: (context, _) {
             final currentId = ThemeController().themeId;
+            final canBuy = EntitlementService.instance.billingAvailable;
             return Column(
               children: WiltkeyThemeRegistry.all.map((d) {
                 final locked = d.premium &&
@@ -34,18 +36,28 @@ class ThemePicker extends StatelessWidget {
                     descriptor: d,
                     selected: d.id == currentId,
                     locked: locked,
+                    canBuy: canBuy,
                     onTap: () {
-                      if (locked) {
+                      if (!locked) {
+                        ThemeController().setTheme(d.id);
+                      } else {
+                        // A locked premium theme opens the LIVE preview; its
+                        // bottom CTA routes to the Shop (Play) or shows the
+                        // Play-exclusive note (FOSS).
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => const ShopScreen(),
+                            builder: (_) => ThemePreviewScreen(descriptor: d),
                           ),
                         );
-                      } else {
-                        ThemeController().setTheme(d.id);
                       }
                     },
+                    onPreview: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ThemePreviewScreen(descriptor: d),
+                      ),
+                    ),
                   ),
                 );
               }).toList(),
@@ -61,13 +73,22 @@ class _ThemeCard extends StatelessWidget {
   final WiltkeyThemeDescriptor descriptor;
   final bool selected;
   final bool locked;
+
+  /// Whether this build can actually sell the theme (Play). On FOSS a locked
+  /// card is a permanent preview, so it trails a lock instead of a shop bag.
+  final bool canBuy;
   final VoidCallback onTap;
+
+  /// Opens the full live [ThemePreviewScreen] for this theme.
+  final VoidCallback onPreview;
 
   const _ThemeCard({
     required this.descriptor,
     required this.selected,
     required this.locked,
+    required this.canBuy,
     required this.onTap,
+    required this.onPreview,
   });
 
   @override
@@ -134,8 +155,23 @@ class _ThemeCard extends StatelessWidget {
                       ],
                     ),
                   ),
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    tooltip: AppLocalizations.of(context)
+                        ?.themePreviewTooltip,
+                    onPressed: onPreview,
+                    icon: Icon(
+                      Icons.visibility_outlined,
+                      color: t.textSecondary,
+                      size: 18,
+                    ),
+                  ),
                   if (locked)
-                    Icon(Icons.shopping_bag_outlined, color: t.action, size: 20)
+                    Icon(
+                      canBuy ? Icons.shopping_bag_outlined : Icons.lock_outline,
+                      color: canBuy ? t.action : t.textTertiary,
+                      size: 20,
+                    )
                   else if (selected)
                     Icon(Icons.check_circle, color: t.action, size: 20)
                   else

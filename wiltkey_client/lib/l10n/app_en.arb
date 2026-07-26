@@ -205,7 +205,18 @@
   "pinUnlockButton": "Unlock",
   "pinUseFingerprintButton": "Use fingerprint",
   "settingsBiometricToggle": "Fingerprint unlock",
-  "settingsBiometricDescription": "Use your fingerprint to unlock instead of the PIN. The PIN is still required after 4 hours of inactivity.",
+  "settingsBiometricDescription": "Use your fingerprint to unlock instead of the PIN. Your PIN is still required after the fallback period below.",
+  "settingsBiometricIdleTitle": "PIN fallback",
+  "settingsBiometricIdleDescription": "Require your PIN again after this long without unlocking.",
+  "settingsBiometricIdleValue": "{hours} h",
+  "@settingsBiometricIdleValue": {
+    "description": "Fingerprint idle window in hours.",
+    "placeholders": { "hours": { "type": "int" } }
+  },
+  "settingsBiometricIdleNever": "Never",
+  "@settingsBiometricIdleNever": {
+    "description": "PIN-fallback slider value meaning fingerprint never expires."
+  },
   "settingsBiometricFailedSnackBar": "Couldn't enable fingerprint unlock.",
   "pinForgotButton": "Forgot PIN? Reset Device",
   "pairTitle": "Pair Devices",
@@ -375,6 +386,10 @@
     }
   },
   "chatImageExceedsMaxSizeSnackBar": "Image too large to send.",
+  "chatImageNeedsPlusSnackBar": "Image too large for the free tier — WiltKey Plus raises the limit to 50 MB.",
+  "@chatImageNeedsPlusSnackBar": {
+    "description": "Shown when a free-tier user tries to send an image bigger than the 5 MB free limit but within the 50 MB Plus limit."
+  },
   "chatTapForDetails": "Tap for details",
   "chatSyncTooltip": "Sync messages",
   "chatStickerHint": "Hold an emoji to send a sticker",
@@ -531,6 +546,11 @@
   "groupLeaveGroupBody": "Leave this group? Wipes local pairwise keys and logs.",
   "groupSyncStepText": "Sync",
   "groupDecryptingImage": "Decrypting image...",
+  "chatFileTapToDownload": "Tap to download",
+  "chatFileDownloadFailed": "Tap to retry",
+  "chatFileKindPhoto": "Photo",
+  "chatFileKindVoice": "Voice message",
+  "chatFileKindFile": "File",
   "groupTapToRevealImage": "Tap to reveal image",
   "groupImageSize": "Size: {size}",
   "@groupImageSize": {
@@ -628,6 +648,10 @@
   "chatImageCompressionLowSize": "Low size",
   "chatImageCompressionHighSize": "High",
   "chatImageCompressionMaxQuality": "Max quality",
+  "chatImageCompressionUncompressed": "Uncompressed",
+  "@chatImageCompressionUncompressed": {
+    "description": "Last slider step past 100% WebP: full resolution, no downscale."
+  },
   "chatImageCompressionPercentQuality": "{percent}% quality",
   "@chatImageCompressionPercentQuality": {
     "placeholders": {
@@ -658,6 +682,23 @@
   "themeGardenDesc": "Soft soil tones, warm linen, petals for your budget.",
   "themePaperinkName": "Paper & Ink",
   "themePaperinkDesc": "Warm washi paper, sumi ink dilutions, vermilion hanko seal.",
+  "themePickerPlayExclusive": "This theme is exclusive to the Play Store version of WiltKey.",
+  "themePreviewTooltip": "Preview",
+  "themePreviewSectionDashboard": "Chat list",
+  "themePreviewSectionChat": "Conversation",
+  "themePreviewSectionEffects": "Special effects",
+  "themePreviewPlayUnlock": "Play unlock animation",
+  "themePreviewPlayNuke": "Play self-destruct animation",
+  "themePreviewApply": "Use this theme",
+  "themePreviewGetInShop": "Get it in the shop",
+  "themePreviewMsgThem1": "Only 800 bytes left on our pad, wanna meet up?",
+  "themePreviewMsgMe": "Sure! Movie night at mine? We can recharge too",
+  "themePreviewMsgThem2": "deal, bringing snacks 🍿",
+  "themePreviewRowPhoto": "Photo from the bouldering gym 🧗",
+  "themePreviewRowLost": "Out of pad — meet up to recharge",
+  "@themePickerPlayExclusive": {
+    "description": "Snackbar shown on the FOSS build when tapping a locked premium theme (which can only be bought in the Play version)."
+  },
   "accessibilityWarningTitle": "Accessibility service active",
   "accessibilityWarningBody": "An accessibility service that can read on-screen content is active: {names}. This is normal for tools like screen readers or password managers. If you didn't turn one on, review your accessibility settings.",
   "@accessibilityWarningBody": {

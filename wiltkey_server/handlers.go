@@ -2,6 +2,9 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
+	"encoding/json"
 	"log"
 	"strings"
 	"time"
@@ -80,8 +83,12 @@ func (c *Client) handleSendMessage(msg WSMessage) {
 			return
 		}
 
+		// Strip the bulky ciphertext so the recipient can be told WHAT arrived
+		// (which chat, which offset, reply/wilt flags) without shipping the body.
+		offerMeta, metaOK := buildOfferMeta(msg.Envelope)
+
 		// Store link in postgres
-		messageID, err := pg.StoreMessage(msg.RecipientID, c.id, nil, &bucketURL, msg.ContentType, holdTTL)
+		messageID, err := pg.StoreMessageSized(msg.RecipientID, c.id, nil, &bucketURL, msg.ContentType, holdTTL, payloadSize, offerMeta)
 		if err != nil {
 			storage.Delete(context.Background(), storageKey) // rollback storage
 			log.Printf("Failed to store message metadata in Postgres: %v", err)
@@ -89,15 +96,37 @@ func (c *Client) handleSendMessage(msg WSMessage) {
 			return
 		}
 
-		// Deliver directly if online
 		target, ok := c.hub.getClient(msg.RecipientID)
+		if !metaOK {
+			// Unparseable envelope (not our JSON shape) — fall back to the old
+			// push-it-all behaviour rather than stranding the message.
+			log.Printf("[Relay] Envelope for %s isn't offer-able; delivering inline", messageID)
+			if ok {
+				target.SendJSON(WSMessage{
+					Type:        "NEW_MESSAGE",
+					SenderID:    c.id,
+					Envelope:    msg.Envelope,
+					ContentType: msg.ContentType,
+					MessageID:   messageID,
+				})
+			} else {
+				go c.hub.sendWakePush(msg.RecipientID, c.id, msg.ContentType)
+			}
+			return
+		}
+
+		// Advertise the file. The body stays in the bucket until the recipient
+		// downloads it and ACKs (FILE_RECEIVED), or the hold TTL expires — so an
+		// interrupted or half-finished download can always be retried.
 		if ok {
 			target.SendJSON(WSMessage{
-				Type:        "NEW_MESSAGE",
+				Type:        "FILE_OFFER",
 				SenderID:    c.id,
-				Envelope:    msg.Envelope,
 				ContentType: msg.ContentType,
 				MessageID:   messageID,
+				Meta:        offerMeta,
+				Size:        payloadSize,
+				ExpiresAt:   time.Now().Add(holdTTL).Unix(),
 			})
 		} else {
 			go c.hub.sendWakePush(msg.RecipientID, c.id, msg.ContentType)
@@ -150,6 +179,76 @@ func (c *Client) handleSendMessage(msg WSMessage) {
 		}
 		go c.hub.sendWakePush(msg.RecipientID, c.id, msg.ContentType)
 	}
+}
+
+// buildOfferMeta returns the message envelope with its `d` ciphertext blanked,
+// so a FILE_OFFER can tell the recipient which chat/offset/flags the pending
+// file belongs to without transferring the body. Returns ok=false when the
+// envelope isn't the expected JSON object with a `d` field — callers then fall
+// back to inline delivery, keeping the relay agnostic about payload shape.
+func buildOfferMeta(envelope string) (string, bool) {
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(envelope), &fields); err != nil {
+		return "", false
+	}
+	if _, hasBody := fields["d"]; !hasBody {
+		return "", false
+	}
+	fields["d"] = json.RawMessage(`""`)
+	out, err := json.Marshal(fields)
+	if err != nil {
+		return "", false
+	}
+	return string(out), true
+}
+
+// handleRequestFile mints a short-lived download token for a pending large file,
+// but only for the client that message is actually addressed to. The HTTP
+// download endpoint has no auth of its own — this WebSocket check, which runs on
+// an already signature-authenticated connection, is the gate.
+func (c *Client) handleRequestFile(msg WSMessage) {
+	if msg.MessageID == "" {
+		c.SendJSON(WSMessage{Type: "FILE_ERROR", Message: "Missing message_id"})
+		return
+	}
+	if pg == nil {
+		c.SendJSON(WSMessage{Type: "FILE_ERROR", MessageID: msg.MessageID, Message: "File storage is not configured"})
+		return
+	}
+
+	record, err := pg.GetFileMessage(msg.MessageID, c.id)
+	if err != nil {
+		log.Printf("[Relay Error] file lookup failed for %s: %v", msg.MessageID, err)
+		c.SendJSON(WSMessage{Type: "FILE_ERROR", MessageID: msg.MessageID, Message: "Could not look up that file"})
+		return
+	}
+	if record == nil {
+		// Unknown, expired, already acknowledged, or addressed to someone else —
+		// all indistinguishable to the caller on purpose.
+		c.SendJSON(WSMessage{Type: "FILE_ERROR", MessageID: msg.MessageID, Message: "File is no longer available"})
+		return
+	}
+
+	tokenBytes := make([]byte, 32)
+	if _, err := rand.Read(tokenBytes); err != nil {
+		c.SendJSON(WSMessage{Type: "FILE_ERROR", MessageID: msg.MessageID, Message: "Could not issue a download token"})
+		return
+	}
+	token := hex.EncodeToString(tokenBytes)
+	if err := c.hub.rdb.StoreFileToken(token, record.ID, c.id); err != nil {
+		log.Printf("[Relay Error] could not store file token: %v", err)
+		c.SendJSON(WSMessage{Type: "FILE_ERROR", MessageID: msg.MessageID, Message: "Could not issue a download token"})
+		return
+	}
+
+	log.Printf("[Relay] Issued download token for message %s to %s (%d bytes)", record.ID, c.id, record.SizeBytes)
+	c.SendJSON(WSMessage{
+		Type:      "FILE_TOKEN",
+		MessageID: record.ID,
+		Token:     token,
+		Size:      record.SizeBytes,
+		ExpiresAt: record.ExpiresAt.Unix(),
+	})
 }
 
 // handleTypingStatus forwards peer typing updates.

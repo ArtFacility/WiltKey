@@ -531,7 +531,22 @@ class AppLocalizationsSv extends AppLocalizations {
 
   @override
   String get settingsBiometricDescription =>
-      'Lås upp med fingeravtryck istället för PIN. PIN krävs igen efter 4 timmars inaktivitet.';
+      'Lås upp med fingeravtryck istället för PIN. PIN krävs igen efter perioden nedan.';
+
+  @override
+  String get settingsBiometricIdleTitle => 'PIN-återgång';
+
+  @override
+  String get settingsBiometricIdleDescription =>
+      'Kräv PIN igen efter så här lång tid utan upplåsning.';
+
+  @override
+  String settingsBiometricIdleValue(int hours) {
+    return '$hours tim';
+  }
+
+  @override
+  String get settingsBiometricIdleNever => 'Aldrig';
 
   @override
   String get settingsBiometricFailedSnackBar =>
@@ -767,6 +782,10 @@ class AppLocalizationsSv extends AppLocalizations {
   @override
   String get chatImageExceedsMaxSizeSnackBar =>
       'Bilden är för stor för att skickas.';
+
+  @override
+  String get chatImageNeedsPlusSnackBar =>
+      'Bilden är för stor för gratisnivån — WiltKey Plus höjer gränsen till 50 MB.';
 
   @override
   String get chatTapForDetails => 'Tryck för detaljer';
@@ -1048,6 +1067,21 @@ class AppLocalizationsSv extends AppLocalizations {
   String get groupDecryptingImage => 'Avkrypterar bild...';
 
   @override
+  String get chatFileTapToDownload => 'Tryck för att ladda ner';
+
+  @override
+  String get chatFileDownloadFailed => 'Tryck för att försöka igen';
+
+  @override
+  String get chatFileKindPhoto => 'Foto';
+
+  @override
+  String get chatFileKindVoice => 'Röstmeddelande';
+
+  @override
+  String get chatFileKindFile => 'Fil';
+
+  @override
   String get groupTapToRevealImage => 'Tryck för att visa bild';
 
   @override
@@ -1185,6 +1219,9 @@ class AppLocalizationsSv extends AppLocalizations {
   String get chatImageCompressionMaxQuality => 'Högsta kvalitet';
 
   @override
+  String get chatImageCompressionUncompressed => 'Okomprimerad';
+
+  @override
   String chatImageCompressionPercentQuality(int percent) {
     return '$percent% kvalitet';
   }
@@ -1240,6 +1277,51 @@ class AppLocalizationsSv extends AppLocalizations {
   @override
   String get themePaperinkDesc =>
       'Varmt washi-papper, sumi-bläck i utspädningar, cinnoberröd hanko-stämpel.';
+
+  @override
+  String get themePickerPlayExclusive =>
+      'Det här temat är exklusivt för Play Store-versionen av WiltKey.';
+
+  @override
+  String get themePreviewTooltip => 'Förhandsvisning';
+
+  @override
+  String get themePreviewSectionDashboard => 'Chattlista';
+
+  @override
+  String get themePreviewSectionChat => 'Konversation';
+
+  @override
+  String get themePreviewSectionEffects => 'Specialeffekter';
+
+  @override
+  String get themePreviewPlayUnlock => 'Spela upplåsningsanimationen';
+
+  @override
+  String get themePreviewPlayNuke => 'Spela självförstörelseanimationen';
+
+  @override
+  String get themePreviewApply => 'Använd det här temat';
+
+  @override
+  String get themePreviewGetInShop => 'Skaffa i butiken';
+
+  @override
+  String get themePreviewMsgThem1 =>
+      'Bara 800 byte kvar på vårt pad, ska vi ses?';
+
+  @override
+  String get themePreviewMsgMe =>
+      'Absolut! Filmkväll hos mig? Vi laddar upp samtidigt';
+
+  @override
+  String get themePreviewMsgThem2 => 'deal, jag tar med snacks 🍿';
+
+  @override
+  String get themePreviewRowPhoto => 'Foto från klättergymmet 🧗';
+
+  @override
+  String get themePreviewRowLost => 'Padet är slut — träffas för att ladda om';
 
   @override
   String get accessibilityWarningTitle => 'Tillgänglighetstjänst aktiv';

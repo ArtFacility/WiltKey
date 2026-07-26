@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'pixel_palette.dart';
 import 'cosmetics/avatar_border_registry.dart';
+import 'cosmetics/avatar_border_ticker.dart';
 
 /// Renders a 10x10 pixel-art grid. [hexString] is the grid in either supported
 /// encoding (legacy 100-char hex or `v2:`+base64 — see [PixelGrid]); invalid or
@@ -38,9 +39,12 @@ class PixelArtAvatar extends StatelessWidget {
     final asset = border.assetPath;
 
     // No border equipped → the original framed avatar, unchanged.
-    if (asset == null) return _pixelBody(size, framed: true);
+    if (asset == null && !border.isAnimated) {
+      return _pixelBody(size, framed: true);
+    }
 
-    // Border equipped → inset the (unframed) avatar to 80% and overlay the SVG.
+    // Border equipped → inset the (unframed) avatar to 80% and overlay the
+    // border (a live painter if animated, otherwise the SVG asset).
     final inner = size * 0.8;
     return SizedBox(
       width: size,
@@ -50,13 +54,15 @@ class PixelArtAvatar extends StatelessWidget {
         children: [
           _pixelBody(inner, framed: false),
           Positioned.fill(
-            child: SvgPicture.asset(
-              asset,
-              fit: BoxFit.contain,
-              // A missing premium asset (fork without the private repo) just
-              // renders nothing rather than throwing.
-              placeholderBuilder: (_) => const SizedBox.shrink(),
-            ),
+            child: border.isAnimated
+                ? AnimatedAvatarBorder(paint: border.animatedPaint!)
+                : SvgPicture.asset(
+                    asset!,
+                    fit: BoxFit.contain,
+                    // A missing premium asset (fork without the private repo)
+                    // just renders nothing rather than throwing.
+                    placeholderBuilder: (_) => const SizedBox.shrink(),
+                  ),
           ),
         ],
       ),

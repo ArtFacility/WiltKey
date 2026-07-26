@@ -37,6 +37,7 @@ part 'state_entitlement.dart';
 part 'state_reactions.dart';
 part 'state_screenshot.dart';
 part 'state_wilting.dart';
+part 'state_downloads.dart';
 
 enum AppStatus { normal, nuked }
 
@@ -77,6 +78,10 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   // shows so it can decide whether to offer fingerprint. See state_auth.dart.
   bool biometricUnlockEnabled = false;
   int? lastUnlockMs;
+
+  /// Hours of inactivity after which fingerprint unlock is disabled and the PIN
+  /// is required again. 0 = never (fingerprint stays available). Default 4h.
+  int biometricIdleHours = 4;
 
   final WiltkeyPersistence _persistence = WiltkeyPersistence();
   bool isLoaded = false;
@@ -193,6 +198,13 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   // DB-derived unread counts per contact.id (computed at unlock, kept live as
   // messages arrive / chats are read). Source for the chats-list badge.
   Map<String, int> unreadCounts = {};
+
+  // --- Pending large-file downloads (see state_downloads.dart) ---
+  // In-flight (and failed) downloads by message id. Kept out of ChatMessage so a
+  // progress tick doesn't require rebuilding the message list; bubbles watch
+  // [downloadRevision] and read this map. Cleared once a body is stored.
+  final Map<String, DownloadProgress> downloadProgress = {};
+  final ValueNotifier<int> downloadRevision = ValueNotifier<int>(0);
 
   // Latest foreground/background lifecycle state (tracked in
   // didChangeAppLifecycleState). Gates the in-app heads-up banner: we only want
@@ -336,6 +348,7 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     ws.onSignChallenge = signMessage;
     ws.fallbackProvider = buildRelayFallbacks;
     ws.onMessageReceived = _deliverMessageToState;
+    _setupDownloadCallbacks();
     ws.onStatusChanged = (connected) {
       if (connected) {
         syncGroupLaneHeaders();
@@ -366,6 +379,7 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     );
     biometricUnlockEnabled = data['biometricEnabled'] as bool? ?? false;
     lastUnlockMs = data['lastUnlockMs'] as int?;
+    biometricIdleHours = data['biometricIdleHours'] as int? ?? 4;
 
     final pinSalt = data['pinSalt'] as String?;
     final pinValidationHash = data['pinValidationHash'] as String?;

@@ -26,12 +26,14 @@ class AvatarBorderController extends ChangeNotifier {
   Future<void> load() async {
     final stored = await _persistence.loadAvatarBorderId();
     if (stored != null) {
-      final resolved = WkAvatarBorderRegistry.byId(stored);
-      // Drop a border that's no longer selectable (e.g. a lapsed entitlement or a
-      // premium border on a build that can't equip it) back to none.
-      _borderId = WkAvatarBorderRegistry.canEquip(resolved)
-          ? resolved.id
-          : WkAvatarBorderRegistry.noneId;
+      // Honour whatever was equipped, independent of live entitlement. Borders
+      // are ONE-TIME purchases, and entitlement (Play Billing) resolves
+      // asynchronously AFTER this runs at cold start — gating on canEquip here
+      // dropped a legitimately-owned premium border back to none on every launch.
+      // byId() already resolves to none for an id this build can't render (e.g. a
+      // fork without the premium overlay), which is the only reset we actually
+      // want. Equipping a NEW border is still ownership-gated in [setBorder].
+      _borderId = WkAvatarBorderRegistry.byId(stored).id;
     }
   }
 

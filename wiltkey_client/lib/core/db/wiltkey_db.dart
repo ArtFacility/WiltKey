@@ -11,6 +11,19 @@ class WiltkeyDatabase {
 
   Database? _db;
 
+  /// Absolute path to the sidecar directory where large message bodies live as
+  /// files instead of inline in the `messages` row. Set during [init].
+  String? _mediaDir;
+
+  /// A message body (base64 ciphertext or master-encrypted copy) at/above this
+  /// many chars is written to a file rather than stored inline. Android's SQLite
+  /// reads query results through a ~2 MB-per-row CursorWindow; a row larger than
+  /// that throws `SQLiteBlobTooBigException` and — because the page query covers
+  /// the whole chat — blanks the ENTIRE chat on load. Each image stored ~3× its
+  /// bytes inline (OTP ciphertext + master copy), so anything past a few hundred
+  /// KB is offloaded to keep every row comfortably inside the window.
+  static const int kInlineBodyLimit = 256 * 1024;
+
   Future<Database> get _database async {
     if (_db != null) return _db!;
     await init();
@@ -21,9 +34,15 @@ class WiltkeyDatabase {
     if (_db != null) return;
     final dbPath = await getDatabasesPath();
     final path = p.join(dbPath, 'wiltkey.db');
+    // Sidecar dir for offloaded large bodies. Kept next to the DB so it shares
+    // the app's private storage and is wiped by the same clear-all.
+    _mediaDir = p.join(dbPath, 'media');
+    try {
+      await Directory(_mediaDir!).create(recursive: true);
+    } catch (_) {}
     _db = await openDatabase(
       path,
-      version: 11,
+      version: 13,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -108,6 +127,25 @@ class WiltkeyDatabase {
     if (oldVersion < 11) {
       await db.execute(
         'ALTER TABLE group_profiles ADD COLUMN avatar_border TEXT',
+      );
+    }
+    // v12: large message bodies (big images/voice) move OUT of the row into a
+    // sidecar file to stay under Android's 2 MB CursorWindow per-row limit —
+    // otherwise a single big image made the whole chat unreadable after restart.
+    // `media_path` (when set) is the file base; text_otp/text_encrypted_master
+    // are then blanked in the row and reconstructed from the file on read.
+    if (oldVersion < 12) {
+      await db.execute('ALTER TABLE messages ADD COLUMN media_path TEXT');
+    }
+    // v13: pending large-file downloads. The relay now advertises a big payload
+    // (FILE_OFFER) instead of pushing it, so a message can exist locally as a
+    // placeholder whose body still lives in the relay's bucket. `remote_file_id`
+    // is the relay message id to fetch (cleared once downloaded + stored);
+    // `remote_size` is the advertised byte size, for the download bubble.
+    if (oldVersion < 13) {
+      await db.execute('ALTER TABLE messages ADD COLUMN remote_file_id TEXT');
+      await db.execute(
+        'ALTER TABLE messages ADD COLUMN remote_size INTEGER DEFAULT 0',
       );
     }
   }
@@ -224,7 +262,10 @@ class WiltkeyDatabase {
         expires_at INTEGER,
         wilted INTEGER DEFAULT 0,
         wilted_by TEXT,
-        reply_to_id TEXT
+        reply_to_id TEXT,
+        media_path TEXT,
+        remote_file_id TEXT,
+        remote_size INTEGER DEFAULT 0
       )
     ''');
     // Speeds windowed paging (chat_id + timestamp ORDER/LIMIT) and unread counts.
@@ -339,11 +380,113 @@ class WiltkeyDatabase {
       await txn.delete('messages', where: 'chat_id = ?', whereArgs: [chatId]);
       await txn.delete('contacts', where: 'id = ?', whereArgs: [chatId]);
     });
+    await _deleteMediaForChat(chatId); // drop any offloaded body files too
   }
 
   // ---------------------------------------------------------------------------
   // Messages CRUD
   // ---------------------------------------------------------------------------
+
+  // ---------------------------------------------------------------------------
+  // Large-body sidecar files (see [kInlineBodyLimit])
+  //
+  // A message whose stored body would blow past the CursorWindow keeps its two
+  // big strings — the OTP ciphertext (`text_otp`, needed for resync) and the
+  // master-encrypted copy (`text_encrypted_master`, needed for display) — in a
+  // pair of files: `<base>.o` and `<base>.m`. `base` is deterministic from
+  // (chatId, id) so a re-save (resync / redelivery) overwrites in place instead
+  // of orphaning files. The row then stores media_path=base and blank bodies.
+  // ---------------------------------------------------------------------------
+
+  String _mediaBase(String chatId, String messageId) {
+    String clean(String s) => s.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_');
+    return '${clean(chatId)}__${clean(messageId)}';
+  }
+
+  Future<void> _writeMediaFiles(String base, String otp, String? master) async {
+    final dir = _mediaDir;
+    if (dir == null) return;
+    await File(p.join(dir, '$base.o')).writeAsString(otp, flush: true);
+    final mf = File(p.join(dir, '$base.m'));
+    if (master != null) {
+      await mf.writeAsString(master, flush: true);
+    } else if (await mf.exists()) {
+      await mf.delete();
+    }
+  }
+
+  /// Synchronously reload an offloaded body pair. Returns (otp, master?) or null
+  /// if the sidecar is missing/unreadable (row then renders as unavailable).
+  /// Sync on purpose: [_rowToMessage] is sync and already does heavy sync work
+  /// (base64Decode), so a blocking read here keeps the decode path uniform.
+  (String, String?)? _readMediaFilesSync(String base) {
+    try {
+      final dir = _mediaDir;
+      if (dir == null) return null;
+      final of = File(p.join(dir, '$base.o'));
+      if (!of.existsSync()) return null;
+      final otp = of.readAsStringSync();
+      final mf = File(p.join(dir, '$base.m'));
+      final master = mf.existsSync() ? mf.readAsStringSync() : null;
+      return (otp, master);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _deleteMediaFiles(String base) async {
+    try {
+      final dir = _mediaDir;
+      if (dir == null) return;
+      for (final ext in const ['.o', '.m']) {
+        final f = File(p.join(dir, '$base$ext'));
+        if (await f.exists()) await f.delete();
+      }
+    } catch (_) {}
+  }
+
+  /// Delete every offloaded sidecar belonging to [chatId] (nuke / chat delete).
+  Future<void> _deleteMediaForChat(String chatId) async {
+    try {
+      final dir = _mediaDir;
+      if (dir == null) return;
+      final prefix = '${chatId.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_')}__';
+      final d = Directory(dir);
+      if (!await d.exists()) return;
+      await for (final e in d.list()) {
+        if (e is File && p.basename(e.path).startsWith(prefix)) {
+          try {
+            await e.delete();
+          } catch (_) {}
+        }
+      }
+    } catch (_) {}
+  }
+
+  /// Reads a possibly-oversized TEXT column in CursorWindow-safe chunks, so a
+  /// legacy inline row too big for a normal query can still be recovered.
+  Future<String> _readColumnChunked(
+    Database db,
+    String id,
+    String column,
+  ) async {
+    const int chunk = 256 * 1024;
+    final buf = StringBuffer();
+    int start = 1; // SQLite substr is 1-indexed
+    while (true) {
+      final r = await db.rawQuery(
+        'SELECT substr($column, ?, ?) AS s FROM messages WHERE id = ?',
+        [start, chunk, id],
+      );
+      if (r.isEmpty) break;
+      final s = r.first['s'] as String?;
+      if (s == null || s.isEmpty) break;
+      buf.write(s);
+      if (s.length < chunk) break;
+      start += chunk;
+    }
+    return buf.toString();
+  }
 
   Future<void> saveMessage(
     ChatMessage msg,
@@ -400,18 +543,37 @@ class WiltkeyDatabase {
       wiltedByJson ??= priorWilt.first['wilted_by'] as String?;
     }
 
+    // Offload oversized bodies to a sidecar file so the row stays inside the
+    // CursorWindow. Never for wilted rows (they keep no recoverable body). The
+    // base is deterministic, so a re-save overwrites in place; when NOT
+    // offloading we still best-effort delete any stale sidecar from a prior save.
+    final String otpBody = wilted ? '' : msg.text;
+    final bool offload =
+        !wilted &&
+        (otpBody.length > kInlineBodyLimit ||
+            (textEncryptedMaster?.length ?? 0) > kInlineBodyLimit);
+    final String base = _mediaBase(chatId, msg.id);
+    String? mediaPath;
+    if (offload) {
+      await _writeMediaFiles(base, otpBody, textEncryptedMaster);
+      mediaPath = base;
+    } else {
+      await _deleteMediaFiles(base);
+    }
+
     await db.insert('messages', {
       'id': msg.id,
       'chat_id': chatId,
       'sender_id': msg.senderId,
       // A wilted row keeps NO recoverable body — blank both ciphertext copies.
-      'text_otp': wilted ? '' : msg.text,
+      // An offloaded row keeps its bodies in the sidecar file, blank in the row.
+      'text_otp': (wilted || offload) ? '' : otpBody,
       'content_type': msg.contentType,
       'timestamp': msg.timestamp.toIso8601String(),
       'is_sent_by_me': msg.isSentByMe ? 1 : 0,
       'offset': wilted ? -1 : msg.offset,
       'is_delivered': msg.isDelivered ? 1 : 0,
-      'text_encrypted_master': wilted ? null : textEncryptedMaster,
+      'text_encrypted_master': (wilted || offload) ? null : textEncryptedMaster,
       'is_failed': msg.isFailed ? 1 : 0,
       'reactions': reactionsJson,
       'allow_save': msg.allowSave ? 1 : 0,
@@ -422,6 +584,10 @@ class WiltkeyDatabase {
       'wilted': wilted ? 1 : 0,
       'wilted_by': wiltedByJson,
       'reply_to_id': msg.replyToId,
+      'media_path': mediaPath,
+      // A wilted placeholder must never stay fetchable.
+      'remote_file_id': wilted ? null : msg.remoteFileId,
+      'remote_size': msg.remoteSize,
     }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
@@ -471,6 +637,16 @@ class WiltkeyDatabase {
   /// row holds no recoverable plaintext even if the OTP pad is retained.
   Future<void> wiltMessageRow(String messageId) async {
     final db = await _database;
+    // Destroy any offloaded body files too, then drop the pointer.
+    final existing = await db.query(
+      'messages',
+      columns: ['media_path'],
+      where: 'id = ?',
+      whereArgs: [messageId],
+      limit: 1,
+    );
+    final base = existing.isNotEmpty ? existing.first['media_path'] as String? : null;
+    if (base != null && base.isNotEmpty) await _deleteMediaFiles(base);
     await db.update(
       'messages',
       {
@@ -478,6 +654,9 @@ class WiltkeyDatabase {
         'text_encrypted_master': null,
         'offset': -1,
         'wilted': 1,
+        'media_path': null,
+        // A wilted message must not remain downloadable from the relay.
+        'remote_file_id': null,
       },
       where: 'id = ?',
       whereArgs: [messageId],
@@ -586,10 +765,24 @@ class WiltkeyDatabase {
   /// resync forwarding, which only needs the OTP ciphertext + metadata.
   ChatMessage _rowToMessage(Map<String, Object?> row, {String? masterKeyHex}) {
     final senderId = row['sender_id'] as String;
-    final textOtp = row['text_otp'] as String;
-    final textEncryptedMaster = row['text_encrypted_master'] as String?;
     final contentType = row['content_type'] as String;
     final wilted = (row['wilted'] as int? ?? 0) == 1;
+
+    // Body may live inline OR in a sidecar file (large images/voice). Tolerate a
+    // missing text_otp key: the CursorWindow-safe page loader omits it from the
+    // batch select and reloads it per-row.
+    String textOtp = (row['text_otp'] as String?) ?? '';
+    String? textEncryptedMaster = row['text_encrypted_master'] as String?;
+    final mediaPath = row['media_path'] as String?;
+    if (!wilted && mediaPath != null && mediaPath.isNotEmpty) {
+      final loaded = _readMediaFilesSync(mediaPath);
+      if (loaded != null) {
+        textOtp = loaded.$1;
+        textEncryptedMaster = loaded.$2 ?? textEncryptedMaster;
+      }
+      // If the sidecar is gone, textOtp/master stay empty → renders as an empty
+      // body rather than throwing, so one lost file can't brick the chat.
+    }
 
     String? decryptedText;
     if (wilted) {
@@ -630,6 +823,8 @@ class WiltkeyDatabase {
       wilted: wilted,
       wiltedBy: _decodeWiltedBy(row['wilted_by'] as String?),
       replyToId: row['reply_to_id'] as String?,
+      remoteFileId: row['remote_file_id'] as String?,
+      remoteSize: row['remote_size'] as int? ?? 0,
     );
   }
 
@@ -653,20 +848,120 @@ class WiltkeyDatabase {
     String? masterKeyHex,
   }) async {
     final db = await _database;
+    final where = beforeTimestamp == null
+        ? 'chat_id = ?'
+        : 'chat_id = ? AND timestamp < ?';
+    final whereArgs = beforeTimestamp == null
+        ? [chatId]
+        : [chatId, beforeTimestamp];
+    try {
+      final rows = await db.query(
+        'messages',
+        where: where,
+        whereArgs: whereArgs,
+        orderBy: 'timestamp DESC',
+        limit: limit,
+      );
+      // Query is newest-first; reverse to chronological for display.
+      return [
+        for (final r in rows.reversed)
+          _rowToMessage(r, masterKeyHex: masterKeyHex),
+      ];
+    } catch (e) {
+      // A legacy inline row too big for the CursorWindow makes the whole batch
+      // query throw. Recover it row-by-row (never selecting the huge columns in
+      // one shot) so the chat loads instead of blanking.
+      print('[DB] page query fell back to safe row-by-row load: $e');
+      return _getMessagesPageSafe(
+        db,
+        where,
+        whereArgs,
+        limit,
+        masterKeyHex,
+      );
+    }
+  }
+
+  /// CursorWindow-safe fallback: selects only the small columns in the batch
+  /// (never the big body columns), then reconstructs each body — from the sidecar
+  /// file if offloaded, else via chunked reads for a legacy oversized inline row,
+  /// which it also migrates to a sidecar so the next load takes the fast path.
+  static const List<String> _smallMessageColumns = [
+    'id', 'chat_id', 'sender_id', 'content_type', 'timestamp', 'is_sent_by_me',
+    'offset', 'is_delivered', 'is_failed', 'reactions', 'allow_save',
+    'ephemeral', 'ttl_seconds', 'opened_at', 'expires_at', 'wilted',
+    'wilted_by', 'reply_to_id', 'media_path', 'remote_file_id', 'remote_size',
+  ];
+
+  Future<List<ChatMessage>> _getMessagesPageSafe(
+    Database db,
+    String where,
+    List<Object?> whereArgs,
+    int limit,
+    String? masterKeyHex,
+  ) async {
     final rows = await db.query(
       'messages',
-      where: beforeTimestamp == null
-          ? 'chat_id = ?'
-          : 'chat_id = ? AND timestamp < ?',
-      whereArgs: beforeTimestamp == null ? [chatId] : [chatId, beforeTimestamp],
+      columns: _smallMessageColumns,
+      where: where,
+      whereArgs: whereArgs,
       orderBy: 'timestamp DESC',
       limit: limit,
     );
-    // Query is newest-first; reverse to chronological for display.
-    final out = [
-      for (final r in rows.reversed)
-        _rowToMessage(r, masterKeyHex: masterKeyHex),
-    ];
+    final out = <ChatMessage>[];
+    for (final r in rows.reversed) {
+      final wilted = (r['wilted'] as int? ?? 0) == 1;
+      final mediaPath = r['media_path'] as String?;
+      if (wilted || (mediaPath != null && mediaPath.isNotEmpty)) {
+        // File-backed or bodyless — _rowToMessage handles both safely.
+        out.add(_rowToMessage(r, masterKeyHex: masterKeyHex));
+        continue;
+      }
+      // Legacy oversized inline row: pull the bodies in chunks, then migrate.
+      try {
+        final id = r['id'] as String;
+        final otp = await _readColumnChunked(db, id, 'text_otp');
+        final master = await _readColumnChunked(db, id, 'text_encrypted_master');
+        final masterOrNull = master.isEmpty ? null : master;
+        final oversized =
+            otp.length > kInlineBodyLimit ||
+            (masterOrNull?.length ?? 0) > kInlineBodyLimit;
+        if (oversized) {
+          final base = _mediaBase(r['chat_id'] as String, id);
+          await _writeMediaFiles(base, otp, masterOrNull);
+          await db.update(
+            'messages',
+            {
+              'text_otp': '',
+              'text_encrypted_master': null,
+              'media_path': base,
+            },
+            where: 'id = ?',
+            whereArgs: [id],
+          );
+        }
+        out.add(
+          _rowToMessage(
+            {
+              ...r,
+              'text_otp': otp,
+              'text_encrypted_master': masterOrNull,
+              'media_path': null, // use the inline strings we just built
+            },
+            masterKeyHex: masterKeyHex,
+          ),
+        );
+      } catch (e) {
+        print('[DB] could not recover message ${r['id']}: $e');
+        // Unreadable — surface a placeholder so the rest of the chat still loads.
+        out.add(
+          _rowToMessage(
+            {...r, 'text_otp': '', 'text_encrypted_master': null, 'media_path': null},
+            masterKeyHex: masterKeyHex,
+          ),
+        );
+      }
+    }
     return out;
   }
 
@@ -816,14 +1111,48 @@ class WiltkeyDatabase {
     );
   }
 
+  /// Mark a large file as fully downloaded + stored: drops the relay pointer so
+  /// the message stops rendering as a pending download. Called immediately before
+  /// the FILE_RECEIVED ack that lets the relay delete its copy.
+  Future<void> clearPendingDownload(String messageId) async {
+    final db = await _database;
+    await db.update(
+      'messages',
+      {'remote_file_id': null},
+      where: 'id = ?',
+      whereArgs: [messageId],
+    );
+  }
+
+  /// How many message bodies are still waiting on the relay (any chat).
+  Future<int> countPendingDownloads() async {
+    final db = await _database;
+    final res = await db.rawQuery(
+      "SELECT COUNT(*) AS c FROM messages "
+      "WHERE remote_file_id IS NOT NULL AND remote_file_id != '' AND wilted = 0",
+    );
+    return (res.first['c'] as int?) ?? 0;
+  }
+
   Future<void> deleteMessagesForChat(String chatId) async {
     final db = await _database;
     await db.delete('messages', where: 'chat_id = ?', whereArgs: [chatId]);
+    await _deleteMediaForChat(chatId); // drop any offloaded body files too
   }
 
   Future<void> deleteMessage(String id) async {
     final db = await _database;
+    final existing = await db.query(
+      'messages',
+      columns: ['media_path'],
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+    final base =
+        existing.isNotEmpty ? existing.first['media_path'] as String? : null;
     await db.delete('messages', where: 'id = ?', whereArgs: [id]);
+    if (base != null && base.isNotEmpty) await _deleteMediaFiles(base);
   }
 
   // ---------------------------------------------------------------------------
@@ -1106,6 +1435,22 @@ class WiltkeyDatabase {
       await txn.delete('messages');
       await txn.delete('contacts');
     });
+    // Purge every offloaded body file (self-destruct leaves no media behind).
+    try {
+      final dir = _mediaDir;
+      if (dir != null) {
+        final d = Directory(dir);
+        if (await d.exists()) {
+          await for (final e in d.list()) {
+            if (e is File) {
+              try {
+                await e.delete();
+              } catch (_) {}
+            }
+          }
+        }
+      }
+    } catch (_) {}
   }
 
   Future<void> closeDb() async {

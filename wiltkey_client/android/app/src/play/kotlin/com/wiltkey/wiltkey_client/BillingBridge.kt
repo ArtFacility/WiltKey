@@ -106,10 +106,12 @@ class BillingBridge(
         }
         billingClient.startConnection(object : BillingClientStateListener {
             override fun onBillingSetupFinished(billingResult: BillingResult) {
+                logDebug("connect: code=${billingResult.responseCode} (${billingResult.debugMessage})")
                 onReady(billingResult.responseCode == BillingClient.BillingResponseCode.OK)
             }
 
             override fun onBillingServiceDisconnected() {
+                logDebug("billing service disconnected")
                 // Next call re-checks isReady and reconnects on demand.
             }
         })
@@ -194,36 +196,65 @@ class BillingBridge(
                 onMain { result.success(emptyList<Map<String, Any?>>()) }
                 return@ensureConnected
             }
-            val productList = ids.map { id ->
-                QueryProductDetailsParams.Product.newBuilder()
-                    .setProductId(id)
-                    .setProductType(
-                        if (isSubscription(id)) BillingClient.ProductType.SUBS
-                        else BillingClient.ProductType.INAPP
-                    )
-                    .build()
-            }
-            val params = QueryProductDetailsParams.newBuilder()
-                .setProductList(productList).build()
-            // Billing 8.0.0: the callback now delivers a QueryProductDetailsResult
-            // (fetched list + unfetched ids) instead of a bare List<ProductDetails>.
-            billingClient.queryProductDetailsAsync(params) { _, queryResult ->
-                val out = ArrayList<Map<String, Any?>>()
-                for (d in queryResult.productDetailsList) {
-                    productCache[d.productId] = d
-                    out.add(
-                        mapOf(
-                            "id" to d.productId,
-                            "title" to d.title,
-                            "description" to d.description,
-                            "price" to priceOf(d),
-                            "isSubscription" to
-                                (d.productType == BillingClient.ProductType.SUBS),
-                        )
-                    )
+            // Billing 8.0.0 BREAKING CHANGE: QueryProductDetailsParams.setProductList
+            // throws IllegalArgumentException ("All products should be of the same
+            // product type.") if a single query mixes SUBS + INAPP. (Billing 7 allowed
+            // it.) So we split by type and query each separately, merging the results.
+            val subIds = ids.filter { isSubscription(it) }
+            val inappIds = ids.filter { !isSubscription(it) }
+            val out = ArrayList<Map<String, Any?>>()
+            queryOneType(inappIds, BillingClient.ProductType.INAPP, out) {
+                queryOneType(subIds, BillingClient.ProductType.SUBS, out) {
+                    onMain { result.success(out) }
                 }
-                onMain { result.success(out) }
             }
+        }
+    }
+
+    /** Queries one product type and appends its results to [accumulator], then
+     *  invokes [onDone]. Empty [ids] short-circuits. Callers chain the two types. */
+    private fun queryOneType(
+        ids: List<String>,
+        type: String,
+        accumulator: MutableList<Map<String, Any?>>,
+        onDone: () -> Unit,
+    ) {
+        if (ids.isEmpty()) {
+            onDone()
+            return
+        }
+        val productList = ids.map { id ->
+            QueryProductDetailsParams.Product.newBuilder()
+                .setProductId(id)
+                .setProductType(type)
+                .build()
+        }
+        val params = QueryProductDetailsParams.newBuilder()
+            .setProductList(productList).build()
+        // Billing 8.0.0: the callback delivers a QueryProductDetailsResult
+        // (fetched list + unfetched ids-with-status) instead of a bare list.
+        billingClient.queryProductDetailsAsync(params) { billingResult, queryResult ->
+            logDebug(
+                "queryProducts[$type]: code=${billingResult.responseCode} (${billingResult.debugMessage}); " +
+                    "requested=${ids.size} fetched=${queryResult.productDetailsList.size}"
+            )
+            for (u in queryResult.unfetchedProductList) {
+                logDebug("  unfetched: ${u.productId} statusCode=${u.statusCode}")
+            }
+            for (d in queryResult.productDetailsList) {
+                productCache[d.productId] = d
+                accumulator.add(
+                    mapOf(
+                        "id" to d.productId,
+                        "title" to d.title,
+                        "description" to d.description,
+                        "price" to priceOf(d),
+                        "isSubscription" to
+                            (d.productType == BillingClient.ProductType.SUBS),
+                    )
+                )
+            }
+            onDone()
         }
     }
 
@@ -264,9 +295,15 @@ class BillingBridge(
             val params = QueryProductDetailsParams.newBuilder()
                 .setProductList(listOf(product)).build()
             // Billing 8.0.0: callback delivers QueryProductDetailsResult (see above).
-            billingClient.queryProductDetailsAsync(params) { _, queryResult ->
+            billingClient.queryProductDetailsAsync(params) { billingResult, queryResult ->
                 val d = queryResult.productDetailsList.firstOrNull()
                 if (d == null) {
+                    val unfetched = queryResult.unfetchedProductList
+                        .joinToString { "${it.productId}:${it.statusCode}" }
+                    logDebug(
+                        "buy '$id': product not found (code=${billingResult.responseCode} " +
+                            "${billingResult.debugMessage}; unfetched=[$unfetched])"
+                    )
                     onMain { result.success(unavailableMap(id)) }
                 } else {
                     productCache[id] = d
@@ -302,6 +339,7 @@ class BillingBridge(
         onMain {
             val launch = billingClient.launchBillingFlow(activity, flowParams)
             if (launch.responseCode != BillingClient.BillingResponseCode.OK) {
+                logDebug("launchBillingFlow '$id' failed: code=${launch.responseCode} (${launch.debugMessage})")
                 pendingBuy = null
                 pendingBuyId = null
                 result.success(errorMap(id, launch.debugMessage))
@@ -317,6 +355,8 @@ class BillingBridge(
         val pendingId = pendingBuyId
         pendingBuy = null
         pendingBuyId = null
+
+        logDebug("onPurchasesUpdated: code=${billingResult.responseCode} (${billingResult.debugMessage}); purchases=${purchases?.size ?: 0}")
 
         when (billingResult.responseCode) {
             BillingClient.BillingResponseCode.OK -> {
@@ -373,4 +413,11 @@ class BillingBridge(
         mapOf("outcome" to "unavailable", "productId" to productId)
 
     private fun onMain(block: () -> Unit) = activity.runOnUiThread(block)
+
+    // Pushes a diagnostic line up to Dart (→ app debug log → Shop debug console),
+    // so billing failures are visible on a real Play-installed release build where
+    // logcat isn't available. MethodChannel calls must run on the main thread.
+    private fun logDebug(msg: String) {
+        onMain { channel.invokeMethod("onBillingLog", msg) }
+    }
 }

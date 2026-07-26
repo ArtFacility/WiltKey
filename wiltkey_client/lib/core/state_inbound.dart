@@ -624,10 +624,21 @@ extension AppStateInbound on AppState {
           : utf8.encode(rawContent).length;
 
       // Gap detection + incoming bookkeeping apply ONLY to the peer's primary
-      // lane. A message that arrives in a disjoint range the peer borrowed from
-      // us lands above incomingMaxOffset; it still decrypts by absolute offset,
-      // but must not drive resync or corrupt the primary incoming pointer.
-      if (offset <= contact.incomingMaxOffset) {
+      // lane. A message the peer wrote into a range they BORROWED from us lands
+      // in our own outgoing lane; it still decrypts by absolute offset, but must
+      // not drive resync or corrupt the primary incoming pointer.
+      //
+      // The lane is [start, incomingMaxOffset). Bounding on the top alone isn't
+      // enough: the pad is split in half and which half is ours depends on our
+      // role, so for an INITIATOR (incoming = the upper half) a borrowed range
+      // sits BELOW incomingMaxOffset and used to slip through — silently
+      // draining the displayed peer budget. Derive the lane start from which
+      // half our incoming ceiling points at, and require both bounds.
+      final int incomingLaneStart =
+          contact.incomingMaxOffset >= contact.maxBufferBytes
+          ? contact.maxBufferBytes ~/ 2
+          : 0;
+      if (offset >= incomingLaneStart && offset <= contact.incomingMaxOffset) {
         final expectedOffset = contact.incomingOffset;
         if (offset > expectedOffset) {
           _requestChatResync(contact, expectedOffset, offset);

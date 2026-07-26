@@ -1,0 +1,10 @@
+<svg width="100" height="100" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+<defs>
+<linearGradient id="oceanG" x1="8" y1="8" x2="92" y2="92" gradientUnits="userSpaceOnUse">
+<stop offset="0" stop-color="#6FE0FF"/>
+<stop offset="0.5" stop-color="#38BDF8"/>
+<stop offset="1" stop-color="#2563EB"/>
+</linearGradient>
+</defs>
+<rect x="6.5" y="6.5" width="87" height="87" rx="9" stroke="url(#oceanG)" stroke-width="7"/>
+</svg>

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:wiltkey_client/l10n/app_localizations.dart';
 import '../../../core/state.dart';
+import '../../../core/payload_limits.dart';
 import '../../../core/models.dart';
 import '../../../core/custom_emoji.dart';
 import 'widgets/image_source_sheet.dart';
@@ -438,8 +439,12 @@ class _ChatScreenState extends State<ChatScreen>
       return;
     }
 
-    if (base64Data.length > 1400000) {
-      _errorSnack(l10n.chatImageExceedsMaxSizeSnackBar);
+    if (WkPayloadLimits.exceedsOutgoing(base64Data.length)) {
+      _errorSnack(
+        WkPayloadLimits.blockedByFreeTier(base64Data.length)
+            ? l10n.chatImageNeedsPlusSnackBar
+            : l10n.chatImageExceedsMaxSizeSnackBar,
+      );
       return;
     }
 

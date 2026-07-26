@@ -17,6 +17,11 @@ type PGMessage struct {
 	BucketURL   *string // Nullable if stored inline
 	ContentType string
 	ExpiresAt   time.Time
+	SizeBytes   int64
+	// OfferMeta is the message envelope with its big `d` ciphertext blanked —
+	// enough for the recipient to place the message in the right chat and render
+	// a pending-download bubble without fetching the body. Empty for inline rows.
+	OfferMeta string
 }
 
 type PGEntitlement struct {
@@ -77,6 +82,17 @@ func (p *PostgresClient) runMigrations() error {
 		return fmt.Errorf("error creating messages table: %v", err)
 	}
 
+	// Envelope byte size, so a FILE_OFFER can advertise how big the pending
+	// download is (and the download endpoint can set Content-Length) without
+	// stat-ing the object store. 0 for legacy rows.
+	_, err = p.db.Exec(`
+		ALTER TABLE messages ADD COLUMN IF NOT EXISTS size_bytes BIGINT NOT NULL DEFAULT 0;
+		ALTER TABLE messages ADD COLUMN IF NOT EXISTS offer_meta TEXT NOT NULL DEFAULT '';
+	`)
+	if err != nil {
+		return fmt.Errorf("error adding large-file columns: %v", err)
+	}
+
 	// Create entitlements table
 	_, err = p.db.Exec(`
 		CREATE TABLE IF NOT EXISTS entitlements (
@@ -95,13 +111,20 @@ func (p *PostgresClient) runMigrations() error {
 
 // StoreMessage inserts a new offline message into the database.
 func (p *PostgresClient) StoreMessage(recipientID, senderID string, envelope *string, bucketURL *string, contentType string, ttl time.Duration) (string, error) {
+	return p.StoreMessageSized(recipientID, senderID, envelope, bucketURL, contentType, ttl, 0, "")
+}
+
+// StoreMessageSized is StoreMessage plus the envelope's byte size and offer
+// metadata, recorded so a pending large file can be advertised (and streamed)
+// without ever pulling the body back out of storage.
+func (p *PostgresClient) StoreMessageSized(recipientID, senderID string, envelope *string, bucketURL *string, contentType string, ttl time.Duration, size int64, offerMeta string) (string, error) {
 	id := uuid.New().String()
 	expiresAt := time.Now().Add(ttl)
 
 	_, err := p.db.Exec(`
-		INSERT INTO messages (id, recipient_id, sender_id, envelope, bucket_url, content_type, expires_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
-	`, id, recipientID, senderID, envelope, bucketURL, contentType, expiresAt)
+		INSERT INTO messages (id, recipient_id, sender_id, envelope, bucket_url, content_type, expires_at, size_bytes, offer_meta)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+	`, id, recipientID, senderID, envelope, bucketURL, contentType, expiresAt, size, offerMeta)
 	if err != nil {
 		return "", err
 	}
@@ -109,10 +132,31 @@ func (p *PostgresClient) StoreMessage(recipientID, senderID string, envelope *st
 	return id, nil
 }
 
+// GetFileMessage returns the bucket-backed message [id] addressed to
+// [recipientID], or nil when it doesn't exist, has expired, isn't a file, or
+// belongs to someone else. Used to authorize + serve a download.
+func (p *PostgresClient) GetFileMessage(id, recipientID string) (*PGMessage, error) {
+	row := p.db.QueryRow(`
+		SELECT id, recipient_id, sender_id, envelope, bucket_url, content_type, expires_at, size_bytes, offer_meta
+		FROM messages
+		WHERE id = $1 AND recipient_id = $2 AND bucket_url IS NOT NULL AND expires_at > NOW()
+	`, id, recipientID)
+
+	var m PGMessage
+	err := row.Scan(&m.ID, &m.RecipientID, &m.SenderID, &m.Envelope, &m.BucketURL,
+		&m.ContentType, &m.ExpiresAt, &m.SizeBytes, &m.OfferMeta)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	} else if err != nil {
+		return nil, err
+	}
+	return &m, nil
+}
+
 // GetPendingMessages returns all unexpired pending messages for a recipient.
 func (p *PostgresClient) GetPendingMessages(recipientID string) ([]PGMessage, error) {
 	rows, err := p.db.Query(`
-		SELECT id, recipient_id, sender_id, envelope, bucket_url, content_type, expires_at
+		SELECT id, recipient_id, sender_id, envelope, bucket_url, content_type, expires_at, size_bytes, offer_meta
 		FROM messages
 		WHERE recipient_id = $1 AND expires_at > NOW()
 		ORDER BY created_at ASC
@@ -125,7 +169,7 @@ func (p *PostgresClient) GetPendingMessages(recipientID string) ([]PGMessage, er
 	var msgs []PGMessage
 	for rows.Next() {
 		var msg PGMessage
-		err := rows.Scan(&msg.ID, &msg.RecipientID, &msg.SenderID, &msg.Envelope, &msg.BucketURL, &msg.ContentType, &msg.ExpiresAt)
+		err := rows.Scan(&msg.ID, &msg.RecipientID, &msg.SenderID, &msg.Envelope, &msg.BucketURL, &msg.ContentType, &msg.ExpiresAt, &msg.SizeBytes, &msg.OfferMeta)
 		if err != nil {
 			return nil, err
 		}

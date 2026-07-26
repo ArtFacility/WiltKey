@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../build_flavor.dart';
 import '../persistence.dart';
+import '../state.dart';
 import 'billing_channel.dart';
 import 'billing_models.dart';
 import 'product_ids.dart';
@@ -18,8 +19,9 @@ import 'product_ids.dart';
 ///   are queried on launch/resume, cached to prefs for offline launches.
 /// - **FOSS build** (`kPlayStore` false): no billing library is compiled in, so
 ///   the fairness model is applied purely in code — palette packs and larger pads
-///   are **free**, premium themes are **not available** (their source isn't in the
-///   public repo and they're never listed), and Plus (server perks) is **off**
+///   are **free**, premium themes are **listed but permanently locked** ("Play
+///   exclusive" previews on the official FOSS build; public forks have only the
+///   empty stub so they list nothing), and Plus (server perks) is **off**
 ///   (the official relay requires payment; a self-hoster sets their own TTL).
 ///
 /// **Trust model:** for purely-local cosmetics the client entitlement is accepted
@@ -72,8 +74,9 @@ class EntitlementService extends ChangeNotifier {
   bool palettePackUnlocked(String packId) =>
       !kPlayStore || _owned.contains(WkProducts.palettePack(packId));
 
-  /// A premium theme. NOT available on FOSS (never listed there); an owned check
-  /// on Play. Note a theme always *renders* — this only gates selecting it.
+  /// A premium theme. An owned check on Play; always false on FOSS, where a
+  /// listed premium theme is a permanently locked "Play exclusive" preview.
+  /// Note a theme always *renders* — this only gates selecting it.
   bool premiumThemeUnlocked(String themeId) =>
       kPlayStore && _owned.contains(WkProducts.premiumTheme(themeId));
 
@@ -94,6 +97,7 @@ class EntitlementService extends ChangeNotifier {
       final cached = await _persistence.loadEntitlements();
       _owned = cached.toSet();
       BillingChannel.onPurchasesChanged = _onPurchasesChanged;
+      BillingChannel.onLog = (m) => AppState().log('[Billing] $m');
       BillingChannel.ensureInitialized();
     }
     _loaded = true;

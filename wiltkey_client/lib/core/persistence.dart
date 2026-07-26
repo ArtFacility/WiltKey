@@ -32,6 +32,7 @@ class WiltkeyPersistence {
   // app was unlocked (used to force the PIN again after a 4h idle window).
   static const String _keyBiometricEnabled = 'wk_biometric_enabled';
   static const String _keyLastUnlockMs = 'wk_last_unlock_ms';
+  static const String _keyBiometricIdleHours = 'wk_biometric_idle_hours';
 
   Future<File> _getHistoryFile() async {
     final directory = await getApplicationDocumentsDirectory();
@@ -77,6 +78,7 @@ class WiltkeyPersistence {
     stateData['biometricEnabled'] =
         prefs.getBool(_keyBiometricEnabled) ?? false;
     stateData['lastUnlockMs'] = prefs.getInt(_keyLastUnlockMs);
+    stateData['biometricIdleHours'] = prefs.getInt(_keyBiometricIdleHours);
 
     final privateKeyRaw = prefs.getString(_keyPrivateKey);
     if (privateKeyRaw != null) {
@@ -175,6 +177,13 @@ class WiltkeyPersistence {
     await prefs.setInt(_keyLastUnlockMs, ms);
   }
 
+  /// Hours of inactivity after which fingerprint unlock is disabled and the PIN
+  /// is required again. 0 means "never" (fingerprint stays available).
+  Future<void> setBiometricIdleHours(int hours) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_keyBiometricIdleHours, hours);
+  }
+
   // --- Theme selection (cosmetic) ---
   // Stored separately from identity/keys and intentionally NOT wiped by
   // clearAll(): a theme id reveals nothing sensitive, and a user's chosen look
@@ -251,6 +260,7 @@ class WiltkeyPersistence {
     await prefs.remove(keyPinValidationHash);
     await prefs.remove(_keyBiometricEnabled);
     await prefs.remove(_keyLastUnlockMs);
+    await prefs.remove(_keyBiometricIdleHours);
     await prefs.remove(_keyPairingTimes);
 
     // Tear down background notification work and wipe the keystore signing key.

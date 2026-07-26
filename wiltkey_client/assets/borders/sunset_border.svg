@@ -1,0 +1,10 @@
+<svg width="100" height="100" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+<defs>
+<linearGradient id="sunsetG" x1="8" y1="8" x2="92" y2="92" gradientUnits="userSpaceOnUse">
+<stop offset="0" stop-color="#FFD24B"/>
+<stop offset="0.5" stop-color="#FF8A4B"/>
+<stop offset="1" stop-color="#F43F7E"/>
+</linearGradient>
+</defs>
+<rect x="6.5" y="6.5" width="87" height="87" rx="9" stroke="url(#sunsetG)" stroke-width="7"/>
+</svg>
