@@ -544,6 +544,12 @@ type PairState struct {
 	BufferBytes  int64  `json:"buffer_bytes"`
 	ReceiverID   string `json:"receiver_id,omitempty"`
 	ReceiverPub  string `json:"receiver_pub,omitempty"`
+	// SecretBlob carries the debug remote GROUP-invite payload (see the
+	// kRemotePairingTesting feature). The host posts it AFTER poll gives it the
+	// joiner's pubkey — only then can it derive the pairwise seed to encrypt the
+	// group seed inside. The relay stays blind: the group seed is pairwise-
+	// encrypted client-side. Empty for a 1-on-1 pairing.
+	SecretBlob string `json:"secret_blob,omitempty"`
 }
 
 func handlePairInit(w http.ResponseWriter, r *http.Request) {
@@ -638,6 +644,17 @@ func handlePairJoin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// A PIN pairs exactly two parties. If a receiver already claimed it, reject
+	// the second joiner instead of overwriting — otherwise last-writer-wins and
+	// the first joiner has already generated a pad for a peer that will never
+	// complete the handshake.
+	if state.ReceiverID != "" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusConflict)
+		w.Write([]byte(`{"error":"This PIN has already been claimed by another device."}`))
+		return
+	}
+
 	state.ReceiverID = req.ReceiverID
 	state.ReceiverPub = req.Pubkey
 
@@ -690,8 +707,10 @@ func handlePairPoll(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	if state.ReceiverID != "" {
-		rdb.DeletePairing(pin)
-
+		// Do NOT delete on first "joined": if this response is lost to a network
+		// blip the initiator could never recover while the joiner has already
+		// built its contact. Let the short TTL reap the record instead, so a
+		// retried poll still returns "joined".
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"status":      "joined",
 			"receiver_id": state.ReceiverID,
@@ -699,6 +718,102 @@ func handlePairPoll(w http.ResponseWriter, r *http.Request) {
 		})
 	} else {
 		json.NewEncoder(w).Encode(map[string]string{"status": "pending"})
+	}
+}
+
+type PairInviteRequest struct {
+	PIN         string `json:"pin"`
+	InitiatorID string `json:"initiator_id"`
+	Blob        string `json:"blob"`
+}
+
+// handlePairInvite carries the encrypted group-invite blob for a debug remote
+// GROUP pairing (see the kRemotePairingTesting client feature). Two-sided:
+//
+//	POST {pin, initiator_id, blob}  — the HOST uploads the invite after poll has
+//	                                  given it the joiner's pubkey. Only the PIN's
+//	                                  initiator may write. Refreshes the TTL so the
+//	                                  joiner has time to fetch.
+//	GET  ?pin=&receiver_id=         — the JOINER polls until the blob is ready.
+//	                                  Only the joined receiver may read.
+//
+// The relay never learns the group seed: the blob's seed field is encrypted with
+// the pairwise seed (derived from both pubkeys) on the client. 1-on-1 pairings
+// never touch this endpoint.
+func handlePairInvite(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodPost:
+		var req PairInviteRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "Invalid request", http.StatusBadRequest)
+			return
+		}
+		if req.PIN == "" || req.InitiatorID == "" || req.Blob == "" {
+			http.Error(w, "Missing fields", http.StatusBadRequest)
+			return
+		}
+		data, err := rdb.GetPairing(req.PIN)
+		if err != nil {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusNotFound)
+			w.Write([]byte(`{"error":"Invalid or expired PIN"}`))
+			return
+		}
+		var state PairState
+		if err := json.Unmarshal([]byte(data), &state); err != nil {
+			http.Error(w, "State corrupted", http.StatusInternalServerError)
+			return
+		}
+		// Only the host that created this PIN may post the invite.
+		if state.InitiatorID != req.InitiatorID {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+		state.SecretBlob = req.Blob
+		stateBytes, _ := json.Marshal(state)
+		// Refresh the TTL: the host has just posted, give the joiner time to fetch.
+		if err := rdb.StorePairing(req.PIN, string(stateBytes), 5*time.Minute); err != nil {
+			http.Error(w, "Database error", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"status":"ok"}`))
+
+	case http.MethodGet:
+		pin := r.URL.Query().Get("pin")
+		id := r.URL.Query().Get("receiver_id")
+		if pin == "" || id == "" {
+			http.Error(w, "Missing parameters", http.StatusBadRequest)
+			return
+		}
+		data, err := rdb.GetPairing(pin)
+		w.Header().Set("Content-Type", "application/json")
+		if err != nil {
+			// Record gone (TTL lapsed) — tell the joiner explicitly so it stops
+			// polling instead of hanging on a spinner.
+			json.NewEncoder(w).Encode(map[string]string{"status": "expired"})
+			return
+		}
+		var state PairState
+		if err := json.Unmarshal([]byte(data), &state); err != nil {
+			http.Error(w, "State corrupted", http.StatusInternalServerError)
+			return
+		}
+		if state.ReceiverID != id {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+		if state.SecretBlob != "" {
+			json.NewEncoder(w).Encode(map[string]string{
+				"status": "ready",
+				"blob":   state.SecretBlob,
+			})
+		} else {
+			json.NewEncoder(w).Encode(map[string]string{"status": "pending"})
+		}
+
+	default:
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 	}
 }
 
@@ -1072,6 +1187,7 @@ func main() {
 	http.HandleFunc("/api/v1/pair/init", rateLimitMiddleware(handlePairInit))
 	http.HandleFunc("/api/v1/pair/join", rateLimitMiddleware(handlePairJoin))
 	http.HandleFunc("/api/v1/pair/poll", rateLimitMiddleware(handlePairPoll))
+	http.HandleFunc("/api/v1/pair/invite", rateLimitMiddleware(handlePairInvite))
 	http.HandleFunc("/api/v1/entitlement", rateLimitMiddleware(handlePostEntitlement))
 	http.HandleFunc("/api/v1/file", rateLimitMiddleware(handleFileDownload))
 	http.HandleFunc("/ping", func(w http.ResponseWriter, r *http.Request) {

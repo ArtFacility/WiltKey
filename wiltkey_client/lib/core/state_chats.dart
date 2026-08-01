@@ -455,6 +455,12 @@ extension AppStateChats on AppState {
 
   Future<void> decryptMessage(Contact contact, ChatMessage message) async {
     if (message.decryptedText != null || message.isFailed) return;
+    // Plain images are loaded on demand by their thumbnail (from the durable
+    // master-key copy, see ChatImageThumbnail / WiltkeyDatabase.loadImageBytes).
+    // Never OTP-decrypt them here: a deferred image has an empty `text`, so this
+    // would set decryptedText='' + an EMPTY decodedImageBytes and the thumbnail
+    // would render that empty cache as a broken image.
+    if (message.contentType == 'image') return;
     try {
       final cipherBytes = base64Decode(message.text);
       final plainBytes = contact.isGroup
@@ -497,6 +503,10 @@ extension AppStateChats on AppState {
     final startIndex = max(0, list.length - 50);
     for (int i = list.length - 1; i >= startIndex; i--) {
       final msg = list[i];
+      // Skip plain images — they load lazily via their thumbnail from the master
+      // copy. OTP-decrypting a deferred image (empty `text`) here would poison it
+      // with an empty decodedImageBytes cache (renders as a broken thumbnail).
+      if (msg.contentType == 'image') continue;
       if (msg.decryptedText == null && !msg.isFailed) {
         try {
           final cipherBytes = base64Decode(msg.text);

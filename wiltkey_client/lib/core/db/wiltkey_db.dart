@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart' as p;
 import '../models.dart';
@@ -434,6 +435,66 @@ class WiltkeyDatabase {
     }
   }
 
+  /// Async sidecar read, for the lazy image loader (off the sync page-load path).
+  Future<(String, String?)?> _readMediaFilesAsync(String base) async {
+    try {
+      final dir = _mediaDir;
+      if (dir == null) return null;
+      final of = File(p.join(dir, '$base.o'));
+      if (!await of.exists()) return null;
+      final otp = await of.readAsString();
+      final mf = File(p.join(dir, '$base.m'));
+      final master = await mf.exists() ? await mf.readAsString() : null;
+      return (otp, master);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Lazily fetch & decode ONE plain image's bytes — called by its on-screen
+  /// thumbnail so the heavy sidecar read + master-key decrypt + base64 decode
+  /// happen only when the image is actually visible, not for every row at page
+  /// load (see [_rowToMessage]'s `deferImage`). Uses the DURABLE master-key copy
+  /// so it still works after a pad reset. Returns null if unavailable/unreadable.
+  ///
+  /// Reads the deterministic sidecar path FIRST (where every large image lives),
+  /// which also sidesteps the ~2 MB CursorWindow limit a big inline column query
+  /// would hit; only small inline images fall back to a direct column read.
+  Future<Uint8List?> loadImageBytes(
+    String chatId,
+    String messageId, {
+    String? masterKeyHex,
+  }) async {
+    if (masterKeyHex == null) return null;
+    String? master;
+    final loaded = await _readMediaFilesAsync(_mediaBase(chatId, messageId));
+    if (loaded != null) {
+      master = loaded.$2;
+    } else {
+      try {
+        final db = await _database;
+        final rows = await db.query(
+          'messages',
+          columns: ['text_encrypted_master', 'wilted'],
+          where: 'chat_id = ? AND id = ?',
+          whereArgs: [chatId, messageId],
+          limit: 1,
+        );
+        if (rows.isEmpty) return null;
+        if ((rows.first['wilted'] as int? ?? 0) == 1) return null;
+        master = rows.first['text_encrypted_master'] as String?;
+      } catch (_) {
+        return null;
+      }
+    }
+    if (master == null) return null;
+    try {
+      return base64Decode(WiltkeyPersistence().decryptString(master, masterKeyHex));
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<void> _deleteMediaFiles(String base) async {
     try {
       final dir = _mediaDir;
@@ -771,10 +832,18 @@ class WiltkeyDatabase {
     // Body may live inline OR in a sidecar file (large images/voice). Tolerate a
     // missing text_otp key: the CursorWindow-safe page loader omits it from the
     // batch select and reloads it per-row.
+    // Plain images are loaded LAZILY by their on-screen thumbnail (see
+    // [loadImageBytes] / ChatImageThumbnail): reading the sidecar, decrypting the
+    // master copy, and base64-decoding here for EVERY row at page load is what
+    // froze chats full of large images. Wilting/hidden images keep the eager path
+    // (special lifecycle / need a pre-reveal size).
+    final bool deferImage =
+        !wilted && contentType == 'image' && (row['ephemeral'] as int? ?? 0) == 0;
+
     String textOtp = (row['text_otp'] as String?) ?? '';
     String? textEncryptedMaster = row['text_encrypted_master'] as String?;
     final mediaPath = row['media_path'] as String?;
-    if (!wilted && mediaPath != null && mediaPath.isNotEmpty) {
+    if (!deferImage && !wilted && mediaPath != null && mediaPath.isNotEmpty) {
       final loaded = _readMediaFilesSync(mediaPath);
       if (loaded != null) {
         textOtp = loaded.$1;
@@ -785,8 +854,9 @@ class WiltkeyDatabase {
     }
 
     String? decryptedText;
-    if (wilted) {
-      // Destroyed content — nothing to decrypt or decode.
+    if (wilted || deferImage) {
+      // wilted: destroyed content. deferImage: body fetched on demand when the
+      // thumbnail scrolls into view — nothing to decrypt here.
     } else if (senderId == 'system') {
       decryptedText = textOtp;
     } else if (textEncryptedMaster != null && masterKeyHex != null) {
@@ -812,7 +882,9 @@ class WiltkeyDatabase {
       isFailed: (row['is_failed'] as int? ?? 0) == 1,
       allowSave: (row['allow_save'] as int? ?? 0) == 1,
       decryptedText: decryptedText,
-      decodedImageBytes: (contentType == 'image' && decryptedText != null)
+      decodedImageBytes: (!deferImage &&
+              contentType == 'image' &&
+              decryptedText != null)
           ? base64Decode(decryptedText)
           : null,
       reactions: ChatMessage.decodeReactions(row['reactions'] as String?),

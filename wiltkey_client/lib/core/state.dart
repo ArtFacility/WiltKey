@@ -532,6 +532,11 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     try {
       await ensureWebSocketConnected();
       await processPendingInbox();
+      // Reconcile large-file offers on resume. If ensureWebSocketConnected just
+      // reconnected, AUTH_OK already asked; if the socket stayed live the whole
+      // time, THIS is the only trigger — recovering a FILE_OFFER missed while
+      // connected (the case where a big image "never arrived" until a resync).
+      WebSocketClient().requestPendingFiles();
     } catch (e) {
       log('[Notifications] Resume drain failed: $e');
     }

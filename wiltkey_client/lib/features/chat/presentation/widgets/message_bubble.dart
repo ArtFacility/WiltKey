@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import '../../../../core/state.dart';
 import '../../../../core/models.dart';
@@ -13,7 +12,7 @@ import 'package:wiltkey_client/l10n/app_localizations.dart';
 import 'voice_message_player.dart';
 import 'download_bubble.dart';
 import 'reactions.dart';
-import 'image_viewer.dart';
+import 'chat_image_thumbnail.dart';
 import 'reply_preview.dart';
 
 class MessageBubble extends StatelessWidget {
@@ -305,6 +304,23 @@ class MessageBubble extends StatelessWidget {
       return _buildWiltGate(t, l10n);
     }
 
+    // Plain images render through the lazy, fixed-size thumbnail — which fetches,
+    // decrypts and decodes its OWN bytes on first build (i.e. when scrolled into
+    // view). This MUST precede the generic "decrypting…" gate below: a deferred
+    // image has no in-memory body yet and must not spin there. Wilting images
+    // reach here only once revealed (the gate above catches unopened ones).
+    if (message.contentType == 'image') {
+      return _wrapWilting(
+        t,
+        l10n,
+        ChatImageThumbnail(
+          appState: appState,
+          contact: contact,
+          message: message,
+        ),
+      );
+    }
+
     if (message.decryptedText == null && !message.isFailed) {
       appState.decryptMessage(contact, message);
 
@@ -390,43 +406,17 @@ class MessageBubble extends StatelessWidget {
         );
       }
 
-      Uint8List? imageBytes = message.decodedImageBytes;
-      if (imageBytes == null) {
-        try {
-          imageBytes = base64Decode(decryptedText);
-          message.decodedImageBytes = imageBytes;
-        } catch (_) {}
-      }
-
-      if (imageBytes != null) {
-        final bytes = imageBytes;
-        return _wrapWilting(
-          t,
-          l10n,
-          GestureDetector(
-            onTap: () => ImageViewerScreen.open(
-              context,
-              imageBytes: bytes,
-              // A wilting image is never downloadable, regardless of allowSave.
-              allowSave: message.allowSave && !message.ephemeral,
-            ),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 300, maxWidth: 280),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(t.radiusControl),
-                child: Image.memory(
-                  bytes,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) =>
-                      _imageError(t, l10n),
-                ),
-              ),
-            ),
-          ),
-        );
-      } else {
-        return _imageError(t, l10n);
-      }
+      // Revealed hidden image → the same fixed-size lazy thumbnail as plain
+      // images (it decodes the already-in-memory revealed body, no DB round-trip).
+      return _wrapWilting(
+        t,
+        l10n,
+        ChatImageThumbnail(
+          appState: appState,
+          contact: contact,
+          message: message,
+        ),
+      );
     }
 
     final scale = appState.chatTextScale;
@@ -728,27 +718,6 @@ class MessageBubble extends StatelessWidget {
     );
   }
 
-  Widget _imageError(WiltkeyTokens t, AppLocalizations l10n) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: t.surface,
-        borderRadius: BorderRadius.circular(t.radiusControl),
-        border: Border.all(color: t.border),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.broken_image, color: t.danger, size: 16),
-          const SizedBox(width: 6),
-          Text(
-            l10n.groupImageFailedToLoad,
-            style: t.bodySecondary.copyWith(fontSize: 10),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 /// A self-ticking draining bar for an opened wilting message: full at open,

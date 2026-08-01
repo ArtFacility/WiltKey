@@ -1194,7 +1194,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String chatImageCompressionCost(String cost) {
-    return 'Charge cost: ~$cost';
+    return 'Payload sent: ~$cost';
   }
 
   @override

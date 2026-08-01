@@ -2205,7 +2205,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatImageCompressionCost.
   ///
   /// In en, this message translates to:
-  /// **'Charge cost: ~{cost}'**
+  /// **'Payload sent: ~{cost}'**
   String chatImageCompressionCost(String cost);
 
   /// No description provided for @chatImageCompressionExplanation.

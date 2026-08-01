@@ -183,33 +183,33 @@ class _CompressionDialogState extends State<CompressionDialog> {
             ),
             style: t.dataMono.copyWith(color: t.textSecondary, fontSize: 11),
           ),
-          const SizedBox(height: 4),
-          // Real (not estimated) output size + charge, computed by compressing.
+          const SizedBox(height: 6),
+          // HEADLINE: the actual payload charged against the pad budget — this is
+          // what decides whether the image can be sent at all. base64 inflates
+          // the compressed bytes ~1.33×, so a "4 MB" image costs ~5.3 MB; showing
+          // the compressed size as the headline confused free users about why it
+          // wouldn't send. The payload is now the prominent number.
           Row(
             children: [
               if (!ready)
                 SizedBox(
-                  width: 10,
-                  height: 10,
+                  width: 12,
+                  height: 12,
                   child: CircularProgressIndicator(
-                    strokeWidth: 1.4,
+                    strokeWidth: 1.6,
                     valueColor: AlwaysStoppedAnimation<Color>(t.action),
                   ),
                 )
               else
                 Flexible(
                   child: Text(
-                    savings > 0
-                        ? l10n.chatImageCompressionEstimatedWithSaving(
-                            AppState.formatBytes(estimatedSize!),
-                            AppState.formatBytes(savings),
-                          )
-                        : l10n.chatImageCompressionEstimated(
-                            AppState.formatBytes(estimatedSize!),
-                          ),
+                    l10n.chatImageCompressionCost(
+                      AppState.formatBytes(estimatedCharge!),
+                    ),
                     style: t.dataMono.copyWith(
-                      color: savings > 0 ? t.action : t.textSecondary,
-                      fontSize: 11,
+                      color: t.action,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ),
@@ -226,15 +226,21 @@ class _CompressionDialogState extends State<CompressionDialog> {
               ],
             ],
           ),
-          const SizedBox(height: 4),
-          Text(
-            ready
-                ? l10n.chatImageCompressionCost(
-                    AppState.formatBytes(estimatedCharge!),
-                  )
-                : l10n.chatImageCompressionCost('…'),
-            style: t.dataMono.copyWith(color: t.textTertiary),
-          ),
+          const SizedBox(height: 3),
+          // Sub-line (small): the compressed image size the payload is derived
+          // from, plus any saving vs. the original.
+          if (ready)
+            Text(
+              savings > 0
+                  ? l10n.chatImageCompressionEstimatedWithSaving(
+                      AppState.formatBytes(estimatedSize!),
+                      AppState.formatBytes(savings),
+                    )
+                  : l10n.chatImageCompressionEstimated(
+                      AppState.formatBytes(estimatedSize!),
+                    ),
+              style: t.dataMono.copyWith(color: t.textTertiary, fontSize: 10),
+            ),
           const SizedBox(height: 6),
           Text(
             l10n.chatImageCompressionExplanation,

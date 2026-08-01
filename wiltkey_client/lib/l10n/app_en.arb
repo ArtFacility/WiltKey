@@ -636,7 +636,7 @@
       }
     }
   },
-  "chatImageCompressionCost": "Charge cost: ~{cost}",
+  "chatImageCompressionCost": "Payload sent: ~{cost}",
   "@chatImageCompressionCost": {
     "placeholders": {
       "cost": {

@@ -15,6 +15,9 @@ import '../controllers/ble_pairing_manager.dart';
 import 'widgets/terminal_log_view.dart';
 import 'widgets/charge_slider.dart';
 import 'widgets/bluetooth_off_banner.dart';
+// TEMPORARY (see kRemotePairingTesting): debug remote-pairing tab.
+import 'package:wiltkey_client/core/build_flavor.dart';
+import 'remote_pair_tab.dart';
 
 class PairingScreen extends StatefulWidget {
   const PairingScreen({super.key});
@@ -42,10 +45,18 @@ class _PairingScreenState extends State<PairingScreen>
   Timer? _flashTimer;
   bool _hasFlashed = false;
 
+  late final TabController _tabController;
+  // TEMPORARY (see kRemotePairingTesting): the debug remote-pairing tab mounts
+  // only on the Play build with the in-app debug toggle on. Read once at init.
+  late final bool _showRemoteTab;
+
   @override
   void initState() {
     super.initState();
     _manager = BlePairingManager();
+    _showRemoteTab =
+        kRemotePairingTesting && kPlayStore && _manager.appState.showDebugButtons;
+    _tabController = TabController(length: _showRemoteTab ? 3 : 2, vsync: this);
     _manager.addListener(_onManagerUpdate);
     _manager.onIncomingRequest = _showIncomingPairDialog;
     _manager.onAlert = _showErrorSnackBar;
@@ -71,6 +82,7 @@ class _PairingScreenState extends State<PairingScreen>
 
   @override
   void dispose() {
+    _tabController.dispose();
     _manager.removeListener(_onManagerUpdate);
     _connectionController.dispose();
     _flashTimer?.cancel();
@@ -325,46 +337,28 @@ class _PairingScreenState extends State<PairingScreen>
                 onPressed: () => TerminalLogView.show(context, _manager),
               ),
             ],
-          ),
-          body: Container(
-            color: t.bg,
-            child: SingleChildScrollView(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (!_manager.isBluetoothOn)
-                      BluetoothOffBanner(manager: _manager),
-                    if (!_manager.isSyncing && !_manager.isSuccess) ...[
-                      _buildDeviceNameRow(t),
-                      const SizedBox(height: 12),
-                      _buildDiscoverableToggle(t),
-                      const SizedBox(height: 16),
-                      context.wkc.syncVisual(
-                        state: SyncVisualState.scanning,
-                        blips: _manager.discoveredDevices
-                            .map((d) => d.toSyncBlip())
-                            .toList(),
-                        log: _manager.terminalLogs,
-                      ),
-                      const SizedBox(height: 16),
-                      _buildNearbyDevicesList(t, closeDevices),
-                      const SizedBox(height: 16),
-                      _buildDirectSyncForm(t),
-                    ] else if (_manager.isSyncing) ...[
-                      _buildSyncingProgressCard(t),
-                      const SizedBox(height: 16),
-                      _buildHoldWarning(t),
-                    ] else if (_manager.isSuccess) ...[
-                      _buildSuccessCard(t),
-                      const SizedBox(height: 16),
-                      _buildHoldWarning(t),
-                    ],
-                  ],
-                ),
-              ),
+            // Mode tabs: in-person proximity (the real pairing), a placeholder
+            // for the upcoming Time Wilt mode, and — Play + debug only — the
+            // temporary remote-pairing test path (see kRemotePairingTesting).
+            bottom: TabBar(
+              controller: _tabController,
+              labelColor: t.action,
+              unselectedLabelColor: t.action.withValues(alpha: 0.5),
+              indicatorColor: t.action,
+              tabs: [
+                const Tab(text: 'Proximity'),
+                const Tab(text: 'Time Wilt'),
+                if (_showRemoteTab) const Tab(text: 'Remote'),
+              ],
             ),
+          ),
+          body: TabBarView(
+            controller: _tabController,
+            children: [
+              _buildProximityBody(t, l10n, closeDevices),
+              _buildTimeWiltSoon(t),
+              if (_showRemoteTab) const RemotePairTab(),
+            ],
           ),
         ),
         if (_flashOpacity > 0.0)
@@ -376,6 +370,90 @@ class _PairingScreenState extends State<PairingScreen>
             ),
           ),
       ],
+    );
+  }
+
+  /// The in-person BLE pairing flow — the original screen body, now the first
+  /// tab. Unchanged behaviour; only lifted into its own method for the tabs.
+  Widget _buildProximityBody(
+    WiltkeyTokens t,
+    AppLocalizations l10n,
+    List<DiscoveredBleDevice> closeDevices,
+  ) {
+    return Container(
+      color: t.bg,
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (!_manager.isBluetoothOn) BluetoothOffBanner(manager: _manager),
+              if (!_manager.isSyncing && !_manager.isSuccess) ...[
+                _buildDeviceNameRow(t),
+                const SizedBox(height: 12),
+                _buildDiscoverableToggle(t),
+                const SizedBox(height: 16),
+                context.wkc.syncVisual(
+                  state: SyncVisualState.scanning,
+                  blips: _manager.discoveredDevices
+                      .map((d) => d.toSyncBlip())
+                      .toList(),
+                  log: _manager.terminalLogs,
+                ),
+                const SizedBox(height: 16),
+                _buildNearbyDevicesList(t, closeDevices),
+                const SizedBox(height: 16),
+                _buildDirectSyncForm(t),
+              ] else if (_manager.isSyncing) ...[
+                _buildSyncingProgressCard(t),
+                const SizedBox(height: 16),
+                _buildHoldWarning(t),
+              ] else if (_manager.isSuccess) ...[
+                _buildSuccessCard(t),
+                const SizedBox(height: 16),
+                _buildHoldWarning(t),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Placeholder for the not-yet-built Time Wilt pairing mode.
+  Widget _buildTimeWiltSoon(WiltkeyTokens t) {
+    return Container(
+      color: t.bg,
+      alignment: Alignment.center,
+      padding: const EdgeInsets.all(32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.hourglass_empty,
+            color: t.action.withValues(alpha: 0.5),
+            size: 48,
+          ),
+          const SizedBox(height: 16),
+          Text('Time Wilt', style: t.screenTitle.copyWith(fontSize: 20)),
+          const SizedBox(height: 8),
+          Text(
+            'Coming soon — pairing that shares a pad which burns down on a timer.',
+            style: t.bodySecondary,
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            decoration: BoxDecoration(
+              color: t.action.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(t.radiusControl),
+            ),
+            child: Text('SOON', style: t.sectionLabel.copyWith(color: t.action)),
+          ),
+        ],
+      ),
     );
   }
 

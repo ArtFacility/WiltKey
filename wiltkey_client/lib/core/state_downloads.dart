@@ -165,6 +165,12 @@ extension AppStateDownloads on AppState {
       // the relay still holds the file (we haven't ACKed), so the offer simply
       // comes back on the next reconnect and rebuilds the placeholder.
       await WiltkeyDatabase.instance.deleteMessage(msg.id);
+      // Also evict it from the in-memory window NOW, not just the DB. Otherwise
+      // the stale placeholder (its remoteFileId about to be cleared, its text
+      // empty) lingers alongside the real message _dispatchIncoming is about to
+      // append — rendering as a spurious "[LOCKED: 0x]" spinner + empty bubble
+      // until the page re-fetch below replaces the list.
+      messages[contact.id]?.removeWhere((m) => m.id == msg.id);
 
       // Hand the body to the ordinary inbound path: it decrypts at the envelope
       // offset, advances the lane/offset bookkeeping, stores the real message and

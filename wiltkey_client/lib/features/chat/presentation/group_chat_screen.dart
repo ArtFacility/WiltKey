@@ -24,6 +24,7 @@ import 'widgets/voice_message_player.dart';
 import 'widgets/download_bubble.dart';
 import 'widgets/reactions.dart';
 import 'widgets/image_viewer.dart';
+import 'widgets/chat_image_thumbnail.dart';
 import 'widgets/screenshot_ui.dart';
 import 'widgets/wilt_duration_sheet.dart';
 import 'widgets/reply_preview.dart';
@@ -2201,6 +2202,18 @@ class _GroupChatScreenState extends State<GroupChatScreen>
 
   Widget _buildGroupImage(WiltkeyTokens t, ChatMessage message) {
     final l10n = AppLocalizations.of(context)!;
+    // Plain images: fixed-size lazy thumbnail. It loads its own bytes when
+    // scrolled into view (a deferred image has none in memory at page load), so
+    // this precedes the "decrypting…" spinner below and the layout doesn't pop as
+    // images decode. The wilt gate (unopened ephemeral) is handled by the caller.
+    final groupContact = _appState.activeContact;
+    if (message.contentType == 'image' && groupContact != null) {
+      return ChatImageThumbnail(
+        appState: _appState,
+        contact: groupContact,
+        message: message,
+      );
+    }
     final String? b64 = message.decryptedText;
     if (b64 == null || b64.isEmpty) {
       return Row(

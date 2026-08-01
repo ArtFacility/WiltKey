@@ -121,15 +121,7 @@ func (h *Hub) deliverOfflineQueue(client *Client) {
 				// bucket until the client downloads it and ACKs (or the TTL
 				// expires), so a half-finished or interrupted download can always
 				// be retried instead of losing the file.
-				client.SendJSON(WSMessage{
-					Type:        "FILE_OFFER",
-					SenderID:    msg.SenderID,
-					ContentType: msg.ContentType,
-					MessageID:   msg.ID,
-					Meta:        msg.OfferMeta,
-					Size:        msg.SizeBytes,
-					ExpiresAt:   msg.ExpiresAt.Unix(),
-				})
+				client.SendJSON(fileOfferFrom(msg))
 				continue
 			}
 			if msg.Envelope == nil {
@@ -148,6 +140,50 @@ func (h *Hub) deliverOfflineQueue(client *Client) {
 		if err != nil {
 			log.Printf("Failed to delete delivered inline Postgres messages for %s: %v", client.id, err)
 		}
+	}
+}
+
+// fileOfferFrom builds the FILE_OFFER frame for a pending bucket message. Shared
+// by the connect-time sweep and the on-demand resendPendingFileOffers so the two
+// can never drift.
+func fileOfferFrom(msg PGMessage) WSMessage {
+	return WSMessage{
+		Type:        "FILE_OFFER",
+		SenderID:    msg.SenderID,
+		ContentType: msg.ContentType,
+		MessageID:   msg.ID,
+		Meta:        msg.OfferMeta,
+		Size:        msg.SizeBytes,
+		ExpiresAt:   msg.ExpiresAt.Unix(),
+	}
+}
+
+// resendPendingFileOffers re-advertises every un-ACKed bucket file the relay is
+// still holding for this client. Bucket rows persist until FILE_RECEIVED, so it
+// is idempotent (the client dedups a re-offer by message id) and safe to call
+// liberally. It is the ONLY recovery path for a live FILE_OFFER that was missed
+// while the client stayed connected (a socket mid-rotation, a full send buffer,
+// or a swallowed client-side error) — without it such a file is invisible until
+// the next full reconnect. Triggered by the client's REQUEST_PENDING_FILES.
+func (c *Client) resendPendingFileOffers() {
+	if pg == nil {
+		return
+	}
+	pgMsgs, err := pg.GetPendingMessages(c.id)
+	if err != nil {
+		log.Printf("[Relay] resendPendingFileOffers: fetch failed for %s: %v", c.id, err)
+		return
+	}
+	var n int
+	for _, msg := range pgMsgs {
+		if msg.BucketURL == nil {
+			continue // inline messages are handled by the connect-time delivery
+		}
+		c.SendJSON(fileOfferFrom(msg))
+		n++
+	}
+	if n > 0 {
+		log.Printf("[Relay] Re-offered %d pending file(s) to %s on request.", n, c.id)
 	}
 }
 
@@ -327,6 +363,11 @@ func (c *Client) handleWSMessage(msg WSMessage) {
 		c.handleFileReceived(msg)
 	case "REQUEST_FILE":
 		c.handleRequestFile(msg)
+	case "REQUEST_PENDING_FILES":
+		// Client reconciliation: re-offer any un-ACKed bucket files. Lets a
+		// still-connected client recover a live FILE_OFFER it missed, without a
+		// full reconnect. Idempotent (client dedups by id).
+		c.resendPendingFileOffers()
 	default:
 		log.Printf("[WebSocket] Unhandled message type: %s", msg.Type)
 	}

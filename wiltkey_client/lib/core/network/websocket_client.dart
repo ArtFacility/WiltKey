@@ -212,6 +212,16 @@ class WebSocketClient {
     sendWSMessage({'type': 'REQUEST_FILE', 'message_id': messageId});
   }
 
+  /// Ask the relay to re-advertise every un-ACKed large file it still holds for
+  /// us. The live FILE_OFFER is the only delivery attempt while we stay
+  /// connected, so a single missed frame (socket rotation, buffer eviction, a
+  /// swallowed handler error) would otherwise hide the file until a full
+  /// reconnect. Fire this on (re)auth and on foreground-resume; re-offers are
+  /// idempotent (dedup by message id in _storeFileOffer).
+  void requestPendingFiles() {
+    sendWSMessage({'type': 'REQUEST_PENDING_FILES'});
+  }
+
   /// Confirm a large file is fully downloaded AND stored, releasing the relay's
   /// copy. Only ever sent after the message is persisted — see the NEW_MESSAGE
   /// note above for why acking any earlier loses files.
@@ -275,6 +285,9 @@ class WebSocketClient {
           _log(
             '[WebSocket] Authentication successful! Server User ID: $serverUserId',
           );
+          // Reconcile large-file offers: recover any FILE_OFFER we missed while
+          // previously connected (see requestPendingFiles). Idempotent.
+          requestPendingFiles();
           break;
         case 'NEW_MESSAGE':
           final senderId = jsonMap['sender_id'] as String;

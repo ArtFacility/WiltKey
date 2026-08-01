@@ -10,6 +10,9 @@ import '../../../core/theme/wiltkey_components.dart';
 import '../../proximity/controllers/ble_pairing_manager.dart';
 import '../../proximity/presentation/widgets/terminal_log_view.dart';
 import '../../proximity/presentation/widgets/bluetooth_off_banner.dart';
+// TEMPORARY (see kRemotePairingTesting): debug remote group-invite entry.
+import 'package:wiltkey_client/core/build_flavor.dart';
+import 'package:wiltkey_client/features/proximity/presentation/remote_group_pair_view.dart';
 
 class GroupInviteScreen extends StatefulWidget {
   final Contact group;
@@ -176,6 +179,21 @@ class _GroupInviteScreenState extends State<GroupInviteScreen> {
               style: t.screenTitle.copyWith(fontSize: 16),
             ),
             actions: [
+              if (kRemotePairingTesting &&
+                  kPlayStore &&
+                  _manager.appState.showDebugButtons)
+                IconButton(
+                  icon: Icon(Icons.cloud_upload_outlined,
+                      color: t.warning, size: 20),
+                  tooltip: 'Remote invite (testing)',
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          RemoteGroupInviteView(group: widget.group),
+                    ),
+                  ),
+                ),
               IconButton(
                 icon: Icon(Icons.terminal, color: t.action, size: 20),
                 onPressed: () => TerminalLogView.show(context, _manager),
