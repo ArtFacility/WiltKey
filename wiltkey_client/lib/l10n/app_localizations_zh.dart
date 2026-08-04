@@ -1008,6 +1008,35 @@ class AppLocalizationsZh extends AppLocalizations {
   String get groupRechargeNeededComposer => '群主重新充能了群组 — 再次见面即可重新加入';
 
   @override
+  String get activityTitle => 'Activity';
+
+  @override
+  String get activityEmpty =>
+      'No activity yet. Events like a chat being destroyed will show up here.';
+
+  @override
+  String get activityClear => 'Clear';
+
+  @override
+  String get activityClearConfirmTitle => 'Clear activity?';
+
+  @override
+  String get activityClearConfirmBody =>
+      'This removes all activity entries from this device. It can\'t be undone.';
+
+  @override
+  String get eventNukeReceivedTitle => 'Chat destroyed';
+
+  @override
+  String get eventNukeReceivedBody => 'A secure chat was destroyed.';
+
+  @override
+  String get eventGroupNukedTitle => 'Group destroyed';
+
+  @override
+  String get eventGroupNukedBody => 'A secure group was destroyed.';
+
+  @override
   String groupSyncingFromMember(String name) {
     return '正在从 $name 同步群组详情和消息...';
   }

@@ -12,9 +12,8 @@ import '../../../core/theme/wiltkey_tokens.dart';
 import '../../../core/theme/wiltkey_components.dart';
 import '../../chat/presentation/chat_screen.dart';
 import '../../chat/presentation/group_chat_screen.dart';
+import 'events_screen.dart';
 import '../../chat/presentation/widgets/nuke_confirm_dialog.dart';
-import '../../groups/presentation/create_group_screen.dart';
-import '../../groups/presentation/group_search_screen.dart';
 import '../../proximity/presentation/pairing_screen.dart';
 import '../../shell/presentation/app_shell.dart';
 
@@ -303,41 +302,17 @@ class _ChatsTabState extends State<ChatsTab> {
                   tooltip: l10n.settingsDebugTitle,
                   onPressed: () => showDebugConsole(context),
                 ),
-              PopupMenuButton<String>(
-                icon: Icon(Icons.add, color: t.action, size: 22),
-                color: t.surface,
-                tooltip: 'New',
-                onSelected: (v) {
-                  if (v == 'create') {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => CreateGroupScreen()),
-                    );
-                  } else if (v == 'join') {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const GroupSearchScreen(),
-                      ),
-                    );
-                  } else if (v == 'pair') {
-                    AppShell.of(context).selectTab(ShellTab.pair);
-                  }
-                },
-                itemBuilder: (context) => [
-                  PopupMenuItem(
-                    value: 'pair',
-                    child: Text(l10n.chatsPopupPair, style: t.body),
-                  ),
-                  PopupMenuItem(
-                    value: 'create',
-                    child: Text(l10n.chatsPopupCreateGroup, style: t.body),
-                  ),
-                  PopupMenuItem(
-                    value: 'join',
-                    child: Text(l10n.chatsPopupJoinGroup, style: t.body),
-                  ),
-                ],
+              // Activity feed. Replaced the old "+" (create/join/pair) menu —
+              // the Connect tab now owns all of those. A dot badges unread events.
+              _ActivityBell(
+                unread: _appState.unreadEventCount,
+                color: t.action,
+                badgeColor: t.danger,
+                tooltip: l10n.activityTitle,
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const EventsScreen()),
+                ),
               ),
             ],
           ),
@@ -771,6 +746,56 @@ class _EmptyState extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// The dashboard's activity-feed button: a bell with a small dot when there are
+/// unread events. Replaced the old "+" (create/join/pair) menu — Connect owns those.
+class _ActivityBell extends StatelessWidget {
+  final int unread;
+  final Color color;
+  final Color badgeColor;
+  final String tooltip;
+  final VoidCallback onTap;
+
+  const _ActivityBell({
+    required this.unread,
+    required this.color,
+    required this.badgeColor,
+    required this.tooltip,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      tooltip: tooltip,
+      onPressed: onTap,
+      icon: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Icon(
+            unread > 0 ? Icons.notifications : Icons.notifications_none,
+            color: color,
+            size: 22,
+          ),
+          if (unread > 0)
+            Positioned(
+              right: -1,
+              top: -1,
+              child: Container(
+                width: 9,
+                height: 9,
+                decoration: BoxDecoration(
+                  color: badgeColor,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: context.wk.bg, width: 1.5),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

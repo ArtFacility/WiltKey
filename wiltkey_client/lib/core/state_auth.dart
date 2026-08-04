@@ -158,6 +158,7 @@ extension AppStateAuth on AppState {
     // Initialize WiltkeyDatabase
     await WiltkeyDatabase.instance.init();
     contacts = await WiltkeyDatabase.instance.getAllContacts();
+    await loadEvents(); // hydrate the activity feed + its unread badge
     log(
       '[Load] ${contacts.length} contact(s): '
       '${contacts.map((c) => "${c.id}:${c.keyHash.substring(0, c.keyHash.length >= 8 ? 8 : c.keyHash.length)}").join(", ")}',

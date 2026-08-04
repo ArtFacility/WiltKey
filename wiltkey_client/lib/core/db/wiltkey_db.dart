@@ -43,7 +43,7 @@ class WiltkeyDatabase {
     } catch (_) {}
     _db = await openDatabase(
       path,
-      version: 15,
+      version: 16,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -165,6 +165,12 @@ class WiltkeyDatabase {
       await db.execute(
         'ALTER TABLE contacts ADD COLUMN group_recharge_pending INTEGER DEFAULT 0',
       );
+    }
+
+    // v16: activity-feed event log. Upgrading devices only run _onUpgrade, so
+    // the table must be created here too (fresh installs get it from _onCreate).
+    if (oldVersion < 16) {
+      await db.execute(_createEventsTableSql);
     }
   }
 
@@ -294,7 +300,26 @@ class WiltkeyDatabase {
     await db.execute(
       'CREATE INDEX IF NOT EXISTS idx_messages_chat_time ON messages(chat_id, timestamp)',
     );
+
+    // 6. Activity feed events (see AppEvent / AppStateEvents).
+    await db.execute(_createEventsTableSql);
   }
+
+  // Activity-feed event log. `chat_key` (nullable) deep-links to a chat when it
+  // still exists; `read` drives the bell badge. Kept as its own table (not
+  // messages) because some events — a nuke that deleted the chat — have no chat
+  // to live in. Defined once so `_onCreate` and the v16 upgrade stay identical.
+  static const String _createEventsTableSql = '''
+      CREATE TABLE IF NOT EXISTS events (
+        id TEXT PRIMARY KEY,
+        type TEXT,
+        title TEXT,
+        body TEXT,
+        chat_key TEXT,
+        timestamp INTEGER,
+        read INTEGER DEFAULT 0
+      )
+    ''';
 
   // ---------------------------------------------------------------------------
   // Contacts CRUD
@@ -1529,6 +1554,56 @@ class WiltkeyDatabase {
   }
 
   // ---------------------------------------------------------------------------
+  // Activity feed events
+  // ---------------------------------------------------------------------------
+
+  Future<void> insertEvent(Map<String, Object?> row) async {
+    final db = await _database;
+    await db.insert(
+      'events',
+      row,
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  /// Newest-first, capped so the log can't grow unbounded.
+  Future<List<Map<String, dynamic>>> getEvents({int limit = 200}) async {
+    final db = await _database;
+    return db.query('events', orderBy: 'timestamp DESC', limit: limit);
+  }
+
+  Future<int> getUnreadEventCount() async {
+    final db = await _database;
+    final r = await db.rawQuery('SELECT COUNT(*) AS c FROM events WHERE read = 0');
+    return Sqflite.firstIntValue(r) ?? 0;
+  }
+
+  Future<void> markAllEventsRead() async {
+    final db = await _database;
+    await db.update('events', {'read': 1}, where: 'read = 0');
+  }
+
+  Future<void> deleteEventsForChat(String chatKey) async {
+    final db = await _database;
+    await db.delete('events', where: 'chat_key = ?', whereArgs: [chatKey]);
+  }
+
+  Future<void> clearEvents() async {
+    final db = await _database;
+    await db.delete('events');
+  }
+
+  /// Trim the log to the newest [keep] rows so it stays bounded over time.
+  Future<void> pruneEvents({int keep = 200}) async {
+    final db = await _database;
+    await db.rawDelete(
+      'DELETE FROM events WHERE id NOT IN '
+      '(SELECT id FROM events ORDER BY timestamp DESC LIMIT ?)',
+      [keep],
+    );
+  }
+
+  // ---------------------------------------------------------------------------
   // Cleanup
   // ---------------------------------------------------------------------------
 
@@ -1540,6 +1615,10 @@ class WiltkeyDatabase {
       await txn.delete('group_info');
       await txn.delete('messages');
       await txn.delete('contacts');
+      // The activity feed is plaintext ("a chat was destroyed", "host recharged
+      // group X") — a nuke must wipe it too, or the new identity inherits a
+      // metadata trail the rest of the app is built to avoid.
+      await txn.delete('events');
     });
     // Purge every offloaded body file (self-destruct leaves no media behind).
     try {

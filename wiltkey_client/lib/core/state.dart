@@ -38,6 +38,7 @@ part 'state_reactions.dart';
 part 'state_screenshot.dart';
 part 'state_wilting.dart';
 part 'state_downloads.dart';
+part 'state_events.dart';
 
 enum AppStatus { normal, nuked }
 
@@ -95,6 +96,10 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   AppStatus status = AppStatus.normal;
   List<Contact> contacts = [];
   Map<String, List<ChatMessage>> messages = {};
+
+  // Activity feed — see AppStateEvents (state_events.dart). Loaded on startup,
+  // newest-first; the bell badge reads [unreadEventCount].
+  List<AppEvent> events = [];
 
   // The last-selected chat. Stays set even after you leave the chat screen —
   // it's the routing anchor for "keep the open chat's Contact object fresh" on

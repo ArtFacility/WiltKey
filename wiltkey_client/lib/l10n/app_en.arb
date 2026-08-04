@@ -533,6 +533,15 @@
   "groupRechargeConfirm": "Recharge",
   "groupRechargeDone": "Group recharged — meet members again to re-add them.",
   "groupRechargeNeededComposer": "Host recharged this group — meet them again to rejoin",
+  "activityTitle": "Activity",
+  "activityEmpty": "No activity yet. Events like a chat being destroyed will show up here.",
+  "activityClear": "Clear",
+  "activityClearConfirmTitle": "Clear activity?",
+  "activityClearConfirmBody": "This removes all activity entries from this device. It can't be undone.",
+  "eventNukeReceivedTitle": "Chat destroyed",
+  "eventNukeReceivedBody": "A secure chat was destroyed.",
+  "eventGroupNukedTitle": "Group destroyed",
+  "eventGroupNukedBody": "A secure group was destroyed.",
   "groupSyncingFromMember": "Syncing details and messages from {name}...",
   "@groupSyncingFromMember": {
     "placeholders": {

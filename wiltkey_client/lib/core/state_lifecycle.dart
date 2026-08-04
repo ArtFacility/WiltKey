@@ -129,6 +129,21 @@ extension AppStateLifecycle on AppState {
       } catch (e) {
         log('Error deleting keystream file: $e');
       }
+
+      // Activity feed: a chat destroyed by the OTHER side is an orphan event —
+      // there's no chat left to hold a note, so it belongs in the feed. Kept
+      // generic (no peer/group name — user choice); the UI localizes by type.
+      // Also drop any stale feed rows that deep-linked to this now-dead chat.
+      await purgeEventsForChat(contactKeyHash);
+      if (receivedFromPeer) {
+        await logEvent(
+          type: isGroup ? 'group_nuked' : 'nuke_received',
+          title: isGroup ? 'Group destroyed' : 'Chat destroyed',
+          body: isGroup
+              ? 'A secure group was destroyed.'
+              : 'A secure chat was destroyed.',
+        );
+      }
     } else {
       // No contact row (e.g. it was already archived/removed but a peer nuke or a
       // retry arrived). We don't know the kind, so best-effort delete both pad

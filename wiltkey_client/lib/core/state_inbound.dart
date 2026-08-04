@@ -1319,7 +1319,14 @@ extension AppStateInbound on AppState {
           'senderId': msg.senderId == 'me' ? userId : msg.senderId,
           'text': msg.text,
           'contentType': msg.contentType,
-          'timestamp': msg.timestamp.toIso8601String(),
+          // Send-time as epoch millis (timezone-independent) so a resynced
+          // message keeps its true instant across senders in different zones —
+          // matches the live path's 'ts'. The old ISO string is kept UTC-marked
+          // for forward-compat with clients that still read 'timestamp'
+          // (a bare local ISO string was the tz bug: it got reparsed in the
+          // RECEIVER's zone, shifting the instant and mis-sorting the message).
+          'ts': msg.timestamp.millisecondsSinceEpoch,
+          'timestamp': msg.timestamp.toUtc().toIso8601String(),
           'isSentByMe': msg.isSentByMe,
           'offset': msg.offset,
           'allowSave': msg.allowSave,
@@ -1429,7 +1436,13 @@ extension AppStateInbound on AppState {
         final String ciphertextB64 = m['text'] as String;
         final String contentType = m['contentType'] as String;
         final String innerSenderId = m['senderId'] as String;
-        final DateTime timestamp = DateTime.parse(m['timestamp'] as String);
+        // Prefer the timezone-independent epoch (new clients). Fall back to the
+        // ISO string, forcing UTC so a legacy tz-less string from an old client
+        // isn't reinterpreted in our local zone (the ordering/display bug).
+        final int? tsMillis = (m['ts'] as num?)?.toInt();
+        final DateTime timestamp = tsMillis != null
+            ? DateTime.fromMillisecondsSinceEpoch(tsMillis)
+            : DateTime.parse(m['timestamp'] as String).toLocal();
         final bool isSentByMe = m['isSentByMe'] as bool;
         final bool allowSave = m['allowSave'] as bool? ?? false;
         final bool ephemeral = m['ephemeral'] as bool? ?? false;

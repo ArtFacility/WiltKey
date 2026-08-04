@@ -1122,6 +1122,20 @@ extension AppStateGroups on AppState {
       }
 
       groupMembersMetadata[group.id] = list;
+
+      // Keep the dashboard's member count in sync with the actual roster (host +
+      // every known member). It was previously only set at join/registration
+      // time, so a host that learned members through metadata/lane-headers could
+      // under-report — e.g. show 3 for a 6-person group while the members sheet
+      // (built from this same roster) showed 6. Deriving it here makes the two
+      // agree and self-heals on every refresh. Idempotent via the guard.
+      final gi = contacts.indexWhere((c) => c.keyHash == groupId);
+      if (gi != -1 && contacts[gi].memberCount != list.length) {
+        contacts[gi] = contacts[gi].copyWith(memberCount: list.length);
+        if (activeContact?.keyHash == groupId) activeContact = contacts[gi];
+        await WiltkeyDatabase.instance.upsertContact(contacts[gi]);
+      }
+
       notifyListeners();
     } catch (e) {
       log('[Group Error] Failed to update members metadata: $e');

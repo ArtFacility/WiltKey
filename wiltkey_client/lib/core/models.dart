@@ -347,6 +347,51 @@ class Contact {
   }
 }
 
+/// One entry in the global activity feed (see AppStateEvents). Records things
+/// that happened when the user wasn't looking or that have no chat to live in
+/// (a nuke that deleted the chat). Stored plaintext locally — wiped by nuke.
+class AppEvent {
+  final String id;
+  final String type; // e.g. 'nuke_received', 'group_recharged', 'kicked'
+  final String title;
+  final String body;
+  final String? chatKey; // deep-link target keyHash, if the chat still exists
+  final DateTime timestamp;
+  bool read;
+
+  AppEvent({
+    required this.id,
+    required this.type,
+    required this.title,
+    required this.body,
+    this.chatKey,
+    required this.timestamp,
+    this.read = false,
+  });
+
+  Map<String, Object?> toRow() => {
+    'id': id,
+    'type': type,
+    'title': title,
+    'body': body,
+    'chat_key': chatKey,
+    'timestamp': timestamp.millisecondsSinceEpoch,
+    'read': read ? 1 : 0,
+  };
+
+  factory AppEvent.fromRow(Map<String, dynamic> r) => AppEvent(
+    id: r['id'] as String,
+    type: r['type'] as String? ?? '',
+    title: r['title'] as String? ?? '',
+    body: r['body'] as String? ?? '',
+    chatKey: r['chat_key'] as String?,
+    timestamp: DateTime.fromMillisecondsSinceEpoch(
+      (r['timestamp'] as int?) ?? 0,
+    ),
+    read: (r['read'] as int? ?? 0) == 1,
+  );
+}
+
 class ChatMessage {
   final String id;
   final String senderId;
