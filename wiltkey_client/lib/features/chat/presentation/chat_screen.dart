@@ -22,6 +22,7 @@ import 'widgets/message_bubble.dart';
 import 'widgets/emoji_autocomplete_bar.dart';
 import 'widgets/emoji_picker_panel.dart';
 import 'widgets/diagnostics_dialog.dart';
+import 'widgets/nuke_confirm_dialog.dart';
 import 'widgets/failed_actions_dialog.dart';
 import 'widgets/compression_dialog.dart';
 import 'widgets/debug_console_sheet.dart';
@@ -129,10 +130,30 @@ class _ChatScreenState extends State<ChatScreen>
     }
 
     initVoiceRecording();
+
+    // Time Wilt live countdown: tick the header every second, but only inside
+    // the last 10 minutes (no point re-rendering hourly). When the timer hits
+    // zero while the chat is open+foreground (the resume sweep won't fire),
+    // archive it live so it flips to read-only on the spot.
+    _wiltTicker = Timer.periodic(const Duration(seconds: 1), (_) {
+      final c = _appState.activeContact;
+      if (!mounted || c == null || !c.isTimeWilt || c.isArchived) return;
+      final exp = c.wiltExpiresAt;
+      if (exp == null) return;
+      final left = exp.difference(DateTime.now());
+      if (left.inSeconds <= 0) {
+        _appState.sweepTimeWiltChats();
+      } else if (left.inMinutes < 10) {
+        setState(() {});
+      }
+    });
   }
+
+  Timer? _wiltTicker;
 
   @override
   void dispose() {
+    _wiltTicker?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     // Mark everything seen during this session read, so leaving the chat clears
     // its unread badge on the list.
@@ -429,7 +450,9 @@ class _ChatScreenState extends State<ChatScreen>
     final String contentType = choice.hidden ? 'image_hidden' : 'image';
 
     final l10n = AppLocalizations.of(context)!;
-    if (byteCost > contact.remainingBufferBytes) {
+    // Time Wilt has no byte budget — skip the remaining-budget gate (the tier
+    // payload cap below still applies). Byte budget keeps the check.
+    if (!contact.isTimeWilt && byteCost > contact.remainingBufferBytes) {
       _errorSnack(
         l10n.chatImageTooLargeSnackBar(
           AppState.formatBytes(byteCost),
@@ -675,10 +698,18 @@ class _ChatScreenState extends State<ChatScreen>
                             overflow: TextOverflow.ellipsis,
                           ),
                           Text(
-                            l10n.chatTapForDetails,
+                            contact.isTimeWilt
+                                ? (contact.isArchived
+                                      ? (t.uppercaseLabels
+                                            ? 'WILTED · READ-ONLY'
+                                            : 'Wilted · read-only')
+                                      : 'Wilts in ${contact.timeWiltCountdownLabel}')
+                                : l10n.chatTapForDetails,
                             style: t.dataMono.copyWith(
                               fontSize: 9,
-                              color: t.textTertiary,
+                              color: contact.isTimeWilt && !contact.isArchived
+                                  ? t.positive
+                                  : t.textTertiary,
                             ),
                           ),
                         ],
@@ -694,17 +725,27 @@ class _ChatScreenState extends State<ChatScreen>
                       contact,
                       _appState.userId,
                     ),
+                    // Time Wilt reuses the single gauge for time-remaining (the
+                    // countdown lives in the subtitle above, so the gauge stays
+                    // unstacked — no overflow on tall vertical gauges).
                     child: context.wkc.budgetIndicator(
-                      ourFraction: currentPercent,
-                      theirFraction: contact.getTheirChargePercentage(
-                        _appState.userId,
-                      ),
-                      isWilted: isWilted,
-                      split: true,
+                      ourFraction: contact.isTimeWilt
+                          ? contact.timeWiltRemainingFraction
+                          : currentPercent,
+                      theirFraction: contact.isTimeWilt
+                          ? 0
+                          : contact.getTheirChargePercentage(_appState.userId),
+                      isWilted:
+                          contact.isTimeWilt ? contact.isArchived : isWilted,
+                      split: !contact.isTimeWilt,
                       variant: BudgetIndicatorVariant.chatHeader,
-                      semanticLabel: l10n.chatRemainingLabel(
-                        AppState.formatBytes(contact.remainingBufferBytes),
-                      ),
+                      semanticLabel: contact.isTimeWilt
+                          ? contact.timeWiltCountdownLabel
+                          : l10n.chatRemainingLabel(
+                              AppState.formatBytes(
+                                contact.remainingBufferBytes,
+                              ),
+                            ),
                     ),
                   ),
                 ],
@@ -886,8 +927,8 @@ class _ChatScreenState extends State<ChatScreen>
                         horizontal: 12,
                         vertical: 8,
                       ),
-                      child: isWilted
-                          ? _buildLockedComposer(t)
+                      child: (isWilted || contact.isArchived)
+                          ? _buildLockedComposer(t, contact)
                           : _buildComposer(t, contact, maxFormatted),
                     ),
                   ),
@@ -900,29 +941,75 @@ class _ChatScreenState extends State<ChatScreen>
     );
   }
 
-  Widget _buildLockedComposer(WiltkeyTokens t) {
+  Widget _buildLockedComposer(WiltkeyTokens t, Contact contact) {
     final l10n = AppLocalizations.of(context)!;
-    return Container(
-      height: 48,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: t.action.withValues(alpha: 0.05),
-        border: Border.all(color: t.action.withValues(alpha: 0.25), width: 1),
-        borderRadius: BorderRadius.circular(t.radiusControl),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.lock_outline, color: t.action, size: 14),
+    // A wilted/expired (archived) chat is the "done with this person" moment —
+    // offer the mutual destroy right in the greyed input bar. A byte-budget chat
+    // that's merely out of budget (isWilted, not archived) keeps just the lock.
+    final bool archived = contact.isArchived;
+    final String label = archived && contact.isTimeWilt
+        ? (t.uppercaseLabels ? 'WILTED · READ-ONLY' : 'Wilted · read-only')
+        : (t.uppercaseLabels
+              ? l10n.chatLockedLabel.toUpperCase()
+              : l10n.chatLockedLabel);
+    return Row(
+      children: [
+        Expanded(
+          child: Container(
+            height: 48,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: t.action.withValues(alpha: 0.05),
+              border: Border.all(
+                color: t.action.withValues(alpha: 0.25),
+                width: 1,
+              ),
+              borderRadius: BorderRadius.circular(t.radiusControl),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.lock_outline, color: t.action, size: 14),
+                const SizedBox(width: 8),
+                Text(
+                  label,
+                  style: t.dataMono.copyWith(
+                    color: t.action,
+                    letterSpacing: 0.6,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (archived) ...[
           const SizedBox(width: 8),
-          Text(
-            t.uppercaseLabels
-                ? l10n.chatLockedLabel.toUpperCase()
-                : l10n.chatLockedLabel,
-            style: t.dataMono.copyWith(color: t.action, letterSpacing: 0.6),
+          SizedBox(
+            height: 48,
+            child: ElevatedButton.icon(
+              // Nuke for both: destroys this chat on BOTH devices (nukeContact
+              // sends NUKE_RECIPIENT for 1:1). Pop first so we're off the screen
+              // before the active contact is removed.
+              onPressed: () => NukeConfirmDialog.show(context, () {
+                Navigator.of(context).maybePop();
+                _appState.nukeContact(
+                  contact.keyHash,
+                  receivedFromPeer: false,
+                );
+              }),
+              icon: const Icon(Icons.flash_on, size: 14),
+              label: Text(t.uppercaseLabels ? 'NUKE BOTH' : 'Nuke both'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: t.danger,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(t.radiusControl),
+                ),
+              ),
+            ),
           ),
         ],
-      ),
+      ],
     );
   }
 
@@ -1057,22 +1144,24 @@ class _ChatScreenState extends State<ChatScreen>
             onSendSticker: _handleSendSticker,
           ),
         const SizedBox(height: 6),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              l10n.chatCostIndicator(
-                cost > 0 ? AppState.formatBytes(cost) : "0 B",
+        // Time Wilt has no byte budget — hide the cost/remaining footer entirely.
+        if (!contact.isTimeWilt)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                l10n.chatCostIndicator(
+                  cost > 0 ? AppState.formatBytes(cost) : "0 B",
+                ),
+                style: t.dataMono.copyWith(
+                  color: overBudget ? t.danger : t.textTertiary,
+                ),
               ),
-              style: t.dataMono.copyWith(
-                color: overBudget ? t.danger : t.textTertiary,
+              Text(
+                '${l10n.chatRemainingLabel(AppState.formatBytes(max(0, contact.remainingBufferBytes - cost)))} / $maxFormatted',
+                style: t.dataMono.copyWith(color: t.textTertiary),
               ),
-            ),
-            Text(
-              '${l10n.chatRemainingLabel(AppState.formatBytes(max(0, contact.remainingBufferBytes - cost)))} / $maxFormatted',
-              style: t.dataMono.copyWith(color: t.textTertiary),
-            ),
-          ],
+            ],
         ),
       ],
     );

@@ -30,7 +30,10 @@ extension AppStateEmoji on AppState {
     if (err != null) return err;
     final budget = contact.isGroup
         ? AppState.infoLaneSize
-        : ChatMetaStore.budgetFor(contact.maxBufferBytes);
+        : ChatMetaStore.budgetFor(
+            contact.maxBufferBytes,
+            timeWilt: contact.isTimeWilt,
+          );
     await CustomEmojiStore.add(contact.keyHash, emoji, maxBytes: budget);
     notifyListeners();
     return null;

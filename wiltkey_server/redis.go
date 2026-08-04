@@ -277,6 +277,80 @@ func (r *RedisClient) GetActiveQueueCount(recipientID string) (int64, error) {
 	return r.rdb.ZCount(ctx, key, fmt.Sprintf("%f", now), "+inf").Result()
 }
 
+// notifiableContentTypes are the queued content types that represent an actual
+// user-visible message — the only ones that should raise a "new message" alert.
+// Everything else (delivery receipts, group metadata/profile broadcasts,
+// reactions, lane headers, screenshot/recharge control frames, …) is plumbing
+// that a recipient shouldn't be pinged for. Mirrors the client's
+// _notifyContentTypes (background_handler.dart). Group traffic all rides as
+// "group_message" (the media type is inside the encrypted envelope).
+var notifiableContentTypes = map[string]bool{
+	"text":          true,
+	"image":         true,
+	"voice":         true,
+	"group_message": true,
+}
+
+// isNotifiable reports whether a queued content type should raise a "new
+// message" alert. An empty/unknown type counts as notifiable so a legacy frame
+// (or one from an older client that omits content_type) is never silently
+// dropped — every real control frame sets an explicit, non-notifiable type.
+func isNotifiable(contentType string) bool {
+	return contentType == "" || notifiableContentTypes[contentType]
+}
+
+// GetNotifiableQueueCount counts only non-expired queued items whose content
+// type is a real user message (see notifiableContentTypes). The passive
+// queue/status poll uses this instead of the raw count so an offline recipient
+// isn't alerted for a queue that holds nothing but control frames — the cause of
+// phantom "new message" notifications, especially in busy groups.
+func (r *RedisClient) GetNotifiableQueueCount(recipientID string) (int64, error) {
+	if r.isMemory {
+		r.mu.RLock()
+		defer r.mu.RUnlock()
+
+		q, exists := r.memoryQueue[recipientID]
+		if !exists {
+			return 0, nil
+		}
+
+		now := time.Now()
+		var count int64
+		for _, item := range q {
+			if item.expires.After(now) && isNotifiable(item.contentType) {
+				count++
+			}
+		}
+		return count, nil
+	}
+
+	key := fmt.Sprintf("queue:%s", recipientID)
+	now := float64(time.Now().Unix())
+	// Read active entries (without deleting — this is a status probe) and count
+	// the notifiable ones by parsing each entry's stored content_type.
+	entries, err := r.rdb.ZRangeByScore(ctx, key, &redis.ZRangeBy{
+		Min: fmt.Sprintf("%f", now),
+		Max: "+inf",
+	}).Result()
+	if err != nil {
+		return 0, err
+	}
+	var count int64
+	for _, raw := range entries {
+		var entry map[string]string
+		if err := json.Unmarshal([]byte(raw), &entry); err != nil {
+			// Legacy raw-envelope entries carry no content_type; count them as
+			// notifiable so an old queued message is never silently dropped.
+			count++
+			continue
+		}
+		if isNotifiable(entry["content_type"]) {
+			count++
+		}
+	}
+	return count, nil
+}
+
 // nukeBlockTTL bounds how long a nuke can hold a recipient's queue blocked. An
 // online victim auto-ACKs and unblocks immediately; this TTL only bites an OFFLINE
 // victim. Shortened from 7 days to 24h so a malicious nuke can't deny delivery for

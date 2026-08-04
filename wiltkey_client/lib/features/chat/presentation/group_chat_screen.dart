@@ -852,6 +852,10 @@ class _GroupChatScreenState extends State<GroupChatScreen>
                           );
                         }
 
+                        if (message.contentType == 'screenshot_request') {
+                          return _buildScreenshotRequest(t, contact, message);
+                        }
+
                         final bool isSystem = message.senderId == 'system';
                         if (isSystem) {
                           return Center(
@@ -1129,13 +1133,23 @@ class _GroupChatScreenState extends State<GroupChatScreen>
                                   message.isPending
                                       ? Opacity(opacity: 0.6, child: bubble)
                                       : GestureDetector(
-                                          onLongPress: () => showReactionPicker(
-                                            context,
-                                            appState: _appState,
-                                            contact: contact,
-                                            message: message,
-                                            emojiMap: emojiMap,
-                                          ),
+                                          onLongPress: () {
+                                            // Drop composer focus first so
+                                            // dismissing the modal reaction sheet
+                                            // doesn't refocus the text field,
+                                            // reopen the keyboard, and yank the
+                                            // list to the bottom (same fix as the
+                                            // 1:1 MessageBubble).
+                                            FocusManager.instance.primaryFocus
+                                                ?.unfocus();
+                                            showReactionPicker(
+                                              context,
+                                              appState: _appState,
+                                              contact: contact,
+                                              message: message,
+                                              emojiMap: emojiMap,
+                                            );
+                                          },
                                           child: bubble,
                                         ),
                                   ReactionsRow(
@@ -1191,7 +1205,9 @@ class _GroupChatScreenState extends State<GroupChatScreen>
                         horizontal: 12,
                         vertical: 8,
                       ),
-                      child: isWilted
+                      child: (contact.groupRechargePending && !contact.isHost)
+                          ? _buildRechargeNeededComposer(t)
+                          : isWilted
                           ? (!contact.isHost
                                 ? _buildRefillComposer(t, contact)
                                 : _buildLockedComposer(t))
@@ -1289,6 +1305,139 @@ class _GroupChatScreenState extends State<GroupChatScreen>
     );
   }
 
+  /// In-history screenshot-request voting card for a group. Mirrors the 1-on-1
+  /// [MessageBubble] card so recipients see an Allow/Deny prompt (majority rules,
+  /// tallied by the requester) instead of the raw control JSON as a chat bubble.
+  Widget _buildScreenshotRequest(
+    WiltkeyTokens t,
+    Contact contact,
+    ChatMessage message,
+  ) {
+    final l10n = AppLocalizations.of(context)!;
+    Map<String, dynamic> p = {};
+    try {
+      p = jsonDecode(message.text) as Map<String, dynamic>;
+    } catch (_) {}
+    final rawName = (p['requester_name'] as String?)?.trim();
+    final name = (rawName == null || rawName.isEmpty) ? contact.name : rawName;
+    final status = message.wilted
+        ? 'expired'
+        : (p['status'] as String? ?? 'pending');
+
+    // Resolved / expired → a compact muted status row.
+    if (status != 'pending') {
+      late final IconData icon;
+      late final String label;
+      late final Color color;
+      switch (status) {
+        case 'accepted':
+          icon = Icons.check_circle_outline;
+          color = t.action;
+          label = l10n.screenshotRequestAllowed;
+          break;
+        case 'declined':
+          icon = Icons.cancel_outlined;
+          color = t.textTertiary;
+          label = l10n.screenshotRequestDeclined;
+          break;
+        default: // expired
+          icon = Icons.timer_off_outlined;
+          color = t.textTertiary;
+          label = l10n.screenshotRequestExpired;
+      }
+      return Container(
+        margin: const EdgeInsets.only(bottom: 16, top: 4),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 15, color: color),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                label,
+                style: t.dataMono.copyWith(fontSize: 11.5, color: color),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16, top: 4),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: t.action.withValues(alpha: 0.06),
+        border: Border.all(color: t.action.withValues(alpha: 0.3), width: 1),
+        borderRadius: BorderRadius.circular(t.radiusControl),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.screenshot_monitor_outlined, size: 16, color: t.action),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  l10n.screenshotRequestInline(name),
+                  style: t.body.copyWith(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (message.openedAt != null && message.expiresAt != null) ...[
+            const SizedBox(height: 7),
+            _GroupWiltCountdownBar(
+              openedAt: message.openedAt!,
+              expiresAt: message.expiresAt!,
+              color: t.action,
+            ),
+          ],
+          const SizedBox(height: 9),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              OutlinedButton(
+                onPressed: () =>
+                    _appState.respondToScreenshotCard(contact, message, false),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: t.textSecondary,
+                  side: BorderSide(color: t.border),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(t.radiusControl),
+                  ),
+                ),
+                child: Text(l10n.pairRequestReject),
+              ),
+              const SizedBox(width: 8),
+              ElevatedButton(
+                onPressed: () =>
+                    _appState.respondToScreenshotCard(contact, message, true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: t.action,
+                  foregroundColor: t.onAction,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(t.radiusControl),
+                  ),
+                ),
+                child: Text(l10n.pairRequestAccept),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildLockedComposer(WiltkeyTokens t) {
     final l10n = AppLocalizations.of(context)!;
     return Container(
@@ -1307,6 +1456,38 @@ class _GroupChatScreenState extends State<GroupChatScreen>
             ? l10n.groupLaneLocked.toUpperCase()
             : l10n.groupLaneLocked,
         style: t.dataMono.copyWith(color: t.budgetWilted, letterSpacing: 0.6),
+      ),
+    );
+  }
+
+  /// Shown to a member whose group the host recharged: sending is impossible
+  /// (their seed/lane is dead), so the composer becomes a "meet the host again"
+  /// prompt instead of the byte-depleted refill composer.
+  Widget _buildRechargeNeededComposer(WiltkeyTokens t) {
+    final l10n = AppLocalizations.of(context)!;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: t.action.withValues(alpha: 0.06),
+        border: Border.all(color: t.action.withValues(alpha: 0.3), width: 1),
+        borderRadius: BorderRadius.circular(t.radiusControl),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.autorenew, size: 16, color: t.action),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              t.uppercaseLabels
+                  ? l10n.groupRechargeNeededComposer.toUpperCase()
+                  : l10n.groupRechargeNeededComposer,
+              textAlign: TextAlign.center,
+              style: t.dataMono.copyWith(color: t.action, letterSpacing: 0.4),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1562,14 +1743,10 @@ class _GroupChatScreenState extends State<GroupChatScreen>
             ElevatedButton(
               onPressed: () {
                 Navigator.pop(context);
-                setState(() {
-                  contact.memberKeyHashes.remove(memberKeyHash);
-                  _appState.notifyMessageReceived();
-                  _appState.log(
-                    '[Group] Removed member $memberKeyHash from group ${contact.name}',
-                  );
-                  _appState.broadcastGroupMetadataUpdate(contact);
-                });
+                // Free the lane + drop from the delivery roster, but keep the
+                // member's profile so old history still attributes to them
+                // (they can only return via a fresh invite). See kickMember.
+                _appState.kickMember(contact, memberKeyHash);
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: t.danger,
@@ -1799,6 +1976,31 @@ class _GroupChatScreenState extends State<GroupChatScreen>
                         ],
                       ),
                     ),
+                    // Host-only "recharge": start a fresh secure enclave when the
+                    // group's budget is spent. Everyone keeps their history but
+                    // must meet the host again to rejoin.
+                    if (contact.isHost)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            Navigator.pop(sheetContext);
+                            _confirmRechargeGroup(contact);
+                          },
+                          icon: const Icon(Icons.autorenew, size: 16),
+                          label: Text(l10n.groupRechargeButton),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: t.action,
+                            side: BorderSide(color: t.action, width: 1),
+                            minimumSize: const Size.fromHeight(44),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(
+                                t.radiusControl,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
                   ],
                 );
               },
@@ -1806,6 +2008,61 @@ class _GroupChatScreenState extends State<GroupChatScreen>
           ),
         );
       },
+    );
+  }
+
+  /// Confirm + run a host recharge (see [AppState.rechargeGroup]). Warns that
+  /// every member must be re-met before the group is usable again.
+  void _confirmRechargeGroup(Contact contact) {
+    final t = context.wk;
+    final l10n = AppLocalizations.of(context)!;
+    showDialog(
+      context: context,
+      builder: (dctx) => AlertDialog(
+        backgroundColor: t.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(t.radiusCard),
+          side: BorderSide(color: t.action, width: 1.5),
+        ),
+        title: Text(
+          t.uppercaseLabels
+              ? l10n.groupRechargeTitle.toUpperCase()
+              : l10n.groupRechargeTitle,
+          style: t.screenTitle.copyWith(color: t.action, fontSize: 16),
+        ),
+        content: Text(l10n.groupRechargeBody, style: t.bodySecondary),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dctx),
+            child: Text(
+              l10n.commonCancel,
+              style: TextStyle(color: t.textSecondary),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(dctx);
+              await _appState.rechargeGroup(contact);
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(l10n.groupRechargeDone),
+                    backgroundColor: t.action,
+                  ),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: t.action,
+              foregroundColor: t.onAction,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(t.radiusControl),
+              ),
+            ),
+            child: Text(l10n.groupRechargeConfirm),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1823,9 +2080,13 @@ class _GroupChatScreenState extends State<GroupChatScreen>
     final double percent = maxBytes > 0
         ? (remaining / maxBytes).clamp(0.0, 1.0)
         : 0.0;
-    final bool wilted = remaining <= 0;
     final bool isSelf = m['isSelf'] ?? false;
     final bool isMemberHost = m['isHost'] ?? false;
+    // Profile kept for attribution but no active lane (never joined this seed,
+    // or awaiting a re-meet after the host recharged). Rendered greyed with an
+    // Invite (re-meet) affordance rather than a byte readout.
+    final bool notYetMet = m['notYetMet'] == true;
+    final bool wilted = !notYetMet && remaining <= 0;
 
     final String? cachedImage =
         _appState.groupProfilesCache[contact.id]?[keyHash]?['profile_image'];
@@ -1895,58 +2156,115 @@ class _GroupChatScreenState extends State<GroupChatScreen>
                   ],
                 ),
               ),
-              SizedBox(
-                width: 36,
-                child: context.wkc.budgetIndicator(
-                  ourFraction: percent,
-                  isWilted: wilted,
-                  variant: BudgetIndicatorVariant.listRow,
-                  semanticLabel: l10n.chatRemainingLabel(
-                    AppState.formatBytes(remaining),
+              if (notYetMet)
+                Flexible(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.person_off_outlined,
+                        size: 15,
+                        color: t.textTertiary,
+                      ),
+                      const SizedBox(width: 5),
+                      Flexible(
+                        child: Text(
+                          t.uppercaseLabels
+                              ? l10n.groupNotYetMet.toUpperCase()
+                              : l10n.groupNotYetMet,
+                          style: t.dataMono.copyWith(
+                            color: t.textTertiary,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              else ...[
+                SizedBox(
+                  width: 36,
+                  child: context.wkc.budgetIndicator(
+                    ourFraction: percent,
+                    isWilted: wilted,
+                    variant: BudgetIndicatorVariant.listRow,
+                    semanticLabel: l10n.chatRemainingLabel(
+                      AppState.formatBytes(remaining),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                wilted
-                    ? (t.uppercaseLabels
-                          ? l10n.groupDepleted.toUpperCase()
-                          : l10n.groupDepleted)
-                    : AppState.formatBytes(remaining),
-                style: t.dataMono.copyWith(
-                  color: wilted ? t.budgetWilted : t.textSecondary,
-                  fontWeight: FontWeight.bold,
+                const SizedBox(width: 8),
+                Text(
+                  wilted
+                      ? (t.uppercaseLabels
+                            ? l10n.groupDepleted.toUpperCase()
+                            : l10n.groupDepleted)
+                      : AppState.formatBytes(remaining),
+                  style: t.dataMono.copyWith(
+                    color: wilted ? t.budgetWilted : t.textSecondary,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
           if (!isSelf) ...[
             const SizedBox(height: 12),
             Row(
               children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      _appState.syncGroupFromMember(contact, keyHash);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(l10n.groupSyncingFromMember(name)),
-                          backgroundColor: t.identity,
+                // A not-yet-met member (post-recharge or never joined this seed)
+                // has no lane to sync from — the host's lead action is to Invite
+                // them back in person (the existing group-invite flow re-meets
+                // them: fresh slot on the current seed, history preserved).
+                if (notYetMet && contact.isHost)
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(sheetContext);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) =>
+                                GroupInviteScreen(group: contact),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.person_add_alt, size: 16),
+                      label: Text(l10n.groupInviteMember),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: t.identity,
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size.fromHeight(42),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(t.radiusControl),
                         ),
-                      );
-                    },
-                    icon: const Icon(Icons.sync, size: 16),
-                    label: Text(l10n.groupSyncStepText),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: t.positive,
-                      foregroundColor: Colors.white,
-                      minimumSize: const Size.fromHeight(42),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(t.radiusControl),
+                      ),
+                    ),
+                  )
+                else if (!notYetMet)
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        _appState.syncGroupFromMember(contact, keyHash);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(l10n.groupSyncingFromMember(name)),
+                            backgroundColor: t.identity,
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.sync, size: 16),
+                      label: Text(l10n.groupSyncStepText),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: t.positive,
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size.fromHeight(42),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(t.radiusControl),
+                        ),
                       ),
                     ),
                   ),
-                ),
                 if (contact.isHost && !isMemberHost) ...[
                   const SizedBox(width: 10),
                   Expanded(

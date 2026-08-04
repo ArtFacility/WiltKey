@@ -505,4 +505,109 @@ extension AppStateLifecycle on AppState {
     notifyListeners();
     _persistence.saveState(this);
   }
+
+  /// Creates (or re-pairs) a 1:1 **Time Wilt** chat: a streaming-keystream chat
+  /// with a lifetime instead of a byte budget. Unlike [addOrRechargeContact] it
+  /// writes NO pad file — it persists the seed ([Contact.streamSeedHex]) and
+  /// derives keystream on demand (like groups). [wiltExpiresAt] is the
+  /// negotiated ABSOLUTE expiry (identical on both sides); at that instant the
+  /// archive sweep flips the chat to read-only. The two directions run on
+  /// disjoint, effectively-unbounded lanes so their keystreams never overlap.
+  Future<void> addOrRechargeTimeWiltContact(
+    String name,
+    String relayUrl,
+    String keyHash,
+    String derivedSeed,
+    DateTime wiltExpiresAt, {
+    String shortNick = '',
+    String profileImage = '',
+  }) async {
+    if (status == AppStatus.nuked) {
+      status = AppStatus.normal;
+      log('[State] Cleared nuke status on new Time Wilt contact creation.');
+    }
+
+    // Metadata-channel key (profile/permission updates) — same one-way
+    // derivation as byte-budget 1:1; encrypts chat_info_update but cannot
+    // reconstruct the message keystream.
+    final metaKeyHex = sha256
+        .convert(utf8.encode('$derivedSeed:meta'))
+        .toString();
+    await ChatMetaStore.setKey(keyHash, metaKeyHex);
+
+    // Symmetric role by userId compare (not who initiated the pairing): the
+    // lower id sends from base 0, the higher from one stride up. Both sides
+    // compute the same split, so the lanes are guaranteed disjoint.
+    final bool isInitiator = userId.compareTo(keyHash) < 0;
+    final int stride = WiltkeyOtpService.kWiltLaneStride;
+    final int outBase = isInitiator ? 0 : stride;
+    final int inBase = isInitiator ? stride : 0;
+
+    final int existingIndex = contacts.indexWhere((c) => c.keyHash == keyHash);
+    final String contactId = existingIndex != -1
+        ? contacts[existingIndex].id
+        : _nextContactId(isGroup: false);
+
+    final contact = Contact(
+      id: contactId,
+      name: name,
+      keyHash: keyHash,
+      relayUrl: relayUrl,
+      isPrivateNode: _isUrlPrivate(relayUrl),
+      // No byte budget — Time Wilt is time-bounded, not byte-bounded.
+      maxBufferBytes: 0,
+      remainingBufferBytes: 0,
+      peerRemainingBufferBytes: 0,
+      lastActivity: DateTime.now(),
+      isWilted: false,
+      shortNick: shortNick,
+      profileImageB64: profileImage,
+      outgoingOffset: outBase,
+      outgoingMaxOffset: outBase + stride,
+      incomingOffset: inBase,
+      incomingMaxOffset: inBase + stride,
+      wiltExpiresAt: wiltExpiresAt,
+      // A re-pair is a FRESH lifetime — reset the start so the gauge measures
+      // now→newExpiry (keeping the old start would leave a huge span and a
+      // near-empty gauge even right after re-pairing).
+      wiltCreatedAt: DateTime.now(),
+      streamSeedHex: derivedSeed,
+    );
+
+    if (existingIndex != -1) {
+      contacts[existingIndex] = contact;
+      await WiltkeyDatabase.instance.upsertContact(contact);
+    } else {
+      contacts.add(contact);
+      const note = 'Connected. This is a Time Wilt chat — it wilts to '
+          'read-only when its timer runs out.';
+      final systemMsg = ChatMessage(
+        // 'system' sender → ChatMessage.isSystem true → rendered as a centered
+        // system note (not a left/right bubble). Our custom text doesn't match
+        // the "Connected. Chat session secure." prefix the byte-budget note uses.
+        id: DateTime.now().toString(),
+        senderId: 'system',
+        text: note,
+        timestamp: DateTime.now(),
+        isSentByMe: false,
+        decryptedText: note,
+      );
+      messages[contact.id] = [systemMsg];
+      loadedChats.add(contact.id);
+      hasMoreOlder[contact.id] = false;
+      await WiltkeyDatabase.instance.upsertContact(contact);
+      await WiltkeyDatabase.instance.saveMessage(
+        systemMsg,
+        contact.id,
+        masterKeyHex: masterKeyHex,
+      );
+    }
+
+    await _persistence.setPairingTime(
+      keyHash,
+      DateTime.now().millisecondsSinceEpoch,
+    );
+    notifyListeners();
+    _persistence.saveState(this);
+  }
 }

@@ -86,6 +86,9 @@ class _GroupInviteScreenState extends State<GroupInviteScreen> {
     required String peerName,
     required String peerShortNick,
     required String peerProfileImage,
+    // Group invites never carry a Time Wilt expiry — accepted for signature
+    // compatibility with the shared onIncomingRequest callback, then ignored.
+    int? wiltExpiresMillis,
   }) {
     final t = context.wk;
     showDialog(

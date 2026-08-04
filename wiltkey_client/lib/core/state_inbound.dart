@@ -319,6 +319,11 @@ extension AppStateInbound on AppState {
         return;
       }
 
+      if (contentType == 'group_recharge_needed') {
+        await _handleGroupRechargeNeeded(contact, senderId, envelopeJson!);
+        return;
+      }
+
       if (contentType == 'group_info_update') {
         log('[WebSocket] Received group_info_update from Host: $senderId');
         try {
@@ -602,11 +607,7 @@ extension AppStateInbound on AppState {
         }
 
         final cipherBytes = base64Decode(rawContent);
-        final plainBytes = await WiltkeyOtpService.xorWithKeystream(
-          contact.keyHash,
-          cipherBytes,
-          offset,
-        );
+        final plainBytes = await xorForContact(contact, cipherBytes, offset);
         // The reply target (if any) is framed into the decrypted body, not the
         // envelope — strip it back out here.
         final parsed = ChatMessage.parseReplyBody(utf8.decode(plainBytes));
@@ -699,7 +700,10 @@ extension AppStateInbound on AppState {
         await _pinEmojiPayload(
           contact.keyHash,
           decryptedPlaintext,
-          ChatMetaStore.budgetFor(contact.maxBufferBytes),
+          ChatMetaStore.budgetFor(
+            contact.maxBufferBytes,
+            timeWilt: contact.isTimeWilt,
+          ),
         );
         notifyListeners();
       }
@@ -1482,22 +1486,8 @@ extension AppStateInbound on AppState {
           }
         } else {
           final cipherBytes = base64Decode(ciphertextB64);
-          String decryptedText;
-          if (contact.isGroup) {
-            final plainBytes = await WiltkeyOtpService.xorWithGroupKeystream(
-              contact.keyHash,
-              cipherBytes,
-              offset,
-            );
-            decryptedText = utf8.decode(plainBytes);
-          } else {
-            final plainBytes = await WiltkeyOtpService.xorWithKeystream(
-              contact.keyHash,
-              cipherBytes,
-              offset,
-            );
-            decryptedText = utf8.decode(plainBytes);
-          }
+          final plainBytes = await xorForContact(contact, cipherBytes, offset);
+          String decryptedText = utf8.decode(plainBytes);
           // Strip the reply header framed into the body (if any).
           final parsedReply = ChatMessage.parseReplyBody(decryptedText);
           replyToId = parsedReply.$1;
@@ -1543,7 +1533,10 @@ extension AppStateInbound on AppState {
           if (contentType == 'emoji_def' || contentType == 'emoji_delete') {
             final budget = contact.isGroup
                 ? AppState.infoLaneSize
-                : ChatMetaStore.budgetFor(contact.maxBufferBytes);
+                : ChatMetaStore.budgetFor(
+                    contact.maxBufferBytes,
+                    timeWilt: contact.isTimeWilt,
+                  );
             await _pinEmojiPayload(contact.keyHash, decryptedText, budget);
           }
 

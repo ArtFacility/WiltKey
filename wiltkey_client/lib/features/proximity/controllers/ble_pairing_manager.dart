@@ -98,6 +98,16 @@ class BlePairingManager extends ChangeNotifier {
 
   final List<int> sliderByteValues = WkPadTiers.values;
 
+  /// Time Wilt pairing state (initiator side): when [timeWiltMode] is true the
+  /// pairing creates a Time Wilt chat with [timeWiltLifetimeSecs] lifetime
+  /// instead of a byte-budget pad. [_sentWiltExpiryMillis] is the ABSOLUTE
+  /// expiry the initiator computed and put on the wire, remembered so the
+  /// initiator stores the exact same instant the responder does (no clock-skew
+  /// disagreement). All null/false for a normal byte-budget pairing.
+  bool timeWiltMode = false;
+  int timeWiltLifetimeSecs = 0;
+  int? _sentWiltExpiryMillis;
+
   DiscoveredBleDevice? selectedDevice;
   BluetoothDevice? activeConnection;
 
@@ -136,6 +146,10 @@ class BlePairingManager extends ChangeNotifier {
     required String peerName,
     required String peerShortNick,
     required String peerProfileImage,
+    // Time Wilt: the initiator's negotiated absolute expiry (unix millis), or
+    // null for a normal byte-budget request. The accept dialog echoes it back
+    // into [respondToPairRequest] so both sides store the same instant.
+    int? wiltExpiresMillis,
   })?
   onIncomingRequest;
 
@@ -377,6 +391,11 @@ class BlePairingManager extends ChangeNotifier {
       final peerProfileImage = json['profile_image'] as String? ?? '';
       final peerPubKey = json['pubkey'] as String;
       final bufferBytes = json['buffer_bytes'] as int;
+      // Time Wilt: 'tw' flags the mode, 'twx' is the initiator's absolute expiry
+      // (unix millis). Absent for a normal byte-budget request.
+      final int? wiltExpiresMillis = json['tw'] == 1
+          ? (json['twx'] as int?)
+          : null;
 
       final peerPubBytes = _hexToBytes(peerPubKey);
       final peerId = sha256.convert(peerPubBytes).toString();
@@ -389,6 +408,7 @@ class BlePairingManager extends ChangeNotifier {
           peerName: peerName,
           peerShortNick: peerShortNick,
           peerProfileImage: peerProfileImage,
+          wiltExpiresMillis: wiltExpiresMillis,
         );
       }
     } catch (e) {
@@ -403,8 +423,11 @@ class BlePairingManager extends ChangeNotifier {
     bool accepted,
     String peerName,
     String peerShortNick,
-    String peerProfileImage,
-  ) async {
+    String peerProfileImage, {
+    // Time Wilt: the initiator's absolute expiry (unix millis) from the request,
+    // stored verbatim so both sides wilt on the same instant. Null = byte budget.
+    int? wiltExpiresMillis,
+  }) async {
     try {
       if (accepted) {
         final list = [appState.publicKeyHex, peerPubKey]..sort();
@@ -485,6 +508,7 @@ class BlePairingManager extends ChangeNotifier {
           peerName: peerName,
           peerShortNick: peerShortNick,
           peerProfileImage: peerProfileImage,
+          wiltExpiresMillis: wiltExpiresMillis,
         );
       } else {
         final response = jsonEncode({"status": "rejected"});
@@ -739,6 +763,8 @@ class BlePairingManager extends ChangeNotifier {
           peerName: selectedDevice!.name,
           peerShortNick: peerShortNick,
           peerProfileImage: peerProfileImage,
+          // We're the initiator: store the exact expiry we put on the wire.
+          wiltExpiresMillis: _sentWiltExpiryMillis,
           deviceToDisconnect: device,
         );
       } else if (json['status'] == 'rejected') {
@@ -887,6 +913,15 @@ class BlePairingManager extends ChangeNotifier {
         }
       });
 
+      // Time Wilt: compute the ABSOLUTE expiry now and remember it, so we store
+      // the exact same instant the responder does. Short keys ('tw'/'twx') keep
+      // the request well inside the 512-byte GATT MTU.
+      _sentWiltExpiryMillis = timeWiltMode
+          ? DateTime.now()
+                  .add(Duration(seconds: timeWiltLifetimeSecs))
+                  .millisecondsSinceEpoch
+          : null;
+
       final payload = jsonEncode({
         "type": "pairing_request",
         "device_name": appState.effectiveDeviceName,
@@ -895,6 +930,8 @@ class BlePairingManager extends ChangeNotifier {
         "user_id": appState.userId,
         "pubkey": appState.publicKeyHex,
         "buffer_bytes": byteSize,
+        if (timeWiltMode) "tw": 1,
+        if (timeWiltMode) "twx": _sentWiltExpiryMillis,
       });
 
       await pairChar.write(Uint8List.fromList(utf8.encode(payload)));
@@ -923,6 +960,9 @@ class BlePairingManager extends ChangeNotifier {
     String peerShortNick = '',
     String peerProfileImage = '',
     BluetoothDevice? deviceToDisconnect,
+    // Time Wilt: negotiated absolute expiry (unix millis), or null for byte
+    // budget. Same value on both sides (initiator remembers what it sent).
+    int? wiltExpiresMillis,
   }) {
     isSyncing = true;
     syncProgress = 0.0;
@@ -963,6 +1003,7 @@ class BlePairingManager extends ChangeNotifier {
         derivedSeed: derivedSeed,
         peerShortNick: peerShortNick,
         peerProfileImage: peerProfileImage,
+        wiltExpiresMillis: wiltExpiresMillis,
         deviceToDisconnect: deviceToDisconnect,
       );
     });
@@ -988,6 +1029,7 @@ class BlePairingManager extends ChangeNotifier {
     required String derivedSeed,
     String peerShortNick = '',
     String peerProfileImage = '',
+    int? wiltExpiresMillis,
     BluetoothDevice? deviceToDisconnect,
   }) async {
     try {
@@ -1044,6 +1086,19 @@ class BlePairingManager extends ChangeNotifier {
           appState.contacts.firstWhere((c) => c.keyHash == meta['groupId']),
         );
         log('[Pairing] Joined group ${meta['groupName']} successfully');
+      } else if (wiltExpiresMillis != null) {
+        // Time Wilt 1-on-1: no pad file — the seed is persisted and keystream is
+        // derived on demand. Both sides store the same absolute expiry.
+        await appState.addOrRechargeTimeWiltContact(
+          peerName,
+          appState.activeRelayUrl,
+          peerId,
+          derivedSeed,
+          DateTime.fromMillisecondsSinceEpoch(wiltExpiresMillis),
+          shortNick: peerShortNick,
+          profileImage: peerProfileImage,
+        );
+        log('[Pairing] Time Wilt contact created for $peerName ($peerId)');
       } else {
         // Standard 1-on-1 contact sync:
         await appState.addOrRechargeContact(

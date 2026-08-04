@@ -117,7 +117,7 @@ abstract class AppLocalizations {
   /// No description provided for @navPair.
   ///
   /// In en, this message translates to:
-  /// **'Pair'**
+  /// **'Connect'**
   String get navPair;
 
   /// No description provided for @navSettings.
@@ -1913,6 +1913,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Depleted'**
   String get groupDepleted;
+
+  /// No description provided for @groupNotYetMet.
+  ///
+  /// In en, this message translates to:
+  /// **'Not yet met'**
+  String get groupNotYetMet;
+
+  /// No description provided for @groupRechargeButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Recharge group'**
+  String get groupRechargeButton;
+
+  /// No description provided for @groupRechargeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Recharge group?'**
+  String get groupRechargeTitle;
+
+  /// No description provided for @groupRechargeBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Starts a fresh secure enclave with a new key. Everyone keeps their message history, but each member must meet you again in person to rejoin. Members you don\'t re-add keep their history but lose access.'**
+  String get groupRechargeBody;
+
+  /// No description provided for @groupRechargeConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Recharge'**
+  String get groupRechargeConfirm;
+
+  /// No description provided for @groupRechargeDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Group recharged — meet members again to re-add them.'**
+  String get groupRechargeDone;
+
+  /// No description provided for @groupRechargeNeededComposer.
+  ///
+  /// In en, this message translates to:
+  /// **'Host recharged this group — meet them again to rejoin'**
+  String get groupRechargeNeededComposer;
 
   /// No description provided for @groupSyncingFromMember.
   ///

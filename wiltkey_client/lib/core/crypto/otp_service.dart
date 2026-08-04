@@ -203,6 +203,32 @@ class WiltkeyOtpService {
     return xorWithKeystream('group_$groupId', data, offset);
   }
 
+  /// Byte gap between the two lanes of a Time Wilt 1:1 chat. Each side sends
+  /// from its own base (0 for the lower userId, this value for the higher), so
+  /// the two keystreams can never overlap. The gap dwarfs any real chat, and the
+  /// 64-bit block counter (see [keystreamRange] `wideCounter`) reaches well past
+  /// it, so neither lane can run into the other in practice.
+  static const int kWiltLaneStride = 1 << 55;
+
+  /// On-demand keystream XOR for Time Wilt 1:1 chats: derives `data.length`
+  /// keystream bytes from [seedHex] at absolute byte [offset] and XORs them in.
+  /// Unlike byte-budget 1:1 there is no stored pad file — the keystream is
+  /// computed straight from the persisted seed (like groups), using the 64-bit
+  /// counter because Time Wilt offsets are time-unbounded. Pure and symmetric:
+  /// the same call both encrypts and decrypts.
+  static Future<List<int>> xorWithStreamSeed(
+    String seedHex,
+    List<int> data,
+    int offset,
+  ) async {
+    final ks = keystreamRange(seedHex, offset, data.length, wideCounter: true);
+    final out = List<int>.filled(data.length, 0);
+    for (int i = 0; i < data.length; i++) {
+      out[i] = data[i] ^ ks[i];
+    }
+    return out;
+  }
+
   /// Computes `length` keystream bytes starting at absolute byte [offset] for a
   /// pad derived from [seedHex], WITHOUT any file I/O. This is the on-demand
   /// equivalent of reading `[offset, offset+length)` out of a pad produced by

@@ -12,7 +12,7 @@ class AppLocalizationsHu extends AppLocalizations {
   String get navChats => 'Csevegések';
 
   @override
-  String get navPair => 'Párosítás';
+  String get navPair => 'Kapcsolódás';
 
   @override
   String get navSettings => 'Beállítások';
@@ -1038,6 +1038,30 @@ class AppLocalizationsHu extends AppLocalizations {
 
   @override
   String get groupDepleted => 'Kimerült';
+
+  @override
+  String get groupNotYetMet => 'Not yet met';
+
+  @override
+  String get groupRechargeButton => 'Recharge group';
+
+  @override
+  String get groupRechargeTitle => 'Recharge group?';
+
+  @override
+  String get groupRechargeBody =>
+      'Starts a fresh secure enclave with a new key. Everyone keeps their message history, but each member must meet you again in person to rejoin. Members you don\'t re-add keep their history but lose access.';
+
+  @override
+  String get groupRechargeConfirm => 'Recharge';
+
+  @override
+  String get groupRechargeDone =>
+      'Group recharged — meet members again to re-add them.';
+
+  @override
+  String get groupRechargeNeededComposer =>
+      'Host recharged this group — meet them again to rejoin';
 
   @override
   String groupSyncingFromMember(String name) {

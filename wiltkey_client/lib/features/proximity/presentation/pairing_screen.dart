@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:wiltkey_client/l10n/app_localizations.dart';
-import 'package:wiltkey_client/features/shell/presentation/app_shell.dart';
 import '../../../../core/state.dart';
 import '../../../../core/network/pairing_service.dart';
 import 'package:wiltkey_client/features/shop/presentation/shop_screen.dart';
@@ -15,12 +14,14 @@ import '../controllers/ble_pairing_manager.dart';
 import 'widgets/terminal_log_view.dart';
 import 'widgets/charge_slider.dart';
 import 'widgets/bluetooth_off_banner.dart';
-// TEMPORARY (see kRemotePairingTesting): debug remote-pairing tab.
-import 'package:wiltkey_client/core/build_flavor.dart';
-import 'remote_pair_tab.dart';
+import '../../../../core/entitlements/entitlement_service.dart';
 
 class PairingScreen extends StatefulWidget {
-  const PairingScreen({super.key});
+  /// When true, this pairing creates a Time Wilt chat (a lifetime picker
+  /// replaces the byte-budget charge slider, and the handshake carries the
+  /// Time Wilt mode + expiry). Launched from the Connect hub's Time Wilt card.
+  final bool timeWilt;
+  const PairingScreen({super.key, this.timeWilt = false});
 
   @override
   State<PairingScreen> createState() => _PairingScreenState();
@@ -45,18 +46,36 @@ class _PairingScreenState extends State<PairingScreen>
   Timer? _flashTimer;
   bool _hasFlashed = false;
 
-  late final TabController _tabController;
-  // TEMPORARY (see kRemotePairingTesting): the debug remote-pairing tab mounts
-  // only on the Play build with the in-app debug toggle on. Read once at init.
-  late final bool _showRemoteTab;
+  // Time Wilt lifetime stops for the slider (label, seconds, Plus-only). The
+  // free range runs up to 30 days; Plus extends the SAME slider on to 6 months
+  // (all free on FOSS). Kept dense so there's no big 7d→30d jump.
+  static const List<(String, int, bool)> _wiltLifetimes = [
+    ('1h', 3600, false),
+    ('3h', 10800, false),
+    ('6h', 21600, false),
+    ('12h', 43200, false),
+    ('1d', 86400, false),
+    ('2d', 172800, false),
+    ('3d', 259200, false),
+    ('5d', 432000, false),
+    ('7d', 604800, false),
+    ('14d', 1209600, false),
+    ('30d', 2592000, false),
+    ('45d', 3888000, true),
+    ('60d', 5184000, true),
+    ('90d', 7776000, true),
+    ('6mo', 15552000, true),
+  ];
+  int _selectedLifetimeSecs = 604800; // default 7 days
 
   @override
   void initState() {
     super.initState();
     _manager = BlePairingManager();
-    _showRemoteTab =
-        kRemotePairingTesting && kPlayStore && _manager.appState.showDebugButtons;
-    _tabController = TabController(length: _showRemoteTab ? 3 : 2, vsync: this);
+    if (widget.timeWilt) {
+      _manager.timeWiltMode = true;
+      _manager.timeWiltLifetimeSecs = _selectedLifetimeSecs;
+    }
     _manager.addListener(_onManagerUpdate);
     _manager.onIncomingRequest = _showIncomingPairDialog;
     _manager.onAlert = _showErrorSnackBar;
@@ -82,7 +101,6 @@ class _PairingScreenState extends State<PairingScreen>
 
   @override
   void dispose() {
-    _tabController.dispose();
     _manager.removeListener(_onManagerUpdate);
     _connectionController.dispose();
     _flashTimer?.cancel();
@@ -129,6 +147,7 @@ class _PairingScreenState extends State<PairingScreen>
     required String peerName,
     required String peerShortNick,
     required String peerProfileImage,
+    int? wiltExpiresMillis,
   }) async {
     // Check we can actually fit the pad BEFORE offering Accept. Generating a pad
     // that runs out of disk fails mid-write, after the initiator has already
@@ -136,7 +155,11 @@ class _PairingScreenState extends State<PairingScreen>
     // platform can't report free space.
     final freeBytes = await WkStorageSpace.usableSpaceBytes();
     final requiredBytes = WkStorageSpace.requiredFor(bufferBytes);
-    final enoughSpace = freeBytes == null || freeBytes >= requiredBytes;
+    // Time Wilt writes no pad, so the free-space gate doesn't apply — always
+    // enough room. (Its `bufferBytes` is just the default tier, sent unused.)
+    final enoughSpace = wiltExpiresMillis != null ||
+        freeBytes == null ||
+        freeBytes >= requiredBytes;
     // Resolved here so the dialog never has to reason about a nullable probe.
     final freeLabel =
         freeBytes == null ? '?' : AppState.formatBytes(freeBytes);
@@ -173,10 +196,14 @@ class _PairingScreenState extends State<PairingScreen>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                l10n.pairRequestDialogBody(
-                  peerName,
-                  AppState.formatBytes(bufferBytes),
-                ),
+                wiltExpiresMillis != null
+                    ? 'Accept a Time Wilt chat from $peerName? '
+                          'It becomes read-only in '
+                          '${_wiltLifetimeLabel(wiltExpiresMillis)}.'
+                    : l10n.pairRequestDialogBody(
+                        peerName,
+                        AppState.formatBytes(bufferBytes),
+                      ),
                 style: t.bodySecondary,
               ),
               if (!enoughSpace) ...[
@@ -243,6 +270,7 @@ class _PairingScreenState extends State<PairingScreen>
                         peerName,
                         peerShortNick,
                         peerProfileImage,
+                        wiltExpiresMillis: wiltExpiresMillis,
                       );
                     },
               child: Text(
@@ -262,6 +290,13 @@ class _PairingScreenState extends State<PairingScreen>
   /// runs the same check before its Accept lights up, so neither side can commit
   /// to a pad that won't fit.
   Future<void> _startSyncChecked() async {
+    // Time Wilt writes no pad file, so there's nothing to size-check against
+    // free space — go straight to the handshake.
+    if (widget.timeWilt) {
+      _manager.timeWiltLifetimeSecs = _selectedLifetimeSecs;
+      _manager.startSyncProcess(_relayController.text.trim());
+      return;
+    }
     final padBytes = WkPadTiers.bytesAt(_manager.sliderValue.round());
     final freeBytes = await WkStorageSpace.usableSpaceBytes();
     if (!mounted) return;
@@ -284,6 +319,110 @@ class _PairingScreenState extends State<PairingScreen>
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(backgroundColor: t.danger, content: Text(message)));
+  }
+
+  /// Coarse human label for a Time Wilt lifetime, from an absolute expiry.
+  String _wiltLifetimeLabel(int expiryMillis) {
+    final d = Duration(
+      milliseconds: expiryMillis - DateTime.now().millisecondsSinceEpoch,
+    );
+    if (d.inDays >= 1) return d.inDays == 1 ? '1 day' : '${d.inDays} days';
+    if (d.inHours >= 1) return d.inHours == 1 ? '1 hour' : '${d.inHours} hours';
+    if (d.inMinutes >= 1) return '${d.inMinutes} min';
+    return 'moments';
+  }
+
+  /// Time Wilt lifetime chooser — a slider (replaces the byte-budget charge
+  /// slider) picking how long the chat lives before it wilts to read-only. Free
+  /// users slide up to 30 days; Plus extends the same track to 6 months (free on
+  /// FOSS). A "Plus" hint below routes to the Shop for locked users.
+  Widget _buildLifetimePicker(WiltkeyTokens t) {
+    final bool extendedUnlocked =
+        EntitlementService.instance.largerPadsUnlocked;
+    final int lastFreeIndex =
+        _wiltLifetimes.lastIndexWhere((o) => !o.$3);
+    final int maxIndex =
+        extendedUnlocked ? _wiltLifetimes.length - 1 : lastFreeIndex;
+    int currentIndex =
+        _wiltLifetimes.indexWhere((o) => o.$2 == _selectedLifetimeSecs);
+    if (currentIndex < 0) currentIndex = lastFreeIndex;
+    currentIndex = currentIndex.clamp(0, maxIndex);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              t.uppercaseLabels ? 'CHAT LIFETIME' : 'Chat lifetime',
+              style: t.dataMono.copyWith(
+                color: t.textTertiary,
+                fontSize: 9,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            Text(
+              _wiltLifetimes[currentIndex].$1,
+              style: t.dataMono.copyWith(
+                color: t.action,
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+        SliderTheme(
+          data: SliderTheme.of(context).copyWith(
+            activeTrackColor: t.action,
+            inactiveTrackColor: t.border,
+            thumbColor: t.action,
+            overlayColor: t.action.withValues(alpha: 0.15),
+          ),
+          child: Slider(
+            value: currentIndex.toDouble(),
+            min: 0,
+            max: maxIndex.toDouble(),
+            divisions: maxIndex > 0 ? maxIndex : 1,
+            label: _wiltLifetimes[currentIndex].$1,
+            onChanged: (v) {
+              final idx = v.round().clamp(0, maxIndex);
+              setState(() {
+                _selectedLifetimeSecs = _wiltLifetimes[idx].$2;
+                _manager.timeWiltLifetimeSecs = _selectedLifetimeSecs;
+              });
+            },
+          ),
+        ),
+        if (!extendedUnlocked)
+          GestureDetector(
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const ShopScreen(initialTab: ShopTab.plus),
+              ),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                children: [
+                  Icon(Icons.lock_outline, size: 13, color: t.textTertiary),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Unlock up to 6 months with Plus',
+                    style: t.bodySecondary.copyWith(color: t.action),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        const SizedBox(height: 4),
+        Text(
+          'The chat becomes read-only when the timer runs out.',
+          style: t.bodySecondary,
+        ),
+      ],
+    );
   }
 
   void _runPing() async {
@@ -317,15 +456,21 @@ class _PairingScreenState extends State<PairingScreen>
       children: [
         Scaffold(
           appBar: AppBar(
+            iconTheme: IconThemeData(color: t.action),
             title: Text(
-              t.uppercaseLabels ? l10n.pairTitle.toUpperCase() : l10n.pairTitle,
+              widget.timeWilt
+                  ? (t.uppercaseLabels ? 'TIME WILT' : 'Time Wilt')
+                  : (t.uppercaseLabels
+                        ? l10n.pairTitle.toUpperCase()
+                        : l10n.pairTitle),
               style: t.screenTitle.copyWith(fontSize: 18),
             ),
             backgroundColor: t.bg,
             elevation: 0,
             actions: [
-              // Manual rescan — replicates the scan restart that tab-switching
-              // away and back performs, recovering devices that didn't show up.
+              // Manual rescan — replicates the scan restart that leaving and
+              // re-entering the screen performs, recovering devices that didn't
+              // show up.
               if (!_manager.isSyncing && !_manager.isSuccess)
                 IconButton(
                   icon: Icon(Icons.refresh, color: t.action, size: 22),
@@ -337,29 +482,8 @@ class _PairingScreenState extends State<PairingScreen>
                 onPressed: () => TerminalLogView.show(context, _manager),
               ),
             ],
-            // Mode tabs: in-person proximity (the real pairing), a placeholder
-            // for the upcoming Time Wilt mode, and — Play + debug only — the
-            // temporary remote-pairing test path (see kRemotePairingTesting).
-            bottom: TabBar(
-              controller: _tabController,
-              labelColor: t.action,
-              unselectedLabelColor: t.action.withValues(alpha: 0.5),
-              indicatorColor: t.action,
-              tabs: [
-                const Tab(text: 'Proximity'),
-                const Tab(text: 'Time Wilt'),
-                if (_showRemoteTab) const Tab(text: 'Remote'),
-              ],
-            ),
           ),
-          body: TabBarView(
-            controller: _tabController,
-            children: [
-              _buildProximityBody(t, l10n, closeDevices),
-              _buildTimeWiltSoon(t),
-              if (_showRemoteTab) const RemotePairTab(),
-            ],
-          ),
+          body: _buildProximityBody(t, l10n, closeDevices),
         ),
         if (_flashOpacity > 0.0)
           Positioned.fill(
@@ -373,8 +497,8 @@ class _PairingScreenState extends State<PairingScreen>
     );
   }
 
-  /// The in-person BLE pairing flow — the original screen body, now the first
-  /// tab. Unchanged behaviour; only lifted into its own method for the tabs.
+  /// The in-person BLE pairing flow — the whole screen body. Pushed as a route
+  /// from the Connect hub, so its BLE manager lives only while it's on screen.
   Widget _buildProximityBody(
     WiltkeyTokens t,
     AppLocalizations l10n,
@@ -384,7 +508,14 @@ class _PairingScreenState extends State<PairingScreen>
       color: t.bg,
       child: SingleChildScrollView(
         child: Padding(
-          padding: const EdgeInsets.all(16.0),
+          // Pad the bottom past the system gesture/nav bar (edge-to-edge) so the
+          // last control isn't tucked under it on devices without gesture nav.
+          padding: EdgeInsets.fromLTRB(
+            16,
+            16,
+            16,
+            16 + MediaQuery.of(context).viewPadding.bottom,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -417,42 +548,6 @@ class _PairingScreenState extends State<PairingScreen>
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  /// Placeholder for the not-yet-built Time Wilt pairing mode.
-  Widget _buildTimeWiltSoon(WiltkeyTokens t) {
-    return Container(
-      color: t.bg,
-      alignment: Alignment.center,
-      padding: const EdgeInsets.all(32),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            Icons.hourglass_empty,
-            color: t.action.withValues(alpha: 0.5),
-            size: 48,
-          ),
-          const SizedBox(height: 16),
-          Text('Time Wilt', style: t.screenTitle.copyWith(fontSize: 20)),
-          const SizedBox(height: 8),
-          Text(
-            'Coming soon — pairing that shares a pad which burns down on a timer.',
-            style: t.bodySecondary,
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-            decoration: BoxDecoration(
-              color: t.action.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(t.radiusControl),
-            ),
-            child: Text('SOON', style: t.sectionLabel.copyWith(color: t.action)),
-          ),
-        ],
       ),
     );
   }
@@ -772,16 +867,19 @@ class _PairingScreenState extends State<PairingScreen>
             },
           ),
           const SizedBox(height: 16),
-          ChargeSlider(
-            value: _manager.sliderValue,
-            onChanged: (val) => _manager.updateSlider(val),
-            onLockedTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => const ShopScreen(initialTab: ShopTab.plus),
+          if (widget.timeWilt)
+            _buildLifetimePicker(t)
+          else
+            ChargeSlider(
+              value: _manager.sliderValue,
+              onChanged: (val) => _manager.updateSlider(val),
+              onLockedTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const ShopScreen(initialTab: ShopTab.plus),
+                ),
               ),
             ),
-          ),
           const SizedBox(height: 20),
           ElevatedButton.icon(
             onPressed: _manager.selectedDevice != null
@@ -1051,11 +1149,9 @@ class _PairingScreenState extends State<PairingScreen>
           ElevatedButton(
             onPressed: () {
               _manager.resetState();
-              try {
-                AppShell.of(context).selectTab(ShellTab.chats);
-              } catch (e) {
-                Navigator.of(context).maybePop();
-              }
+              // Pop with success so the Connect hub (still a shell descendant,
+              // unlike this pushed route) can jump to the Chats tab.
+              Navigator.of(context).pop(true);
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: t.action,

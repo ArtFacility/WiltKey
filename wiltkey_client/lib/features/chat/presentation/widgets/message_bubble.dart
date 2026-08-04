@@ -202,13 +202,22 @@ class MessageBubble extends StatelessWidget {
       onTap: (message.isFailed && onFailedTap != null) ? onFailedTap : null,
       onLongPress: message.isPending
           ? null
-          : () => showReactionPicker(
-              context,
-              appState: appState,
-              contact: contact,
-              message: message,
-              emojiMap: emojiMap,
-            ),
+          : () {
+              // Drop the composer's focus first: the reaction sheet is a modal
+              // route, and dismissing it restores focus to whatever the parent
+              // scope last focused (the text field). That reopens the keyboard
+              // and yanks the list to the bottom. Clearing focus now leaves the
+              // sheet nothing to restore, so reacting no longer pops the
+              // keyboard.
+              FocusManager.instance.primaryFocus?.unfocus();
+              showReactionPicker(
+                context,
+                appState: appState,
+                contact: contact,
+                message: message,
+                emojiMap: emojiMap,
+              );
+            },
       child: shownBubble,
     );
 

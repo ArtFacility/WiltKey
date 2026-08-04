@@ -816,6 +816,157 @@ extension AppStateGroups on AppState {
     _persistence.saveState(this);
   }
 
+  /// Host-only "recharge": a byte-budget group's total is fixed at creation
+  /// (`infoLane + maxMembers × laneSize`), so once every lane is spent the group
+  /// is dead — there's no way to hand out more budget without meeting again. This
+  /// starts a FRESH secure enclave in place: a brand-new random `groupSeed`, all
+  /// member lanes freed (host keeps one fresh lane), while every member's profile
+  /// row is preserved so old history stays attributed. Members now render "not
+  /// yet met" until the host re-meets each in person (re-meet pushes the new seed
+  /// + reassigns a lane; they keep their local history + slot). History survives
+  /// untouched because messages are stored decrypted at rest — the new seed only
+  /// affects NEW traffic.
+  ///
+  /// See [[connect-hub-and-timewilt-plan]] §A. Member-side "you were recharged,
+  /// go read-only" notification + the re-meet handshake land with that step.
+  Future<void> rechargeGroup(Contact group) async {
+    if (!group.isGroup || !group.isHost) return;
+    final groupId = group.keyHash;
+    final info = await GroupDatabase.instance.getGroupInfo(groupId);
+    if (info == null) return;
+
+    final laneSize = info['lane_size'] as int;
+    final maxMembers = info['max_members'] as int;
+    final totalSize = info['total_size'] as int;
+    final infoLaneSize = AppState.infoLaneSize;
+
+    // 0. BEFORE swapping the seed, tell current members the group was recharged
+    //    so they lock their composer (their old lane/seed is about to die — a
+    //    send would go into the void). Encrypted with the OLD-seed meta key,
+    //    which is exactly the seed each member still holds, so it decrypts for
+    //    them (and stays relay-blind). Offline members get it from the queue on
+    //    reconnect. The host's own re-meet later clears the flag on their side.
+    final oldSeed = group.groupSeed ?? '';
+    final priorMembers = group.memberKeyHashes
+        .where((h) => h != userId)
+        .toList();
+    if (oldSeed.isNotEmpty && priorMembers.isNotEmpty) {
+      final oldKeyHex = sha256.convert(utf8.encode(oldSeed)).toString();
+      final enc = WiltkeyPersistence().encryptString(
+        jsonEncode({'group_id': groupId, 'v': 1}),
+        oldKeyHex,
+      );
+      final envelope = jsonEncode({
+        'group_id': groupId,
+        'sender_id': userId,
+        'd': enc,
+        't': 'group_recharge_needed',
+      });
+      await ensureWebSocketConnected();
+      for (final memberHash in priorMembers) {
+        WebSocketClient().sendWSMessage({
+          'type': 'SEND_MESSAGE',
+          'recipient_id': memberHash,
+          'envelope': envelope,
+          'content_type': 'group_recharge_needed',
+        });
+      }
+    }
+
+    // 1. Fresh random 32-byte seed (groups transmit the seed at join — it's not
+    //    derived — so a new random one is all that's needed).
+    final seedBytes = List<int>.generate(32, (_) => Random.secure().nextInt(256));
+    final newSeed =
+        seedBytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+
+    // 2. Swap the seed in group_info + the on-demand keystream cache.
+    await GroupDatabase.instance.upsertGroupInfo(
+      groupId: groupId,
+      groupName: (info['group_name'] as String?) ?? group.name,
+      groupIcon: (info['group_icon'] as String?) ?? group.groupIconHex ?? '',
+      laneSize: laneSize,
+      maxMembers: maxMembers,
+      totalSize: totalSize,
+      groupSeedEncrypted: newSeed,
+      infoLaneWriteOffset: 0,
+      isHost: true,
+      hostKeyHash: userId,
+    );
+    WiltkeyOtpService.cacheGroupSeed(groupId, newSeed, totalSize);
+
+    // 3. Reset lanes on the new seed. Slot 0 = shared info lane (host-owned);
+    //    slot 1 = the host's fresh message lane. Every other slot is freed
+    //    (member_key_hash=null, offset 0, header cleared) → "not yet met".
+    await GroupDatabase.instance.upsertLane(
+      groupId: groupId,
+      slotIndex: 0,
+      memberKeyHash: userId,
+      startOffset: 0,
+      maxOffset: infoLaneSize,
+      currentWriteOffset: 0,
+      headerWritten: false,
+    );
+    await GroupDatabase.instance.upsertLane(
+      groupId: groupId,
+      slotIndex: 1,
+      memberKeyHash: userId,
+      startOffset: infoLaneSize,
+      maxOffset: infoLaneSize + laneSize,
+      currentWriteOffset: 0,
+      headerWritten: false,
+    );
+    final lanes = await GroupDatabase.instance.getAllLanes(groupId);
+    for (final lane in lanes) {
+      final slot = lane['slot_index'] as int;
+      if (slot <= 1) continue; // keep info lane + host's fresh lane
+      await GroupDatabase.instance.freeLane(groupId, slot);
+    }
+
+    // 4. Update the in-memory Contact: new seed, host is the only active member
+    //    again (delivery list), host's own lane budget reset to full. Profiles
+    //    (attribution + the "not yet met" roster) are left untouched.
+    final idx = contacts.indexWhere((c) => c.keyHash == groupId);
+    if (idx != -1) {
+      contacts[idx] = contacts[idx].copyWith(
+        groupSeed: newSeed,
+        memberKeyHashes: [userId],
+        memberCount: 1,
+        remainingBufferBytes: laneSize,
+        slotIndex: 1,
+        additionalSlots: <int>[],
+        isArchived: false,
+      );
+      if (activeContact?.keyHash == groupId) activeContact = contacts[idx];
+      await WiltkeyDatabase.instance.upsertContact(contacts[idx]);
+      // Recompute the roster so every former member immediately renders
+      // "not yet met" (profile kept, lane gone) in the members sheet.
+      updateGroupMembersMetadata(contacts[idx]);
+    }
+
+    // 5. Drop a system note into history so the recharge is visible in-chat.
+    final systemMsg = ChatMessage(
+      id: DateTime.now().toString(),
+      senderId: 'system',
+      text: 'Group recharged — fresh secure enclave. Members must meet you '
+          'again to rejoin (history is kept).',
+      timestamp: DateTime.now(),
+      isSentByMe: false,
+      decryptedText: 'Group recharged — fresh secure enclave. Members must meet '
+          'you again to rejoin (history is kept).',
+    );
+    appendLoadedMessage(group.id, systemMsg);
+    await WiltkeyDatabase.instance.saveMessage(
+      systemMsg,
+      group.id,
+      masterKeyHex: masterKeyHex,
+    );
+
+    notifyListeners();
+    _persistence.saveState(this);
+    log('[Group Host] Recharged group $groupId — new seed, lanes reset, '
+        'profiles kept for re-meet.');
+  }
+
   void updateGroupMembersMetadata(Contact group) async {
     if (!group.isGroup) return;
     final groupId = group.keyHash;
@@ -882,6 +1033,11 @@ extension AppStateGroups on AppState {
 
       final List<Map<String, dynamic>> list = [];
       final Map<String, int> memberRemainingBytes = {};
+      // Hashes that currently hold a message lane. A profile WITHOUT one is
+      // "not yet met" — either never joined the current seed, or (after a host
+      // recharge) awaiting a re-meet. Distinguishes them from a member whose
+      // lane is merely depleted (remaining == 0 but still assigned).
+      final Set<String> assignedHashes = {};
 
       int assignedSlots = 0;
       for (final lane in lanes) {
@@ -896,6 +1052,7 @@ extension AppStateGroups on AppState {
 
           if ((lane['slot_index'] as int) > 0) {
             assignedSlots++;
+            assignedHashes.add(memberHash);
           }
         }
       }
@@ -959,6 +1116,8 @@ extension AppStateGroups on AppState {
           'isHost': false,
           'remaining': remaining,
           'max': laneSize,
+          // Profile kept for attribution but no active lane → re-meet to rejoin.
+          'notYetMet': !assignedHashes.contains(memberHash),
         });
       }
 
@@ -1295,6 +1454,112 @@ extension AppStateGroups on AppState {
 
     await ensureWebSocketConnected();
     await broadcastGroupMetadataUpdate(updated);
+  }
+
+  /// Host-only "kick": free the member's lane and drop them from the active
+  /// delivery roster, but KEEP their profile row so old history still attributes
+  /// to them (user decision: "keep history, lose access"). They can only return
+  /// via a fresh invite into a new slot. Works on a live member (removes access
+  /// now) or an already not-yet-met one (idempotent — just ensures they're out).
+  Future<void> kickMember(Contact group, String memberKeyHash) async {
+    if (!group.isGroup || !group.isHost) return;
+    if (memberKeyHash == userId) return; // never kick yourself (the host)
+    final groupId = group.keyHash;
+
+    final lane = await GroupDatabase.instance.getLaneByMember(
+      groupId,
+      memberKeyHash,
+    );
+    if (lane != null) {
+      await GroupDatabase.instance.freeLane(groupId, lane['slot_index'] as int);
+    }
+
+    final idx = contacts.indexWhere((c) => c.isGroup && c.keyHash == groupId);
+    if (idx != -1) {
+      final existing = contacts[idx];
+      final newHashes = existing.memberKeyHashes
+          .where((h) => h != memberKeyHash)
+          .toList();
+      final updated = existing.copyWith(
+        memberKeyHashes: newHashes,
+        memberCount: newHashes.length,
+      );
+      contacts[idx] = updated;
+      if (activeContact?.keyHash == groupId) activeContact = updated;
+      await WiltkeyDatabase.instance.upsertContact(updated);
+      // NB: profile row is intentionally NOT deleted (attribution is preserved).
+      updateGroupMembersMetadata(updated);
+    }
+
+    notifyListeners();
+    _persistence.saveState(this);
+    if (contacts.any((c) => c.keyHash == groupId)) {
+      await ensureWebSocketConnected();
+      await broadcastGroupMetadataUpdate(
+        contacts.firstWhere((c) => c.keyHash == groupId),
+      );
+    }
+    log('[Group Host] Kicked $memberKeyHash (lane freed, profile kept).');
+  }
+
+  /// Member side of a host recharge: the group's seed was reset, so our lane is
+  /// dead. Lock the chat (composer → "meet the host again") until we re-meet the
+  /// host. History is kept — only sending is blocked. Decrypts with our current
+  /// (old) seed, which is exactly the key the host encrypted it with.
+  Future<void> _handleGroupRechargeNeeded(
+    Contact group,
+    String senderId,
+    Map<String, dynamic> envelopeJson,
+  ) async {
+    // Only the host may recharge; ignore a frame not from our host, and ignore
+    // it on the host's own device (we never lock ourselves out).
+    if (group.isHost) return;
+    if (group.hostKeyHash != null && senderId != group.hostKeyHash) return;
+    try {
+      final seed = group.groupSeed ?? '';
+      if (seed.isEmpty) return;
+      final keyHex = sha256.convert(utf8.encode(seed)).toString();
+      // Decrypt purely to authenticate (only host+members share the old seed);
+      // the payload itself carries no secret beyond the group id.
+      WiltkeyPersistence().decryptString(envelopeJson['d'] as String, keyHex);
+    } catch (e) {
+      log('[Group] recharge_needed failed to authenticate: $e');
+      return;
+    }
+
+    if (group.groupRechargePending) return; // already flagged — idempotent
+
+    final idx = contacts.indexWhere((c) => c.keyHash == group.keyHash);
+    if (idx == -1) return;
+    final updated = contacts[idx].copyWith(groupRechargePending: true);
+    contacts[idx] = updated;
+    if (activeContact?.keyHash == group.keyHash) activeContact = updated;
+    await WiltkeyDatabase.instance.upsertContact(updated);
+
+    final sysMsg = ChatMessage(
+      id: DateTime.now().toString(),
+      senderId: 'system',
+      text: 'The host recharged this group. Meet them again in person to '
+          'rejoin — your message history is kept.',
+      timestamp: DateTime.now(),
+      isSentByMe: false,
+      decryptedText: 'The host recharged this group. Meet them again in person '
+          'to rejoin — your message history is kept.',
+    );
+    appendLoadedMessage(updated.id, sysMsg);
+    await WiltkeyDatabase.instance.saveMessage(
+      sysMsg,
+      updated.id,
+      masterKeyHex: masterKeyHex,
+    );
+    bumpUnread(updated, sysMsg);
+    notifyListeners();
+    _persistence.saveState(this);
+    if (visibleChatId != updated.id) {
+      WiltkeyNotifications.showMessageNotification(chatKey: updated.keyHash);
+    }
+    log('[Group] Recharge-needed from host — group ${group.keyHash} locked '
+        'until re-meet.');
   }
 
   Future<void> requestManualGroupSync(

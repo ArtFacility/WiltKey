@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:wiltkey_client/l10n/app_localizations.dart';
 import '../../../core/state.dart';
@@ -13,6 +15,7 @@ import '../../chat/presentation/group_chat_screen.dart';
 import '../../chat/presentation/widgets/nuke_confirm_dialog.dart';
 import '../../groups/presentation/create_group_screen.dart';
 import '../../groups/presentation/group_search_screen.dart';
+import '../../proximity/presentation/pairing_screen.dart';
 import '../../shell/presentation/app_shell.dart';
 
 /// The Chats tab: a single list of every conversation — 1:1 contacts and groups
@@ -55,14 +58,43 @@ class _ChatsTabState extends State<ChatsTab> {
     }
   }
 
+  // Ticks the Time Wilt countdowns on the list. Only rebuilds when some chat is
+  // in its final-minutes window (mirrors the chat screen's cadence — no point
+  // re-rendering the whole list every second when everything is hours away), and
+  // sweeps any chat that just crossed its expiry so it flips to archived here.
+  Timer? _wiltTicker;
+
   @override
   void initState() {
     super.initState();
     _appState.addListener(_onState);
+    _wiltTicker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      final now = DateTime.now();
+      bool needsSweep = false;
+      bool ticking = false;
+      for (final c in _appState.contacts) {
+        if (!c.isTimeWilt || c.isArchived) continue;
+        final exp = c.wiltExpiresAt;
+        if (exp == null) continue;
+        final left = exp.difference(now);
+        if (left.inSeconds <= 0) {
+          needsSweep = true;
+        } else if (left.inMinutes < 10) {
+          ticking = true;
+        }
+      }
+      if (needsSweep) {
+        _appState.sweepTimeWiltChats(); // notifies → _onState rebuilds
+      } else if (ticking) {
+        setState(() {});
+      }
+    });
   }
 
   @override
   void dispose() {
+    _wiltTicker?.cancel();
     _appState.removeListener(_onState);
     _searchController.dispose();
     super.dispose();
@@ -373,8 +405,14 @@ class _ChatsTabState extends State<ChatsTab> {
                         myId: _appState.userId,
                         onTap: () => _openContact(c),
                         onLongPress: () => _showChatActions(c),
-                        onSync: () =>
-                            AppShell.of(context).selectTab(ShellTab.pair),
+                        // Recharge is a known target — skip the hub menu and go
+                        // straight into the in-person pairing flow.
+                        onSync: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const PairingScreen(),
+                          ),
+                        ),
                       ),
                     );
                   },
@@ -548,19 +586,31 @@ class _ContactRow extends StatelessWidget {
                     style: t.bodySecondary,
                   ),
                   const SizedBox(height: 4),
-                  Text(
-                    c.isGroup
-                        ? l10n.chatsRowGroupRemaining(remaining, maxF)
-                        : l10n.chatsRowMeRemaining(
-                            remaining,
-                            AppState.formatBytes(
-                              c.getTheirRemainingBytes(myId),
+                  // Time Wilt has no byte budget — the "row below" carries the
+                  // lifetime countdown instead of the me/peer byte readout.
+                  if (c.isTimeWilt)
+                    Text(
+                      c.isArchived
+                          ? (t.uppercaseLabels ? 'WILTED' : 'Wilted')
+                          : 'Wilts in ${c.timeWiltCountdownLabel}',
+                      style: t.dataMono.copyWith(
+                        color: c.isArchived ? t.textTertiary : t.positive,
+                      ),
+                    )
+                  else
+                    Text(
+                      c.isGroup
+                          ? l10n.chatsRowGroupRemaining(remaining, maxF)
+                          : l10n.chatsRowMeRemaining(
+                              remaining,
+                              AppState.formatBytes(
+                                c.getTheirRemainingBytes(myId),
+                              ),
                             ),
-                          ),
-                    style: t.dataMono.copyWith(
-                      color: wilted ? t.action : t.positive,
+                      style: t.dataMono.copyWith(
+                        color: wilted ? t.action : t.positive,
+                      ),
                     ),
-                  ),
                 ],
               ),
             ),
@@ -587,14 +637,22 @@ class _ContactRow extends StatelessWidget {
             ],
             const SizedBox(width: 10),
             // Budget glyph. 1:1 uses the (theme-specific) split indicator; groups
-            // show their usable budget (own lane + claimable lanes) as our-fraction.
+            // show their usable budget as our-fraction. Time Wilt reuses the same
+            // single gauge for time-remaining (the countdown lives in the row
+            // below, so the gauge stays unstacked and never overflows tall
+            // vertical gauges like Tideline/Phosphor).
             context.wkc.budgetIndicator(
-              ourFraction: ourFraction,
-              theirFraction: c.isGroup ? 0 : c.getTheirChargePercentage(myId),
-              isWilted: wilted,
-              split: !c.isGroup,
+              ourFraction:
+                  c.isTimeWilt ? c.timeWiltRemainingFraction : ourFraction,
+              theirFraction: (c.isGroup || c.isTimeWilt)
+                  ? 0
+                  : c.getTheirChargePercentage(myId),
+              isWilted: c.isTimeWilt ? c.isArchived : wilted,
+              split: !c.isGroup && !c.isTimeWilt,
               variant: BudgetIndicatorVariant.listRow,
-              semanticLabel: '$remaining remaining',
+              semanticLabel: c.isTimeWilt
+                  ? c.timeWiltCountdownLabel
+                  : '$remaining remaining',
             ),
           ],
         ),

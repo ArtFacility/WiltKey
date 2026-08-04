@@ -513,7 +513,11 @@ func handleQueueStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	count, err := rdb.GetActiveQueueCount(id)
+	// Only count real user messages, not control frames (receipts, group
+	// metadata/profile/reaction/lane-header/recharge signals, …). Otherwise a
+	// recipient — especially in a busy group — gets phantom "new message"
+	// notifications from the passive poll whenever the queue holds only plumbing.
+	count, err := rdb.GetNotifiableQueueCount(id)
 	if err != nil {
 		http.Error(w, "Database error fetching queue count", http.StatusInternalServerError)
 		return

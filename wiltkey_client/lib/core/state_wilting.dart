@@ -228,6 +228,29 @@ extension AppStateWilting on AppState {
     }
   }
 
+  /// Archive any Time Wilt chat whose lifetime has elapsed. Authoritative on
+  /// resume (timers don't survive backgrounding, and a chat can wilt while the
+  /// app is closed): flips each expired chat to read-only ([Contact.isArchived])
+  /// and persists. Cheap — just a scan over contacts.
+  Future<void> sweepTimeWiltChats() async {
+    final now = DateTime.now();
+    bool changed = false;
+    for (final c in contacts) {
+      if (!c.isTimeWilt || c.isArchived) continue;
+      final exp = c.wiltExpiresAt;
+      if (exp == null) continue;
+      if (!now.isBefore(exp)) {
+        c.isArchived = true;
+        await WiltkeyDatabase.instance.upsertContact(c);
+        changed = true;
+      }
+    }
+    if (changed) {
+      notifyListeners();
+      _persistence.saveState(this);
+    }
+  }
+
   /// (Re)arm the countdown for one opened message. Cancels any existing timer for
   /// the same id first so a re-arm never double-fires.
   void _armWiltTimer(String chatId, String messageId, int expiresAtMs) {

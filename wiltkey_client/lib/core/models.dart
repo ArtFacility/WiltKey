@@ -39,6 +39,12 @@ class Contact {
   final int? slotIndex; // This member's primary lane slot index
   final List<int> additionalSlots; // Extra lane slots from refills
 
+  // A member's group needs a re-meet: the host recharged (reseeded) the group,
+  // so this member's old lane/seed is dead — sending would go into the void.
+  // Set by the inbound `group_recharge_needed` signal, cleared when the member
+  // re-meets the host. Locks the composer to a "meet the host again" prompt.
+  bool groupRechargePending;
+
   // Profile metadata sync
   String? shortNick;
   String? profileImageB64; // Stored as a 100-character hex matrix for pixel art
@@ -52,6 +58,55 @@ class Contact {
   int outgoingMaxOffset;
   int incomingOffset;
   int incomingMaxOffset;
+
+  // Time Wilt: a chat with a lifetime rather than a byte budget.
+  // [wiltExpiresAt] is the negotiated ABSOLUTE expiry — the initiator computes
+  // it at pairing and both sides store the same instant verbatim, so clock skew
+  // can't make one side archive before the other. Non-null is what marks this a
+  // Time Wilt chat. At expiry the chat flips to [isArchived] (read-only).
+  // [streamSeedHex] is the on-demand keystream seed: 1:1 Time Wilt keeps no
+  // stored pad (it derives keystream from the seed like groups do), so unlike
+  // byte-budget 1:1 the seed must persist here.
+  DateTime? wiltExpiresAt;
+  String? streamSeedHex;
+  // When the Time Wilt chat was created locally — the other end of the lifetime
+  // span, so the budget gauge can render fraction-of-lifetime-remaining. Local
+  // (not negotiated): only the EXPIRY needs to match across devices; this is a
+  // cosmetic denominator, so a few seconds of skew is irrelevant.
+  DateTime? wiltCreatedAt;
+
+  bool get isTimeWilt => wiltExpiresAt != null;
+
+  /// Fraction of the Time Wilt lifetime still remaining (1.0 fresh → 0.0 spent),
+  /// for the reused budget gauge. 0 for non-Time-Wilt or once expired.
+  double get timeWiltRemainingFraction {
+    final start = wiltCreatedAt;
+    final end = wiltExpiresAt;
+    if (start == null || end == null) return 0.0;
+    final total = end.difference(start).inSeconds;
+    if (total <= 0) return 0.0;
+    final left = end.difference(DateTime.now()).inSeconds;
+    return (left / total).clamp(0.0, 1.0);
+  }
+
+  /// Compact remaining-time label for the countdown beside the gauge, e.g.
+  /// "6d 4h", "3h 12m", "12m", "9m 45s", "30s", or "Wilted" once expired.
+  ///
+  /// Below 10 minutes it carries seconds ("9m 45s") so the per-second tickers
+  /// (chat + dashboard, which only rebuild inside that same window) actually
+  /// paint a changing string — above 10 minutes the coarse form is enough since
+  /// nothing ticks it faster than a minute anyway.
+  String get timeWiltCountdownLabel {
+    final end = wiltExpiresAt;
+    if (end == null) return '';
+    final d = end.difference(DateTime.now());
+    if (d.isNegative || d.inSeconds == 0) return 'Wilted';
+    if (d.inDays >= 1) return '${d.inDays}d ${d.inHours % 24}h';
+    if (d.inHours >= 1) return '${d.inHours}h ${d.inMinutes % 60}m';
+    if (d.inMinutes >= 10) return '${d.inMinutes}m';
+    if (d.inMinutes >= 1) return '${d.inMinutes}m ${d.inSeconds % 60}s';
+    return '${d.inSeconds}s';
+  }
 
   Contact({
     required this.id,
@@ -84,11 +139,15 @@ class Contact {
     this.outgoingMaxOffset = 0,
     this.incomingOffset = 0,
     this.incomingMaxOffset = 0,
+    this.wiltExpiresAt,
+    this.streamSeedHex,
+    this.wiltCreatedAt,
     this.groupSeed,
     this.laneSize,
     this.totalGroupSize,
     this.slotIndex,
     List<int> additionalSlots = const [],
+    this.groupRechargePending = false,
   }) : additionalSlots = List<int>.from(additionalSlots);
 
   Contact copyWith({
@@ -122,11 +181,15 @@ class Contact {
     int? outgoingMaxOffset,
     int? incomingOffset,
     int? incomingMaxOffset,
+    DateTime? wiltExpiresAt,
+    String? streamSeedHex,
+    DateTime? wiltCreatedAt,
     String? groupSeed,
     int? laneSize,
     int? totalGroupSize,
     int? slotIndex,
     List<int>? additionalSlots,
+    bool? groupRechargePending,
   }) {
     return Contact(
       id: id ?? this.id,
@@ -160,15 +223,21 @@ class Contact {
       outgoingMaxOffset: outgoingMaxOffset ?? this.outgoingMaxOffset,
       incomingOffset: incomingOffset ?? this.incomingOffset,
       incomingMaxOffset: incomingMaxOffset ?? this.incomingMaxOffset,
+      wiltExpiresAt: wiltExpiresAt ?? this.wiltExpiresAt,
+      streamSeedHex: streamSeedHex ?? this.streamSeedHex,
+      wiltCreatedAt: wiltCreatedAt ?? this.wiltCreatedAt,
       groupSeed: groupSeed ?? this.groupSeed,
       laneSize: laneSize ?? this.laneSize,
       totalGroupSize: totalGroupSize ?? this.totalGroupSize,
       slotIndex: slotIndex ?? this.slotIndex,
       additionalSlots: additionalSlots ?? this.additionalSlots,
+      groupRechargePending: groupRechargePending ?? this.groupRechargePending,
     );
   }
 
-  double get chargePercentage => remainingBufferBytes / maxBufferBytes;
+  // Guarded against maxBufferBytes == 0 (Time Wilt chats carry no byte budget).
+  double get chargePercentage =>
+      maxBufferBytes == 0 ? 0.0 : remainingBufferBytes / maxBufferBytes;
 
   int getTheirRemainingBytes(String myUserId) {
     if (isGroup) return 0;
@@ -211,11 +280,15 @@ class Contact {
     'outgoingMaxOffset': outgoingMaxOffset,
     'incomingOffset': incomingOffset,
     'incomingMaxOffset': incomingMaxOffset,
+    'wiltExpiresAt': wiltExpiresAt?.toIso8601String(),
+    'streamSeedHex': streamSeedHex,
+    'wiltCreatedAt': wiltCreatedAt?.toIso8601String(),
     'groupSeed': groupSeed,
     'laneSize': laneSize,
     'totalGroupSize': totalGroupSize,
     'slotIndex': slotIndex,
     'additionalSlots': additionalSlots,
+    'groupRechargePending': groupRechargePending,
   };
 
   factory Contact.fromJson(Map<String, dynamic> json) {
@@ -256,12 +329,20 @@ class Contact {
       outgoingMaxOffset: json['outgoingMaxOffset'] as int? ?? maxBuffer ~/ 2,
       incomingOffset: json['incomingOffset'] as int? ?? maxBuffer ~/ 2,
       incomingMaxOffset: json['incomingMaxOffset'] as int? ?? maxBuffer,
+      wiltExpiresAt: json['wiltExpiresAt'] != null
+          ? DateTime.parse(json['wiltExpiresAt'] as String)
+          : null,
+      streamSeedHex: json['streamSeedHex'] as String?,
+      wiltCreatedAt: json['wiltCreatedAt'] != null
+          ? DateTime.parse(json['wiltCreatedAt'] as String)
+          : null,
       groupSeed: json['groupSeed'] as String?,
       laneSize: json['laneSize'] as int?,
       totalGroupSize: json['totalGroupSize'] as int?,
       slotIndex: json['slotIndex'] as int?,
       additionalSlots:
           (json['additionalSlots'] as List<dynamic>?)?.cast<int>() ?? [],
+      groupRechargePending: json['groupRechargePending'] as bool? ?? false,
     );
   }
 }

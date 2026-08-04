@@ -12,7 +12,7 @@ import '../../dashboard/presentation/chats_tab.dart';
 import '../../chat/presentation/chat_screen.dart';
 import '../../chat/presentation/group_chat_screen.dart';
 import '../../chat/presentation/widgets/screenshot_ui.dart';
-import '../../proximity/presentation/pairing_screen.dart';
+import '../../proximity/presentation/connect_hub_screen.dart';
 import '../../settings/presentation/settings_screen.dart';
 import 'wk_bottom_nav.dart';
 
@@ -65,6 +65,9 @@ class _AppShellState extends State<AppShell>
     // A peer asking to screenshot a chat with us → show the Allow/Deny prompt
     // here (works regardless of which tab/screen is on top).
     _appState.incomingScreenshotRequest.addListener(_onScreenshotRequest);
+    // Archive Time Wilt chats that expired while the app was closed.
+    WidgetsBinding.instance
+        .addPostFrameCallback((_) => _appState.sweepTimeWiltChats());
   }
 
   /// Peer requested consent for a screenshot → surface the dialog once.
@@ -88,6 +91,8 @@ class _AppShellState extends State<AppShell>
       // Re-arm wilting countdowns (timers don't survive backgrounding) and wilt
       // anything whose lifetime elapsed while we were away.
       _appState.sweepAndArmWilting(force: true);
+      // Archive any Time Wilt chats whose lifetime elapsed while away.
+      _appState.sweepTimeWiltChats();
     }
   }
 
@@ -200,9 +205,9 @@ class _AppShellState extends State<AppShell>
                   index: _index,
                   children: [
                     const ChatsTab(),
-                    // PairTab mounts PairingScreen ONLY while active, so BLE never
-                    // scans from launch and stops the moment you leave the tab.
-                    _PairTab(isActive: _index == ShellTab.pair),
+                    // The Connect hub itself mounts no BLE — scanning only starts
+                    // when the user pushes into an in-person mode from here.
+                    const ConnectHubScreen(),
                     const SettingsScreen(embedded: true),
                   ],
                 ),
@@ -235,19 +240,6 @@ class _AppShellState extends State<AppShell>
         ),
       ),
     );
-  }
-}
-
-/// Mounts the heavyweight [PairingScreen] (and thus its BLE manager) only when
-/// the Pair tab is selected. When inactive it renders nothing, so the screen's
-/// State (and BLE scanning) is torn down — equivalent to the old push/pop.
-class _PairTab extends StatelessWidget {
-  final bool isActive;
-  const _PairTab({required this.isActive});
-
-  @override
-  Widget build(BuildContext context) {
-    return isActive ? const PairingScreen() : const SizedBox.shrink();
   }
 }
 

@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wiltkey_client/l10n/app_localizations.dart';
 import '../../../core/build_flavor.dart';
 import '../../../core/state.dart';
@@ -78,6 +79,90 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       OnboardingPageType.notifications,
       OnboardingPageType.pin,
     ]);
+
+    // Restore an in-progress onboarding after a background kill (Android can
+    // reclaim the activity while it's backgrounded — e.g. during the memory-heavy
+    // pixel-art step, or when the user leaves to grab a reference image — and
+    // onboarding is otherwise in-memory only, so it would restart from scratch).
+    _usernameController.addListener(_saveCheckpoint);
+    _codenameController.addListener(_saveCheckpoint);
+    _restoreCheckpoint();
+  }
+
+  // ---- Onboarding checkpoint (survives a background process death) -----------
+  static const _kOnbPageType = 'wk_onb_pagetype';
+  static const _kOnbUser = 'wk_onb_user';
+  static const _kOnbCode = 'wk_onb_code';
+  static const _kOnbGrid = 'wk_onb_grid';
+  static const _kOnbNotif = 'wk_onb_notif';
+
+  bool _restoring = false; // suppress checkpoint writes while applying a restore
+
+  Future<void> _saveCheckpoint() async {
+    if (_restoring || !mounted) return;
+    // Never checkpoint the PIN page: the PIN itself is never persisted, and
+    // resuming straight onto it (with no confirmed enclave) would be confusing.
+    final type = _activePages[_currentPage];
+    if (type == OnboardingPageType.pin) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_kOnbPageType, type.name);
+      await prefs.setString(_kOnbUser, _usernameController.text);
+      await prefs.setString(_kOnbCode, _codenameController.text);
+      await prefs.setString(_kOnbGrid, _pixelGrid.join());
+      await prefs.setInt(_kOnbNotif, _selectedNotificationMode.index);
+    } catch (_) {}
+  }
+
+  Future<void> _restoreCheckpoint() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final typeName = prefs.getString(_kOnbPageType);
+      if (typeName == null || !mounted) return;
+      // Page composition can differ between runs (the language page drops out
+      // once a locale is set), so resolve by page TYPE, not a stored index.
+      final idx = _activePages.indexWhere((p) => p.name == typeName);
+      if (idx <= 0) return; // not found, or already at the first page — no-op
+      final user = prefs.getString(_kOnbUser);
+      final code = prefs.getString(_kOnbCode);
+      final grid = prefs.getString(_kOnbGrid);
+      final notif = prefs.getInt(_kOnbNotif);
+      _restoring = true;
+      setState(() {
+        if (user != null) _usernameController.text = user;
+        if (code != null) _codenameController.text = code;
+        if (grid != null && grid.length == 100) _pixelGrid = grid.split('');
+        if (notif != null &&
+            notif >= 0 &&
+            notif < NotificationMode.values.length) {
+          _selectedNotificationMode = NotificationMode.values[notif];
+        }
+        _currentPage = idx;
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _pageController.hasClients) {
+          _pageController.jumpToPage(idx);
+        }
+        _restoring = false;
+      });
+    } catch (_) {
+      _restoring = false;
+    }
+  }
+
+  Future<void> _clearCheckpoint() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      for (final k in const [
+        _kOnbPageType,
+        _kOnbUser,
+        _kOnbCode,
+        _kOnbGrid,
+        _kOnbNotif,
+      ]) {
+        await prefs.remove(k);
+      }
+    } catch (_) {}
   }
 
   String _generateRandomCodename() {
@@ -131,7 +216,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       title: l10n.onboardingAvatarTitle,
       defaultColorIndex: 1,
     );
-    if (result != null) setState(() => _pixelGrid = result.split(''));
+    if (result != null) {
+      setState(() => _pixelGrid = result.split(''));
+      _saveCheckpoint(); // persist the avatar work — this is exactly what a user
+      // loses when they leave to grab a reference and Android kills the activity.
+    }
   }
 
   void _nextPage() {
@@ -219,6 +308,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         codename: _codenameController.text.trim().toUpperCase(),
         profileImage: _pixelGrid.join(),
       );
+      await _clearCheckpoint(); // onboarding done — drop the resume checkpoint.
       // Apply the notification choice now that the enclave exists. Off is the
       // default state already, so only act when the user opted into a background
       // mode — this also triggers the OS notification-permission prompt.
@@ -308,6 +398,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   setState(() {
                     _currentPage = page;
                   });
+                  _saveCheckpoint();
                 },
                 children: pages,
               ),
@@ -740,7 +831,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }) {
     final selected = _selectedNotificationMode == mode;
     return GestureDetector(
-      onTap: () => setState(() => _selectedNotificationMode = mode),
+      onTap: () {
+        setState(() => _selectedNotificationMode = mode);
+        _saveCheckpoint();
+      },
       child: AnimatedContainer(
         duration: t.motionShort,
         curve: Curves.easeOut,

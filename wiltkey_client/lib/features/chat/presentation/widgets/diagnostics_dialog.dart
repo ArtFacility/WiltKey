@@ -55,43 +55,89 @@ class DiagnosticsDialog extends StatelessWidget {
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Contact: ${contact.name}',
-            style: label.copyWith(color: t.action),
-          ),
-          const SizedBox(height: 12),
-          Text('My sending channel (outbound):', style: label),
-          const SizedBox(height: 4),
-          Text(
-            '  · Keystream range: ${contact.outgoingOffset} / ${contact.outgoingMaxOffset} bytes',
-            style: line,
-          ),
-          Text('  · Remaining budget: $remainingMe', style: line),
-          const SizedBox(height: 12),
-          Text('Peer channel (inbound):', style: label),
-          const SizedBox(height: 4),
-          Text(
-            '  · Keystream range: ${contact.incomingOffset} / ${contact.incomingMaxOffset} bytes',
-            style: line,
-          ),
-          Text('  · Remaining budget: $remainingPeer', style: line),
-          const SizedBox(height: 12),
-          Text('Overall specifications:', style: label),
-          const SizedBox(height: 4),
-          Text(
-            '  · Partition role: ${isInitiator ? "Initiator (Alice)" : "Receiver (Bob)"}',
-            style: line,
-          ),
-          Text('  · Total enclave storage: $totalBytes', style: line),
-          Text(
-            '  · Status: ${contact.isWilted ? "Wilted" : "Connected / active"}',
-            style: line.copyWith(
-              color: contact.isWilted ? t.danger : t.positive,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
+        children: contact.isTimeWilt
+            ? [
+                // Time Wilt has no byte budget — report the lifetime instead.
+                Text(
+                  'Contact: ${contact.name}',
+                  style: label.copyWith(color: t.action),
+                ),
+                const SizedBox(height: 12),
+                Text('Mode:', style: label),
+                const SizedBox(height: 4),
+                Text('  · Time Wilt (streaming keystream)', style: line),
+                const SizedBox(height: 12),
+                Text('Lifetime:', style: label),
+                const SizedBox(height: 4),
+                Text(
+                  '  · Created: ${contact.wiltCreatedAt?.toLocal()}',
+                  style: line,
+                ),
+                Text(
+                  '  · Wilts at: ${contact.wiltExpiresAt?.toLocal()}',
+                  style: line,
+                ),
+                Text(
+                  '  · Time remaining: ${contact.isArchived ? "wilted" : contact.timeWiltCountdownLabel}',
+                  style: line,
+                ),
+                const SizedBox(height: 12),
+                Text('Lanes:', style: label),
+                const SizedBox(height: 4),
+                Text('  · My send offset: ${contact.outgoingOffset}', style: line),
+                Text(
+                  '  · Peer send offset: ${contact.incomingOffset}',
+                  style: line,
+                ),
+                Text(
+                  '  · Partition role: ${isInitiator ? "lower id" : "higher id"}',
+                  style: line,
+                ),
+                Text(
+                  '  · Status: ${contact.isArchived ? "Wilted (read-only)" : "Active"}',
+                  style: line.copyWith(
+                    color: contact.isArchived ? t.danger : t.positive,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ]
+            : [
+                Text(
+                  'Contact: ${contact.name}',
+                  style: label.copyWith(color: t.action),
+                ),
+                const SizedBox(height: 12),
+                Text('My sending channel (outbound):', style: label),
+                const SizedBox(height: 4),
+                Text(
+                  '  · Keystream range: ${contact.outgoingOffset} / ${contact.outgoingMaxOffset} bytes',
+                  style: line,
+                ),
+                Text('  · Remaining budget: $remainingMe', style: line),
+                const SizedBox(height: 12),
+                Text('Peer channel (inbound):', style: label),
+                const SizedBox(height: 4),
+                Text(
+                  '  · Keystream range: ${contact.incomingOffset} / ${contact.incomingMaxOffset} bytes',
+                  style: line,
+                ),
+                Text('  · Remaining budget: $remainingPeer', style: line),
+                const SizedBox(height: 12),
+                Text('Overall specifications:', style: label),
+                const SizedBox(height: 4),
+                Text(
+                  '  · Partition role: ${isInitiator ? "Initiator (Alice)" : "Receiver (Bob)"}',
+                  style: line,
+                ),
+                Text('  · Total enclave storage: $totalBytes', style: line),
+                Text(
+                  '  · Status: ${contact.isWilted ? "Wilted" : "Connected / active"}',
+                  style: line.copyWith(
+                    color: contact.isWilted ? t.danger : t.positive,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
       ),
       actions: [
         ElevatedButton(

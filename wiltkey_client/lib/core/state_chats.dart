@@ -132,7 +132,17 @@ extension AppStateChats on AppState {
       'Outgoing offset: ${contact.outgoingOffset}, max: ${contact.outgoingMaxOffset}, remaining: ${contact.remainingBufferBytes}',
     );
 
-    if (contact.remainingBufferBytes < 74) {
+    // Time Wilt chats have no byte budget (unbounded streaming keystream); once
+    // expired they archive to read-only, so block sends then.
+    if (contact.isTimeWilt) {
+      final exp = contact.wiltExpiresAt;
+      final expired =
+          contact.isArchived || (exp != null && !DateTime.now().isBefore(exp));
+      if (expired) {
+        log('sendMessage error: Time Wilt chat expired (read-only)');
+        return 'This chat has wilted — it\'s read-only now.';
+      }
+    } else if (contact.remainingBufferBytes < 74) {
       // Empty lane: try to borrow keystream from the peer (1-on-1 only) so the
       // chat can recover instead of dead-ending.
       if (!contact.isGroup) requestBorrow(contact);
@@ -147,23 +157,31 @@ extension AppStateChats on AppState {
     final String wireText = ChatMessage.buildReplyBody(replyToId, text);
     final payloadBytes = utf8.encode(wireText).length;
 
-    // Pick where to encrypt: our primary sending lane first, otherwise a
-    // disjoint range the peer donated to us (borrowed keystream). If nothing
-    // fits anywhere, ask the peer to donate more and bail out for now.
-    final int? currentOffset = _pickSendOffset(contact, payloadBytes);
-    if (currentOffset == null) {
-      log(
-        'sendMessage: out of keystream (primary + borrowed). Requesting a borrow.',
-      );
-      requestBorrow(contact);
-      return 'Out of keystream in your lane — asked your peer for more bytes. Try again in a moment.';
+    // Pick where to encrypt. Time Wilt just streams from its own lane cursor
+    // (unbounded, no borrowing); byte-budget picks our primary sending lane
+    // first, otherwise a disjoint range the peer donated to us (borrowed
+    // keystream), and bails to a borrow request if nothing fits.
+    final int currentOffset;
+    if (contact.isTimeWilt) {
+      currentOffset = contact.outgoingOffset;
+      // Reserve synchronously so a concurrent send takes the next range.
+      contact.outgoingOffset += payloadBytes;
+    } else {
+      final int? picked = _pickSendOffset(contact, payloadBytes);
+      if (picked == null) {
+        log(
+          'sendMessage: out of keystream (primary + borrowed). Requesting a borrow.',
+        );
+        requestBorrow(contact);
+        return 'Out of keystream in your lane — asked your peer for more bytes. Try again in a moment.';
+      }
+      currentOffset = picked;
+      // Reserve the offset NOW (synchronously) so a second send during our
+      // awaits picks the next range, then recompute remaining capacity.
+      _advanceSendPointer(contact, currentOffset, payloadBytes);
+      contact.remainingBufferBytes = _sendCapacity(contact);
+      contact.isWilted = contact.remainingBufferBytes < 74;
     }
-
-    // Reserve the offset NOW (synchronously) so a second send during our awaits
-    // picks the next range, then recompute remaining capacity across all ranges.
-    _advanceSendPointer(contact, currentOffset, payloadBytes);
-    contact.remainingBufferBytes = _sendCapacity(contact);
-    contact.isWilted = contact.remainingBufferBytes < 74;
 
     // Show the bubble immediately as a pending placeholder (no DB write yet).
     final newMessage = ChatMessage(
@@ -195,11 +213,7 @@ extension AppStateChats on AppState {
     List<int> cipherBytes;
     try {
       final rawBytes = utf8.encode(wireText);
-      cipherBytes = await WiltkeyOtpService.xorWithKeystream(
-        contact.keyHash,
-        rawBytes,
-        currentOffset,
-      );
+      cipherBytes = await xorForContact(contact, rawBytes, currentOffset);
       log(
         'Encryption success. Plain bytes: ${rawBytes.length}, offset: $currentOffset',
       );
@@ -207,9 +221,13 @@ extension AppStateChats on AppState {
       log('Encryption error: $e');
       // Undo the placeholder + offset reservation so nothing leaks on failure.
       messages[contact.id]?.removeWhere((m) => m.id == newMessage.id);
-      _rollbackSendPointer(contact, currentOffset, payloadBytes);
-      contact.remainingBufferBytes = _sendCapacity(contact);
-      contact.isWilted = contact.remainingBufferBytes < 74;
+      if (contact.isTimeWilt) {
+        contact.outgoingOffset -= payloadBytes;
+      } else {
+        _rollbackSendPointer(contact, currentOffset, payloadBytes);
+        contact.remainingBufferBytes = _sendCapacity(contact);
+        contact.isWilted = contact.remainingBufferBytes < 74;
+      }
       notifyListeners();
       return 'Encryption failed: $e';
     }
@@ -232,8 +250,9 @@ extension AppStateChats on AppState {
     notifyListeners();
     _persistence.saveState(this);
 
-    // Proactively top up while there's still a little room left.
-    if (contact.remainingBufferBytes < 500) {
+    // Proactively top up while there's still a little room left (byte-budget
+    // only — Time Wilt streams unbounded and never borrows).
+    if (!contact.isTimeWilt && contact.remainingBufferBytes < 500) {
       requestBorrow(contact);
     }
 
@@ -453,6 +472,20 @@ extension AppStateChats on AppState {
     }
   }
 
+  /// Picks the right keystream for a 1:1/group contact and XORs [data] at
+  /// [offset]. Byte-budget uses the stored pad; Time Wilt derives on demand from
+  /// the persisted seed (no pad file); groups use the shared-pad path. XOR is
+  /// symmetric, so this both encrypts and decrypts.
+  Future<List<int>> xorForContact(Contact c, List<int> data, int offset) {
+    if (c.isGroup) {
+      return WiltkeyOtpService.xorWithGroupKeystream(c.keyHash, data, offset);
+    }
+    if (c.isTimeWilt) {
+      return WiltkeyOtpService.xorWithStreamSeed(c.streamSeedHex!, data, offset);
+    }
+    return WiltkeyOtpService.xorWithKeystream(c.keyHash, data, offset);
+  }
+
   Future<void> decryptMessage(Contact contact, ChatMessage message) async {
     if (message.decryptedText != null || message.isFailed) return;
     // Plain images are loaded on demand by their thumbnail (from the durable
@@ -463,17 +496,11 @@ extension AppStateChats on AppState {
     if (message.contentType == 'image') return;
     try {
       final cipherBytes = base64Decode(message.text);
-      final plainBytes = contact.isGroup
-          ? await WiltkeyOtpService.xorWithGroupKeystream(
-              contact.keyHash,
-              cipherBytes,
-              message.offset,
-            )
-          : await WiltkeyOtpService.xorWithKeystream(
-              contact.keyHash,
-              cipherBytes,
-              message.offset,
-            );
+      final plainBytes = await xorForContact(
+        contact,
+        cipherBytes,
+        message.offset,
+      );
       message.decryptedText = utf8.decode(plainBytes);
 
       // Cache decoded image bytes if image
@@ -510,17 +537,11 @@ extension AppStateChats on AppState {
       if (msg.decryptedText == null && !msg.isFailed) {
         try {
           final cipherBytes = base64Decode(msg.text);
-          final plainBytes = contact.isGroup
-              ? await WiltkeyOtpService.xorWithGroupKeystream(
-                  contact.keyHash,
-                  cipherBytes,
-                  msg.offset,
-                )
-              : await WiltkeyOtpService.xorWithKeystream(
-                  contact.keyHash,
-                  cipherBytes,
-                  msg.offset,
-                );
+          final plainBytes = await xorForContact(
+            contact,
+            cipherBytes,
+            msg.offset,
+          );
           msg.decryptedText = utf8.decode(plainBytes);
           if (msg.contentType == 'image') {
             msg.decodedImageBytes = base64Decode(msg.decryptedText!);

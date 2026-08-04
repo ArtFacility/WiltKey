@@ -1,6 +1,6 @@
 {
   "navChats": "Chats",
-  "navPair": "Pair",
+  "navPair": "Connect",
   "navSettings": "Settings",
   "nukedTitle": "Device Reset",
   "nukedExplanation": "All messages and keys have been deleted from this device. The secure database has been cleared.",
@@ -522,6 +522,13 @@
   "groupHost": "Host",
   "groupMember": "Member",
   "groupDepleted": "Depleted",
+  "groupNotYetMet": "Not yet met",
+  "groupRechargeButton": "Recharge group",
+  "groupRechargeTitle": "Recharge group?",
+  "groupRechargeBody": "Starts a fresh secure enclave with a new key. Everyone keeps their message history, but each member must meet you again in person to rejoin. Members you don't re-add keep their history but lose access.",
+  "groupRechargeConfirm": "Recharge",
+  "groupRechargeDone": "Group recharged — meet members again to re-add them.",
+  "groupRechargeNeededComposer": "Host recharged this group — meet them again to rejoin",
   "groupSyncingFromMember": "Syncing details and messages from {name}...",
   "@groupSyncingFromMember": {
     "placeholders": {

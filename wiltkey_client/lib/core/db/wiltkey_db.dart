@@ -43,7 +43,7 @@ class WiltkeyDatabase {
     } catch (_) {}
     _db = await openDatabase(
       path,
-      version: 13,
+      version: 15,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -149,6 +149,23 @@ class WiltkeyDatabase {
         'ALTER TABLE messages ADD COLUMN remote_size INTEGER DEFAULT 0',
       );
     }
+
+    // v14: Time Wilt chats — an absolute expiry (unix millis; non-null marks the
+    // chat as Time Wilt) and a persisted stream seed (1:1 Time Wilt keeps no pad
+    // file, so it derives keystream from this seed on demand).
+    if (oldVersion < 14) {
+      await db.execute('ALTER TABLE contacts ADD COLUMN wilt_expires_at INTEGER');
+      await db.execute('ALTER TABLE contacts ADD COLUMN stream_seed TEXT');
+      await db.execute('ALTER TABLE contacts ADD COLUMN wilt_created_at INTEGER');
+    }
+
+    // v15: a group member awaiting a re-meet after the host recharged the group
+    // (their old lane/seed is dead — the composer locks to a "meet host" prompt).
+    if (oldVersion < 15) {
+      await db.execute(
+        'ALTER TABLE contacts ADD COLUMN group_recharge_pending INTEGER DEFAULT 0',
+      );
+    }
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -233,11 +250,15 @@ class WiltkeyDatabase {
         outgoing_max_offset INTEGER,
         incoming_offset INTEGER,
         incoming_max_offset INTEGER,
+        wilt_expires_at INTEGER,
+        stream_seed TEXT,
+        wilt_created_at INTEGER,
         group_seed TEXT,
         lane_size INTEGER,
         total_group_size INTEGER,
         slot_index INTEGER,
-        additional_slots TEXT
+        additional_slots TEXT,
+        group_recharge_pending INTEGER DEFAULT 0
       )
     ''');
 
@@ -314,11 +335,15 @@ class WiltkeyDatabase {
       'outgoing_max_offset': contact.outgoingMaxOffset,
       'incoming_offset': contact.incomingOffset,
       'incoming_max_offset': contact.incomingMaxOffset,
+      'wilt_expires_at': contact.wiltExpiresAt?.millisecondsSinceEpoch,
+      'stream_seed': contact.streamSeedHex,
+      'wilt_created_at': contact.wiltCreatedAt?.millisecondsSinceEpoch,
       'group_seed': contact.groupSeed,
       'lane_size': contact.laneSize,
       'total_group_size': contact.totalGroupSize,
       'slot_index': contact.slotIndex,
       'additional_slots': jsonEncode(contact.additionalSlots),
+      'group_recharge_pending': contact.groupRechargePending ? 1 : 0,
     }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
@@ -363,6 +388,13 @@ class WiltkeyDatabase {
         outgoingMaxOffset: row['outgoing_max_offset'] as int? ?? 0,
         incomingOffset: row['incoming_offset'] as int? ?? 0,
         incomingMaxOffset: row['incoming_max_offset'] as int? ?? 0,
+        wiltExpiresAt: row['wilt_expires_at'] != null
+            ? DateTime.fromMillisecondsSinceEpoch(row['wilt_expires_at'] as int)
+            : null,
+        streamSeedHex: row['stream_seed'] as String?,
+        wiltCreatedAt: row['wilt_created_at'] != null
+            ? DateTime.fromMillisecondsSinceEpoch(row['wilt_created_at'] as int)
+            : null,
         groupSeed: row['group_seed'] as String?,
         laneSize: row['lane_size'] as int?,
         totalGroupSize: row['total_group_size'] as int?,
@@ -371,6 +403,8 @@ class WiltkeyDatabase {
             (jsonDecode(row['additional_slots'] as String? ?? '[]')
                     as List<dynamic>)
                 .cast<int>(),
+        groupRechargePending:
+            (row['group_recharge_pending'] as int? ?? 0) == 1,
       );
     }).toList();
   }

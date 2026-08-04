@@ -9,6 +9,31 @@ import 'package:wiltkey_client/core/network/remote_pairing_controller.dart';
 import 'package:wiltkey_client/core/theme/wk.dart';
 import 'package:wiltkey_client/core/theme/wiltkey_tokens.dart';
 
+/// Pushable wrapper around [RemotePairTab] for the Connect hub — gives the
+/// debug remote-pair flow its own Scaffold + back button now that it's a route
+/// rather than a tab. TEMPORARY, same lifetime as [kRemotePairingTesting].
+class RemotePairScreen extends StatelessWidget {
+  const RemotePairScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.wk;
+    return Scaffold(
+      backgroundColor: t.bg,
+      appBar: AppBar(
+        backgroundColor: t.bg,
+        elevation: 0,
+        iconTheme: IconThemeData(color: t.action),
+        title: Text(
+          t.uppercaseLabels ? 'REMOTE PAIR' : 'Remote pair',
+          style: t.screenTitle.copyWith(fontSize: 16),
+        ),
+      ),
+      body: const RemotePairTab(),
+    );
+  }
+}
+
 class RemotePairTab extends StatefulWidget {
   const RemotePairTab({super.key});
 
@@ -45,7 +70,12 @@ class _RemotePairTabState extends State<RemotePairTab> {
         return Container(
           color: t.bg,
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.fromLTRB(
+              16,
+              16,
+              16,
+              16 + MediaQuery.of(context).viewPadding.bottom,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [

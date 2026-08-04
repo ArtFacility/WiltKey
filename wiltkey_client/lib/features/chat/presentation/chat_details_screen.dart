@@ -167,9 +167,13 @@ class _ChatDetailsScreenState extends State<ChatDetailsScreen> {
     final t = context.wk;
     final l10n = AppLocalizations.of(context)!;
     final contact = _contact;
-    final int budget = ChatMetaStore.budgetFor(contact.maxBufferBytes);
+    final int budget = ChatMetaStore.budgetFor(
+      contact.maxBufferBytes,
+      timeWilt: contact.isTimeWilt,
+    );
     final bool emojisOk = ChatMetaStore.customEmojisAllowed(
       contact.maxBufferBytes,
+      timeWilt: contact.isTimeWilt,
     );
 
     return Scaffold(
@@ -189,7 +193,15 @@ class _ChatDetailsScreenState extends State<ChatDetailsScreen> {
         ),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        // Pad the bottom by the system nav-bar inset so the last action (Nuke)
+        // clears 3-button navigation under edge-to-edge — a gesture/3-button
+        // user must never have the destructive button sitting under the bar.
+        padding: EdgeInsets.fromLTRB(
+          16,
+          16,
+          16,
+          16 + MediaQuery.of(context).viewPadding.bottom,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -229,28 +241,44 @@ class _ChatDetailsScreenState extends State<ChatDetailsScreen> {
                     style: t.dataMono.copyWith(color: t.textTertiary),
                   ),
                   const SizedBox(height: 14),
-                  // Detail budget glyph (large flower / full bar) + labels.
+                  // Detail budget glyph (large flower / full bar) + labels. Time
+                  // Wilt reuses the single gauge for time-remaining, with a
+                  // lifetime line instead of the me/peer byte readout.
                   context.wkc.budgetIndicator(
-                    ourFraction: contact.chargePercentage,
-                    theirFraction: contact.getTheirChargePercentage(
-                      _appState.userId,
-                    ),
-                    isWilted: contact.isWilted,
-                    split: true,
+                    ourFraction: contact.isTimeWilt
+                        ? contact.timeWiltRemainingFraction
+                        : contact.chargePercentage,
+                    theirFraction: contact.isTimeWilt
+                        ? 0
+                        : contact.getTheirChargePercentage(_appState.userId),
+                    isWilted: contact.isTimeWilt
+                        ? contact.isArchived
+                        : contact.isWilted,
+                    split: !contact.isTimeWilt,
                     variant: BudgetIndicatorVariant.detail,
-                    semanticLabel: l10n.chatRemainingLabel(
-                      AppState.formatBytes(contact.remainingBufferBytes),
-                    ),
+                    semanticLabel: contact.isTimeWilt
+                        ? contact.timeWiltCountdownLabel
+                        : l10n.chatRemainingLabel(
+                            AppState.formatBytes(contact.remainingBufferBytes),
+                          ),
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    l10n.chatDetailsHeaderMeRemaining(
-                      AppState.formatBytes(contact.remainingBufferBytes),
-                      AppState.formatBytes(
-                        contact.getTheirRemainingBytes(_appState.userId),
-                      ),
+                    contact.isTimeWilt
+                        ? (contact.isArchived
+                              ? 'Wilted — read-only'
+                              : 'Wilts in ${contact.timeWiltCountdownLabel}')
+                        : l10n.chatDetailsHeaderMeRemaining(
+                            AppState.formatBytes(contact.remainingBufferBytes),
+                            AppState.formatBytes(
+                              contact.getTheirRemainingBytes(_appState.userId),
+                            ),
+                          ),
+                    style: t.dataMono.copyWith(
+                      color: contact.isTimeWilt && contact.isArchived
+                          ? t.textTertiary
+                          : t.positive,
                     ),
-                    style: t.dataMono.copyWith(color: t.positive),
                   ),
                 ],
               ),
@@ -349,27 +377,28 @@ class _ChatDetailsScreenState extends State<ChatDetailsScreen> {
             ),
             const SizedBox(height: 24),
 
-            // Metadata space (relative budget)
-            _title(t, l10n.chatDetailsSectionMetadata, t.action),
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: _panel(t),
-              child: Text(
-                l10n.chatDetailsMetadataExplanation(
-                  AppState.formatBytes(budget),
-                  AppState.formatBytes(contact.maxBufferBytes),
+            // Metadata space + secure lanes / byte-borrow ("request chat space")
+            // are byte-budget concepts — hidden for Time Wilt (unbounded stream).
+            if (!contact.isTimeWilt) ...[
+              _title(t, l10n.chatDetailsSectionMetadata, t.action),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: _panel(t),
+                child: Text(
+                  l10n.chatDetailsMetadataExplanation(
+                    AppState.formatBytes(budget),
+                    AppState.formatBytes(contact.maxBufferBytes),
+                  ),
+                  style: t.bodySecondary,
                 ),
-                style: t.bodySecondary,
               ),
-            ),
-            const SizedBox(height: 24),
-
-            // Secure lanes / byte-range
-            _title(t, l10n.chatDetailsSectionLanes, t.action),
-            const SizedBox(height: 8),
-            _buildLanes(t, contact),
-            const SizedBox(height: 24),
+              const SizedBox(height: 24),
+              _title(t, l10n.chatDetailsSectionLanes, t.action),
+              const SizedBox(height: 8),
+              _buildLanes(t, contact),
+              const SizedBox(height: 24),
+            ],
 
             // Custom emojis
             _buildEmojiSection(t, emojisOk, budget),

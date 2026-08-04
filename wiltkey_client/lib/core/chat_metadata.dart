@@ -50,14 +50,21 @@ class ChatMetaStore {
   static const int customEmojiThreshold =
       50 * 1024; // emojis need ≥ ~50 KB budget
 
+  /// Time Wilt chats carry no byte budget, so they get a FIXED metadata
+  /// allowance instead — comfortably above [customEmojiThreshold] so they always
+  /// support custom emojis (room for ~10+ small pixel emojis).
+  static const int timeWiltBudget = 256 * 1024; // ~256 KB
+
   /// Soft metadata budget in bytes for a chat of [bufferBytes] total pad.
   /// e.g. 100 KB → ~2 KB (no emojis); 5 MB → ~100 KB; 50 MB → 1 MB (capped).
-  static int budgetFor(int bufferBytes) {
+  /// [timeWilt] chats ignore the pad size and use the fixed [timeWiltBudget].
+  static int budgetFor(int bufferBytes, {bool timeWilt = false}) {
+    if (timeWilt) return timeWiltBudget;
     final b = (bufferBytes * _ratio).round();
     return b < 0 ? 0 : (b > _budgetCap ? _budgetCap : b);
   }
 
   /// Whether a chat of this size is large enough to support custom emojis.
-  static bool customEmojisAllowed(int bufferBytes) =>
-      budgetFor(bufferBytes) >= customEmojiThreshold;
+  static bool customEmojisAllowed(int bufferBytes, {bool timeWilt = false}) =>
+      budgetFor(bufferBytes, timeWilt: timeWilt) >= customEmojiThreshold;
 }
