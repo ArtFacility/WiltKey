@@ -342,7 +342,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsLanguageSystem => '跟随系统';
 
   @override
-  String get settingsLanguageEnglish => 'English';
+  String get settingsLanguageEnglish => 'English (英语)';
 
   @override
   String get settingsLanguageHungarian => 'Magyar (匈牙利语)';
@@ -697,7 +697,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatDetailsLanesExplanation =>
-      'If you run low on chat capacity, you can borrow unused space from your peer. This can also happen automatically so you can keep chatting.';
+      '如果你的聊天容量不足，可以借用对方未使用的空间。这也可能会自动发生，以便你继续聊天。';
 
   @override
   String get chatDetailsLanesBorrowButton => '申请聊天空间';
@@ -987,28 +987,25 @@ class AppLocalizationsZh extends AppLocalizations {
   String get groupDepleted => '容量已耗尽';
 
   @override
-  String get groupNotYetMet => 'Not yet met';
+  String get groupNotYetMet => '还没见过面';
 
   @override
-  String get groupRechargeButton => 'Recharge group';
+  String get groupRechargeButton => '重新充能群组';
 
   @override
-  String get groupRechargeTitle => 'Recharge group?';
+  String get groupRechargeTitle => '要重新充能群组吗？';
 
   @override
-  String get groupRechargeBody =>
-      'Starts a fresh secure enclave with a new key. Everyone keeps their message history, but each member must meet you again in person to rejoin. Members you don\'t re-add keep their history but lose access.';
+  String get groupRechargeBody => '用新密钥重新充能聊天。聊天记录会保留，但成员必须与你当面重聚才能重新加入。';
 
   @override
-  String get groupRechargeConfirm => 'Recharge';
+  String get groupRechargeConfirm => '重新充能';
 
   @override
-  String get groupRechargeDone =>
-      'Group recharged — meet members again to re-add them.';
+  String get groupRechargeDone => '群组已重新充能 — 再次见面即可重新添加成员。';
 
   @override
-  String get groupRechargeNeededComposer =>
-      'Host recharged this group — meet them again to rejoin';
+  String get groupRechargeNeededComposer => '群主重新充能了群组 — 再次见面即可重新加入';
 
   @override
   String groupSyncingFromMember(String name) {
@@ -1576,4 +1573,99 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get shopFreeLabel => '免费';
+
+  @override
+  String get notificationModePrivate => '私密';
+
+  @override
+  String get notificationModePrivateDesc =>
+      '在后台定期检查新消息，不使用 Google 推送服务。提醒可能会有延迟，但没有任何信号经过第三方服务。';
+
+  @override
+  String get connectSectionOneOnOne => '一对一聊天';
+
+  @override
+  String get connectSectionGroups => '群组';
+
+  @override
+  String get connectByteBudgetTitle => '字节预算';
+
+  @override
+  String get connectByteBudgetDesc => '无时间限制，有容量限制。最适合长期的亲友聊天及高安全需求。';
+
+  @override
+  String get connectTimeWiltTitle => 'Time Wilt';
+
+  @override
+  String get connectTimeWiltDesc => '有时间限制，无容量限制。适合认识新朋友、相亲或短期的临时聊天。';
+
+  @override
+  String get connectRemotePairTitle => '远程配对（测试）';
+
+  @override
+  String get connectRemotePairDesc => '仅供测试：通过服务器与测试人员配对（使用 PIN 与身份哈希）。';
+
+  @override
+  String get connectByteBudgetGroupTitle => '字节预算群组';
+
+  @override
+  String get connectByteBudgetGroupDesc => '无时间限制，有容量限制。通过当面邀请成员来创建群组。';
+
+  @override
+  String get connectTimeWiltGroupTitle => 'Time Wilt 群组';
+
+  @override
+  String get connectTimeWiltGroupDesc => '有时间限制，无容量限制。消息随时间自动过期的休闲群组。';
+
+  @override
+  String get connectJoinGroupTitle => '加入群组';
+
+  @override
+  String get connectJoinGroupDesc => '附近有人邀请了你 — 搜索对方的群组信号。';
+
+  @override
+  String get connectJoinRemoteGroupTitle => '加入远程群组（测试）';
+
+  @override
+  String get connectJoinRemoteGroupDesc => '仅供测试：通过服务器加入测试人员的群组。';
+
+  @override
+  String get connectBadgeSoon => '即将推出';
+
+  @override
+  String get timeWiltLifetimeLabel => '聊天时长';
+
+  @override
+  String get timeWiltPlusHint => '使用 Plus 解锁长达 6 个月的时长';
+
+  @override
+  String get timeWiltExplanation => '计时结束后，聊天将变为只读模式。';
+
+  @override
+  String timeWiltPairRequestDialogBody(String peerName, String lifetime) {
+    return '是否接受来自 $peerName 的 Time Wilt 聊天？聊天将在 $lifetime 后变为只读模式。';
+  }
+
+  @override
+  String timeWiltLifetimeDays(int count) {
+    return '$count 天';
+  }
+
+  @override
+  String timeWiltLifetimeHours(int count) {
+    return '$count 小时';
+  }
+
+  @override
+  String timeWiltLifetimeMinutes(int count) {
+    return '$count 分钟';
+  }
+
+  @override
+  String timeWiltLifetimeMonths(int count) {
+    return '$count 个月';
+  }
+
+  @override
+  String get timeWiltLifetimeMoments => '片刻';
 }

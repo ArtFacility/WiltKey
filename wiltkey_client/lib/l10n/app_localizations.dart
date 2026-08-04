@@ -2999,6 +2999,174 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Free'**
   String get shopFreeLabel;
+
+  /// No description provided for @notificationModePrivate.
+  ///
+  /// In en, this message translates to:
+  /// **'Private'**
+  String get notificationModePrivate;
+
+  /// No description provided for @notificationModePrivateDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Periodically checks for new messages in the background without using Google push services. Alerts may be delayed, but no signals pass through a 3rd-party service.'**
+  String get notificationModePrivateDesc;
+
+  /// No description provided for @connectSectionOneOnOne.
+  ///
+  /// In en, this message translates to:
+  /// **'One-on-one'**
+  String get connectSectionOneOnOne;
+
+  /// No description provided for @connectSectionGroups.
+  ///
+  /// In en, this message translates to:
+  /// **'Groups'**
+  String get connectSectionGroups;
+
+  /// No description provided for @connectByteBudgetTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Byte budget'**
+  String get connectByteBudgetTitle;
+
+  /// No description provided for @connectByteBudgetDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlimited time, limited budget. Best for long-distance friends and family, and high-security chats.'**
+  String get connectByteBudgetDesc;
+
+  /// No description provided for @connectTimeWiltTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Time Wilt'**
+  String get connectTimeWiltTitle;
+
+  /// No description provided for @connectTimeWiltDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Limited time, unlimited budget. Best for getting to know new people, blind dates, or friends you need an excuse to see.'**
+  String get connectTimeWiltDesc;
+
+  /// No description provided for @connectRemotePairTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Remote pair (testing)'**
+  String get connectRemotePairTitle;
+
+  /// No description provided for @connectRemotePairDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Debug-only: pair with a tester over the relay using a PIN + identity hash.'**
+  String get connectRemotePairDesc;
+
+  /// No description provided for @connectByteBudgetGroupTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Byte budget group'**
+  String get connectByteBudgetGroupTitle;
+
+  /// No description provided for @connectByteBudgetGroupDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlimited time, limited budget. A group you build by inviting members in person.'**
+  String get connectByteBudgetGroupDesc;
+
+  /// No description provided for @connectTimeWiltGroupTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Time Wilt group'**
+  String get connectTimeWiltGroupTitle;
+
+  /// No description provided for @connectTimeWiltGroupDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Limited time, unlimited budget. A casual group whose messages expire as you go.'**
+  String get connectTimeWiltGroupDesc;
+
+  /// No description provided for @connectJoinGroupTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Join a group'**
+  String get connectJoinGroupTitle;
+
+  /// No description provided for @connectJoinGroupDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Someone nearby invited you — find their group beacon.'**
+  String get connectJoinGroupDesc;
+
+  /// No description provided for @connectJoinRemoteGroupTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Join remote group (testing)'**
+  String get connectJoinRemoteGroupTitle;
+
+  /// No description provided for @connectJoinRemoteGroupDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Debug-only: join a tester\'s group over the relay.'**
+  String get connectJoinRemoteGroupDesc;
+
+  /// No description provided for @connectBadgeSoon.
+  ///
+  /// In en, this message translates to:
+  /// **'SOON'**
+  String get connectBadgeSoon;
+
+  /// No description provided for @timeWiltLifetimeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat lifetime'**
+  String get timeWiltLifetimeLabel;
+
+  /// No description provided for @timeWiltPlusHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock up to 6 months with Plus'**
+  String get timeWiltPlusHint;
+
+  /// No description provided for @timeWiltExplanation.
+  ///
+  /// In en, this message translates to:
+  /// **'The chat becomes read-only when the timer runs out.'**
+  String get timeWiltExplanation;
+
+  /// No description provided for @timeWiltPairRequestDialogBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Accept a Time Wilt chat from {peerName}? It becomes read-only in {lifetime}.'**
+  String timeWiltPairRequestDialogBody(String peerName, String lifetime);
+
+  /// No description provided for @timeWiltLifetimeDays.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 day} other{{count} days}}'**
+  String timeWiltLifetimeDays(int count);
+
+  /// No description provided for @timeWiltLifetimeHours.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 hour} other{{count} hours}}'**
+  String timeWiltLifetimeHours(int count);
+
+  /// No description provided for @timeWiltLifetimeMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} min'**
+  String timeWiltLifetimeMinutes(int count);
+
+  /// No description provided for @timeWiltLifetimeMonths.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 month} other{{count} months}}'**
+  String timeWiltLifetimeMonths(int count);
+
+  /// No description provided for @timeWiltLifetimeMoments.
+  ///
+  /// In en, this message translates to:
+  /// **'moments'**
+  String get timeWiltLifetimeMoments;
 }
 
 class _AppLocalizationsDelegate

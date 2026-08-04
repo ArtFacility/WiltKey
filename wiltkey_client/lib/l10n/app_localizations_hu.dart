@@ -1040,28 +1040,28 @@ class AppLocalizationsHu extends AppLocalizations {
   String get groupDepleted => 'Kimerült';
 
   @override
-  String get groupNotYetMet => 'Not yet met';
+  String get groupNotYetMet => 'Még nem találkoztatok';
 
   @override
-  String get groupRechargeButton => 'Recharge group';
+  String get groupRechargeButton => 'Csoport újratöltése';
 
   @override
-  String get groupRechargeTitle => 'Recharge group?';
+  String get groupRechargeTitle => 'Újratöltöd a csoportot?';
 
   @override
   String get groupRechargeBody =>
-      'Starts a fresh secure enclave with a new key. Everyone keeps their message history, but each member must meet you again in person to rejoin. Members you don\'t re-add keep their history but lose access.';
+      'Újratölti a chatet egy új kulccsal, az üzenetelőzmények megmaradnak, de minden tagnak újra találkoznia kell veled hogy újracsatlakozzanak';
 
   @override
-  String get groupRechargeConfirm => 'Recharge';
+  String get groupRechargeConfirm => 'Újratöltés';
 
   @override
   String get groupRechargeDone =>
-      'Group recharged — meet members again to re-add them.';
+      'Csoport újratöltve — találkozz újra a tagokkal az újrafelvételükhöz.';
 
   @override
   String get groupRechargeNeededComposer =>
-      'Host recharged this group — meet them again to rejoin';
+      'A házigazda újratöltötte a csoportot — találkozz vele újra az újracsatlakozáshoz';
 
   @override
   String groupSyncingFromMember(String name) {
@@ -1662,4 +1662,126 @@ class AppLocalizationsHu extends AppLocalizations {
 
   @override
   String get shopFreeLabel => 'Ingyenes';
+
+  @override
+  String get notificationModePrivate => 'Privát';
+
+  @override
+  String get notificationModePrivateDesc =>
+      'Időközönként ellenőrzi az új üzeneteket a háttérben, a Google push szolgáltatása nélkül. Az értesítések késhetnek, de semmilyen jel nem megy át harmadik féltől származó szolgáltatáson.';
+
+  @override
+  String get connectSectionOneOnOne => 'Személyes chat';
+
+  @override
+  String get connectSectionGroups => 'Csoportok';
+
+  @override
+  String get connectByteBudgetTitle => 'Bájt keret';
+
+  @override
+  String get connectByteBudgetDesc =>
+      'Kötetlen idő, korlátozott tárhely. A legjobb régóta ismert barátoknak, családnak és kiemelten biztonságos beszélgetésekhez.';
+
+  @override
+  String get connectTimeWiltTitle => 'Time Wilt';
+
+  @override
+  String get connectTimeWiltDesc =>
+      'Korlátozott idő, korlátlan tárhely. Tökéletes új ismerősöknek, randikhoz vagy gyors találkozókhoz.';
+
+  @override
+  String get connectRemotePairTitle => 'Távoli párosítás (teszt)';
+
+  @override
+  String get connectRemotePairDesc =>
+      'Fejlesztői teszt: párosítás egy tesztelővel a szerveren keresztül PIN és azonosító hash alapján.';
+
+  @override
+  String get connectByteBudgetGroupTitle => 'Bájt keretes csoport';
+
+  @override
+  String get connectByteBudgetGroupDesc =>
+      'Kötetlen idő, korlátozott tárhely. Egy csoport, amit személyes meghívásokkal építesz fel.';
+
+  @override
+  String get connectTimeWiltGroupTitle => 'Time Wilt csoport';
+
+  @override
+  String get connectTimeWiltGroupDesc =>
+      'Korlátozott idő, korlátlan tárhely. Egy laza csoport, ahol az üzenetek idővel lejárnak.';
+
+  @override
+  String get connectJoinGroupTitle => 'Csatlakozás csoporthoz';
+
+  @override
+  String get connectJoinGroupDesc =>
+      'Valaki a közelben meghívott — keresd meg a csoportjának jelét.';
+
+  @override
+  String get connectJoinRemoteGroupTitle =>
+      'Csatlakozás távoli csoporthoz (teszt)';
+
+  @override
+  String get connectJoinRemoteGroupDesc =>
+      'Fejlesztői teszt: csatlakozás egy tesztelő csoportjához a szerveren keresztül.';
+
+  @override
+  String get connectBadgeSoon => 'HAMAROSAN';
+
+  @override
+  String get timeWiltLifetimeLabel => 'Chat élettartama';
+
+  @override
+  String get timeWiltPlusHint => 'Oldj fel akár 6 hónapot a Plus-szal';
+
+  @override
+  String get timeWiltExplanation =>
+      'A chat csak olvashatóvá válik, amint lejár az időzítő.';
+
+  @override
+  String timeWiltPairRequestDialogBody(String peerName, String lifetime) {
+    return 'Elfogadod a Time Wilt chatet tőle: $peerName? Ennyi idő múlva lesz csak olvasható: $lifetime.';
+  }
+
+  @override
+  String timeWiltLifetimeDays(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count nap',
+      one: '1 nap',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String timeWiltLifetimeHours(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count óra',
+      one: '1 óra',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String timeWiltLifetimeMinutes(int count) {
+    return '$count perc';
+  }
+
+  @override
+  String timeWiltLifetimeMonths(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count hónap',
+      one: '1 hónap',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get timeWiltLifetimeMoments => 'pár pillanat';
 }

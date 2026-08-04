@@ -75,28 +75,25 @@ class _ConnectHubScreenState extends State<ConnectHubScreen> {
           24 + MediaQuery.of(context).viewPadding.bottom,
         ),
         children: [
-          _sectionLabel(t, 'One-on-one'),
+          _sectionLabel(t, l10n.connectSectionOneOnOne),
           const SizedBox(height: 8),
           _HubCard(
             icon: Icons.bluetooth_searching,
-            title: 'Byte budget',
-            subtitle: 'Unlimited time, limited budget. Best for long-distance '
-                'friends and family, and high-security chats.',
+            title: l10n.connectByteBudgetTitle,
+            subtitle: l10n.connectByteBudgetDesc,
             onTap: () => _pushPairThenChats(context),
           ),
           _HubCard(
             icon: Icons.hourglass_bottom,
-            title: 'Time Wilt',
-            subtitle: 'Limited time, unlimited budget. Best for getting to know '
-                'new people, blind dates, or friends you need an excuse to see.',
+            title: l10n.connectTimeWiltTitle,
+            subtitle: l10n.connectTimeWiltDesc,
             onTap: () => _pushPairThenChats(context, timeWilt: true),
           ),
           if (showRemote)
             _HubCard(
               icon: Icons.cloud_sync_outlined,
-              title: 'Remote pair (testing)',
-              subtitle: 'Debug-only: pair with a tester over the relay using a '
-                  'PIN + identity hash.',
+              title: l10n.connectRemotePairTitle,
+              subtitle: l10n.connectRemotePairDesc,
               accent: t.warning,
               onTap: () => Navigator.push(
                 context,
@@ -104,13 +101,12 @@ class _ConnectHubScreenState extends State<ConnectHubScreen> {
               ),
             ),
           const SizedBox(height: 22),
-          _sectionLabel(t, 'Groups'),
+          _sectionLabel(t, l10n.connectSectionGroups),
           const SizedBox(height: 8),
           _HubCard(
             icon: Icons.group_add_outlined,
-            title: 'Byte budget group',
-            subtitle: 'Unlimited time, limited budget. A group you build by '
-                'inviting members in person.',
+            title: l10n.connectByteBudgetGroupTitle,
+            subtitle: l10n.connectByteBudgetGroupDesc,
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => CreateGroupScreen()),
@@ -118,15 +114,14 @@ class _ConnectHubScreenState extends State<ConnectHubScreen> {
           ),
           _HubCard(
             icon: Icons.hourglass_bottom,
-            title: 'Time Wilt group',
-            subtitle: 'Limited time, unlimited budget. A casual group whose '
-                'messages expire as you go.',
+            title: l10n.connectTimeWiltGroupTitle,
+            subtitle: l10n.connectTimeWiltGroupDesc,
             soon: true,
           ),
           _HubCard(
             icon: Icons.groups_outlined,
-            title: 'Join a group',
-            subtitle: 'Someone nearby invited you — find their group beacon.',
+            title: l10n.connectJoinGroupTitle,
+            subtitle: l10n.connectJoinGroupDesc,
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const GroupSearchScreen()),
@@ -135,8 +130,8 @@ class _ConnectHubScreenState extends State<ConnectHubScreen> {
           if (showRemote)
             _HubCard(
               icon: Icons.cloud_download_outlined,
-              title: 'Join remote group (testing)',
-              subtitle: 'Debug-only: join a tester\'s group over the relay.',
+              title: l10n.connectJoinRemoteGroupTitle,
+              subtitle: l10n.connectJoinRemoteGroupDesc,
               accent: t.warning,
               onTap: () => Navigator.push(
                 context,
@@ -264,7 +259,7 @@ class _HubCard extends StatelessWidget {
                                     BorderRadius.circular(t.radiusControl),
                               ),
                               child: Text(
-                                'SOON',
+                                AppLocalizations.of(context)!.connectBadgeSoon,
                                 style: t.sectionLabel.copyWith(
                                   color: t.action,
                                   fontSize: 9,

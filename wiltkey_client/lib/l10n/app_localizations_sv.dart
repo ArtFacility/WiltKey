@@ -358,7 +358,7 @@ class AppLocalizationsSv extends AppLocalizations {
   String get settingsLanguageSystem => 'Systemspråk';
 
   @override
-  String get settingsLanguageEnglish => 'English';
+  String get settingsLanguageEnglish => 'English (Engelska)';
 
   @override
   String get settingsLanguageHungarian => 'Magyar (Ungerska)';
@@ -1032,28 +1032,28 @@ class AppLocalizationsSv extends AppLocalizations {
   String get groupDepleted => 'Slut';
 
   @override
-  String get groupNotYetMet => 'Not yet met';
+  String get groupNotYetMet => 'Inte träffats än';
 
   @override
-  String get groupRechargeButton => 'Recharge group';
+  String get groupRechargeButton => 'Ladda om grupp';
 
   @override
-  String get groupRechargeTitle => 'Recharge group?';
+  String get groupRechargeTitle => 'Ladda om grupp?';
 
   @override
   String get groupRechargeBody =>
-      'Starts a fresh secure enclave with a new key. Everyone keeps their message history, but each member must meet you again in person to rejoin. Members you don\'t re-add keep their history but lose access.';
+      'Laddar om chatten med en ny nyckel. Historiken finns kvar, men alla måste träffa dig igen för att gå med på nytt.';
 
   @override
-  String get groupRechargeConfirm => 'Recharge';
+  String get groupRechargeConfirm => 'Ladda om';
 
   @override
   String get groupRechargeDone =>
-      'Group recharged — meet members again to re-add them.';
+      'Gruppen är omladdad — träffa medlemmarna igen för att lägga till dem.';
 
   @override
   String get groupRechargeNeededComposer =>
-      'Host recharged this group — meet them again to rejoin';
+      'Värden laddade om gruppen — träffa dem igen för att gå med på nytt';
 
   @override
   String groupSyncingFromMember(String name) {
@@ -1650,4 +1650,125 @@ class AppLocalizationsSv extends AppLocalizations {
 
   @override
   String get shopFreeLabel => 'Gratis';
+
+  @override
+  String get notificationModePrivate => 'Privat';
+
+  @override
+  String get notificationModePrivateDesc =>
+      'Kontrollerar regelbundet nya meddelanden i bakgrunden utan att använda Googles push-tjänst. Aviseringar kan fördröjas, men inga signaler går via en tredje part.';
+
+  @override
+  String get connectSectionOneOnOne => 'En-mot-en';
+
+  @override
+  String get connectSectionGroups => 'Grupper';
+
+  @override
+  String get connectByteBudgetTitle => 'Bajtebudget';
+
+  @override
+  String get connectByteBudgetDesc =>
+      'Obegränsad tid, begränsad utrymmesbudget. Bäst för vänner, familj och extra säkra chattar.';
+
+  @override
+  String get connectTimeWiltTitle => 'Time Wilt';
+
+  @override
+  String get connectTimeWiltDesc =>
+      'Begränsad tid, obegränsat utrymme. Perfekt för nya bekantskaper, dejter eller spontana träffar.';
+
+  @override
+  String get connectRemotePairTitle => 'Fjärrparkoppling (test)';
+
+  @override
+  String get connectRemotePairDesc =>
+      'Testläge: parkoppla med en testare via servern med PIN och identitetshash.';
+
+  @override
+  String get connectByteBudgetGroupTitle => 'Bajtebudget-grupp';
+
+  @override
+  String get connectByteBudgetGroupDesc =>
+      'Obegränsad tid, begränsad budget. En grupp du bygger genom att bjuda in medlemmar personligen.';
+
+  @override
+  String get connectTimeWiltGroupTitle => 'Time Wilt-grupp';
+
+  @override
+  String get connectTimeWiltGroupDesc =>
+      'Begränsad tid, obegränsat utrymme. En avslappnad grupp där meddelanden löper ut efter hand.';
+
+  @override
+  String get connectJoinGroupTitle => 'Gå med i en grupp';
+
+  @override
+  String get connectJoinGroupDesc =>
+      'Någon i närheten bjöds in dig — sök efter deras gruppsignal.';
+
+  @override
+  String get connectJoinRemoteGroupTitle => 'Gå med i fjärrgrupp (test)';
+
+  @override
+  String get connectJoinRemoteGroupDesc =>
+      'Testläge: gå med i en testares grupp via servern.';
+
+  @override
+  String get connectBadgeSoon => 'SNART';
+
+  @override
+  String get timeWiltLifetimeLabel => 'Chattens livslängd';
+
+  @override
+  String get timeWiltPlusHint => 'Lås upp upp till 6 månader med Plus';
+
+  @override
+  String get timeWiltExplanation =>
+      'Chatten blir skrivelåst när timern går ut.';
+
+  @override
+  String timeWiltPairRequestDialogBody(String peerName, String lifetime) {
+    return 'Acceptera en Time Wilt-chatt från $peerName? Den blir skrivelåst om $lifetime.';
+  }
+
+  @override
+  String timeWiltLifetimeDays(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count dagar',
+      one: '1 dag',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String timeWiltLifetimeHours(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count timmar',
+      one: '1 timme',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String timeWiltLifetimeMinutes(int count) {
+    return '$count min';
+  }
+
+  @override
+  String timeWiltLifetimeMonths(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count månader',
+      one: '1 månad',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get timeWiltLifetimeMoments => 'några ögonblick';
 }

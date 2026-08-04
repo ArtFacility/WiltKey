@@ -211,7 +211,11 @@
   "settingsBiometricIdleValue": "{hours} h",
   "@settingsBiometricIdleValue": {
     "description": "Fingerprint idle window in hours.",
-    "placeholders": { "hours": { "type": "int" } }
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      }
+    }
   },
   "settingsBiometricIdleNever": "Never",
   "@settingsBiometricIdleNever": {
@@ -1049,5 +1053,71 @@
   "shopFreeLabel": "Free",
   "@shopFreeLabel": {
     "description": "Badge on a cosmetic that's free for everyone."
-  }
+  },
+  "notificationModePrivate": "Private",
+  "notificationModePrivateDesc": "Periodically checks for new messages in the background without using Google push services. Alerts may be delayed, but no signals pass through a 3rd-party service.",
+  "connectSectionOneOnOne": "One-on-one",
+  "connectSectionGroups": "Groups",
+  "connectByteBudgetTitle": "Byte budget",
+  "connectByteBudgetDesc": "Unlimited time, limited budget. Best for long-distance friends and family, and high-security chats.",
+  "connectTimeWiltTitle": "Time Wilt",
+  "connectTimeWiltDesc": "Limited time, unlimited budget. Best for getting to know new people, blind dates, or friends you need an excuse to see.",
+  "connectRemotePairTitle": "Remote pair (testing)",
+  "connectRemotePairDesc": "Debug-only: pair with a tester over the relay using a PIN + identity hash.",
+  "connectByteBudgetGroupTitle": "Byte budget group",
+  "connectByteBudgetGroupDesc": "Unlimited time, limited budget. A group you build by inviting members in person.",
+  "connectTimeWiltGroupTitle": "Time Wilt group",
+  "connectTimeWiltGroupDesc": "Limited time, unlimited budget. A casual group whose messages expire as you go.",
+  "connectJoinGroupTitle": "Join a group",
+  "connectJoinGroupDesc": "Someone nearby invited you — find their group beacon.",
+  "connectJoinRemoteGroupTitle": "Join remote group (testing)",
+  "connectJoinRemoteGroupDesc": "Debug-only: join a tester's group over the relay.",
+  "connectBadgeSoon": "SOON",
+  "timeWiltLifetimeLabel": "Chat lifetime",
+  "timeWiltPlusHint": "Unlock up to 6 months with Plus",
+  "timeWiltExplanation": "The chat becomes read-only when the timer runs out.",
+  "timeWiltPairRequestDialogBody": "Accept a Time Wilt chat from {peerName}? It becomes read-only in {lifetime}.",
+  "@timeWiltPairRequestDialogBody": {
+    "placeholders": {
+      "peerName": {
+        "type": "String"
+      },
+      "lifetime": {
+        "type": "String"
+      }
+    }
+  },
+  "timeWiltLifetimeDays": "{count, plural, =1{1 day} other{{count} days}}",
+  "@timeWiltLifetimeDays": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "timeWiltLifetimeHours": "{count, plural, =1{1 hour} other{{count} hours}}",
+  "@timeWiltLifetimeHours": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "timeWiltLifetimeMinutes": "{count} min",
+  "@timeWiltLifetimeMinutes": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "timeWiltLifetimeMonths": "{count, plural, =1{1 month} other{{count} months}}",
+  "@timeWiltLifetimeMonths": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "timeWiltLifetimeMoments": "moments"
 }

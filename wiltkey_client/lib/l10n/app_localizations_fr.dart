@@ -381,7 +381,7 @@ class AppLocalizationsFr extends AppLocalizations {
   String get settingsLanguageSwedish => 'Svenska (Suédois)';
 
   @override
-  String get settingsLanguageChinese => '中文 (Chinesisch)';
+  String get settingsLanguageChinese => '中文 (Chinois)';
 
   @override
   String get notificationModeOff => 'Désactivé';
@@ -1042,28 +1042,28 @@ class AppLocalizationsFr extends AppLocalizations {
   String get groupDepleted => 'Épuisé';
 
   @override
-  String get groupNotYetMet => 'Not yet met';
+  String get groupNotYetMet => 'Pas encore rencontré';
 
   @override
-  String get groupRechargeButton => 'Recharge group';
+  String get groupRechargeButton => 'Recharger le groupe';
 
   @override
-  String get groupRechargeTitle => 'Recharge group?';
+  String get groupRechargeTitle => 'Recharger le groupe ?';
 
   @override
   String get groupRechargeBody =>
-      'Starts a fresh secure enclave with a new key. Everyone keeps their message history, but each member must meet you again in person to rejoin. Members you don\'t re-add keep their history but lose access.';
+      'Recharge le chat avec une nouvelle clé. Tout le monde garde son historique, mais chaque membre doit te recroiser en personne pour revenir dans le groupe.';
 
   @override
-  String get groupRechargeConfirm => 'Recharge';
+  String get groupRechargeConfirm => 'Recharger';
 
   @override
   String get groupRechargeDone =>
-      'Group recharged — meet members again to re-add them.';
+      'Groupe rechargé — recroise les membres pour les rajouter.';
 
   @override
   String get groupRechargeNeededComposer =>
-      'Host recharged this group — meet them again to rejoin';
+      'L\'hôte a rechargé le groupe — recroise-le pour revenir';
 
   @override
   String groupSyncingFromMember(String name) {
@@ -1659,4 +1659,126 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get shopFreeLabel => 'Gratuit';
+
+  @override
+  String get notificationModePrivate => 'Privé';
+
+  @override
+  String get notificationModePrivateDesc =>
+      'Vérifie régulièrement les nouveaux messages en arrière-plan sans utiliser le service push de Google. Les alertes peuvent être retardées, mais aucun signal ne passe par un service tiers.';
+
+  @override
+  String get connectSectionOneOnOne => 'Tête-à-tête';
+
+  @override
+  String get connectSectionGroups => 'Groupes';
+
+  @override
+  String get connectByteBudgetTitle => 'Budget d\'octets';
+
+  @override
+  String get connectByteBudgetDesc =>
+      'Temps illimité, budget limité. Idéal pour les amis proches, la famille et les échanges ultra-sécurisés.';
+
+  @override
+  String get connectTimeWiltTitle => 'Time Wilt';
+
+  @override
+  String get connectTimeWiltDesc =>
+      'Temps limité, budget illimité. Idéal pour faire de nouvelles connaissances, des rendez-vous ou des rencontres spontanées.';
+
+  @override
+  String get connectRemotePairTitle => 'Appairage distant (test)';
+
+  @override
+  String get connectRemotePairDesc =>
+      'Mode test : appairez-vous avec un testeur via le relais avec un PIN et un hash d\'identité.';
+
+  @override
+  String get connectByteBudgetGroupTitle => 'Groupe budget d\'octets';
+
+  @override
+  String get connectByteBudgetGroupDesc =>
+      'Temps illimité, budget limité. Un groupe créé en invitant les membres en personne.';
+
+  @override
+  String get connectTimeWiltGroupTitle => 'Groupe Time Wilt';
+
+  @override
+  String get connectTimeWiltGroupDesc =>
+      'Temps limité, budget illimité. Un groupe éphémère dont les messages expirent au fur et à mesure.';
+
+  @override
+  String get connectJoinGroupTitle => 'Rejoindre un groupe';
+
+  @override
+  String get connectJoinGroupDesc =>
+      'Quelqu\'un à proximité vous a invité — recherchez son signal.';
+
+  @override
+  String get connectJoinRemoteGroupTitle =>
+      'Rejoindre un groupe distant (test)';
+
+  @override
+  String get connectJoinRemoteGroupDesc =>
+      'Mode test : rejoignez le groupe d\'un testeur via le relais.';
+
+  @override
+  String get connectBadgeSoon => 'BIENTÔT';
+
+  @override
+  String get timeWiltLifetimeLabel => 'Durée de vie du chat';
+
+  @override
+  String get timeWiltPlusHint => 'Débloquez jusqu\'à 6 mois avec Plus';
+
+  @override
+  String get timeWiltExplanation =>
+      'La discussion devient en lecture seule quand le minuteur expire.';
+
+  @override
+  String timeWiltPairRequestDialogBody(String peerName, String lifetime) {
+    return 'Accepter le chat Time Wilt de $peerName ? Il deviendra en lecture seule dans $lifetime.';
+  }
+
+  @override
+  String timeWiltLifetimeDays(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count jours',
+      one: '1 jour',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String timeWiltLifetimeHours(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count heures',
+      one: '1 heure',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String timeWiltLifetimeMinutes(int count) {
+    return '$count min';
+  }
+
+  @override
+  String timeWiltLifetimeMonths(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count mois',
+      one: '1 mois',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get timeWiltLifetimeMoments => 'quelques instants';
 }

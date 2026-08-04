@@ -992,8 +992,12 @@ class _SettingsScreenState extends State<SettingsScreen>
         l10n.notificationModeOffDesc,
       ),
       NotificationMode.lowPower => (
-        l10n.notificationModeLowPower,
-        l10n.notificationModeLowPowerDesc,
+        kFcmEnabled
+            ? l10n.notificationModePrivate
+            : l10n.notificationModeLowPower,
+        kFcmEnabled
+            ? l10n.notificationModePrivateDesc
+            : l10n.notificationModeLowPowerDesc,
       ),
       NotificationMode.instant => (
         l10n.notificationModeInstant,

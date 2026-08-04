@@ -197,9 +197,10 @@ class _PairingScreenState extends State<PairingScreen>
             children: [
               Text(
                 wiltExpiresMillis != null
-                    ? 'Accept a Time Wilt chat from $peerName? '
-                          'It becomes read-only in '
-                          '${_wiltLifetimeLabel(wiltExpiresMillis)}.'
+                    ? l10n.timeWiltPairRequestDialogBody(
+                        peerName,
+                        _wiltLifetimeLabel(l10n, wiltExpiresMillis),
+                      )
                     : l10n.pairRequestDialogBody(
                         peerName,
                         AppState.formatBytes(bufferBytes),
@@ -322,14 +323,30 @@ class _PairingScreenState extends State<PairingScreen>
   }
 
   /// Coarse human label for a Time Wilt lifetime, from an absolute expiry.
-  String _wiltLifetimeLabel(int expiryMillis) {
+  String _wiltLifetimeLabel(AppLocalizations l10n, int expiryMillis) {
     final d = Duration(
       milliseconds: expiryMillis - DateTime.now().millisecondsSinceEpoch,
     );
-    if (d.inDays >= 1) return d.inDays == 1 ? '1 day' : '${d.inDays} days';
-    if (d.inHours >= 1) return d.inHours == 1 ? '1 hour' : '${d.inHours} hours';
-    if (d.inMinutes >= 1) return '${d.inMinutes} min';
-    return 'moments';
+    if (d.inDays >= 1) return l10n.timeWiltLifetimeDays(d.inDays);
+    if (d.inHours >= 1) return l10n.timeWiltLifetimeHours(d.inHours);
+    if (d.inMinutes >= 1) return l10n.timeWiltLifetimeMinutes(d.inMinutes);
+    return l10n.timeWiltLifetimeMoments;
+  }
+
+  String _formatLifetimeTick(AppLocalizations l10n, int seconds) {
+    if (seconds >= 15552000) {
+      return l10n.timeWiltLifetimeMonths(6);
+    }
+    if (seconds >= 2592000) {
+      final months = (seconds / 2592000).round();
+      return l10n.timeWiltLifetimeMonths(months);
+    }
+    if (seconds >= 86400) {
+      final days = (seconds / 86400).round();
+      return l10n.timeWiltLifetimeDays(days);
+    }
+    final hours = (seconds / 3600).round();
+    return l10n.timeWiltLifetimeHours(hours);
   }
 
   /// Time Wilt lifetime chooser — a slider (replaces the byte-budget charge
@@ -337,6 +354,7 @@ class _PairingScreenState extends State<PairingScreen>
   /// users slide up to 30 days; Plus extends the same track to 6 months (free on
   /// FOSS). A "Plus" hint below routes to the Shop for locked users.
   Widget _buildLifetimePicker(WiltkeyTokens t) {
+    final l10n = AppLocalizations.of(context)!;
     final bool extendedUnlocked =
         EntitlementService.instance.largerPadsUnlocked;
     final int lastFreeIndex =
@@ -348,6 +366,9 @@ class _PairingScreenState extends State<PairingScreen>
     if (currentIndex < 0) currentIndex = lastFreeIndex;
     currentIndex = currentIndex.clamp(0, maxIndex);
 
+    final currentTickLabel =
+        _formatLifetimeTick(l10n, _wiltLifetimes[currentIndex].$2);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -355,7 +376,9 @@ class _PairingScreenState extends State<PairingScreen>
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              t.uppercaseLabels ? 'CHAT LIFETIME' : 'Chat lifetime',
+              t.uppercaseLabels
+                  ? l10n.timeWiltLifetimeLabel.toUpperCase()
+                  : l10n.timeWiltLifetimeLabel,
               style: t.dataMono.copyWith(
                 color: t.textTertiary,
                 fontSize: 9,
@@ -363,7 +386,7 @@ class _PairingScreenState extends State<PairingScreen>
               ),
             ),
             Text(
-              _wiltLifetimes[currentIndex].$1,
+              currentTickLabel,
               style: t.dataMono.copyWith(
                 color: t.action,
                 fontSize: 13,
@@ -384,7 +407,7 @@ class _PairingScreenState extends State<PairingScreen>
             min: 0,
             max: maxIndex.toDouble(),
             divisions: maxIndex > 0 ? maxIndex : 1,
-            label: _wiltLifetimes[currentIndex].$1,
+            label: currentTickLabel,
             onChanged: (v) {
               final idx = v.round().clamp(0, maxIndex);
               setState(() {
@@ -409,7 +432,7 @@ class _PairingScreenState extends State<PairingScreen>
                   Icon(Icons.lock_outline, size: 13, color: t.textTertiary),
                   const SizedBox(width: 6),
                   Text(
-                    'Unlock up to 6 months with Plus',
+                    l10n.timeWiltPlusHint,
                     style: t.bodySecondary.copyWith(color: t.action),
                   ),
                 ],
@@ -418,7 +441,7 @@ class _PairingScreenState extends State<PairingScreen>
           ),
         const SizedBox(height: 4),
         Text(
-          'The chat becomes read-only when the timer runs out.',
+          l10n.timeWiltExplanation,
           style: t.bodySecondary,
         ),
       ],

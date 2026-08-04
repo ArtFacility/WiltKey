@@ -1638,4 +1638,125 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get shopFreeLabel => 'Free';
+
+  @override
+  String get notificationModePrivate => 'Private';
+
+  @override
+  String get notificationModePrivateDesc =>
+      'Periodically checks for new messages in the background without using Google push services. Alerts may be delayed, but no signals pass through a 3rd-party service.';
+
+  @override
+  String get connectSectionOneOnOne => 'One-on-one';
+
+  @override
+  String get connectSectionGroups => 'Groups';
+
+  @override
+  String get connectByteBudgetTitle => 'Byte budget';
+
+  @override
+  String get connectByteBudgetDesc =>
+      'Unlimited time, limited budget. Best for long-distance friends and family, and high-security chats.';
+
+  @override
+  String get connectTimeWiltTitle => 'Time Wilt';
+
+  @override
+  String get connectTimeWiltDesc =>
+      'Limited time, unlimited budget. Best for getting to know new people, blind dates, or friends you need an excuse to see.';
+
+  @override
+  String get connectRemotePairTitle => 'Remote pair (testing)';
+
+  @override
+  String get connectRemotePairDesc =>
+      'Debug-only: pair with a tester over the relay using a PIN + identity hash.';
+
+  @override
+  String get connectByteBudgetGroupTitle => 'Byte budget group';
+
+  @override
+  String get connectByteBudgetGroupDesc =>
+      'Unlimited time, limited budget. A group you build by inviting members in person.';
+
+  @override
+  String get connectTimeWiltGroupTitle => 'Time Wilt group';
+
+  @override
+  String get connectTimeWiltGroupDesc =>
+      'Limited time, unlimited budget. A casual group whose messages expire as you go.';
+
+  @override
+  String get connectJoinGroupTitle => 'Join a group';
+
+  @override
+  String get connectJoinGroupDesc =>
+      'Someone nearby invited you — find their group beacon.';
+
+  @override
+  String get connectJoinRemoteGroupTitle => 'Join remote group (testing)';
+
+  @override
+  String get connectJoinRemoteGroupDesc =>
+      'Debug-only: join a tester\'s group over the relay.';
+
+  @override
+  String get connectBadgeSoon => 'SOON';
+
+  @override
+  String get timeWiltLifetimeLabel => 'Chat lifetime';
+
+  @override
+  String get timeWiltPlusHint => 'Unlock up to 6 months with Plus';
+
+  @override
+  String get timeWiltExplanation =>
+      'The chat becomes read-only when the timer runs out.';
+
+  @override
+  String timeWiltPairRequestDialogBody(String peerName, String lifetime) {
+    return 'Accept a Time Wilt chat from $peerName? It becomes read-only in $lifetime.';
+  }
+
+  @override
+  String timeWiltLifetimeDays(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count days',
+      one: '1 day',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String timeWiltLifetimeHours(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count hours',
+      one: '1 hour',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String timeWiltLifetimeMinutes(int count) {
+    return '$count min';
+  }
+
+  @override
+  String timeWiltLifetimeMonths(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count months',
+      one: '1 month',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get timeWiltLifetimeMoments => 'moments';
 }

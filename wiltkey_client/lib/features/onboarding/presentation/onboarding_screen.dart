@@ -806,8 +806,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           _notificationModeCard(
             t,
             mode: NotificationMode.lowPower,
-            label: l10n.notificationModeLowPower,
-            description: l10n.notificationModeLowPowerDesc,
+            label: kFcmEnabled
+                ? l10n.notificationModePrivate
+                : l10n.notificationModeLowPower,
+            description: kFcmEnabled
+                ? l10n.notificationModePrivateDesc
+                : l10n.notificationModeLowPowerDesc,
           ),
           const SizedBox(height: 10),
           _notificationModeCard(
