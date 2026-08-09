@@ -250,7 +250,9 @@ mixin VoiceRecordingMixin<T extends StatefulWidget> on State<T> {
 
     if (!mounted) return;
     final l10n = AppLocalizations.of(context)!;
-    if (byteCost > contact.remainingBufferBytes) {
+    // Time Wilt has no byte budget (unbounded streaming keystream) — skip the
+    // remaining-buffer gate like the image path; the tier cap below still applies.
+    if (!contact.isTimeWilt && byteCost > contact.remainingBufferBytes) {
       onVoiceError(
         l10n.chatVoiceTooLargeSnackBar(
           AppState.formatBytes(byteCost),
@@ -336,7 +338,10 @@ mixin VoiceRecordingMixin<T extends StatefulWidget> on State<T> {
   Widget buildRecordingHud(WiltkeyTokens t, AppLocalizations l10n) {
     final contact = voiceContact;
     final cost = _estimatedVoiceCost();
-    final over = contact != null && cost > contact.remainingBufferBytes;
+    final over =
+        contact != null &&
+        !contact.isTimeWilt &&
+        cost > contact.remainingBufferBytes;
     final nearCap =
         (kVoiceMaxDuration - _voiceElapsed) <= const Duration(seconds: 10);
     return Container(

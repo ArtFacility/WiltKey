@@ -65,39 +65,12 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
       );
       if (idx != -1) {
         final existing = _appState.contacts[idx];
-        _appState.contacts[idx] = Contact(
-          id: existing.id,
-          name: existing.name,
-          keyHash: existing.keyHash,
-          relayUrl: existing.relayUrl,
-          isPrivateNode: existing.isPrivateNode,
-          maxBufferBytes: existing.maxBufferBytes,
-          remainingBufferBytes: existing.remainingBufferBytes,
-          peerRemainingBufferBytes: existing.peerRemainingBufferBytes,
-          lastActivity: existing.lastActivity,
-          isWilted: existing.isWilted,
-          isGroup: true,
-          memberCount: existing.memberCount,
-          hostName: existing.hostName,
-          isHost: existing.isHost,
-          hostKeyHash: existing.hostKeyHash,
-          memberKeyHashes: existing.memberKeyHashes,
-          groupIconHex: existing.groupIconHex,
+        // copyWith (not a manual rebuild) so fields the policy editor doesn't
+        // touch — Time Wilt lifetime/expiry, recharge-pending, etc. — survive.
+        _appState.contacts[idx] = existing.copyWith(
           maxMembers: _maxMembers,
           maxMessageSize: (_maxMessageSizeKb * 1024).toInt(),
           imagesAllowed: _imagesAllowed,
-          joinedAt: existing.joinedAt,
-          shortNick: existing.shortNick,
-          profileImageB64: existing.profileImageB64,
-          outgoingOffset: existing.outgoingOffset,
-          outgoingMaxOffset: existing.outgoingMaxOffset,
-          incomingOffset: existing.incomingOffset,
-          incomingMaxOffset: existing.incomingMaxOffset,
-          groupSeed: existing.groupSeed,
-          laneSize: existing.laneSize,
-          totalGroupSize: existing.totalGroupSize,
-          slotIndex: existing.slotIndex,
-          additionalSlots: existing.additionalSlots,
         );
         _appState.notifyMessageReceived();
         _appState.broadcastGroupMetadataUpdate(_appState.contacts[idx]);
@@ -241,6 +214,12 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
   void _nukeGroup() {
     final t = context.wk;
     final l10n = AppLocalizations.of(context)!;
+    // "Destroy for everyone" is a majority VOTE when there are other members —
+    // one member can't unilaterally wipe everyone's history. A solo group (no
+    // other members) is destroyed immediately.
+    final bool hasPeers = widget.group.memberKeyHashes
+        .where((h) => h != _appState.userId)
+        .isNotEmpty;
     showDialog(
       context: context,
       builder: (dialogCtx) => AlertDialog(
@@ -250,13 +229,18 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
           side: BorderSide(color: t.danger, width: 1.5),
         ),
         title: Text(
-          t.uppercaseLabels
-              ? l10n.groupDetailsDeleteConfirmTitle.toUpperCase()
-              : l10n.groupDetailsDeleteConfirmTitle,
+          () {
+            final s = hasPeers
+                ? l10n.groupNukeProposeTitle
+                : l10n.groupDetailsDeleteConfirmTitle;
+            return t.uppercaseLabels ? s.toUpperCase() : s;
+          }(),
           style: t.screenTitle.copyWith(color: t.danger, fontSize: 16),
         ),
         content: Text(
-          l10n.groupDetailsDeleteConfirmBody,
+          hasPeers
+              ? l10n.groupNukeProposeBody
+              : l10n.groupDetailsDeleteConfirmBody,
           style: t.bodySecondary,
         ),
         actions: [
@@ -270,16 +254,37 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
           ElevatedButton(
             onPressed: () {
               Navigator.pop(dialogCtx);
-              _playNukeAndDestroy();
+              if (hasPeers) {
+                _proposeGroupNuke();
+              } else {
+                _playNukeAndDestroy();
+              }
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: t.danger,
               foregroundColor: Colors.white,
             ),
-            child: Text(l10n.groupDetailsDeleteConfirmButton),
+            child: Text(
+              hasPeers
+                  ? l10n.groupNukeProposeConfirm
+                  : l10n.groupDetailsDeleteConfirmButton,
+            ),
           ),
         ],
       ),
+    );
+  }
+
+  /// Send a "destroy for everyone" proposal to the other members and return to
+  /// the chat, where the outcome (a member's card / the tally) plays out. The
+  /// group is NOT destroyed here — only a passing majority vote wipes it.
+  Future<void> _proposeGroupNuke() async {
+    final l10n = AppLocalizations.of(context)!;
+    await _appState.proposeGroupNuke(widget.group);
+    if (!mounted) return;
+    Navigator.of(context).pop(); // back to the chat
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(l10n.groupNukeVoteSent)),
     );
   }
 

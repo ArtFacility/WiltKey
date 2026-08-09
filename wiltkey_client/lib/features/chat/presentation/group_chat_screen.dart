@@ -29,6 +29,8 @@ import 'widgets/screenshot_ui.dart';
 import 'widgets/wilt_duration_sheet.dart';
 import 'widgets/reply_preview.dart';
 import 'widgets/swipe_to_reply.dart';
+import 'widgets/highlight_flash.dart';
+import 'widgets/scroll_to_message.dart';
 import '../../groups/presentation/group_settings_screen.dart';
 import '../../groups/presentation/group_invite_screen.dart';
 
@@ -77,6 +79,14 @@ class _GroupChatScreenState extends State<GroupChatScreen>
   bool _isAtBottom = true;
   bool _showScrollDownArrow = false;
   final Set<String> _revealedImageIds = {};
+
+  // Quote-tap reveal: rows are keyed by message id so [scrollToMessageInList]
+  // can jump to a reply's parent; [_flashMessageId]/[_flashTick] drive the
+  // one-shot highlight on the target row.
+  final Map<String, GlobalKey> _messageRowKeys = {};
+  String? _flashMessageId;
+  int _flashTick = 0;
+  Timer? _flashTimer;
 
   // The message the composer is currently replying to (null = normal send).
   ChatMessage? _replyingTo;
@@ -135,6 +145,7 @@ class _GroupChatScreenState extends State<GroupChatScreen>
     _scrollController.removeListener(_scrollListener);
     _messageController.dispose();
     _scrollController.dispose();
+    _flashTimer?.cancel();
     disposeVoiceRecording();
     super.dispose();
   }
@@ -406,6 +417,7 @@ class _GroupChatScreenState extends State<GroupChatScreen>
         message.isPending ||
         message.wilted ||
         message.contentType == 'screenshot_request' ||
+        message.contentType == 'group_nuke_request' ||
         message.contentType == 'refill_request') {
       return;
     }
@@ -422,6 +434,7 @@ class _GroupChatScreenState extends State<GroupChatScreen>
       !m.isPending &&
       !m.wilted &&
       m.contentType != 'screenshot_request' &&
+      m.contentType != 'group_nuke_request' &&
       m.contentType != 'refill_request';
 
   /// Small left→right nudge (resistance + haptic + spring-back) to reply.
@@ -432,6 +445,33 @@ class _GroupChatScreenState extends State<GroupChatScreen>
       onReply: () => _startReply(message),
       child: child,
     );
+  }
+
+  /// Tapping a quote block scrolls to the quoted parent message and flashes it,
+  /// so replies to near-identical messages (e.g. several images) are findable.
+  /// The parent is resolved from the loaded window; if it isn't there (scrolled
+  /// far out / unloaded), the quote already renders muted + un-tappable, so this
+  /// only fires when the target is actually reachable.
+  Future<void> _revealQuotedMessage(String? parentId) async {
+    final contact = _appState.activeContact;
+    if (contact == null || parentId == null) return;
+    final list = _visibleMessages(contact);
+    if (!list.any((m) => m.id == parentId)) return;
+    await scrollToMessageInList(
+      controller: _scrollController,
+      messages: list,
+      targetId: parentId,
+      rowKeys: _messageRowKeys,
+    );
+    if (!mounted) return;
+    _flashTimer?.cancel();
+    setState(() {
+      _flashMessageId = parentId;
+      _flashTick++;
+    });
+    _flashTimer = Timer(const Duration(milliseconds: 1300), () {
+      if (mounted) setState(() => _flashMessageId = null);
+    });
   }
 
   void _handleSend() async {
@@ -626,6 +666,19 @@ class _GroupChatScreenState extends State<GroupChatScreen>
 
     final bool isWilted = contact.isWilted;
 
+    // Group Time Wilt: swap the byte budget for a lifetime. The host is
+    // "infinite" (renders ∞, greys only once every member wilts = the group
+    // archives); a member shows its own countdown and wilts on its own expiry.
+    final bool isTw = contact.isTimeWilt;
+    final bool isTwHost = contact.isTimeWiltGroupHost;
+    final bool twWilted = isTw &&
+        (contact.isArchived ||
+            (!isTwHost && contact.timeWiltRemainingFraction <= 0));
+    final double twFraction = isTwHost ? 1.0 : contact.timeWiltRemainingFraction;
+    final String twLabel = isTwHost
+        ? l10n.groupTimeWiltHostInfinite
+        : contact.timeWiltCountdownLabel;
+
     return PopScope(
       // Back / back-gesture closes the emoji panel first; the chat only pops
       // once nothing else is open.
@@ -688,12 +741,14 @@ class _GroupChatScreenState extends State<GroupChatScreen>
                   ),
                   const SizedBox(width: 8),
                   context.wkc.budgetIndicator(
-                    ourFraction: currentPercent,
-                    isWilted: isWilted,
+                    ourFraction: isTw ? twFraction : currentPercent,
+                    isWilted: isTw ? twWilted : isWilted,
                     variant: BudgetIndicatorVariant.chatHeader,
-                    semanticLabel: l10n.chatRemainingLabel(
-                      AppState.formatBytes(remainingBytesNow),
-                    ),
+                    semanticLabel: isTw
+                        ? twLabel
+                        : l10n.chatRemainingLabel(
+                            AppState.formatBytes(remainingBytesNow),
+                          ),
                   ),
                 ],
               ),
@@ -751,40 +806,67 @@ class _GroupChatScreenState extends State<GroupChatScreen>
                   child: GestureDetector(
                     onTap: () => _showMembersSheet(contact),
                     behavior: HitTestBehavior.opaque,
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: memberList.isNotEmpty
-                              ? context.wkc.groupBudgetIndicator(
-                                  members: _memberBudgets(shownHeaderMembers),
-                                  emptySlots: 0,
-                                )
-                              : context.wkc.budgetIndicator(
-                                  ourFraction: currentPercent,
-                                  isWilted: isWilted,
-                                  variant: BudgetIndicatorVariant.detail,
+                    // Time Wilt has no per-member byte gauges — just the lifetime
+                    // countdown (host = ∞). Feeding the theme's decorative "detail"
+                    // gauge into this 22px strip made the bespoke themes (garden
+                    // flower, paperink ink-ring, etc.) blow up over the screen; the
+                    // small trailing header gauge already carries the fraction.
+                    child: isTw
+                        ? Row(
+                            children: [
+                              Icon(
+                                isTwHost
+                                    ? Icons.all_inclusive
+                                    : Icons.hourglass_bottom,
+                                size: 13,
+                                color: twWilted ? t.budgetWilted : t.action,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                twLabel,
+                                style: t.dataMono.copyWith(
+                                  color: twWilted ? t.budgetWilted : t.action,
+                                  fontWeight: FontWeight.bold,
                                 ),
-                        ),
-                        if (hiddenHeaderMembers > 0) ...[
-                          const SizedBox(width: 8),
-                          Text(
-                            '+$hiddenHeaderMembers',
-                            style: t.dataMono.copyWith(
-                              color: t.textTertiary,
-                              fontWeight: FontWeight.bold,
-                            ),
+                              ),
+                            ],
+                          )
+                        : Row(
+                            children: [
+                              Expanded(
+                                child: memberList.isNotEmpty
+                                    ? context.wkc.groupBudgetIndicator(
+                                        members: _memberBudgets(
+                                          shownHeaderMembers,
+                                        ),
+                                        emptySlots: 0,
+                                      )
+                                    : context.wkc.budgetIndicator(
+                                        ourFraction: currentPercent,
+                                        isWilted: isWilted,
+                                        variant: BudgetIndicatorVariant.detail,
+                                      ),
+                              ),
+                              if (hiddenHeaderMembers > 0) ...[
+                                const SizedBox(width: 8),
+                                Text(
+                                  '+$hiddenHeaderMembers',
+                                  style: t.dataMono.copyWith(
+                                    color: t.textTertiary,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                              const SizedBox(width: 12),
+                              Text(
+                                AppState.formatBytes(remainingBytesNow),
+                                style: t.dataMono.copyWith(
+                                  color: isWilted ? t.budgetWilted : t.positive,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
-                        const SizedBox(width: 12),
-                        Text(
-                          AppState.formatBytes(remainingBytesNow),
-                          style: t.dataMono.copyWith(
-                            color: isWilted ? t.budgetWilted : t.positive,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
                   ),
                 ),
               ),
@@ -793,7 +875,7 @@ class _GroupChatScreenState extends State<GroupChatScreen>
               color: t.bg,
               child: Column(
                 children: [
-                  if (isWilted)
+                  if (isWilted && !isTw)
                     Container(
                       width: double.infinity,
                       color: t.budgetWilted.withValues(alpha: 0.12),
@@ -854,6 +936,10 @@ class _GroupChatScreenState extends State<GroupChatScreen>
 
                         if (message.contentType == 'screenshot_request') {
                           return _buildScreenshotRequest(t, contact, message);
+                        }
+
+                        if (message.contentType == 'group_nuke_request') {
+                          return _buildGroupNukeRequest(t, contact, message);
                         }
 
                         final bool isSystem = message.senderId == 'system';
@@ -1008,6 +1094,18 @@ class _GroupChatScreenState extends State<GroupChatScreen>
                                     _appState,
                                     contact,
                                     message,
+                                    onTap: message.replyToId == null
+                                        ? null
+                                        : () =>
+                                              _revealQuotedMessage(
+                                                message.replyToId,
+                                              ),
+                                    // A parent loaded but filtered out of the
+                                    // visible list (e.g. pre-join) renders as
+                                    // muted "unavailable" instead of a
+                                    // tappable-looking quote that no-ops.
+                                    isParentVisible: (parent) => messageList
+                                        .any((m) => m.id == parent.id),
                                   ) ??
                                   const SizedBox.shrink(),
                               _buildGroupContent(
@@ -1176,7 +1274,20 @@ class _GroupChatScreenState extends State<GroupChatScreen>
                             ],
                           ],
                         );
-                        return _wrapSwipeToReply(message, row);
+                        final Widget swipeRow =
+                            _wrapSwipeToReply(message, row);
+                        return KeyedSubtree(
+                          key: _messageRowKeys.putIfAbsent(
+                            message.id,
+                            GlobalKey.new,
+                          ),
+                          child: HighlightFlash(
+                            active: message.id == _flashMessageId,
+                            tick: _flashTick,
+                            color: t.action,
+                            child: swipeRow,
+                          ),
+                        );
                       },
                         ),
                         ),
@@ -1207,7 +1318,11 @@ class _GroupChatScreenState extends State<GroupChatScreen>
                       ),
                       child: (contact.groupRechargePending && !contact.isHost)
                           ? _buildRechargeNeededComposer(t)
-                          : isWilted
+                          : twWilted
+                          ? (contact.isHost
+                                ? _buildTimeWiltHostWiltedComposer(t)
+                                : _buildTimeWiltRenewComposer(t))
+                          : (isWilted && !isTw)
                           ? (!contact.isHost
                                 ? _buildRefillComposer(t, contact)
                                 : _buildLockedComposer(t))
@@ -1438,6 +1553,148 @@ class _GroupChatScreenState extends State<GroupChatScreen>
     );
   }
 
+  /// In-chat voting card for a "destroy this group for everyone" proposal.
+  /// Danger-styled; a majority of the other members must Agree for the wipe.
+  Widget _buildGroupNukeRequest(
+    WiltkeyTokens t,
+    Contact contact,
+    ChatMessage message,
+  ) {
+    final l10n = AppLocalizations.of(context)!;
+    Map<String, dynamic> p = {};
+    try {
+      p = jsonDecode(message.text) as Map<String, dynamic>;
+    } catch (_) {}
+    final rawName = (p['requester_name'] as String?)?.trim();
+    final name = (rawName == null || rawName.isEmpty) ? contact.name : rawName;
+    final status = message.wilted
+        ? 'expired'
+        : (p['status'] as String? ?? 'pending');
+
+    if (status != 'pending') {
+      late final IconData icon;
+      late final String label;
+      late final Color color;
+      switch (status) {
+        case 'accepted':
+          icon = Icons.check_circle_outline;
+          color = t.danger;
+          label = l10n.groupNukeVoteAllow;
+          break;
+        case 'declined':
+          icon = Icons.shield_outlined;
+          color = t.textTertiary;
+          label = l10n.groupNukeVoteDeny;
+          break;
+        default: // expired
+          icon = Icons.timer_off_outlined;
+          color = t.textTertiary;
+          label = l10n.screenshotRequestExpired;
+      }
+      return Container(
+        margin: const EdgeInsets.only(bottom: 16, top: 4),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 15, color: color),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                label,
+                style: t.dataMono.copyWith(fontSize: 11.5, color: color),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16, top: 4),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: t.danger.withValues(alpha: 0.06),
+        border: Border.all(color: t.danger.withValues(alpha: 0.4), width: 1),
+        borderRadius: BorderRadius.circular(t.radiusControl),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, size: 16, color: t.danger),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  l10n.groupNukeVoteTitle,
+                  style: t.body.copyWith(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: t.danger,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            l10n.groupNukeVoteBody,
+            style: t.bodySecondary.copyWith(fontSize: 11),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            '— $name',
+            style: t.dataMono.copyWith(fontSize: 10.5, color: t.textTertiary),
+          ),
+          if (message.openedAt != null && message.expiresAt != null) ...[
+            const SizedBox(height: 7),
+            _GroupWiltCountdownBar(
+              openedAt: message.openedAt!,
+              expiresAt: message.expiresAt!,
+              color: t.danger,
+            ),
+          ],
+          const SizedBox(height: 9),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              OutlinedButton(
+                onPressed: () =>
+                    _appState.respondToGroupNukeCard(contact, message, false),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: t.textSecondary,
+                  side: BorderSide(color: t.border),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(t.radiusControl),
+                  ),
+                ),
+                child: Text(l10n.groupNukeVoteDeny),
+              ),
+              const SizedBox(width: 8),
+              ElevatedButton(
+                onPressed: () =>
+                    _appState.respondToGroupNukeCard(contact, message, true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: t.danger,
+                  foregroundColor: Colors.white,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(t.radiusControl),
+                  ),
+                ),
+                child: Text(l10n.groupNukeVoteAllow),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildLockedComposer(WiltkeyTokens t) {
     final l10n = AppLocalizations.of(context)!;
     return Container(
@@ -1483,6 +1740,74 @@ class _GroupChatScreenState extends State<GroupChatScreen>
               t.uppercaseLabels
                   ? l10n.groupRechargeNeededComposer.toUpperCase()
                   : l10n.groupRechargeNeededComposer,
+              textAlign: TextAlign.center,
+              style: t.dataMono.copyWith(color: t.action, letterSpacing: 0.4),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Time Wilt group member whose clock ran out: read-only until they meet the
+  /// host again to renew their access.
+  Widget _buildTimeWiltRenewComposer(WiltkeyTokens t) {
+    final l10n = AppLocalizations.of(context)!;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: t.budgetWilted.withValues(alpha: 0.06),
+        border: Border.all(
+          color: t.budgetWilted.withValues(alpha: 0.3),
+          width: 1,
+        ),
+        borderRadius: BorderRadius.circular(t.radiusControl),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.hourglass_bottom, size: 16, color: t.budgetWilted),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              t.uppercaseLabels
+                  ? l10n.groupTimeWiltRenewComposer.toUpperCase()
+                  : l10n.groupTimeWiltRenewComposer,
+              textAlign: TextAlign.center,
+              style: t.dataMono.copyWith(
+                color: t.budgetWilted,
+                letterSpacing: 0.4,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Time Wilt group host once every member has wilted (the group archived):
+  /// read-only until the host meets someone again, which revives the group.
+  Widget _buildTimeWiltHostWiltedComposer(WiltkeyTokens t) {
+    final l10n = AppLocalizations.of(context)!;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: t.action.withValues(alpha: 0.06),
+        border: Border.all(color: t.action.withValues(alpha: 0.3), width: 1),
+        borderRadius: BorderRadius.circular(t.radiusControl),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.groups_outlined, size: 16, color: t.action),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              t.uppercaseLabels
+                  ? l10n.groupTimeWiltHostAllWilted.toUpperCase()
+                  : l10n.groupTimeWiltHostAllWilted,
               textAlign: TextAlign.center,
               style: t.dataMono.copyWith(color: t.action, letterSpacing: 0.4),
             ),
@@ -1682,27 +2007,35 @@ class _GroupChatScreenState extends State<GroupChatScreen>
             onSendSticker: _handleSendSticker,
           ),
         const SizedBox(height: 6),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              overSize
-                  ? l10n.groupExceedsSizeLimit(contact.maxMessageSize!)
-                  : l10n.chatCostIndicator(
-                      cost > 0 ? AppState.formatBytes(cost) : "0 B",
-                    ),
-              style: t.dataMono.copyWith(
-                color: (overSize || cost > contact.remainingBufferBytes)
-                    ? t.danger
-                    : t.textTertiary,
+        // Time Wilt groups have no byte budget ("unlimited") — the lifetime lives
+        // in the header/dashboard, so the composer only shows an over-size warning.
+        if (!contact.isTimeWilt)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                overSize
+                    ? l10n.groupExceedsSizeLimit(contact.maxMessageSize!)
+                    : l10n.chatCostIndicator(
+                        cost > 0 ? AppState.formatBytes(cost) : "0 B",
+                      ),
+                style: t.dataMono.copyWith(
+                  color: (overSize || cost > contact.remainingBufferBytes)
+                      ? t.danger
+                      : t.textTertiary,
+                ),
               ),
-            ),
-            Text(
-              '${l10n.chatRemainingLabel(AppState.formatBytes(max(0, contact.remainingBufferBytes - cost)))} / ${AppState.formatBytes(contact.maxBufferBytes)}',
-              style: t.dataMono.copyWith(color: t.textTertiary),
-            ),
-          ],
-        ),
+              Text(
+                '${l10n.chatRemainingLabel(AppState.formatBytes(max(0, contact.remainingBufferBytes - cost)))} / ${AppState.formatBytes(contact.maxBufferBytes)}',
+                style: t.dataMono.copyWith(color: t.textTertiary),
+              ),
+            ],
+          )
+        else if (overSize)
+          Text(
+            l10n.groupExceedsSizeLimit(contact.maxMessageSize!),
+            style: t.dataMono.copyWith(color: t.danger),
+          ),
       ],
     );
   }
@@ -1878,7 +2211,9 @@ class _GroupChatScreenState extends State<GroupChatScreen>
                         ],
                       ),
                     ),
-                    if (memberList.isNotEmpty)
+                    // Per-member byte gauges are meaningless for a Time Wilt group
+                    // (unbounded budget), so the members sheet skips them there.
+                    if (memberList.isNotEmpty && !contact.isTimeWilt)
                       Padding(
                         padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                         child: context.wkc.groupBudgetIndicator(
@@ -2066,6 +2401,63 @@ class _GroupChatScreenState extends State<GroupChatScreen>
     );
   }
 
+  /// Time Wilt roster readout for one member row: the host is ∞ (infinite);
+  /// everyone else shows a compact countdown — our own row from our
+  /// authoritative local clock ([Contact.wiltExpiresAt]), other members from the
+  /// host-broadcast per-member expiry ([m]['twExpiresAt']). A null clock (an
+  /// older host that never broadcast one) falls back to a neutral hourglass.
+  Widget _twMemberTimeReadout(
+    WiltkeyTokens t,
+    AppLocalizations l10n,
+    Contact contact,
+    Map<String, dynamic> m,
+    bool isSelf,
+    bool isMemberHost,
+  ) {
+    if (isMemberHost) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.all_inclusive, size: 15, color: t.action),
+          const SizedBox(width: 5),
+          Text(
+            l10n.groupTimeWiltHostInfinite,
+            style: t.dataMono.copyWith(
+              color: t.action,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      );
+    }
+    final String? iso = isSelf
+        ? contact.wiltExpiresAt?.toIso8601String()
+        : m['twExpiresAt'] as String?;
+    final DateTime? expiry = iso != null ? DateTime.tryParse(iso) : null;
+    if (expiry == null) {
+      return Icon(Icons.hourglass_empty, size: 15, color: t.textTertiary);
+    }
+    final bool wilted = !expiry.isAfter(DateTime.now());
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          wilted ? Icons.hourglass_disabled : Icons.hourglass_bottom,
+          size: 15,
+          color: wilted ? t.budgetWilted : t.action,
+        ),
+        const SizedBox(width: 5),
+        Text(
+          Contact.formatWiltCountdown(expiry),
+          style: t.dataMono.copyWith(
+            color: wilted ? t.budgetWilted : t.textSecondary,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildMemberSheetCard(
     WiltkeyTokens t,
     Map<String, dynamic> m,
@@ -2181,6 +2573,11 @@ class _GroupChatScreenState extends State<GroupChatScreen>
                     ],
                   ),
                 )
+              // Time Wilt groups show a per-member countdown instead of a byte
+              // budget: the host is ∞, our own row reads our authoritative local
+              // clock, and other members read the host-broadcast expiry.
+              else if (contact.isTimeWilt)
+                _twMemberTimeReadout(t, l10n, contact, m, isSelf, isMemberHost)
               else ...[
                 SizedBox(
                   width: 36,

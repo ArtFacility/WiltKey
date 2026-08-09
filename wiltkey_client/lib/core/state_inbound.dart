@@ -324,6 +324,16 @@ extension AppStateInbound on AppState {
         return;
       }
 
+      if (contentType == 'group_nuke_request') {
+        await _handleGroupNukeRequest(contact, senderId, envelopeJson!);
+        return;
+      }
+
+      if (contentType == 'group_nuke_response') {
+        await _handleGroupNukeResponse(contact, senderId, envelopeJson!);
+        return;
+      }
+
       if (contentType == 'group_info_update') {
         log('[WebSocket] Received group_info_update from Host: $senderId');
         try {
@@ -401,6 +411,9 @@ extension AppStateInbound on AppState {
                   name: m['name'] as String?,
                   profileImage: m['profile_image'] as String?,
                   arrivalOrder: m['arrival_order'] as int?,
+                  // Host-stamped Time Wilt clock for this member (may be null on
+                  // byte-budget groups / older hosts) — cached for the roster.
+                  wiltExpiresAt: m['wilt_expires_at'] as String?,
                 );
               }
             }
@@ -439,47 +452,23 @@ extension AppStateInbound on AppState {
             }
           }
 
-          final updatedContact = Contact(
-            id: contact.id,
-            name: decryptedJson['group_name'] as String? ?? contact.name,
-            keyHash: contact.keyHash,
-            relayUrl: contact.relayUrl,
-            isPrivateNode: contact.isPrivateNode,
-            maxBufferBytes: contact.maxBufferBytes,
-            remainingBufferBytes: contact.remainingBufferBytes,
-            peerRemainingBufferBytes: contact.peerRemainingBufferBytes,
-            lastActivity: contact.lastActivity,
-            isWilted: contact.isWilted,
-            isGroup: true,
+          // copyWith (not a manual Contact rebuild) so fields this metadata
+          // broadcast doesn't carry survive — crucially the Time Wilt marker
+          // (groupWiltLifetimeSecs), the member's own per-member wiltExpiresAt/
+          // wiltCreatedAt, and groupRechargePending. Rebuilding them by hand
+          // dropped those, which flipped a Time Wilt group back to byte-budget
+          // (isTimeWilt false) the moment the host sent an update.
+          final updatedContact = contact.copyWith(
+            name: decryptedJson['group_name'] as String?,
             memberCount: memberHashes.length,
             hostName: resolvedHostName,
-            isHost: contact.isHost,
             hostKeyHash: resolvedHostKeyHash,
             memberKeyHashes: memberHashes,
-            groupIconHex:
-                decryptedJson['group_icon'] as String? ?? contact.groupIconHex,
-            maxMembers:
-                decryptedJson['max_members'] as int? ?? contact.maxMembers,
-            maxMessageSize:
-                decryptedJson['max_message_size'] as int? ??
-                contact.maxMessageSize,
-            imagesAllowed:
-                decryptedJson['images_allowed'] as bool? ??
-                contact.imagesAllowed,
-            joinedAt: contact.joinedAt,
-            shortNick: contact.shortNick,
-            profileImageB64:
-                decryptedJson['group_icon'] as String? ??
-                contact.profileImageB64,
-            outgoingOffset: contact.outgoingOffset,
-            outgoingMaxOffset: contact.outgoingMaxOffset,
-            incomingOffset: contact.incomingOffset,
-            incomingMaxOffset: contact.incomingMaxOffset,
-            groupSeed: contact.groupSeed,
-            laneSize: contact.laneSize,
-            totalGroupSize: contact.totalGroupSize,
-            slotIndex: contact.slotIndex,
-            additionalSlots: contact.additionalSlots,
+            groupIconHex: decryptedJson['group_icon'] as String?,
+            maxMembers: decryptedJson['max_members'] as int?,
+            maxMessageSize: decryptedJson['max_message_size'] as int?,
+            imagesAllowed: decryptedJson['images_allowed'] as bool?,
+            profileImageB64: decryptedJson['group_icon'] as String?,
           );
 
           final idx = contacts.indexWhere((c) => c.keyHash == contact.keyHash);

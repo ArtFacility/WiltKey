@@ -399,25 +399,27 @@ func TestGroupChatHubAndSpoke(t *testing.T) {
 		t.Errorf("wrong message received: %v", receivedMsg)
 	}
 
-	// 4. Alice (Host) broadcasts to Bob and Charlie
+	// 4. Alice (Host) fans one identical envelope out to Bob and Charlie via
+	// server-side broadcast (group envelopes are byte-identical — shared keystream,
+	// no per-recipient re-encryption — so it's a single Envelope + Recipients list,
+	// NOT a per-recipient map).
+	const groupEnvelope = "shared_group_envelope"
 	broadcast := WSMessage{
-		Type:       "BROADCAST_GROUP_MESSAGE",
-		Recipients: []string{bobID, charlieID},
-		Envelopes: map[string]string{
-			bobID:     "re_encrypted_bob_envelope",
-			charlieID: "re_encrypted_charlie_envelope",
-		},
+		Type:        "BROADCAST_GROUP_MESSAGE",
+		Recipients:  []string{bobID, charlieID},
+		Envelope:    groupEnvelope,
+		ContentType: "group_message",
 	}
 	if err := aliceConn.WriteJSON(broadcast); err != nil {
 		t.Fatalf("failed to write BROADCAST_GROUP_MESSAGE: %v", err)
 	}
 
-	// Bob and Charlie should receive their respective envelopes
+	// Both online recipients receive the same envelope, attributed to Alice.
 	var bobRecv WSMessage
 	if err := bobConn.ReadJSON(&bobRecv); err != nil || bobRecv.Type != "NEW_MESSAGE" {
 		t.Fatalf("expected Bob to receive NEW_MESSAGE, got: %v", bobRecv)
 	}
-	if bobRecv.Envelope != "re_encrypted_bob_envelope" || bobRecv.SenderID != aliceID {
+	if bobRecv.Envelope != groupEnvelope || bobRecv.SenderID != aliceID {
 		t.Errorf("Bob received wrong envelope: %v", bobRecv)
 	}
 
@@ -425,7 +427,7 @@ func TestGroupChatHubAndSpoke(t *testing.T) {
 	if err := charlieConn.ReadJSON(&charlieRecv); err != nil || charlieRecv.Type != "NEW_MESSAGE" {
 		t.Fatalf("expected Charlie to receive NEW_MESSAGE, got: %v", charlieRecv)
 	}
-	if charlieRecv.Envelope != "re_encrypted_charlie_envelope" || charlieRecv.SenderID != aliceID {
+	if charlieRecv.Envelope != groupEnvelope || charlieRecv.SenderID != aliceID {
 		t.Errorf("Charlie received wrong envelope: %v", charlieRecv)
 	}
 }

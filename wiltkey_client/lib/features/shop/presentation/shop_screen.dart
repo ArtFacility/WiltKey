@@ -593,6 +593,7 @@ class _ShopScreenState extends State<ShopScreen>
         _benefit(t, Icons.schedule, l10n.shopPlusBenefitHold),
         _benefit(t, Icons.cloud_upload_outlined, l10n.shopPlusBenefitFiles),
         _benefit(t, Icons.sd_storage_outlined, l10n.shopPlusBenefitPads),
+        _benefit(t, Icons.hourglass_bottom, l10n.shopPlusBenefitTimeWiltGroups),
         _benefit(t, Icons.favorite_outline, l10n.shopPlusBenefitSupport),
         const SizedBox(height: 24),
         if (active) ...[

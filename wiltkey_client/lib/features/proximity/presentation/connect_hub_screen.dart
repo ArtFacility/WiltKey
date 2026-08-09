@@ -116,7 +116,12 @@ class _ConnectHubScreenState extends State<ConnectHubScreen> {
             icon: Icons.hourglass_bottom,
             title: l10n.connectTimeWiltGroupTitle,
             subtitle: l10n.connectTimeWiltGroupDesc,
-            soon: true,
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const CreateGroupScreen(timeWilt: true),
+              ),
+            ),
           ),
           _HubCard(
             icon: Icons.groups_outlined,

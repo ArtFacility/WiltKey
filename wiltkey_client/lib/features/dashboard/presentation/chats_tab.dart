@@ -567,6 +567,8 @@ class _ContactRow extends StatelessWidget {
                     Text(
                       c.isArchived
                           ? (t.uppercaseLabels ? 'WILTED' : 'Wilted')
+                          : c.isTimeWiltGroupHost
+                          ? l10n.groupTimeWiltHostInfinite
                           : 'Wilts in ${c.timeWiltCountdownLabel}',
                       style: t.dataMono.copyWith(
                         color: c.isArchived ? t.textTertiary : t.positive,
@@ -617,8 +619,9 @@ class _ContactRow extends StatelessWidget {
             // below, so the gauge stays unstacked and never overflows tall
             // vertical gauges like Tideline/Phosphor).
             context.wkc.budgetIndicator(
-              ourFraction:
-                  c.isTimeWilt ? c.timeWiltRemainingFraction : ourFraction,
+              ourFraction: c.isTimeWilt
+                  ? (c.isTimeWiltGroupHost ? 1.0 : c.timeWiltRemainingFraction)
+                  : ourFraction,
               theirFraction: (c.isGroup || c.isTimeWilt)
                   ? 0
                   : c.getTheirChargePercentage(myId),

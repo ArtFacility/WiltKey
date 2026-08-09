@@ -210,6 +210,7 @@ extension AppStateGroups on AppState {
     String? profileImage,
     int? arrivalOrder,
     String? avatarBorder,
+    String? wiltExpiresAt,
   }) async {
     final existing = await GroupDatabase.instance.getProfile(
       groupId,
@@ -233,6 +234,10 @@ extension AppStateGroups on AppState {
       // Null preserves the stored value (see upsertProfile); a concrete id
       // (including 'none' to unequip) overwrites it.
       avatarBorder: avatarBorder,
+      // Time Wilt per-member clock — only the host stamps it (at register/
+      // re-meet). Null preserves any host-broadcast value on member-profile
+      // writes so a nick/avatar change doesn't blank the countdown.
+      wiltExpiresAt: wiltExpiresAt,
     );
   }
 
@@ -260,6 +265,9 @@ extension AppStateGroups on AppState {
           'name': p['name'],
           'profile_image': p['profile_image'],
           'arrival_order': p['arrival_order'],
+          // Time Wilt per-member clock (ISO8601, host-stamped). Null on
+          // byte-budget groups / legacy rows — receivers fall back gracefully.
+          'wilt_expires_at': p['wilt_expires_at'],
         });
       }
 
@@ -521,6 +529,30 @@ extension AppStateGroups on AppState {
     });
   }
 
+  /// Deliver one identical group frame to every other member. Uses the relay's
+  /// server-side fan-out (a single upload — the big win for images) when the
+  /// connected relay advertised it in AUTH_OK; otherwise falls back to the
+  /// per-member SEND_MESSAGE loop so older/self-hosted relays keep working.
+  void _fanOutGroupFrame(
+    List<String> recipients,
+    String envelope,
+    String contentType,
+  ) {
+    final ws = WebSocketClient();
+    if (ws.supportsGroupFanout && recipients.isNotEmpty) {
+      ws.sendBroadcastGroupMessage(recipients, envelope, contentType);
+    } else {
+      for (final memberHash in recipients) {
+        ws.sendWSMessage({
+          'type': 'SEND_MESSAGE',
+          'recipient_id': memberHash,
+          'envelope': envelope,
+          'content_type': contentType,
+        });
+      }
+    }
+  }
+
   Future<String?> sendGroupMessage(
     String text, {
     String contentType = 'text',
@@ -536,6 +568,19 @@ extension AppStateGroups on AppState {
     }
     final contact = activeContact!;
     final groupId = contact.keyHash;
+
+    // Group Time Wilt: block sends once wilted. A member is wilted when its own
+    // clock has run out (archived / no time left); the host is wilted only once
+    // every member has wilted (the group archived). Either way the composer is
+    // already locked in the UI — this just closes the gap before the sweep runs.
+    if (contact.isTimeWilt) {
+      final bool memberWilted = !contact.isTimeWiltGroupHost &&
+          (contact.isArchived || contact.timeWiltRemainingFraction <= 0);
+      final bool hostWilted = contact.isTimeWiltGroupHost && contact.isArchived;
+      if (memberWilted || hostWilted) {
+        return 'This Time Wilt group has wilted — meet again to renew.';
+      }
+    }
 
     // maxMessageSize is a TEXT policy; images, voice notes and emoji defs are
     // bounded by lane space + the sender's own pre-send size checks, so don't
@@ -650,15 +695,11 @@ extension AppStateGroups on AppState {
         'd': base64Encode(cipherHeader),
         't': 'group_lane_header',
       });
-      for (final memberHash in contact.memberKeyHashes) {
-        if (memberHash == userId) continue;
-        WebSocketClient().sendWSMessage({
-          'type': 'SEND_MESSAGE',
-          'recipient_id': memberHash,
-          'envelope': headerEnvelope,
-          'content_type': 'group_lane_header',
-        });
-      }
+      _fanOutGroupFrame(
+        contact.memberKeyHashes.where((h) => h != userId).toList(),
+        headerEnvelope,
+        'group_lane_header',
+      );
       currentWriteOffset = 512;
       await GroupDatabase.instance.upsertLane(
         groupId: groupId,
@@ -698,15 +739,11 @@ extension AppStateGroups on AppState {
     });
 
     final bool socketConnected = WebSocketClient().isConnected;
-    for (final memberHash in contact.memberKeyHashes) {
-      if (memberHash == userId) continue;
-      WebSocketClient().sendWSMessage({
-        'type': 'SEND_MESSAGE',
-        'recipient_id': memberHash,
-        'envelope': envelope,
-        'content_type': 'group_message',
-      });
-    }
+    _fanOutGroupFrame(
+      contact.memberKeyHashes.where((h) => h != userId).toList(),
+      envelope,
+      'group_message',
+    );
 
     final newWriteOffset = currentWriteOffset + rawBytes.length;
     await GroupDatabase.instance.updateLaneWriteOffset(
@@ -988,39 +1025,13 @@ extension AppStateGroups on AppState {
         if (idx != -1) {
           final existing = contacts[idx];
           if (existing.name != newName || existing.profileImageB64 != newIcon) {
-            final updated = Contact(
-              id: existing.id,
+            // copyWith so Time Wilt (groupWiltLifetimeSecs / wiltExpiresAt /
+            // wiltCreatedAt) and groupRechargePending survive a name/icon change
+            // — a manual rebuild here silently reverted TW groups to byte-budget.
+            final updated = existing.copyWith(
               name: newName,
-              keyHash: existing.keyHash,
-              relayUrl: existing.relayUrl,
-              isPrivateNode: existing.isPrivateNode,
-              maxBufferBytes: existing.maxBufferBytes,
-              remainingBufferBytes: existing.remainingBufferBytes,
-              peerRemainingBufferBytes: existing.peerRemainingBufferBytes,
-              lastActivity: existing.lastActivity,
-              isWilted: existing.isWilted,
-              isGroup: true,
-              memberCount: existing.memberCount,
-              hostName: existing.hostName,
-              isHost: existing.isHost,
-              hostKeyHash: existing.hostKeyHash,
-              memberKeyHashes: existing.memberKeyHashes,
-              groupIconHex: newIcon ?? existing.groupIconHex,
-              maxMembers: existing.maxMembers,
-              maxMessageSize: existing.maxMessageSize,
-              imagesAllowed: existing.imagesAllowed,
-              joinedAt: existing.joinedAt,
-              shortNick: existing.shortNick,
-              profileImageB64: newIcon ?? existing.profileImageB64,
-              outgoingOffset: existing.outgoingOffset,
-              outgoingMaxOffset: existing.outgoingMaxOffset,
-              incomingOffset: existing.incomingOffset,
-              incomingMaxOffset: existing.incomingMaxOffset,
-              groupSeed: existing.groupSeed,
-              laneSize: existing.laneSize,
-              totalGroupSize: existing.totalGroupSize,
-              slotIndex: existing.slotIndex,
-              additionalSlots: existing.additionalSlots,
+              groupIconHex: newIcon,
+              profileImageB64: newIcon,
             );
             contacts[idx] = updated;
             if (activeContact?.keyHash == groupId) {
@@ -1060,6 +1071,8 @@ extension AppStateGroups on AppState {
       groupSlotsInfo[group.id] = {'used': assignedSlots, 'total': totalSlots};
 
       final Map<String, Map<String, String>> cachedGroupProfiles = {};
+      // Host-stamped per-member Time Wilt expiry (ISO8601), keyed by member hash.
+      final Map<String, String> memberWiltExpiry = {};
       for (final p in profiles) {
         final memberHash = p['member_key_hash'] as String;
         cachedGroupProfiles[memberHash] = {
@@ -1067,6 +1080,8 @@ extension AppStateGroups on AppState {
           'profile_image': p['profile_image'] as String? ?? '',
           'avatar_border': p['avatar_border'] as String? ?? '',
         };
+        final exp = p['wilt_expires_at'] as String?;
+        if (exp != null && exp.isNotEmpty) memberWiltExpiry[memberHash] = exp;
       }
       // Keyed by the local contact id to match the UI read sites
       // (groupMembersMetadata / groupSlotsInfo are also keyed by contact id).
@@ -1099,6 +1114,9 @@ extension AppStateGroups on AppState {
           'isHost': false,
           'remaining': memberRemainingBytes[userId] ?? 0,
           'max': laneSize,
+          // Our own clock is authoritative locally (contact.wiltExpiresAt), not
+          // the host's broadcast copy, so the roster reads it off the contact.
+          'twExpiresAt': group.wiltExpiresAt?.toIso8601String(),
         });
       }
 
@@ -1118,6 +1136,8 @@ extension AppStateGroups on AppState {
           'max': laneSize,
           // Profile kept for attribution but no active lane → re-meet to rejoin.
           'notYetMet': !assignedHashes.contains(memberHash),
+          // Host-broadcast Time Wilt clock for this member (null on byte groups).
+          'twExpiresAt': memberWiltExpiry[memberHash],
         });
       }
 
@@ -1151,6 +1171,7 @@ extension AppStateGroups on AppState {
     required String groupIconHex,
     required int maxMembers,
     required String groupSeed,
+    int? wiltLifetimeSecs,
     void Function(int written, int total)? onPadProgress,
   }) async {
     // Groups no longer pre-generate a giant on-disk pad — the keystream is
@@ -1235,6 +1256,15 @@ extension AppStateGroups on AppState {
       laneSize: laneSize,
       totalGroupSize: totalGroupSize,
       slotIndex: 1,
+      // Group Time Wilt: the host is "infinite" but keeps a hidden expiry
+      // (now + lifetime) that any member meeting bumps — the group only greys
+      // once every member has wilted. groupWiltLifetimeSecs is the real marker
+      // (host stores no *personal* countdown; it renders ∞).
+      groupWiltLifetimeSecs: wiltLifetimeSecs,
+      wiltExpiresAt: wiltLifetimeSecs != null
+          ? DateTime.now().add(Duration(seconds: wiltLifetimeSecs))
+          : null,
+      wiltCreatedAt: wiltLifetimeSecs != null ? DateTime.now() : null,
     );
 
     contacts.add(newGroup);
@@ -1272,8 +1302,18 @@ extension AppStateGroups on AppState {
     required String hostName,
     String? groupIconHex,
     int? maxMembers,
+    int? wiltLifetimeSecs,
     void Function(int written, int total)? onPadProgress,
   }) async {
+    // Group Time Wilt (member side): each meeting — first join OR a later re-meet
+    // — (re)starts THIS member's clock at now + the group's lifetime. Both the
+    // gauge start (wiltCreatedAt) and expiry are refreshed, mirroring the 1:1
+    // re-pair rule, so a re-met member gets a full fresh window.
+    final now = DateTime.now();
+    final DateTime? memberWiltExpiresAt = wiltLifetimeSecs != null
+        ? now.add(Duration(seconds: wiltLifetimeSecs))
+        : null;
+
     // Compute-on-demand: cache the seed instead of writing a physical pad file
     // (same as the host path in addGroupChat). Report generation complete so the
     // join progress UI closes immediately.
@@ -1348,6 +1388,9 @@ extension AppStateGroups on AppState {
         laneSize: laneSize,
         totalGroupSize: totalSize,
         slotIndex: slotIndex,
+        groupWiltLifetimeSecs: wiltLifetimeSecs,
+        wiltExpiresAt: memberWiltExpiresAt,
+        wiltCreatedAt: wiltLifetimeSecs != null ? now : null,
       );
       contacts[existingIndex] = updatedContact;
       await WiltkeyDatabase.instance.upsertContact(updatedContact);
@@ -1376,6 +1419,9 @@ extension AppStateGroups on AppState {
         laneSize: laneSize,
         totalGroupSize: totalSize,
         slotIndex: slotIndex,
+        groupWiltLifetimeSecs: wiltLifetimeSecs,
+        wiltExpiresAt: memberWiltExpiresAt,
+        wiltCreatedAt: wiltLifetimeSecs != null ? now : null,
       );
       contacts.add(newContact);
       final systemMsg = ChatMessage(
@@ -1416,20 +1462,32 @@ extension AppStateGroups on AppState {
     required int slotIndex,
   }) async {
     await GroupDatabase.instance.assignLaneToMember(groupId, slotIndex, peerId);
-    await upsertGroupProfileMerged(
-      groupId: groupId,
-      memberKeyHash: peerId,
-      name: peerName,
-      profileImage: peerProfileImage,
-      arrivalOrder: slotIndex,
-    );
 
+    // Group Time Wilt: the host is "infinite" but greys out once EVERY member
+    // has wilted. Any member meeting (join or re-meet) is the freshest clock, so
+    // bump the host's hidden gate to now + lifetime and revive the group. The
+    // same instant is this peer's own clock (whenTheyMetHost + lifetime), which
+    // we stamp on their profile so the roster can show their remaining time.
     final idx = contacts.indexWhere((c) => c.isGroup && c.keyHash == groupId);
     if (idx == -1) {
       log('[Group Host Error] hostRegisterMember: group $groupId not found.');
       return;
     }
     final existing = contacts[idx];
+    final int? twl = existing.groupWiltLifetimeSecs;
+    final DateTime? hostGate = twl != null
+        ? DateTime.now().add(Duration(seconds: twl))
+        : null;
+
+    await upsertGroupProfileMerged(
+      groupId: groupId,
+      memberKeyHash: peerId,
+      name: peerName,
+      profileImage: peerProfileImage,
+      arrivalOrder: slotIndex,
+      wiltExpiresAt: hostGate?.toIso8601String(),
+    );
+
     final newHashes = List<String>.from(existing.memberKeyHashes);
     if (!newHashes.contains(userId)) newHashes.add(userId);
     if (!newHashes.contains(peerId)) newHashes.add(peerId);
@@ -1438,6 +1496,9 @@ extension AppStateGroups on AppState {
       memberKeyHashes: newHashes,
       memberCount: newHashes.length,
       lastActivity: DateTime.now(),
+      wiltExpiresAt: hostGate,
+      wiltCreatedAt: twl != null ? DateTime.now() : null,
+      isArchived: twl != null ? false : existing.isArchived,
     );
     contacts[idx] = updated;
     if (activeContact?.keyHash == groupId) activeContact = updated;

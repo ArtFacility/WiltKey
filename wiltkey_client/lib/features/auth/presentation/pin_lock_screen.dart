@@ -465,10 +465,14 @@ class _PinLockScreenState extends State<PinLockScreen>
             if (isPhosphor)
               Positioned.fill(
                 child: IgnorePointer(
-                  child: CustomPaint(
-                    painter: _CrtScanlinePainter(
-                      shade: t.bg,
-                      glare: t.positive,
+                  // Cache the static scanline pass so key-press animations and
+                  // the shake don't re-run ~800 rects + 2 shaders per frame.
+                  child: RepaintBoundary(
+                    child: CustomPaint(
+                      painter: _CrtScanlinePainter(
+                        shade: t.bg,
+                        glare: t.positive,
+                      ),
                     ),
                   ),
                 ),

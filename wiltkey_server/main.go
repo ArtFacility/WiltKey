@@ -167,6 +167,13 @@ const (
 	largeUploadCooldown   = 15 * time.Second // min gap between large sends, per sender
 )
 
+// maxBroadcastRecipients hard-caps a single BROADCAST_GROUP_MESSAGE fan-out. The
+// relay is group-blind (it routes by recipient_id and never parses group_id), so
+// it can't validate membership — this absolute bound is the only defense against
+// one frame becoming an N× storage/queue amplification bomb. It sits well above
+// the client's 100-member Plus group cap, with headroom for future growth.
+const maxBroadcastRecipients = 256
+
 // Offline-hold TTLs: how long a queued message waits for an offline RECIPIENT to
 // come back online. Premium recipients (WiltKey Plus) get the longer hold.
 const (

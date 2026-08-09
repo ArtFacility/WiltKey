@@ -442,23 +442,34 @@ class BlePairingManager extends ChangeNotifier {
         };
 
         if (groupToInvite != null) {
-          final emptyLanes = await GroupDatabase.instance.getEmptyLanes(
+          // Re-meet (Time Wilt time-refresh / re-invite after a byte recharge):
+          // if this peer already holds a lane, reuse THAT slot rather than
+          // consuming a fresh one — otherwise the same member would occupy two
+          // slots. First-time joiners fall through to the lowest empty slot.
+          final existingLane = await GroupDatabase.instance.getLaneByMember(
             groupToInvite!.keyHash,
+            peerId,
           );
-          if (emptyLanes.isEmpty) {
-            log('[BLE Host Error] No empty slots available to invite peer!');
-            final response = jsonEncode({
-              "status": "rejected",
-              "message": "Group capacity reached",
-            });
-            _gattResponseBytes = Uint8List.fromList(utf8.encode(response));
-            await BlePeripheral.updateCharacteristic(
-              characteristicId: '098ed89c-5b2d-4f70-91f6-7ccff798f5b2',
-              value: _gattResponseBytes!,
+          int? assignedSlot = existingLane?['slot_index'] as int?;
+          if (assignedSlot == null) {
+            final emptyLanes = await GroupDatabase.instance.getEmptyLanes(
+              groupToInvite!.keyHash,
             );
-            return;
+            if (emptyLanes.isEmpty) {
+              log('[BLE Host Error] No empty slots available to invite peer!');
+              final response = jsonEncode({
+                "status": "rejected",
+                "message": "Group capacity reached",
+              });
+              _gattResponseBytes = Uint8List.fromList(utf8.encode(response));
+              await BlePeripheral.updateCharacteristic(
+                characteristicId: '098ed89c-5b2d-4f70-91f6-7ccff798f5b2',
+                value: _gattResponseBytes!,
+              );
+              return;
+            }
+            assignedSlot = emptyLanes.first['slot_index'] as int;
           }
-          final assignedSlot = emptyLanes.first['slot_index'] as int;
           final encryptedSeed = _encryptGroupSeed(
             groupToInvite!.groupSeed!,
             derivedSeed,
@@ -473,6 +484,16 @@ class BlePairingManager extends ChangeNotifier {
           responseMap["group_name"] = groupToInvite!.name;
           responseMap["host_name"] = appState.effectiveDeviceName;
           responseMap["host_short_nick"] = appState.effectiveShortNick;
+          // Group Time Wilt lifetime (seconds); null/absent for byte-budget
+          // groups. The member derives its own expiry = now + this.
+          responseMap["group_wilt_lifetime"] =
+              groupToInvite!.groupWiltLifetimeSecs;
+          // Drop user_id: the joiner never reads it (it derives the host id as
+          // sha256(pubkey) — see _processPairingResponse), and its ~78 bytes push
+          // a Time Wilt invite over the 512-byte GATT read limit (the huge
+          // total_size/lane_size + the lifetime field already inflate it), which
+          // silently truncated the response and stalled the joiner's read.
+          responseMap.remove("user_id");
         } else {
           responseMap["short_nick"] = appState.effectiveShortNick;
           responseMap["profile_image"] = appState.profileImageB64;
@@ -481,11 +502,22 @@ class BlePairingManager extends ChangeNotifier {
         final response = jsonEncode(responseMap);
 
         _gattResponseBytes = Uint8List.fromList(utf8.encode(response));
-
-        await BlePeripheral.updateCharacteristic(
-          characteristicId: '098ed89c-5b2d-4f70-91f6-7ccff798f5b2',
-          value: _gattResponseBytes!,
+        log(
+          '[BLE Host] Pairing response ${_gattResponseBytes!.length} bytes '
+          '(GATT read limit ~512).',
         );
+
+        try {
+          await BlePeripheral.updateCharacteristic(
+            characteristicId: '098ed89c-5b2d-4f70-91f6-7ccff798f5b2',
+            value: _gattResponseBytes!,
+          );
+        } catch (e) {
+          // Some BLE stacks throw on an over-MTU value rather than truncating —
+          // don't let that hard-crash the host mid-invite.
+          log('[BLE Host Error] Failed to write pairing response: $e');
+          return;
+        }
 
         agreedSeed = '0x' + derivedSeed.substring(0, 16).toUpperCase() + '...';
         notifyListeners();
@@ -741,6 +773,7 @@ class BlePairingManager extends ChangeNotifier {
             'lane_size': json['lane_size'] as int,
             'total_size': json['total_size'] as int,
             'slot_index': json['slot_index'] as int,
+            'group_wilt_lifetime': json['group_wilt_lifetime'] as int?,
           };
         } else {
           incomingGroupMetadata = null;
@@ -1041,12 +1074,21 @@ class BlePairingManager extends ChangeNotifier {
         // Host path:
         final groupId = groupToInvite!.keyHash;
 
-        final emptyLanes = await GroupDatabase.instance.getEmptyLanes(groupId);
-        if (emptyLanes.isEmpty) {
-          log('[BLE Host Error] No empty slots available to assign to member.');
-          return;
+        // Re-meet reuses the peer's existing slot (Time Wilt time-refresh /
+        // re-invite); first-timers take the lowest empty slot.
+        final existingLane = await GroupDatabase.instance.getLaneByMember(
+          groupId,
+          peerId,
+        );
+        int? assignedSlot = existingLane?['slot_index'] as int?;
+        if (assignedSlot == null) {
+          final emptyLanes = await GroupDatabase.instance.getEmptyLanes(groupId);
+          if (emptyLanes.isEmpty) {
+            log('[BLE Host Error] No empty slots available to assign to member.');
+            return;
+          }
+          assignedSlot = emptyLanes.first['slot_index'] as int;
         }
-        final assignedSlot = emptyLanes.first['slot_index'] as int;
 
         await appState.hostRegisterMember(
           groupId: groupId,
@@ -1079,6 +1121,7 @@ class BlePairingManager extends ChangeNotifier {
           hostName: meta['hostName'] as String,
           groupIconHex: meta['groupIcon'] as String?,
           maxMembers: meta['maxMembers'] as int?,
+          wiltLifetimeSecs: meta['group_wilt_lifetime'] as int?,
           onPadProgress: _onPadProgress,
         );
 

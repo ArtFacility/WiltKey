@@ -43,7 +43,7 @@ class WiltkeyDatabase {
     } catch (_) {}
     _db = await openDatabase(
       path,
-      version: 16,
+      version: 18,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -172,6 +172,26 @@ class WiltkeyDatabase {
     if (oldVersion < 16) {
       await db.execute(_createEventsTableSql);
     }
+
+    // v17: group Time Wilt — the group's configured lifetime in seconds. Non-null
+    // marks a Time Wilt group (host stores no personal wilt_expires_at under the
+    // per-member model, so this is the marker + the value stamped on invites).
+    if (oldVersion < 17) {
+      await db.execute(
+        'ALTER TABLE contacts ADD COLUMN group_wilt_lifetime_secs INTEGER',
+      );
+    }
+
+    // v18: per-member Time Wilt expiry in the group roster. Under the per-member
+    // model each member's clock (whenTheyMetHost + lifetime) is authoritative on
+    // their OWN device; the host stamps it here at register/re-meet time and
+    // broadcasts it (group_info_update members_profiles) so everyone can show
+    // each member's remaining time in the members sheet. Legacy rows null.
+    if (oldVersion < 18) {
+      await db.execute(
+        'ALTER TABLE group_profiles ADD COLUMN wilt_expires_at TEXT',
+      );
+    }
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -218,6 +238,7 @@ class WiltkeyDatabase {
         arrival_order INTEGER,
         permissions TEXT DEFAULT '',
         avatar_border TEXT,
+        wilt_expires_at TEXT,
         UNIQUE(group_id, member_key_hash),
         FOREIGN KEY (group_id) REFERENCES group_info(group_id) ON DELETE CASCADE
       )
@@ -259,6 +280,7 @@ class WiltkeyDatabase {
         wilt_expires_at INTEGER,
         stream_seed TEXT,
         wilt_created_at INTEGER,
+        group_wilt_lifetime_secs INTEGER,
         group_seed TEXT,
         lane_size INTEGER,
         total_group_size INTEGER,
@@ -363,6 +385,7 @@ class WiltkeyDatabase {
       'wilt_expires_at': contact.wiltExpiresAt?.millisecondsSinceEpoch,
       'stream_seed': contact.streamSeedHex,
       'wilt_created_at': contact.wiltCreatedAt?.millisecondsSinceEpoch,
+      'group_wilt_lifetime_secs': contact.groupWiltLifetimeSecs,
       'group_seed': contact.groupSeed,
       'lane_size': contact.laneSize,
       'total_group_size': contact.totalGroupSize,
@@ -420,6 +443,7 @@ class WiltkeyDatabase {
         wiltCreatedAt: row['wilt_created_at'] != null
             ? DateTime.fromMillisecondsSinceEpoch(row['wilt_created_at'] as int)
             : null,
+        groupWiltLifetimeSecs: row['group_wilt_lifetime_secs'] as int?,
         groupSeed: row['group_seed'] as String?,
         laneSize: row['lane_size'] as int?,
         totalGroupSize: row['total_group_size'] as int?,
@@ -1498,17 +1522,22 @@ class WiltkeyDatabase {
     required String profileImage,
     required int arrivalOrder,
     String? avatarBorder,
+    String? wiltExpiresAt,
   }) async {
     final db = await _database;
     // avatar_border is known only to the member themselves (it rides the
     // group_member_profile channel), so authoritative writers — lane-header
     // parses and the host's group_info_update — pass null. This is a full-row
     // ConflictAlgorithm.replace, so preserve any already-known border instead
-    // of letting those writers blank it.
+    // of letting those writers blank it. wilt_expires_at is the mirror case:
+    // ONLY the host's group_info_update sets it, so a member-profile write
+    // (null) must not blank the host-stamped clock — same null-preserve trick.
     String? border = avatarBorder;
-    if (border == null) {
+    String? wiltExpiry = wiltExpiresAt;
+    if (border == null || wiltExpiry == null) {
       final existing = await getProfile(groupId, memberKeyHash);
-      border = existing?['avatar_border'] as String?;
+      border ??= existing?['avatar_border'] as String?;
+      wiltExpiry ??= existing?['wilt_expires_at'] as String?;
     }
     await db.insert('group_profiles', {
       'group_id': groupId,
@@ -1517,6 +1546,7 @@ class WiltkeyDatabase {
       'profile_image': profileImage,
       'arrival_order': arrivalOrder,
       'avatar_border': border,
+      'wilt_expires_at': wiltExpiry,
     }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 

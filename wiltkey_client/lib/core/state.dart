@@ -36,6 +36,7 @@ part 'state_push.dart';
 part 'state_entitlement.dart';
 part 'state_reactions.dart';
 part 'state_screenshot.dart';
+part 'state_group_nuke.dart';
 part 'state_wilting.dart';
 part 'state_downloads.dart';
 part 'state_events.dart';
@@ -62,6 +63,19 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   static const int infoLaneSize = 1024 * 1024; // 1MB for group metadata/logs
   static const int laneHeaderSize =
       512; // Fixed per-lane metadata header (name, pic, order)
+
+  // Group Time Wilt ("unlimited budget"): the group's whole keystream reach that
+  // its member lanes are split across. It stays under the group keystream's
+  // 32-bit block-counter reach (~137 GB before the counter would wrap and reuse
+  // keystream — see WiltkeyOtpService.keystreamRange), so a TW group needs NO
+  // wide-counter crypto change: each member just gets a huge (multi-GB) disjoint
+  // lane, effectively unlimited for a casual, limited-*time* chat.
+  static const int twGroupReachBytes = 120 * 1024 * 1024 * 1024; // 120 GB
+
+  /// Per-member lane size for a Time Wilt group of [maxMembers], sized so the
+  /// members split [twGroupReachBytes] evenly on disjoint offsets.
+  static int twGroupLaneSize(int maxMembers) =>
+      (twGroupReachBytes - infoLaneSize) ~/ (maxMembers < 2 ? 2 : maxMembers);
 
   AppState._internal() {
     _loadCleanState();
@@ -237,6 +251,10 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   final ValueNotifier<String?> screenshotDeniedSignal = ValueNotifier(null);
   // Our in-flight requests, keyed by request id (requester side only).
   final Map<String, ScreenshotSession> screenshotSessions = {};
+
+  // --- Group nuke-for-everyone vote (see state_group_nuke.dart) ---
+  // Proposer-side tallies for outstanding "destroy this group" proposals.
+  final Map<String, GroupNukeSession> groupNukeSessions = {};
 
   /// Emit an in-app heads-up cue for [contact], unless the user is already in
   /// that chat, the app is backgrounded/locked, or we're replaying frames the

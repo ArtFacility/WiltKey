@@ -116,7 +116,12 @@ class _GroupInviteScreenState extends State<GroupInviteScreen> {
             ],
           ),
           content: Text(
-            'Add $peerName to group "${widget.group.name}"?\n\nKey buffer: ${AppState.formatBytes(bufferBytes)}.',
+            // A Time Wilt group has no per-member byte budget — the joiner's
+            // requested buffer is irrelevant, so don't show it (was the stray
+            // "Key buffer: 9.5 MB" line).
+            widget.group.isTimeWilt
+                ? 'Add $peerName to group "${widget.group.name}"?'
+                : 'Add $peerName to group "${widget.group.name}"?\n\nKey buffer: ${AppState.formatBytes(bufferBytes)}.',
             style: t.bodySecondary.copyWith(height: 1.5),
           ),
           actions: [

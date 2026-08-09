@@ -231,6 +231,10 @@ type WSMessage struct {
 	Sequence        int64             `json:"sequence,omitempty"`
 	Recipients      []string          `json:"recipients,omitempty"`
 	Envelopes       map[string]string `json:"envelopes,omitempty"`
+	// Capabilities the relay advertises in AUTH_OK (e.g. "group_fanout"), so a
+	// client can use newer frames only when the relay it connected to supports
+	// them and otherwise fall back (old self-hosted relays stay compatible).
+	Capabilities []string `json:"capabilities,omitempty"`
 	Message         string            `json:"message,omitempty"`
 	NukeEnvelope    string            `json:"nuke_envelope,omitempty"`
 	EphemeralPubkey string            `json:"ephemeral_pubkey,omitempty"`
@@ -353,6 +357,8 @@ func (c *Client) handleWSMessage(msg WSMessage) {
 	switch msg.Type {
 	case "SEND_MESSAGE":
 		c.handleSendMessage(msg)
+	case "BROADCAST_GROUP_MESSAGE":
+		c.handleBroadcastGroupMessage(msg)
 	case "TYPING_STATUS":
 		c.handleTypingStatus(msg)
 	case "NUKE_RECIPIENT":
@@ -437,8 +443,9 @@ func ServeWS(hub *Hub, w http.ResponseWriter, r *http.Request) {
 	client.hub.register <- client
 
 	client.SendJSON(WSMessage{
-		Type:   "AUTH_OK",
-		UserID: userID,
+		Type:         "AUTH_OK",
+		UserID:       userID,
+		Capabilities: []string{"group_fanout"},
 	})
 
 	// Reset read deadlines and start pumps

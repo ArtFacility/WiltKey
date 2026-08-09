@@ -1956,6 +1956,174 @@ abstract class AppLocalizations {
   /// **'Host recharged this group — meet them again to rejoin'**
   String get groupRechargeNeededComposer;
 
+  /// No description provided for @groupTimeWiltToggle.
+  ///
+  /// In en, this message translates to:
+  /// **'Time Wilt group'**
+  String get groupTimeWiltToggle;
+
+  /// No description provided for @groupTimeWiltToggleSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Limited time, unlimited budget. The group wilts to read-only when your timer runs out; meet the host again to renew it.'**
+  String get groupTimeWiltToggleSub;
+
+  /// No description provided for @groupTimeWiltMembersLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Max members'**
+  String get groupTimeWiltMembersLabel;
+
+  /// No description provided for @groupTimeWiltMembersUpsell.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock up to 100 members with Plus'**
+  String get groupTimeWiltMembersUpsell;
+
+  /// No description provided for @groupTimeWiltHostInfinite.
+  ///
+  /// In en, this message translates to:
+  /// **'Host · ∞'**
+  String get groupTimeWiltHostInfinite;
+
+  /// No description provided for @groupTimeWiltRenewComposer.
+  ///
+  /// In en, this message translates to:
+  /// **'Wilted — meet the host again to renew your access'**
+  String get groupTimeWiltRenewComposer;
+
+  /// No description provided for @groupTimeWiltHostAllWilted.
+  ///
+  /// In en, this message translates to:
+  /// **'All members have wilted — meet someone again to revive the group'**
+  String get groupTimeWiltHostAllWilted;
+
+  /// No description provided for @groupNukeProposeButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Propose destroying for everyone'**
+  String get groupNukeProposeButton;
+
+  /// No description provided for @groupNukeProposeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Destroy this group for everyone?'**
+  String get groupNukeProposeTitle;
+
+  /// No description provided for @groupNukeProposeBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Asks the other members to vote. If a majority agree, the group and its history are destroyed on every device. This can\'t be undone.'**
+  String get groupNukeProposeBody;
+
+  /// No description provided for @groupNukeProposeConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Propose'**
+  String get groupNukeProposeConfirm;
+
+  /// No description provided for @groupNukeVoteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Destroy group?'**
+  String get groupNukeVoteTitle;
+
+  /// No description provided for @groupNukeVoteBody.
+  ///
+  /// In en, this message translates to:
+  /// **'A member proposed destroying this group for everyone. If a majority agree, it\'s wiped on every device.'**
+  String get groupNukeVoteBody;
+
+  /// No description provided for @groupNukeVoteAllow.
+  ///
+  /// In en, this message translates to:
+  /// **'Agree'**
+  String get groupNukeVoteAllow;
+
+  /// No description provided for @groupNukeVoteDeny.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep'**
+  String get groupNukeVoteDeny;
+
+  /// No description provided for @groupNukeVotePending.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for members to vote…'**
+  String get groupNukeVotePending;
+
+  /// No description provided for @groupNukeVotePassed.
+  ///
+  /// In en, this message translates to:
+  /// **'The group was destroyed by majority vote.'**
+  String get groupNukeVotePassed;
+
+  /// No description provided for @groupNukeVoteFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The proposal to destroy the group did not pass.'**
+  String get groupNukeVoteFailed;
+
+  /// No description provided for @groupNukeVoteSent.
+  ///
+  /// In en, this message translates to:
+  /// **'Proposal sent — waiting for members to vote.'**
+  String get groupNukeVoteSent;
+
+  /// No description provided for @activityTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Activity'**
+  String get activityTitle;
+
+  /// No description provided for @activityEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No activity yet. Events like a chat being destroyed will show up here.'**
+  String get activityEmpty;
+
+  /// No description provided for @activityClear.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear'**
+  String get activityClear;
+
+  /// No description provided for @activityClearConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear activity?'**
+  String get activityClearConfirmTitle;
+
+  /// No description provided for @activityClearConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This removes all activity entries from this device. It can\'t be undone.'**
+  String get activityClearConfirmBody;
+
+  /// No description provided for @eventNukeReceivedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat destroyed'**
+  String get eventNukeReceivedTitle;
+
+  /// No description provided for @eventNukeReceivedBody.
+  ///
+  /// In en, this message translates to:
+  /// **'A secure chat was destroyed.'**
+  String get eventNukeReceivedBody;
+
+  /// No description provided for @eventGroupNukedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Group destroyed'**
+  String get eventGroupNukedTitle;
+
+  /// No description provided for @eventGroupNukedBody.
+  ///
+  /// In en, this message translates to:
+  /// **'A secure group was destroyed.'**
+  String get eventGroupNukedBody;
+
   /// No description provided for @groupSyncingFromMember.
   ///
   /// In en, this message translates to:
@@ -2903,6 +3071,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Create bigger pads — up to 200 MB for a chat and 500 MB for a group.'**
   String get shopPlusBenefitPads;
+
+  /// Plus benefit: larger Time Wilt group member cap.
+  ///
+  /// In en, this message translates to:
+  /// **'Host bigger Time Wilt groups — up to 100 members instead of 20.'**
+  String get shopPlusBenefitTimeWiltGroups;
 
   /// Plus benefit: supporting the project.
   ///

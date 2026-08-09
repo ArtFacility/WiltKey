@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"log"
 	"strings"
 	"time"
@@ -134,50 +135,225 @@ func (c *Client) handleSendMessage(msg WSMessage) {
 		return
 	}
 
-	// 3. High RAM check -> Postgres inline (under 500KB)
-	if pg != nil && isHighRAMLoad() {
-		messageID, err := pg.StoreMessage(msg.RecipientID, c.id, &msg.Envelope, nil, msg.ContentType, holdTTL)
-		if err != nil {
-			log.Printf("Failed to store message in Postgres under high memory: %v", err)
-			c.SendJSON(WSMessage{Type: "ERROR", Message: "Failed to store message in database"})
-			return
-		}
+	// 3+4. Sub-threshold routing (Postgres-inline under memory pressure, else
+	// direct/Redis) — shared with the group fan-out path.
+	if err := c.routeSmallMessage(msg.RecipientID, msg.Envelope, msg.ContentType, holdTTL); err != nil {
+		log.Printf("[Relay Error] Failed to route message to %s: %v", msg.RecipientID, err)
+		c.SendJSON(WSMessage{Type: "ERROR", Message: "Failed to route message"})
+	}
+}
 
-		target, ok := c.hub.getClient(msg.RecipientID)
-		if ok {
+// routeSmallMessage delivers ONE sub-[largePayloadThreshold] envelope to a single
+// recipient: straight to the socket if they're online, else queued in Redis (or,
+// under memory pressure, parked inline in Postgres and dropped once delivered).
+// It returns an error WITHOUT notifying the sender, so the 1-on-1 path can turn
+// that into an ERROR while the group fan-out can log-and-skip one bad recipient
+// without aborting delivery to the rest of the group.
+func (c *Client) routeSmallMessage(recipientID, envelope, contentType string, holdTTL time.Duration) error {
+	// High RAM -> Postgres inline, delivered-then-deleted.
+	if pg != nil && isHighRAMLoad() {
+		messageID, err := pg.StoreMessage(recipientID, c.id, &envelope, nil, contentType, holdTTL)
+		if err != nil {
+			return fmt.Errorf("postgres inline store: %w", err)
+		}
+		if target, ok := c.hub.getClient(recipientID); ok {
 			target.SendJSON(WSMessage{
 				Type:        "NEW_MESSAGE",
 				SenderID:    c.id,
-				Envelope:    msg.Envelope,
-				ContentType: msg.ContentType,
+				Envelope:    envelope,
+				ContentType: contentType,
 			})
-			// Delete inline message immediately from DB once sent
 			pg.DeleteMessage(messageID)
 		} else {
-			go c.hub.sendWakePush(msg.RecipientID, c.id, msg.ContentType)
+			go c.hub.sendWakePush(recipientID, c.id, contentType)
 		}
-		return
+		return nil
 	}
 
-	// 4. Normal routing (under 500KB, normal RAM) -> Redis
-	target, ok := c.hub.getClient(msg.RecipientID)
-	if ok {
-		log.Printf("[Relay] Routing message directly to online client %s", msg.RecipientID)
+	// Normal -> direct if online, else Redis queue.
+	if target, ok := c.hub.getClient(recipientID); ok {
 		target.SendJSON(WSMessage{
 			Type:        "NEW_MESSAGE",
 			SenderID:    c.id,
-			Envelope:    msg.Envelope,
-			ContentType: msg.ContentType,
+			Envelope:    envelope,
+			ContentType: contentType,
 		})
 	} else {
-		log.Printf("[Relay] Client %s offline. Queuing message in Redis with %s TTL.", msg.RecipientID, holdTTL)
-		err := c.hub.rdb.AddMessageToQueue(msg.RecipientID, c.id, msg.Envelope, msg.ContentType, holdTTL)
-		if err != nil {
-			log.Printf("[Relay Error] Failed to queue offline message for %s in Redis: %v", msg.RecipientID, err)
-			c.SendJSON(WSMessage{Type: "ERROR", Message: "Failed to queue message offline"})
+		if err := c.hub.rdb.AddMessageToQueue(recipientID, c.id, envelope, contentType, holdTTL); err != nil {
+			return fmt.Errorf("redis queue: %w", err)
+		}
+		go c.hub.sendWakePush(recipientID, c.id, contentType)
+	}
+	return nil
+}
+
+// handleBroadcastGroupMessage is server-side fan-out: the sender uploads ONE
+// envelope plus a recipient list, and the relay routes that identical envelope to
+// each recipient (group envelopes are byte-identical — the group shares one
+// keystream, so there is no per-recipient re-encryption). This replaces the old
+// model where the sender fired N separate SEND_MESSAGE frames, each carrying the
+// full envelope — brutal for images. For large files the body is uploaded to the
+// bucket ONCE and shared by N Postgres pointer rows (see the ref-counted deletion
+// in handleFileReceived / PruneExpiredMessages).
+//
+// The relay is group-blind: it cannot validate membership, so the recipient list
+// is only a routing hint, capped + deduped + rate-charged to bound amplification,
+// and discarded after fan-out (never persisted as a group).
+func (c *Client) handleBroadcastGroupMessage(msg WSMessage) {
+	// Dedupe + drop self/empties so a repeated id can't queue N copies for one
+	// victim, and so the cap counts distinct recipients.
+	seen := make(map[string]struct{}, len(msg.Recipients))
+	recipients := make([]string, 0, len(msg.Recipients))
+	for _, r := range msg.Recipients {
+		if r == "" || r == c.id {
+			continue
+		}
+		if _, dup := seen[r]; dup {
+			continue
+		}
+		seen[r] = struct{}{}
+		recipients = append(recipients, r)
+	}
+	if len(recipients) == 0 {
+		c.SendJSON(WSMessage{Type: "ERROR", Message: "No recipients"})
+		return
+	}
+	if len(recipients) > maxBroadcastRecipients {
+		log.Printf("[Relay] Client %s broadcast to %d recipients exceeds cap %d", c.id, len(recipients), maxBroadcastRecipients)
+		c.SendJSON(WSMessage{Type: "ERROR", Message: "Too many recipients"})
+		return
+	}
+
+	// Amplification guard: one frame does N recipients' work, so charge N tokens
+	// from the flood bucket (readPump already took 1). Same goroutine as readPump,
+	// so touching c.tokens here is lock-free. Negative is fine — it just throttles
+	// the sender's next frames until the bucket refills.
+	c.tokens -= float64(len(recipients) - 1)
+
+	payloadSize := int64(len(msg.Envelope))
+
+	// Sender-side gates run ONCE per broadcast (not per recipient).
+	if payloadSize > plusMaxPayload {
+		c.SendJSON(WSMessage{Type: "ERROR", Message: "Payload exceeds the 50MB maximum"})
+		return
+	}
+	if payloadSize >= freeMaxPayload {
+		hasSub, err := checkPremiumSubscription(c.id)
+		if err != nil || !hasSub {
+			c.SendJSON(WSMessage{Type: "ERROR", Message: "Payload >= 5MB requires an active premium subscription"})
 			return
 		}
-		go c.hub.sendWakePush(msg.RecipientID, c.id, msg.ContentType)
+	}
+	if payloadSize >= largePayloadThreshold {
+		allowed, rlErr := c.hub.rdb.AllowLargeUpload(c.id, largeUploadCooldown)
+		if rlErr != nil {
+			log.Printf("[Relay Warning] large-upload rate check failed for %s: %v — allowing", c.id, rlErr)
+		} else if !allowed {
+			c.SendJSON(WSMessage{Type: "ERROR", Message: "Sending large files too quickly — please wait a few seconds and try again"})
+			return
+		}
+	}
+
+	log.Printf("[Relay] Group fan-out from %s to %d recipients, content-type %s, %d bytes", c.id, len(recipients), msg.ContentType, payloadSize)
+
+	// Large-file path: upload the body to the bucket ONCE, then fan out pointers.
+	if payloadSize >= largePayloadThreshold {
+		c.broadcastLargeFile(recipients, msg)
+		return
+	}
+
+	// Small path: route the identical envelope to each recipient. Per-recipient
+	// failures (blocked/nuked queue, transient DB/Redis error) are logged and
+	// skipped — one bad recipient must not drop the message for the whole group.
+	for _, rid := range recipients {
+		blocked, err := c.hub.rdb.IsQueueBlocked(rid)
+		if err != nil {
+			log.Printf("[Relay] fan-out: queue-status check failed for %s: %v — skipping", rid, err)
+			continue
+		}
+		if blocked {
+			log.Printf("[Relay] fan-out: recipient %s queue blocked (nuke) — skipping", rid)
+			continue
+		}
+		holdTTL := holdTTLForRecipient(rid) // per-recipient perk (72h Plus / 24h free)
+		if err := c.routeSmallMessage(rid, msg.Envelope, msg.ContentType, holdTTL); err != nil {
+			log.Printf("[Relay] fan-out: failed to route to %s: %v — skipping", rid, err)
+		}
+	}
+}
+
+// broadcastLargeFile uploads a >= largePayloadThreshold group envelope to the
+// bucket ONCE and advertises it to each recipient via its own Postgres pointer
+// row (all sharing the single bucket object). The object is reference-counted:
+// handleFileReceived / PruneExpiredMessages only delete it once the last pointer
+// row is gone, so one recipient downloading (or a free member's shorter TTL
+// expiring) can't strand the file for the others.
+func (c *Client) broadcastLargeFile(recipients []string, msg WSMessage) {
+	if pg == nil {
+		c.SendJSON(WSMessage{Type: "ERROR", Message: "Postgres and storage must be configured to process large payloads"})
+		return
+	}
+	payloadSize := int64(len(msg.Envelope))
+	storageKey := uuid.New().String()
+	bucketURL, err := storage.Upload(context.Background(), storageKey, strings.NewReader(msg.Envelope), payloadSize, "application/octet-stream")
+	if err != nil {
+		log.Printf("[Relay Error] fan-out: failed to upload payload to storage: %v", err)
+		c.SendJSON(WSMessage{Type: "ERROR", Message: "Failed to upload large file to storage"})
+		return
+	}
+
+	offerMeta, metaOK := buildOfferMeta(msg.Envelope)
+
+	delivered := 0
+	for _, rid := range recipients {
+		blocked, err := c.hub.rdb.IsQueueBlocked(rid)
+		if err != nil {
+			log.Printf("[Relay] fan-out(file): queue-status check failed for %s: %v — skipping", rid, err)
+			continue
+		}
+		if blocked {
+			log.Printf("[Relay] fan-out(file): recipient %s queue blocked (nuke) — skipping", rid)
+			continue
+		}
+		holdTTL := holdTTLForRecipient(rid)
+		messageID, err := pg.StoreMessageSized(rid, c.id, nil, &bucketURL, msg.ContentType, holdTTL, payloadSize, offerMeta)
+		if err != nil {
+			log.Printf("[Relay] fan-out(file): failed to store pointer for %s: %v — skipping", rid, err)
+			continue
+		}
+		delivered++
+
+		target, ok := c.hub.getClient(rid)
+		if !metaOK {
+			// Unparseable envelope — fall back to inline delivery for online
+			// recipients, matching the 1-on-1 large-file fallback.
+			if ok {
+				target.SendJSON(WSMessage{Type: "NEW_MESSAGE", SenderID: c.id, Envelope: msg.Envelope, ContentType: msg.ContentType, MessageID: messageID})
+			} else {
+				go c.hub.sendWakePush(rid, c.id, msg.ContentType)
+			}
+			continue
+		}
+		if ok {
+			target.SendJSON(WSMessage{
+				Type:        "FILE_OFFER",
+				SenderID:    c.id,
+				ContentType: msg.ContentType,
+				MessageID:   messageID,
+				Meta:        offerMeta,
+				Size:        payloadSize,
+				ExpiresAt:   time.Now().Add(holdTTL).Unix(),
+			})
+		} else {
+			go c.hub.sendWakePush(rid, c.id, msg.ContentType)
+		}
+	}
+
+	// No pointer rows were created (every recipient blocked/errored) → nothing
+	// references the object, so reclaim it rather than orphaning it in the bucket.
+	if delivered == 0 {
+		storage.Delete(context.Background(), storageKey)
+		log.Printf("[Relay] fan-out(file): no recipients accepted — reclaimed orphan object %s", storageKey)
 	}
 }
 
@@ -371,22 +547,34 @@ func (c *Client) handleFileReceived(msg WSMessage) {
 		}
 	}
 
-	// Delete from storage
-	if key != "" {
-		err = storage.Delete(context.Background(), key)
-		if err != nil {
-			log.Printf("[Storage Error] Failed to delete object %s: %v", key, err)
-		} else {
-			log.Printf("[Storage] Deleted object %s successfully", key)
-		}
-	}
-
-	// Delete from Postgres
-	err = pg.DeleteMessage(id)
-	if err != nil {
+	// Delete THIS recipient's pointer row FIRST, then delete the bucket object
+	// only if no other pointer rows still reference it. Doing the row delete
+	// before the ref-count check means two simultaneous ACKs can at worst both
+	// try to delete the object (harmless — Delete errors are only logged), never
+	// both skip it and orphan it. A group fan-out shares one object across N rows.
+	if err = pg.DeleteMessage(id); err != nil {
 		log.Printf("[Relay Error] Failed to delete Postgres message %s: %v", id, err)
 	} else {
-		log.Printf("[Relay] File message %s successfully acknowledged and cleared from database", id)
+		log.Printf("[Relay] File message %s acknowledged and cleared from database", id)
+	}
+
+	if key != "" {
+		remaining, cErr := pg.CountMessagesByBucket(bucketURL)
+		if cErr != nil {
+			// Fail SAFE: if we can't confirm the object is unreferenced, leave it.
+			// The prune sweep will reclaim it once every pointer row has expired.
+			log.Printf("[Relay Warning] ref-count check for %s failed: %v — leaving object", bucketURL, cErr)
+			return
+		}
+		if remaining > 0 {
+			log.Printf("[Storage] Object %s still referenced by %d recipient(s) — keeping", key, remaining)
+			return
+		}
+		if err = storage.Delete(context.Background(), key); err != nil {
+			log.Printf("[Storage Error] Failed to delete object %s: %v", key, err)
+		} else {
+			log.Printf("[Storage] Deleted object %s (last reference cleared)", key)
+		}
 	}
 }
 

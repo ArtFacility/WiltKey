@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/google/uuid"
@@ -185,39 +186,66 @@ func (p *PostgresClient) DeleteMessage(id string) error {
 	return err
 }
 
+// CountMessagesByBucket returns how many message rows still reference a bucket
+// object. Group fan-out shares ONE bucket object across N pointer rows, so a
+// caller must only delete the object once this reaches zero — otherwise one
+// recipient's ACK (or a shorter free-tier TTL expiring) would strand the file
+// for the others.
+func (p *PostgresClient) CountMessagesByBucket(bucketURL string) (int, error) {
+	var n int
+	err := p.db.QueryRow("SELECT COUNT(*) FROM messages WHERE bucket_url = $1", bucketURL).Scan(&n)
+	return n, err
+}
+
 // DeleteInlineMessages deletes all unexpired inline messages for a user (called after WebSocket delivery).
 func (p *PostgresClient) DeleteInlineMessages(recipientID string) error {
 	_, err := p.db.Exec("DELETE FROM messages WHERE recipient_id = $1 AND envelope IS NOT NULL", recipientID)
 	return err
 }
 
-// PruneExpiredMessages removes expired messages from the database and returns the URLs of any deleted bucket objects.
+// PruneExpiredMessages removes expired messages and returns the URLs of bucket
+// objects that are now safe to delete. Group fan-out shares one object across N
+// pointer rows with PER-RECIPIENT hold TTLs (72h Plus / 24h free), so an object
+// must NOT be deleted while a not-yet-expired row still points at it. So: gather
+// the distinct bucket URLs of expired rows, delete the expired rows, then return
+// only those URLs no surviving row still references.
 func (p *PostgresClient) PruneExpiredMessages() ([]string, error) {
-	// First select bucket URLs of expired messages to clean up object storage
 	rows, err := p.db.Query(`
-		SELECT bucket_url 
-		FROM messages 
+		SELECT DISTINCT bucket_url
+		FROM messages
 		WHERE expires_at <= NOW() AND bucket_url IS NOT NULL
 	`)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-
-	var urls []string
+	var candidates []string
 	for rows.Next() {
 		var url string
 		if err := rows.Scan(&url); err == nil {
-			urls = append(urls, url)
+			candidates = append(candidates, url)
 		}
 	}
+	rows.Close()
 
-	// Delete from database
-	_, err = p.db.Exec("DELETE FROM messages WHERE expires_at <= NOW()")
-	if err != nil {
+	// Delete the expired rows first, so the ref-count below reflects only the
+	// rows that are still live.
+	if _, err = p.db.Exec("DELETE FROM messages WHERE expires_at <= NOW()"); err != nil {
 		return nil, fmt.Errorf("error deleting expired messages: %v", err)
 	}
 
+	var urls []string
+	for _, url := range candidates {
+		var n int
+		if err := p.db.QueryRow("SELECT COUNT(*) FROM messages WHERE bucket_url = $1", url).Scan(&n); err != nil {
+			// Fail SAFE: can't confirm it's unreferenced → leave the object (a
+			// later sweep retries once its rows are gone).
+			log.Printf("[Prune Warning] ref-count for %s failed: %v — keeping object", url, err)
+			continue
+		}
+		if n == 0 {
+			urls = append(urls, url)
+		}
+	}
 	return urls, nil
 }
 

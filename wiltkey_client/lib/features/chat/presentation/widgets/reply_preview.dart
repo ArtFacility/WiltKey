@@ -36,18 +36,26 @@ String replyAuthorName(
 /// null. Resolves the parent from the loaded window; a dangling / not-loaded
 /// parent renders the muted "unavailable" quote. [onMyBubble] styling follows the
 /// replying message's own side. Shared by the 1-on-1 bubble and the group bubble.
+///
+/// [onTap] only takes effect when the parent actually renders (tapping scrolls to
+/// the original). [isParentVisible] lets callers additionally gate the parent on
+/// the same filter that drives the list (e.g. a group parent sent before the
+/// viewer joined is loaded but never shown, so it must render as "unavailable"
+/// rather than a resolved-looking quote whose tap no-ops).
 Widget? buildReplyQuoteFor(
   BuildContext context,
   AppState app,
   Contact contact,
   ChatMessage message, {
   VoidCallback? onTap,
+  bool Function(ChatMessage parent)? isParentVisible,
 }) {
   final parentId = message.replyToId;
   if (parentId == null) return null;
   final l10n = AppLocalizations.of(context)!;
   final parent = app.loadedMessageById(contact.id, parentId);
-  final Widget quote = parent == null
+  final bool visible = parent != null && (isParentVisible?.call(parent) ?? true);
+  final Widget quote = (parent == null || !visible)
       ? ReplyQuote.unavailableQuote(l10n, onMyBubble: message.isSentByMe)
       : ReplyQuote(
           author: replyAuthorName(parent, contact, app, l10n),

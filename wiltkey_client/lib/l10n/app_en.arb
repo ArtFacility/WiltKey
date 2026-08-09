@@ -533,6 +533,25 @@
   "groupRechargeConfirm": "Recharge",
   "groupRechargeDone": "Group recharged — meet members again to re-add them.",
   "groupRechargeNeededComposer": "Host recharged this group — meet them again to rejoin",
+  "groupTimeWiltToggle": "Time Wilt group",
+  "groupTimeWiltToggleSub": "Limited time, unlimited budget. The group wilts to read-only when your timer runs out; meet the host again to renew it.",
+  "groupTimeWiltMembersLabel": "Max members",
+  "groupTimeWiltMembersUpsell": "Unlock up to 100 members with Plus",
+  "groupTimeWiltHostInfinite": "Host · ∞",
+  "groupTimeWiltRenewComposer": "Wilted — meet the host again to renew your access",
+  "groupTimeWiltHostAllWilted": "All members have wilted — meet someone again to revive the group",
+  "groupNukeProposeButton": "Propose destroying for everyone",
+  "groupNukeProposeTitle": "Destroy this group for everyone?",
+  "groupNukeProposeBody": "Asks the other members to vote. If a majority agree, the group and its history are destroyed on every device. This can't be undone.",
+  "groupNukeProposeConfirm": "Propose",
+  "groupNukeVoteTitle": "Destroy group?",
+  "groupNukeVoteBody": "A member proposed destroying this group for everyone. If a majority agree, it's wiped on every device.",
+  "groupNukeVoteAllow": "Agree",
+  "groupNukeVoteDeny": "Keep",
+  "groupNukeVotePending": "Waiting for members to vote…",
+  "groupNukeVotePassed": "The group was destroyed by majority vote.",
+  "groupNukeVoteFailed": "The proposal to destroy the group did not pass.",
+  "groupNukeVoteSent": "Proposal sent — waiting for members to vote.",
   "activityTitle": "Activity",
   "activityEmpty": "No activity yet. Events like a chat being destroyed will show up here.",
   "activityClear": "Clear",
@@ -972,6 +991,10 @@
   "shopPlusBenefitPads": "Create bigger pads — up to 200 MB for a chat and 500 MB for a group.",
   "@shopPlusBenefitPads": {
     "description": "Plus benefit: larger OTP pad sizes at pairing and group creation."
+  },
+  "shopPlusBenefitTimeWiltGroups": "Host bigger Time Wilt groups — up to 100 members instead of 20.",
+  "@shopPlusBenefitTimeWiltGroups": {
+    "description": "Plus benefit: larger Time Wilt group member cap."
   },
   "shopPlusBenefitSupport": "You keep the relay running and WiltKey independent.",
   "@shopPlusBenefitSupport": {

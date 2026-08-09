@@ -27,6 +27,8 @@ import 'widgets/failed_actions_dialog.dart';
 import 'widgets/compression_dialog.dart';
 import 'widgets/debug_console_sheet.dart';
 import 'widgets/voice_recording_mixin.dart';
+import 'widgets/highlight_flash.dart';
+import 'widgets/scroll_to_message.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -52,6 +54,14 @@ class _ChatScreenState extends State<ChatScreen>
   bool _isAtBottom = true;
   bool _showScrollDownArrow = false;
   final Set<String> _revealedMessageIds = {};
+
+  // Quote-tap reveal: rows are keyed by message id so [scrollToMessageInList]
+  // can jump to a reply's parent; [_flashMessageId]/[_flashTick] drive the
+  // one-shot highlight on the target row.
+  final Map<String, GlobalKey> _messageRowKeys = {};
+  String? _flashMessageId;
+  int _flashTick = 0;
+  Timer? _flashTimer;
 
   // The message the composer is currently replying to (null = normal send).
   ChatMessage? _replyingTo;
@@ -171,6 +181,7 @@ class _ChatScreenState extends State<ChatScreen>
     _messageController.dispose();
     _scrollController.dispose();
     _inputFocus.dispose();
+    _flashTimer?.cancel();
     disposeVoiceRecording();
     super.dispose();
   }
@@ -532,6 +543,33 @@ class _ChatScreenState extends State<ChatScreen>
     );
   }
 
+  /// Tapping a quote block scrolls to the quoted parent message and flashes it,
+  /// so replies to near-identical messages (e.g. several images) are findable.
+  /// The parent is resolved from the loaded window; if it isn't there (scrolled
+  /// far out / unloaded), the quote already renders muted + un-tappable, so this
+  /// only fires when the target is actually reachable.
+  Future<void> _revealQuotedMessage(String? parentId) async {
+    final contact = _appState.activeContact;
+    if (contact == null || parentId == null) return;
+    final list = _visibleMessages(contact);
+    if (!list.any((m) => m.id == parentId)) return;
+    await scrollToMessageInList(
+      controller: _scrollController,
+      messages: list,
+      targetId: parentId,
+      rowKeys: _messageRowKeys,
+    );
+    if (!mounted) return;
+    _flashTimer?.cancel();
+    setState(() {
+      _flashMessageId = parentId;
+      _flashTick++;
+    });
+    _flashTimer = Timer(const Duration(milliseconds: 1300), () {
+      if (mounted) setState(() => _flashMessageId = null);
+    });
+  }
+
   void _handleSend() async {
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
@@ -873,7 +911,7 @@ class _ChatScreenState extends State<ChatScreen>
                                 message.isSentByMe) ||
                             messageList[index - 1].isSystem;
 
-                        return _wrapSwipeToReply(
+                        final Widget bubble = _wrapSwipeToReply(
                           message,
                           MessageBubble(
                             message: message,
@@ -897,6 +935,22 @@ class _ChatScreenState extends State<ChatScreen>
                               message,
                               _appState,
                             ),
+                            onQuoteTap: message.replyToId == null
+                                ? null
+                                : () => _revealQuotedMessage(message.replyToId),
+                          ),
+                        );
+
+                        return KeyedSubtree(
+                          key: _messageRowKeys.putIfAbsent(
+                            message.id,
+                            GlobalKey.new,
+                          ),
+                          child: HighlightFlash(
+                            active: message.id == _flashMessageId,
+                            tick: _flashTick,
+                            color: t.action,
+                            child: bubble,
                           ),
                         );
                       },

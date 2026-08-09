@@ -75,7 +75,22 @@ class Contact {
   // cosmetic denominator, so a few seconds of skew is irrelevant.
   DateTime? wiltCreatedAt;
 
-  bool get isTimeWilt => wiltExpiresAt != null;
+  // Group Time Wilt: the group's configured lifetime in seconds. Non-null marks
+  // a Time Wilt GROUP (the per-member model means the host stores no personal
+  // [wiltExpiresAt], so this — not [wiltExpiresAt] — is the group's Time Wilt
+  // marker). The host persists it to stamp every invite/re-meet with the same
+  // lifetime; each member also stores it (for display) and derives its own
+  // [wiltExpiresAt] = whenTheyMetHost + lifetime.
+  int? groupWiltLifetimeSecs;
+
+  bool get isTimeWilt => wiltExpiresAt != null || groupWiltLifetimeSecs != null;
+
+  /// True for the host of a Time Wilt group. The host is "infinite" — it renders
+  /// ∞ rather than a personal countdown, and only greys out once every member
+  /// has wilted (tracked via the host's hidden [wiltExpiresAt] = latest-meet +
+  /// lifetime, bumped on every register/re-meet).
+  bool get isTimeWiltGroupHost =>
+      isGroup && isHost && groupWiltLifetimeSecs != null;
 
   /// Fraction of the Time Wilt lifetime still remaining (1.0 fresh → 0.0 spent),
   /// for the reused budget gauge. 0 for non-Time-Wilt or once expired.
@@ -96,8 +111,13 @@ class Contact {
   /// (chat + dashboard, which only rebuild inside that same window) actually
   /// paint a changing string — above 10 minutes the coarse form is enough since
   /// nothing ticks it faster than a minute anyway.
-  String get timeWiltCountdownLabel {
-    final end = wiltExpiresAt;
+  String get timeWiltCountdownLabel => formatWiltCountdown(wiltExpiresAt);
+
+  /// Same compact form as [timeWiltCountdownLabel] but for an ARBITRARY expiry —
+  /// used to render another group member's remaining time in the roster (their
+  /// clock is broadcast by the host, not stored on our own contact). Returns ''
+  /// for a null expiry and 'Wilted' once it's in the past.
+  static String formatWiltCountdown(DateTime? end) {
     if (end == null) return '';
     final d = end.difference(DateTime.now());
     if (d.isNegative || d.inSeconds == 0) return 'Wilted';
@@ -142,6 +162,7 @@ class Contact {
     this.wiltExpiresAt,
     this.streamSeedHex,
     this.wiltCreatedAt,
+    this.groupWiltLifetimeSecs,
     this.groupSeed,
     this.laneSize,
     this.totalGroupSize,
@@ -184,6 +205,7 @@ class Contact {
     DateTime? wiltExpiresAt,
     String? streamSeedHex,
     DateTime? wiltCreatedAt,
+    int? groupWiltLifetimeSecs,
     String? groupSeed,
     int? laneSize,
     int? totalGroupSize,
@@ -226,6 +248,8 @@ class Contact {
       wiltExpiresAt: wiltExpiresAt ?? this.wiltExpiresAt,
       streamSeedHex: streamSeedHex ?? this.streamSeedHex,
       wiltCreatedAt: wiltCreatedAt ?? this.wiltCreatedAt,
+      groupWiltLifetimeSecs:
+          groupWiltLifetimeSecs ?? this.groupWiltLifetimeSecs,
       groupSeed: groupSeed ?? this.groupSeed,
       laneSize: laneSize ?? this.laneSize,
       totalGroupSize: totalGroupSize ?? this.totalGroupSize,
@@ -283,6 +307,7 @@ class Contact {
     'wiltExpiresAt': wiltExpiresAt?.toIso8601String(),
     'streamSeedHex': streamSeedHex,
     'wiltCreatedAt': wiltCreatedAt?.toIso8601String(),
+    'groupWiltLifetimeSecs': groupWiltLifetimeSecs,
     'groupSeed': groupSeed,
     'laneSize': laneSize,
     'totalGroupSize': totalGroupSize,
@@ -336,6 +361,7 @@ class Contact {
       wiltCreatedAt: json['wiltCreatedAt'] != null
           ? DateTime.parse(json['wiltCreatedAt'] as String)
           : null,
+      groupWiltLifetimeSecs: json['groupWiltLifetimeSecs'] as int?,
       groupSeed: json['groupSeed'] as String?,
       laneSize: json['laneSize'] as int?,
       totalGroupSize: json['totalGroupSize'] as int?,

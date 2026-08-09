@@ -271,21 +271,30 @@ class RemotePairingController extends ChangeNotifier {
     final pairwise = _pairwiseSeed(joinerPub);
 
     try {
-      final emptyLanes = await GroupDatabase.instance.getEmptyLanes(
+      // Re-meet reuses the joiner's existing slot (Time Wilt time-refresh), so a
+      // full group only blocks brand-new joiners.
+      final existingLane = await GroupDatabase.instance.getLaneByMember(
         group.keyHash,
+        joinerId,
       );
-      if (emptyLanes.isEmpty) {
-        // Tell the joiner rather than leaving them polling: post an error blob.
-        await PairingService.pairInviteUpload(
-          _relay,
-          pin: pin!,
-          initiatorId: appState.userId,
-          blob: jsonEncode({'error': 'group_full'}),
+      int? slot = existingLane?['slot_index'] as int?;
+      if (slot == null) {
+        final emptyLanes = await GroupDatabase.instance.getEmptyLanes(
+          group.keyHash,
         );
-        _fail('Group is full — no free slots.');
-        return;
+        if (emptyLanes.isEmpty) {
+          // Tell the joiner rather than leaving them polling: post an error blob.
+          await PairingService.pairInviteUpload(
+            _relay,
+            pin: pin!,
+            initiatorId: appState.userId,
+            blob: jsonEncode({'error': 'group_full'}),
+          );
+          _fail('Group is full — no free slots.');
+          return;
+        }
+        slot = emptyLanes.first['slot_index'] as int;
       }
-      final slot = emptyLanes.first['slot_index'] as int;
 
       final blob = jsonEncode({
         'group_id': group.keyHash,
@@ -300,6 +309,8 @@ class RemotePairingController extends ChangeNotifier {
         'host_short_nick': appState.effectiveShortNick,
         'group_icon': group.groupIconHex,
         'max_members': group.maxMembers,
+        // Group Time Wilt lifetime (seconds); null for byte-budget groups.
+        'group_wilt_lifetime': group.groupWiltLifetimeSecs,
       });
 
       await PairingService.pairInviteUpload(
@@ -401,6 +412,7 @@ class RemotePairingController extends ChangeNotifier {
         hostName: (meta['host_name'] as String?) ?? 'Host',
         groupIconHex: meta['group_icon'] as String?,
         maxMembers: (meta['max_members'] as num?)?.toInt(),
+        wiltLifetimeSecs: (meta['group_wilt_lifetime'] as num?)?.toInt(),
       );
       if (_disposed) return;
 

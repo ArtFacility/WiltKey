@@ -11,7 +11,10 @@ import '../../../core/theme/wiltkey_tokens.dart';
 import 'group_invite_screen.dart';
 
 class CreateGroupScreen extends StatefulWidget {
-  const CreateGroupScreen({super.key});
+  /// When true the screen opens straight into Time Wilt mode (from the Connect
+  /// hub's "Time Wilt group" card) — no byte-budget sliders, no mode toggle.
+  final bool timeWilt;
+  const CreateGroupScreen({super.key, this.timeWilt = false});
 
   @override
   State<CreateGroupScreen> createState() => _CreateGroupScreenState();
@@ -28,6 +31,36 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
   double _laneSizeMb = 2.0; // Default 2 MB per lane
   bool _imagesAllowed = true;
   double _maxMessageSizeKb = 2.0; // Default 2 KB per message
+
+  // Time Wilt group state: "limited time, unlimited budget". When on, the two
+  // byte-budget sliders are replaced by a lifetime slider + a members slider,
+  // and each member gets a huge disjoint lane (see AppState.twGroupLaneSize).
+  bool _timeWiltMode = false;
+  int _twLifetimeSecs = 604800; // default 7 days
+  int _twMaxMembers = 20;
+  // Free users cap at 20 members; Plus unlocks the rest up to 100. (100 still
+  // fits the 32-bit group-keystream reach: 120GB/100 ≈ 1.2GB per member.)
+  final List<int> _twMemberOptions = [5, 10, 20, 30, 50, 100];
+  static const int _freeMemberMaxIndex = 2; // index of 20
+
+  // Lifetime stops shared with the 1:1 Time Wilt slider (label, seconds, Plus).
+  static const List<(String, int, bool)> _wiltLifetimes = [
+    ('1h', 3600, false),
+    ('3h', 10800, false),
+    ('6h', 21600, false),
+    ('12h', 43200, false),
+    ('1d', 86400, false),
+    ('2d', 172800, false),
+    ('3d', 259200, false),
+    ('5d', 432000, false),
+    ('7d', 604800, false),
+    ('14d', 1209600, false),
+    ('30d', 2592000, false),
+    ('45d', 3888000, true),
+    ('60d', 5184000, true),
+    ('90d', 7776000, true),
+    ('6mo', 15552000, true),
+  ];
 
   // 10x10 pixel art icon (100-char hex grid); edited via the shared popup.
   late List<String> _pixelGrid;
@@ -71,6 +104,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
   @override
   void initState() {
     super.initState();
+    _timeWiltMode = widget.timeWilt;
     _generateRandomIcon();
   }
 
@@ -152,9 +186,22 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
     final clampedIndex = _totalGroupSizeOptions
         .indexOf(_totalGroupSizeMb)
         .clamp(0, _maxGroupSizeIndex);
-    final totalGroupBytes =
-        (_totalGroupSizeOptions[clampedIndex] * 1024 * 1024).toInt();
-    final laneBytes = (_laneSizeMb * 1024 * 1024).toInt();
+    // Time Wilt groups ignore the byte sliders: each member gets a huge disjoint
+    // lane (unlimited budget), and the group carries a lifetime instead.
+    final bool tw = _timeWiltMode;
+    // Enforce the member cap by entitlement (free = 20, Plus = 100), so a stale
+    // selection can't exceed what this host may actually create.
+    final int twMemberCap = EntitlementService.instance.largerPadsUnlocked
+        ? _twMemberOptions.last
+        : _twMemberOptions[_freeMemberMaxIndex];
+    final int maxMembers =
+        tw ? _twMaxMembers.clamp(2, twMemberCap) : _calculatedMaxMembers;
+    final int laneBytes = tw
+        ? AppState.twGroupLaneSize(maxMembers)
+        : (_laneSizeMb * 1024 * 1024).toInt();
+    final int totalGroupBytes = tw
+        ? AppState.infoLaneSize + laneBytes * maxMembers
+        : (_totalGroupSizeOptions[clampedIndex] * 1024 * 1024).toInt();
 
     try {
       await _appState.addGroupChat(
@@ -164,8 +211,9 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
         totalGroupSize: totalGroupBytes,
         laneSize: laneBytes,
         groupIconHex: groupIconHex,
-        maxMembers: _calculatedMaxMembers,
+        maxMembers: maxMembers,
         groupSeed: groupSeed,
+        wiltLifetimeSecs: tw ? _twLifetimeSecs : null,
         onPadProgress: (written, total) {
           if (total <= 0) return;
           final frac = written / total;
@@ -403,6 +451,29 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                 ),
                 const SizedBox(height: 12),
 
+                // Time Wilt groups explain themselves up top (the mode is chosen
+                // by which Connect-hub card opened this screen, not a toggle).
+                if (_timeWiltMode) ...[
+                  _policyPanel(
+                    t,
+                    child: Row(
+                      children: [
+                        Icon(Icons.hourglass_bottom, size: 18, color: t.action),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            l10n.groupTimeWiltToggleSub,
+                            style: t.bodySecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+
+                // Byte-budget sizing — hidden in Time Wilt mode.
+                if (!_timeWiltMode) ...[
                 // Total Shared Pad Size Slider
                 _policyPanel(
                   t,
@@ -557,6 +628,15 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                   ),
                 ),
                 const SizedBox(height: 12),
+                ], // end byte-budget sizing
+
+                // Time Wilt sizing — lifetime + members (unlimited budget).
+                if (_timeWiltMode) ...[
+                  _policyPanel(t, child: _buildLifetimePanel(t, l10n)),
+                  const SizedBox(height: 12),
+                  _policyPanel(t, child: _buildMembersPanel(t, l10n)),
+                  const SizedBox(height: 12),
+                ],
 
                 // Images Toggle & Message Size
                 _policyPanel(
@@ -666,4 +746,148 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
     ),
     child: child,
   );
+
+  /// Time Wilt lifetime slider (mirrors the 1:1 pairing lifetime picker): free
+  /// up to 30d, Plus extends the same track to 6mo (free on FOSS).
+  Widget _buildLifetimePanel(WiltkeyTokens t, AppLocalizations l10n) {
+    final bool extendedUnlocked =
+        EntitlementService.instance.largerPadsUnlocked;
+    final int lastFreeIndex = _wiltLifetimes.lastIndexWhere((o) => !o.$3);
+    final int maxIndex =
+        extendedUnlocked ? _wiltLifetimes.length - 1 : lastFreeIndex;
+    int currentIndex = _wiltLifetimes.indexWhere((o) => o.$2 == _twLifetimeSecs);
+    if (currentIndex < 0) currentIndex = lastFreeIndex;
+    currentIndex = currentIndex.clamp(0, maxIndex);
+    final String tickLabel = _wiltLifetimes[currentIndex].$1;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              l10n.timeWiltLifetimeLabel,
+              style: t.body.copyWith(fontSize: 11, fontWeight: FontWeight.w600),
+            ),
+            Text(
+              tickLabel,
+              style: t.dataMono.copyWith(
+                color: t.action,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Slider(
+          value: currentIndex.toDouble(),
+          min: 0,
+          max: maxIndex.toDouble(),
+          divisions: maxIndex > 0 ? maxIndex : 1,
+          label: tickLabel,
+          activeColor: t.action,
+          inactiveColor: t.budgetEmpty,
+          onChanged: (v) {
+            final idx = v.round().clamp(0, maxIndex);
+            setState(() => _twLifetimeSecs = _wiltLifetimes[idx].$2);
+          },
+        ),
+        if (!extendedUnlocked)
+          InkWell(
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const ShopScreen(initialTab: ShopTab.plus),
+              ),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                children: [
+                  Icon(Icons.lock_outline, size: 13, color: t.textTertiary),
+                  const SizedBox(width: 6),
+                  Text(
+                    l10n.timeWiltPlusHint,
+                    style: t.bodySecondary.copyWith(color: t.action),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        const SizedBox(height: 4),
+        Text(l10n.timeWiltExplanation, style: t.bodySecondary),
+      ],
+    );
+  }
+
+  /// Max-members slider for a Time Wilt group. More members = a slightly smaller
+  /// (but still multi-GB, effectively unlimited) per-member lane.
+  Widget _buildMembersPanel(WiltkeyTokens t, AppLocalizations l10n) {
+    final bool plusUnlocked = EntitlementService.instance.largerPadsUnlocked;
+    final int maxIndex =
+        plusUnlocked ? _twMemberOptions.length - 1 : _freeMemberMaxIndex;
+    int idx = _twMemberOptions.indexOf(_twMaxMembers);
+    if (idx < 0) idx = _freeMemberMaxIndex;
+    idx = idx.clamp(0, maxIndex);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              l10n.groupTimeWiltMembersLabel,
+              style: t.body.copyWith(fontSize: 11, fontWeight: FontWeight.w600),
+            ),
+            Text(
+              '$_twMaxMembers',
+              style: t.dataMono.copyWith(
+                color: t.identity,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Slider(
+          value: idx.toDouble(),
+          min: 0,
+          max: maxIndex.toDouble(),
+          divisions: maxIndex > 0 ? maxIndex : 1,
+          activeColor: t.identity,
+          inactiveColor: t.budgetEmpty,
+          onChanged: (v) => setState(
+            () => _twMaxMembers =
+                _twMemberOptions[v.round().clamp(0, maxIndex)],
+          ),
+        ),
+        if (!plusUnlocked)
+          InkWell(
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const ShopScreen(initialTab: ShopTab.plus),
+              ),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                children: [
+                  Icon(Icons.lock_open, size: 13, color: t.action),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      l10n.groupTimeWiltMembersUpsell,
+                      style: t.bodySecondary.copyWith(color: t.action),
+                    ),
+                  ),
+                  Icon(Icons.chevron_right, size: 14, color: t.action),
+                ],
+              ),
+            ),
+          ),
+      ],
+    );
+  }
 }

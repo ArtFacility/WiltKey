@@ -1064,6 +1064,70 @@ class AppLocalizationsHu extends AppLocalizations {
       'A házigazda újratöltötte a csoportot — találkozz vele újra az újracsatlakozáshoz';
 
   @override
+  String get groupTimeWiltToggle => 'Time Wilt group';
+
+  @override
+  String get groupTimeWiltToggleSub =>
+      'Limited time, unlimited budget. The group wilts to read-only when your timer runs out; meet the host again to renew it.';
+
+  @override
+  String get groupTimeWiltMembersLabel => 'Max members';
+
+  @override
+  String get groupTimeWiltMembersUpsell => 'Unlock up to 100 members with Plus';
+
+  @override
+  String get groupTimeWiltHostInfinite => 'Host · ∞';
+
+  @override
+  String get groupTimeWiltRenewComposer =>
+      'Wilted — meet the host again to renew your access';
+
+  @override
+  String get groupTimeWiltHostAllWilted =>
+      'All members have wilted — meet someone again to revive the group';
+
+  @override
+  String get groupNukeProposeButton => 'Propose destroying for everyone';
+
+  @override
+  String get groupNukeProposeTitle => 'Destroy this group for everyone?';
+
+  @override
+  String get groupNukeProposeBody =>
+      'Asks the other members to vote. If a majority agree, the group and its history are destroyed on every device. This can\'t be undone.';
+
+  @override
+  String get groupNukeProposeConfirm => 'Propose';
+
+  @override
+  String get groupNukeVoteTitle => 'Destroy group?';
+
+  @override
+  String get groupNukeVoteBody =>
+      'A member proposed destroying this group for everyone. If a majority agree, it\'s wiped on every device.';
+
+  @override
+  String get groupNukeVoteAllow => 'Agree';
+
+  @override
+  String get groupNukeVoteDeny => 'Keep';
+
+  @override
+  String get groupNukeVotePending => 'Waiting for members to vote…';
+
+  @override
+  String get groupNukeVotePassed => 'The group was destroyed by majority vote.';
+
+  @override
+  String get groupNukeVoteFailed =>
+      'The proposal to destroy the group did not pass.';
+
+  @override
+  String get groupNukeVoteSent =>
+      'Proposal sent — waiting for members to vote.';
+
+  @override
   String get activityTitle => 'Activity';
 
   @override
@@ -1630,6 +1694,10 @@ class AppLocalizationsHu extends AppLocalizations {
   @override
   String get shopPlusBenefitPads =>
       'Készíts nagyobb padokat – akár 200 MB egy csevegéshez és 500 MB egy csoporthoz.';
+
+  @override
+  String get shopPlusBenefitTimeWiltGroups =>
+      'Host bigger Time Wilt groups — up to 100 members instead of 20.';
 
   @override
   String get shopPlusBenefitSupport =>

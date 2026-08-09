@@ -26,6 +26,10 @@ class MessageBubble extends StatelessWidget {
   final VoidCallback? onFailedTap;
   final bool isFirstInBatch;
 
+  /// Tapping the quoted-parent block (if this message is a reply) scrolls the
+  /// list to the original message. Null disables the tap on the quote.
+  final VoidCallback? onQuoteTap;
+
   /// Live shared emoji pool for this chat (name -> emoji); empty when none.
   final Map<String, CustomEmoji> emojiMap;
 
@@ -41,6 +45,7 @@ class MessageBubble extends StatelessWidget {
     this.onFailedTap,
     required this.isFirstInBatch,
     this.emojiMap = const {},
+    this.onQuoteTap,
   });
 
   @override
@@ -130,7 +135,13 @@ class MessageBubble extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          buildReplyQuoteFor(context, appState, contact, message) ??
+          buildReplyQuoteFor(
+                context,
+                appState,
+                contact,
+                message,
+                onTap: onQuoteTap,
+              ) ??
               const SizedBox.shrink(),
           _buildMessageContent(context),
           const SizedBox(height: 4),

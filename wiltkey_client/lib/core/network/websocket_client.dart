@@ -10,6 +10,12 @@ class WebSocketClient {
 
   WebSocket? _socket;
   bool _isAuthenticated = false;
+  // Whether the relay we're CURRENTLY connected to advertised group fan-out
+  // (server-side broadcast). Per-connection: reset on every disconnect and set
+  // from AUTH_OK, so switching to an older self-hosted relay falls back to the
+  // per-member send loop instead of dropping messages into its `default:` case.
+  bool _supportsGroupFanout = false;
+  bool get supportsGroupFanout => _isAuthenticated && _supportsGroupFanout;
   bool _isConnecting = false;
   String? _currentUrl; // the URL we're actively trying right now
   String? _primaryUrl; // the user's configured relay (rotation anchor)
@@ -149,6 +155,7 @@ class WebSocketClient {
     _socket = null;
     if (_isAuthenticated) {
       _isAuthenticated = false;
+      _supportsGroupFanout = false; // re-learned from the next AUTH_OK
       _statusController.add(false);
       onStatusChanged?.call(false);
     }
@@ -248,15 +255,21 @@ class WebSocketClient {
     });
   }
 
-  /// Host broadcasts individually-encrypted group message envelopes to all spokes.
+  /// Server-side group fan-out: upload ONE envelope + the recipient list, and the
+  /// relay routes that identical envelope to each recipient. Group envelopes are
+  /// byte-identical (shared keystream, no per-recipient re-encryption), so a
+  /// single copy — not a per-recipient map — is what saves the bandwidth. Only
+  /// call when [supportsGroupFanout] is true; otherwise use the per-member loop.
   void sendBroadcastGroupMessage(
     List<String> recipientIds,
-    Map<String, String> envelopes,
+    String envelope,
+    String contentType,
   ) {
     sendWSMessage({
       'type': 'BROADCAST_GROUP_MESSAGE',
       'recipients': recipientIds,
-      'envelopes': envelopes,
+      'envelope': envelope,
+      'content_type': contentType,
     });
   }
 
@@ -274,6 +287,9 @@ class WebSocketClient {
           break;
         case 'AUTH_OK':
           _isAuthenticated = true;
+          final caps = jsonMap['capabilities'];
+          _supportsGroupFanout =
+              caps is List && caps.contains('group_fanout');
           // A live connection clears the failure streak and pins rotation to the
           // relay that actually worked, so we stay put instead of drifting off it.
           _failCount = 0;
