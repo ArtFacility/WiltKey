@@ -249,6 +249,20 @@ abstract class WiltkeyComponents {
   /// no-op; only themes with a costly first frame need to override it.
   void precacheUnlock(BuildContext context) {}
 
+  /// Full-screen backdrop for a contact profile. Wraps [child] with the theme's
+  /// profile-specific ambient visual (falling 0/1 rain, meadow flowers, hanging
+  /// slips, etc.). [seed] is a stable per-profile value (derived from the
+  /// contact's keyHash/userId) so the visual is deterministic and identical
+  /// for both peers. Returns [child] unchanged if the theme has no bespoke
+  /// profile backdrop.
+  ///
+  /// A shared default exists in [ProfileBackdropDefaults]; themes mix it in and
+  /// override only for a bespoke look.
+  Widget profileBackdrop({
+    required Widget child,
+    int seed = 0,
+  });
+
   /// Inline voice-message progress track, painted inside the chat bubble. Unlike
   /// the other effect hooks this is NOT a full-screen overlay — it's a small,
   /// interactive, continuously-driven widget: the bubble feeds [progress] (0..1
@@ -289,6 +303,19 @@ mixin VoiceScrubberDefaults {
     onSeek: onSeek,
     accent: accent,
   );
+}
+
+/// The default [WiltkeyComponents.profileBackdrop] — returns [child] unchanged.
+/// Because the theme component sets `implements` [WiltkeyComponents] (rather
+/// than extend it), a concrete method on the interface wouldn't be inherited;
+/// mixing this in supplies the no-op default while keeping the class's `const`
+/// constructor (the mixin holds no state). A theme that wants a bespoke backdrop
+/// just declares its own `profileBackdrop`, which shadows this.
+mixin ProfileBackdropDefaults {
+  Widget profileBackdrop({
+    required Widget child,
+    int seed = 0,
+  }) => child;
 }
 
 /// Non-lerping [ThemeExtension] that carries the active theme's component

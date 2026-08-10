@@ -14,6 +14,7 @@ import '../../chat/presentation/group_chat_screen.dart';
 import '../../chat/presentation/widgets/screenshot_ui.dart';
 import '../../proximity/presentation/connect_hub_screen.dart';
 import '../../settings/presentation/settings_screen.dart';
+import '../../contacts/presentation/contact_list_screen.dart';
 import 'wk_bottom_nav.dart';
 
 /// Lets descendants jump to another tab (e.g. a wilted chat row → Pair tab).
@@ -23,12 +24,13 @@ abstract class ShellNavigator {
 
 /// Tab indices, named so call sites don't use magic numbers.
 class ShellTab {
-  static const int chats = 0;
-  static const int pair = 1;
-  static const int settings = 2;
+  static const int contacts = 0; // far-left panel (swipe-in)
+  static const int chats = 1;
+  static const int pair = 2;
+  static const int settings = 3;
 }
 
-/// Root scaffold after unlock: a 3-tab bottom bar (Chats / Pair / Settings)
+/// Root scaffold after unlock: a 4-tab bottom bar (Contacts / Chats / Pair / Settings)
 /// over an [IndexedStack]. Replaces the old DashboardScreen + pushed Settings +
 /// pushed Pairing chrome.
 class AppShell extends StatefulWidget {
@@ -204,6 +206,8 @@ class _AppShellState extends State<AppShell>
                 IndexedStack(
                   index: _index,
                   children: [
+                    // Social contacts list (friends list) — independent of chat contacts.
+                    const ContactListScreen(),
                     const ChatsTab(),
                     // The Connect hub itself mounts no BLE — scanning only starts
                     // when the user pushes into an in-person mode from here.
@@ -227,6 +231,10 @@ class _AppShellState extends State<AppShell>
           currentIndex: _index,
           onTap: selectTab,
           items: [
+            WkNavItem(
+              Icons.people_outline,
+              AppLocalizations.of(context)!.navContacts,
+            ),
             WkNavItem(
               Icons.chat_bubble_outline,
               AppLocalizations.of(context)!.navChats,

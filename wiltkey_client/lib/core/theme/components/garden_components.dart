@@ -134,6 +134,12 @@ class GardenComponents with VoiceScrubberDefaults implements WiltkeyComponents {
   @override
   void precacheUnlock(BuildContext context) {} // cheap first frame; nothing to warm
 
+  @override
+  Widget profileBackdrop({
+    required Widget child,
+    int seed = 0,
+  }) => _GardenProfileBackdrop(seed: seed, child: child);
+
   // Shadows the VoiceScrubberDefaults mixin: the bespoke greening vine.
   @override
   Widget voiceScrubber({
@@ -479,4 +485,109 @@ class _FireflyPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_FireflyPainter old) => old.progress != progress;
+}
+
+// Garden profile backdrop: a living meadow with grass blades and flowers.
+// Reuses MeadowPainter from garden_sync_visual.dart with seeded flowers.
+class _GardenProfileBackdrop extends StatefulWidget {
+  final Widget child;
+  final int seed;
+
+  const _GardenProfileBackdrop({required this.child, required this.seed});
+
+  @override
+  State<_GardenProfileBackdrop> createState() => _GardenProfileBackdropState();
+}
+
+class _GardenProfileBackdropState extends State<_GardenProfileBackdrop>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ticker;
+  late final List<FlowerRender> _flowers;
+  late final Stopwatch _clock;
+
+  @override
+  void initState() {
+    super.initState();
+    final r = math.Random(widget.seed);
+    _flowers = List.generate(12, (i) {
+      final double x = r.nextDouble();
+      final double y = 0.35 + r.nextDouble() * 0.55;
+      return _makeFlower(x, y);
+    });
+
+    _clock = Stopwatch()..start();
+    _ticker = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 4),
+    )..repeat();
+
+    if (!context.reduceMotion) {
+      _ticker.forward();
+    }
+  }
+
+  FlowerRender _makeFlower(double x, double y) {
+    return FlowerRender(
+      blip: SyncBlip(
+        id: 'profile_flower_${x}_$y',
+        strength: y,
+        angle: 0,
+        isWiltkey: false,
+        isNear: false,
+        isGroup: false,
+      ),
+      grow: 1.0,
+      fade: 1.0,
+    );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final wantMotion = !context.reduceMotion;
+    if (wantMotion && !_ticker.isAnimating) {
+      _ticker.repeat();
+    } else if (!wantMotion && _ticker.isAnimating) {
+      _ticker.stop();
+    }
+  }
+
+  @override
+  void dispose() {
+    _ticker.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.wk;
+    final reduceMotion = context.reduceMotion;
+
+    return Stack(
+      children: [
+        CustomPaint(
+          painter: MeadowPainter(
+            flowers: _flowers,
+            timeMs: _clock.elapsedMilliseconds,
+            reduceMotion: reduceMotion,
+            grass: t.positive,
+            soil: t.bg,
+            peer: t.budgetFill,
+            group: t.identity,
+            unknown: t.textTertiary,
+            center: t.surfacePressed,
+            halo: t.action,
+            easeGrow: (double t) => 1 - math.pow(1 - t, 3).toDouble(),
+            easeBloom: (double t) {
+              const c = 1.70158;
+              final u = t - 1;
+              return 1 + (c + 1) * u * u * u + c * u * u;
+            },
+          ),
+          size: Size.infinite,
+        ),
+        widget.child,
+      ],
+    );
+  }
 }

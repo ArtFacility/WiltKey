@@ -14,13 +14,13 @@ import '../../wk.dart';
 ///
 /// * **Proximity is depth.** A near/strong peer falls lower (foreground), bigger
 ///   and crisper; a far/weak device hangs higher up, smaller and paler. Once
-///   pinned it never moves again, so RSSI flicker can't make slips jitter.
+///   pinned it never moves again, so RSSI flicker can't make _slips jitter.
 /// * **Peers are sealed in red.** A Wiltkey peer's kanji is the key character 鍵,
 ///   stamped in vermilion — the theme's one color, used as a seal. Generic BLE
 ///   devices carry a neutral character (音/影/遠/客) brushed in plain sumi ink.
 /// * **Lost devices come unpinned** and flutter away downward as they fade.
 ///
-/// Owns a single repaint pacer; honours reduce-motion (slips appear already
+/// Owns a single repaint pacer; honours reduce-motion (_slips appear already
 /// pinned and still). No terminal text.
 class PaperinkSyncVisual extends StatefulWidget {
   final List<SyncBlip> blips;
@@ -45,7 +45,7 @@ const String _keyKanji = '鍵'; // key
 /// Mutable per-device lifecycle. Geometry/character are fixed at spawn (from the
 /// id hash + the strength at the moment it was found) so a pinned slip stays put
 /// even as live RSSI wobbles. Keyed by blip id.
-class _Slip {
+class Slip {
   SyncBlip blip;
   final int spawnMs;
   int? despawnMs;
@@ -61,7 +61,7 @@ class _Slip {
   final bool peer;
   final TextPainter glyph; // laid out once
 
-  _Slip(
+  Slip(
     this.blip,
     this.spawnMs, {
     required this.strength,
@@ -77,14 +77,14 @@ class _Slip {
   });
 }
 
-class _SlipRender {
-  final _Slip slip;
+class SlipRender {
+  final Slip slip;
   final double fallPhase; // 0→1 falling → reaches pin
   final double stiffen; // 0→1 after pinning (body locks, sway/flutter damp)
   final double pinGrow; // 0→1 needle drives in
   final double recoil; // signed, decaying kick along the arrow's travel
   final double fade; // 1→0 unpinned drift-away
-  const _SlipRender({
+  const SlipRender({
     required this.slip,
     required this.fallPhase,
     required this.stiffen,
@@ -104,7 +104,7 @@ class _PaperinkSyncVisualState extends State<PaperinkSyncVisual>
   static const int _graceMs = 1200; // hold a lost slip before it lets go
 
   final Stopwatch _clock = Stopwatch()..start();
-  final Map<String, _Slip> _slips = {};
+  final Map<String, Slip> _slips = {};
   AnimationController? _ticker;
 
   @override
@@ -164,7 +164,7 @@ class _PaperinkSyncVisualState extends State<PaperinkSyncVisual>
     });
   }
 
-  _Slip _make(SyncBlip b, int now) {
+  Slip _make(SyncBlip b, int now) {
     final rand = math.Random(_hash(b.id));
     final s = b.strength.clamp(0.0, 1.0);
     final peer = b.isWiltkey;
@@ -186,7 +186,7 @@ class _PaperinkSyncVisualState extends State<PaperinkSyncVisual>
       ),
       textDirection: TextDirection.ltr,
     )..layout();
-    return _Slip(
+    return Slip(
       b,
       now,
       strength: s,
@@ -211,9 +211,9 @@ class _PaperinkSyncVisualState extends State<PaperinkSyncVisual>
     super.dispose();
   }
 
-  List<_SlipRender> _resolve(bool reduceMotion) {
+  List<SlipRender> _resolve(bool reduceMotion) {
     final now = _clock.elapsedMilliseconds;
-    final out = <_SlipRender>[];
+    final out = <SlipRender>[];
     for (final s in _slips.values) {
       final fallPhase = reduceMotion
           ? 1.0
@@ -241,7 +241,7 @@ class _PaperinkSyncVisualState extends State<PaperinkSyncVisual>
         if (fade <= 0) continue;
       }
       out.add(
-        _SlipRender(
+        SlipRender(
           slip: s,
           fallPhase: fallPhase,
           stiffen: stiffen,
@@ -251,7 +251,7 @@ class _PaperinkSyncVisualState extends State<PaperinkSyncVisual>
         ),
       );
     }
-    // Far/back slips first so near foreground ones overlap them.
+    // Far/back _slips first so near foreground ones overlap them.
     out.sort((a, b) => a.slip.strength.compareTo(b.slip.strength));
     return out;
   }
@@ -267,7 +267,7 @@ class _PaperinkSyncVisualState extends State<PaperinkSyncVisual>
     final boardGrain = Color.lerp(t.budgetWilted, t.textPrimary, 0.62)!;
 
     Widget buildSheet() => CustomPaint(
-      painter: _OfudaPainter(
+      painter: OfudaPainter(
         slips: _resolve(reduceMotion),
         timeMs: _clock.elapsedMilliseconds,
         reduceMotion: reduceMotion,
@@ -325,8 +325,8 @@ class _PaperinkSyncVisualState extends State<PaperinkSyncVisual>
 // Painter — falling, pinned ofuda
 // =============================================================================
 
-class _OfudaPainter extends CustomPainter {
-  final List<_SlipRender> slips;
+class OfudaPainter extends CustomPainter {
+  final List<SlipRender> _slips;
   final int timeMs;
   final bool reduceMotion;
   final Color paper;
@@ -338,8 +338,8 @@ class _OfudaPainter extends CustomPainter {
   final Color boardBase;
   final Color boardGrain;
 
-  _OfudaPainter({
-    required this.slips,
+  OfudaPainter({
+    required this._slips,
     required this.timeMs,
     required this.reduceMotion,
     required this.paper,
@@ -378,12 +378,12 @@ class _OfudaPainter extends CustomPainter {
       }
     }
 
-    for (final r in slips) {
+    for (final r in _slips) {
       _paintSlip(canvas, size, r);
     }
   }
 
-  /// A weathered wood board the slips get pinned into — derived warm taupe with
+  /// A weathered wood board the _slips get pinned into — derived warm taupe with
   /// a few horizontal plank seams and wavy grain. Static; drawn behind the dust.
   void _paintBoard(Canvas canvas, Size size) {
     canvas.drawRect(Offset.zero & size, Paint()..color = boardBase);
@@ -435,7 +435,7 @@ class _OfudaPainter extends CustomPainter {
     }
   }
 
-  void _paintSlip(Canvas canvas, Size size, _SlipRender r) {
+  void _paintSlip(Canvas canvas, Size size, SlipRender r) {
     final s = r.slip;
     final opacity = r.fade * _lerp(0.6, 1.0, s.strength);
     if (opacity <= 0.01) return;
@@ -564,7 +564,7 @@ class _OfudaPainter extends CustomPainter {
     canvas.restore();
   }
 
-  void _paintPin(Canvas canvas, _Slip s, double hw, double hh, double grow) {
+  void _paintPin(Canvas canvas, Slip s, double hw, double hh, double grow) {
     // Pin point near the top of the slip; the needle trails back toward the
     // direction the signal arrived from.
     final point = Offset(0, -hh * 0.62);
@@ -592,9 +592,9 @@ class _OfudaPainter extends CustomPainter {
   static double _lerp(double a, double b, double t) => a + (b - a) * t;
 
   @override
-  bool shouldRepaint(covariant _OfudaPainter old) =>
+  bool shouldRepaint(covariant OfudaPainter old) =>
       old.timeMs != timeMs ||
-      old.slips != slips ||
+      old._slips != _slips ||
       old.sumi != sumi ||
       old.seal != seal;
 }

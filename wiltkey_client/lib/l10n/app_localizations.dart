@@ -3341,6 +3341,168 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'moments'**
   String get timeWiltLifetimeMoments;
+
+  /// No description provided for @navContacts.
+  ///
+  /// In en, this message translates to:
+  /// **'Contacts'**
+  String get navContacts;
+
+  /// No description provided for @contactsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Contacts'**
+  String get contactsTitle;
+
+  /// No description provided for @contactsSectionFriends.
+  ///
+  /// In en, this message translates to:
+  /// **'Friends'**
+  String get contactsSectionFriends;
+
+  /// No description provided for @contactsEmptyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No contacts yet'**
+  String get contactsEmptyTitle;
+
+  /// No description provided for @contactsEmptyBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Add someone from an existing chat to see them here.'**
+  String get contactsEmptyBody;
+
+  /// No description provided for @contactsOwnProfile.
+  ///
+  /// In en, this message translates to:
+  /// **'Your Profile'**
+  String get contactsOwnProfile;
+
+  /// No description provided for @contactsOwnProfileHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to set status or wilting story'**
+  String get contactsOwnProfileHint;
+
+  /// No description provided for @contactRequestSent.
+  ///
+  /// In en, this message translates to:
+  /// **'Contact request sent to {name}'**
+  String contactRequestSent(String name);
+
+  /// No description provided for @contactRequestReceived.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} wants to add you as a contact'**
+  String contactRequestReceived(String name);
+
+  /// No description provided for @contactRequestApproved.
+  ///
+  /// In en, this message translates to:
+  /// **'Contact request accepted'**
+  String get contactRequestApproved;
+
+  /// No description provided for @contactRequestDeclined.
+  ///
+  /// In en, this message translates to:
+  /// **'Contact request declined'**
+  String get contactRequestDeclined;
+
+  /// No description provided for @contactRequestApprove.
+  ///
+  /// In en, this message translates to:
+  /// **'Approve'**
+  String get contactRequestApprove;
+
+  /// No description provided for @contactRequestDeny.
+  ///
+  /// In en, this message translates to:
+  /// **'Deny'**
+  String get contactRequestDeny;
+
+  /// No description provided for @contactProfileOpenChat.
+  ///
+  /// In en, this message translates to:
+  /// **'Open Chat'**
+  String get contactProfileOpenChat;
+
+  /// No description provided for @contactProfileRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove Contact'**
+  String get contactProfileRemove;
+
+  /// No description provided for @contactProfileBlock.
+  ///
+  /// In en, this message translates to:
+  /// **'Block User'**
+  String get contactProfileBlock;
+
+  /// No description provided for @contactProfileStatusPlaceholder.
+  ///
+  /// In en, this message translates to:
+  /// **'No status yet'**
+  String get contactProfileStatusPlaceholder;
+
+  /// No description provided for @contactRemoveConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove {name}?'**
+  String contactRemoveConfirmTitle(String name);
+
+  /// No description provided for @contactRemoveConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This removes them from your contact list. You can add them again later.'**
+  String get contactRemoveConfirmBody;
+
+  /// No description provided for @contactBlockConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Block {name}?'**
+  String contactBlockConfirmTitle(String name);
+
+  /// No description provided for @contactBlockConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'They won\'t be able to contact you or send contact requests.'**
+  String get contactBlockConfirmBody;
+
+  /// No description provided for @settingsBlockedContacts.
+  ///
+  /// In en, this message translates to:
+  /// **'Blocked Contacts'**
+  String get settingsBlockedContacts;
+
+  /// No description provided for @settingsBlockedEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No blocked contacts'**
+  String get settingsBlockedEmpty;
+
+  /// No description provided for @commonRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get commonRemove;
+
+  /// No description provided for @commonBlock.
+  ///
+  /// In en, this message translates to:
+  /// **'Block'**
+  String get commonBlock;
+
+  /// No description provided for @contactProfileChatNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'No chat found for this contact — it may have been deleted'**
+  String get contactProfileChatNotFound;
+
+  /// No description provided for @gestureSwipeForContacts.
+  ///
+  /// In en, this message translates to:
+  /// **'Swipe from left edge for contacts'**
+  String get gestureSwipeForContacts;
 }
 
 class _AppLocalizationsDelegate

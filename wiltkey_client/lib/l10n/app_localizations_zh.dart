@@ -1765,4 +1765,97 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get timeWiltLifetimeMoments => '片刻';
+
+  @override
+  String get navContacts => 'Contacts';
+
+  @override
+  String get contactsTitle => 'Contacts';
+
+  @override
+  String get contactsSectionFriends => 'Friends';
+
+  @override
+  String get contactsEmptyTitle => 'No contacts yet';
+
+  @override
+  String get contactsEmptyBody =>
+      'Add someone from an existing chat to see them here.';
+
+  @override
+  String get contactsOwnProfile => 'Your Profile';
+
+  @override
+  String get contactsOwnProfileHint => 'Tap to set status or wilting story';
+
+  @override
+  String contactRequestSent(String name) {
+    return 'Contact request sent to $name';
+  }
+
+  @override
+  String contactRequestReceived(String name) {
+    return '$name wants to add you as a contact';
+  }
+
+  @override
+  String get contactRequestApproved => 'Contact request accepted';
+
+  @override
+  String get contactRequestDeclined => 'Contact request declined';
+
+  @override
+  String get contactRequestApprove => 'Approve';
+
+  @override
+  String get contactRequestDeny => 'Deny';
+
+  @override
+  String get contactProfileOpenChat => 'Open Chat';
+
+  @override
+  String get contactProfileRemove => 'Remove Contact';
+
+  @override
+  String get contactProfileBlock => 'Block User';
+
+  @override
+  String get contactProfileStatusPlaceholder => 'No status yet';
+
+  @override
+  String contactRemoveConfirmTitle(String name) {
+    return 'Remove $name?';
+  }
+
+  @override
+  String get contactRemoveConfirmBody =>
+      'This removes them from your contact list. You can add them again later.';
+
+  @override
+  String contactBlockConfirmTitle(String name) {
+    return 'Block $name?';
+  }
+
+  @override
+  String get contactBlockConfirmBody =>
+      'They won\'t be able to contact you or send contact requests.';
+
+  @override
+  String get settingsBlockedContacts => 'Blocked Contacts';
+
+  @override
+  String get settingsBlockedEmpty => 'No blocked contacts';
+
+  @override
+  String get commonRemove => 'Remove';
+
+  @override
+  String get commonBlock => 'Block';
+
+  @override
+  String get contactProfileChatNotFound =>
+      'No chat found for this contact — it may have been deleted';
+
+  @override
+  String get gestureSwipeForContacts => 'Swipe from left edge for contacts';
 }

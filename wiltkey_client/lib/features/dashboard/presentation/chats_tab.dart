@@ -34,6 +34,12 @@ class _ChatsTabState extends State<ChatsTab> {
   String _query = '';
   _ChatFilter _filter = _ChatFilter.all;
 
+  // Swipe from left to right anywhere to open Contacts panel (no edge gate)
+  static const double _swipeDistanceThreshold = 120.0; // minimum drag distance
+  static const double _swipeVelocityThreshold = 800.0; // px/s
+  double _dragStartX = 0;
+  bool _dragStarted = false;
+
   /// Recency used for ordering: the latest message timestamp if there is one,
   /// else the contact's pairing time. (lastActivity isn't bumped per-message, so
   /// we look at the message log for true conversation recency.)
@@ -101,6 +107,39 @@ class _ChatsTabState extends State<ChatsTab> {
 
   void _onState() {
     if (mounted) setState(() {});
+  }
+
+  void _onDragStart(DragStartDetails details) {
+    _dragStartX = details.localPosition.dx;
+    _dragStarted = true;
+  }
+
+  void _onDragUpdate(DragUpdateDetails details) {
+    if (!_dragStarted) return;
+    final dx = details.localPosition.dx - _dragStartX;
+    if (dx >= _swipeDistanceThreshold) {
+      _openContactsPanel();
+      _dragStarted = false; // fire once
+    }
+  }
+
+  void _onDragEnd(DragEndDetails details) {
+    if (!_dragStarted) return;
+    final dx = details.localPosition.dx - _dragStartX;
+    final velocity = details.velocity.pixelsPerSecond.dx;
+    if (dx >= _swipeDistanceThreshold || velocity > _swipeVelocityThreshold) {
+      _openContactsPanel();
+    }
+    _dragStarted = false;
+  }
+
+  void _onDragCancel() {
+    _dragStarted = false;
+  }
+
+  void _openContactsPanel() {
+    if (!mounted) return;
+    AppShell.of(context).selectTab(ShellTab.contacts);
   }
 
   void _openContact(Contact c) {
@@ -277,7 +316,13 @@ class _ChatsTabState extends State<ChatsTab> {
       ],
     ];
 
-    return Column(
+    return GestureDetector(
+      onHorizontalDragStart: _onDragStart,
+      onHorizontalDragUpdate: _onDragUpdate,
+      onHorizontalDragEnd: _onDragEnd,
+      onHorizontalDragCancel: _onDragCancel,
+      behavior: HitTestBehavior.translucent,
+      child: Column(
       children: [
         // Header
         Padding(
@@ -394,7 +439,7 @@ class _ChatsTabState extends State<ChatsTab> {
                 ),
         ),
       ],
-    );
+    ));
   }
 
   Widget _filterChip(WiltkeyTokens t, String label, _ChatFilter value) {

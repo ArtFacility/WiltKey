@@ -40,6 +40,7 @@ part 'state_group_nuke.dart';
 part 'state_wilting.dart';
 part 'state_downloads.dart';
 part 'state_events.dart';
+part 'state_contacts.dart';
 
 enum AppStatus { normal, nuked }
 
@@ -173,6 +174,10 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     return 'Wiltkey Device ($suffix)';
   }
 
+  /// The locally-equipped avatar border id (from AvatarBorderController).
+  /// Peers' borders come from their broadcast profile (contact row).
+  String? get equippedAvatarBorderId => AvatarBorderController.instance.borderId;
+
   // Background notification preference (off / lowPower / instant). Drives what,
   // if anything, runs while the app is backgrounded/locked. See notifications/.
   NotificationMode notificationMode = NotificationMode.off;
@@ -217,6 +222,12 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   // DB-derived unread counts per contact.id (computed at unlock, kept live as
   // messages arrive / chats are read). Source for the chats-list badge.
   Map<String, int> unreadCounts = {};
+
+  // --- Social contacts (friends list) ---
+  List<SocialContact> socialContacts = [];
+
+  // Pending outbound contact requests (for UI updates)
+  final Map<String, PendingContactRequest> _pendingContactRequests = {};
 
   // --- Pending large-file downloads (see state_downloads.dart) ---
   // In-flight (and failed) downloads by message id. Kept out of ChatMessage so a

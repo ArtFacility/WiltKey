@@ -6,7 +6,7 @@ import '../../wk.dart';
 /// Garden proximity scan effect: a dusk meadow. Grass blades sway in the wind
 /// and each discovered device sprouts as a flower — near (pairable) Wiltkey
 /// peers bloom large in the foreground with a soft pollen halo; far / generic
-/// BLE devices are smaller buds toward the horizon. Flowers grow in when found
+/// BLE devices are smaller buds toward the horizon. _flowers grow in when found
 /// and wilt out when lost (with a short grace period so RSSI flicker doesn't
 /// make them pop).
 ///
@@ -24,11 +24,11 @@ class GardenSyncVisual extends StatefulWidget {
 
 /// Mutable per-device lifecycle: when it sprouted and (if lost) when it began to
 /// wilt out. Keyed by blip id so positions/growth survive frame-to-frame.
-class _Flower {
+class Flower {
   SyncBlip blip;
   final int spawnMs;
   int? despawnMs;
-  _Flower(this.blip, this.spawnMs);
+  Flower(this.blip, this.spawnMs);
 }
 
 class _GardenSyncVisualState extends State<GardenSyncVisual>
@@ -39,7 +39,7 @@ class _GardenSyncVisualState extends State<GardenSyncVisual>
       1100; // keep a lost flower this long before wilting
 
   final Stopwatch _clock = Stopwatch()..start();
-  final Map<String, _Flower> _flowers = {};
+  final Map<String, Flower> _flowers = {};
   AnimationController? _ticker; // repaint pacer only; time comes from _clock
 
   @override
@@ -69,7 +69,7 @@ class _GardenSyncVisualState extends State<GardenSyncVisual>
     _sync(widget.blips);
   }
 
-  /// Reconcile the incoming blip set against tracked flowers.
+  /// Reconcile the incoming blip set against tracked _flowers.
   void _sync(List<SyncBlip> blips) {
     final now = _clock.elapsedMilliseconds;
     final seen = <String>{};
@@ -77,14 +77,14 @@ class _GardenSyncVisualState extends State<GardenSyncVisual>
       seen.add(b.id);
       final existing = _flowers[b.id];
       if (existing == null) {
-        _flowers[b.id] = _Flower(b, now);
+        _flowers[b.id] = Flower(b, now);
       } else {
         existing.blip = b;
         existing.despawnMs = null; // revived / still in range
       }
     }
     // Anything no longer present starts (or continues) wilting after the grace
-    // period; fully-faded flowers are pruned.
+    // period; fully-faded _flowers are pruned.
     _flowers.removeWhere((id, f) {
       if (seen.contains(id)) return false;
       f.despawnMs ??= now + _graceMs;
@@ -107,9 +107,9 @@ class _GardenSyncVisualState extends State<GardenSyncVisual>
   }
 
   /// Resolve the current render state of each flower for this frame.
-  List<_FlowerRender> _resolve(bool reduceMotion) {
+  List<FlowerRender> _resolve(bool reduceMotion) {
     final now = _clock.elapsedMilliseconds;
-    final out = <_FlowerRender>[];
+    final out = <FlowerRender>[];
     for (final f in _flowers.values) {
       final rawGrow = reduceMotion
           ? 1.0
@@ -120,9 +120,9 @@ class _GardenSyncVisualState extends State<GardenSyncVisual>
         fade = 1.0 - ((now - f.despawnMs!) / _fadeMs).clamp(0.0, 1.0);
         if (fade <= 0) continue;
       }
-      out.add(_FlowerRender(blip: f.blip, grow: rawGrow, fade: fade));
+      out.add(FlowerRender(blip: f.blip, grow: rawGrow, fade: fade));
     }
-    // Paint far/back flowers first so near foreground ones overlap them.
+    // Paint far/back _flowers first so near foreground ones overlap them.
     out.sort((a, b) => a.blip.strength.compareTo(b.blip.strength));
     return out;
   }
@@ -132,10 +132,10 @@ class _GardenSyncVisualState extends State<GardenSyncVisual>
     final t = context.wk;
     final reduceMotion = context.reduceMotion;
 
-    // Built per-frame so `timeMs` + resolved flowers advance each tick (and on
+    // Built per-frame so `timeMs` + resolved _flowers advance each tick (and on
     // each parent rebuild when motion is reduced and there's no ticker).
     Widget buildField() => CustomPaint(
-      painter: _MeadowPainter(
+      painter: MeadowPainter(
         flowers: _resolve(reduceMotion),
         timeMs: _clock.elapsedMilliseconds,
         reduceMotion: reduceMotion,
@@ -201,19 +201,19 @@ class _GardenSyncVisualState extends State<GardenSyncVisual>
 }
 
 /// Per-frame resolved flower (growth 0..1, fade 0..1).
-class _FlowerRender {
+class FlowerRender {
   final SyncBlip blip;
   final double grow;
   final double fade;
-  const _FlowerRender({
+  const FlowerRender({
     required this.blip,
     required this.grow,
     required this.fade,
   });
 }
 
-class _MeadowPainter extends CustomPainter {
-  final List<_FlowerRender> flowers;
+class MeadowPainter extends CustomPainter {
+  final List<FlowerRender> _flowers;
   final int timeMs;
   final bool reduceMotion;
   final Color grass, soil, peer, group, unknown, center, halo;
@@ -221,13 +221,13 @@ class _MeadowPainter extends CustomPainter {
   final double Function(double) easeBloom;
 
   // Deterministic blade field so the meadow is stable across rebuilds.
-  static const int _backBlades = 26;
-  static const int _frontBlades = 12;
-  static final List<_Blade> _back = _genBlades(_backBlades, 0.30, 0.60, 7);
-  static final List<_Blade> _front = _genBlades(_frontBlades, 0.46, 0.80, 99);
+  static const int backBlades = 26;
+  static const int frontBlades = 12;
+  static final List<Blade> back = genBlades(backBlades, 0.30, 0.60, 7);
+  static final List<Blade> front = genBlades(frontBlades, 0.46, 0.80, 99);
 
-  _MeadowPainter({
-    required this.flowers,
+  MeadowPainter({
+    required this._flowers,
     required this.timeMs,
     required this.reduceMotion,
     required this.grass,
@@ -241,10 +241,10 @@ class _MeadowPainter extends CustomPainter {
     required this.easeBloom,
   });
 
-  static List<_Blade> _genBlades(int n, double minH, double maxH, int seed) {
+  static List<Blade> genBlades(int n, double minH, double maxH, int seed) {
     final r = math.Random(seed);
     return List.generate(n, (i) {
-      return _Blade(
+      return Blade(
         x: r.nextDouble(),
         height: minH + r.nextDouble() * (maxH - minH),
         phase: r.nextDouble() * math.pi * 2,
@@ -263,7 +263,7 @@ class _MeadowPainter extends CustomPainter {
     final gust = reduceMotion ? 0.0 : 0.5 + 0.5 * math.sin(_t * 0.6);
 
     // Back grass (darker, recedes toward the soil).
-    for (final b in _back) {
+    for (final b in back) {
       _drawBlade(
         canvas,
         size,
@@ -275,13 +275,13 @@ class _MeadowPainter extends CustomPainter {
       );
     }
 
-    // Flowers (sorted far→near by the caller).
-    for (final f in flowers) {
+    // _flowers (sorted far→near by the caller).
+    for (final f in _flowers) {
       _drawFlower(canvas, size, f, baseY);
     }
 
     // Front grass (brighter, sunlit) draped over the stems for depth.
-    for (final b in _front) {
+    for (final b in front) {
       _drawBlade(
         canvas,
         size,
@@ -317,7 +317,7 @@ class _MeadowPainter extends CustomPainter {
   void _drawBlade(
     Canvas canvas,
     Size size,
-    _Blade b,
+    Blade b,
     double baseY,
     Color color,
     double gust,
@@ -343,7 +343,7 @@ class _MeadowPainter extends CustomPainter {
     canvas.drawPath(path, Paint()..color = color.withValues(alpha: alpha));
   }
 
-  void _drawFlower(Canvas canvas, Size size, _FlowerRender f, double baseY) {
+  void _drawFlower(Canvas canvas, Size size, FlowerRender f, double baseY) {
     final b = f.blip;
     final s = b.strength.clamp(0.0, 1.0);
 
@@ -463,13 +463,13 @@ class _MeadowPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _MeadowPainter old) =>
-      old.timeMs != timeMs || old.flowers != flowers;
+  bool shouldRepaint(covariant MeadowPainter old) =>
+      old.timeMs != timeMs || old._flowers != _flowers;
 }
 
-class _Blade {
+class Blade {
   final double x, height, phase, width, shade, lean;
-  const _Blade({
+  const Blade({
     required this.x,
     required this.height,
     required this.phase,

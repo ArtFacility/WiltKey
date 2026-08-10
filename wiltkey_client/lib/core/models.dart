@@ -654,3 +654,106 @@ class ChatMessage {
     );
   }
 }
+
+/// A social contact (friend) — independent of chat contacts.
+/// Established via mutual contact request over an existing 1-on-1 chat.
+/// The [sharedSecretSeed] = sha256(sorted(myPub + peerPub)) is the single
+/// source of truth for all derived peer-to-peer content (theme, stories, etc.).
+class SocialContact {
+  final int id;
+  final String keyHash; // Peer's identity hash (64-char hex)
+  final String name;
+  final String? shortNick;
+  final String? profileImageB64;
+  final String? avatarBorderId;
+  final String sharedSecretSeed;
+  final String myPubkey;
+  final String peerPubkey;
+  final int addedAt; // Unix millis
+  final bool isBlocked;
+  final String? themeSeed; // Derived: sha256(sharedSecretSeed + "theme")
+  final int? lastSyncedAt;
+
+  SocialContact({
+    required this.id,
+    required this.keyHash,
+    required this.name,
+    this.shortNick,
+    this.profileImageB64,
+    this.avatarBorderId,
+    required this.sharedSecretSeed,
+    required this.myPubkey,
+    required this.peerPubkey,
+    required this.addedAt,
+    this.isBlocked = false,
+    this.themeSeed,
+    this.lastSyncedAt,
+  });
+
+  factory SocialContact.fromRow(Map<String, dynamic> row) => SocialContact(
+    id: row['id'] as int,
+    keyHash: row['key_hash'] as String,
+    name: row['name'] as String,
+    shortNick: row['short_nick'] as String?,
+    profileImageB64: row['profile_image_b64'] as String?,
+    avatarBorderId: row['avatar_border_id'] as String?,
+    sharedSecretSeed: row['shared_secret_seed'] as String,
+    myPubkey: row['my_pubkey'] as String,
+    peerPubkey: row['peer_pubkey'] as String,
+    addedAt: row['added_at'] as int,
+    isBlocked: (row['is_blocked'] as int? ?? 0) == 1,
+    themeSeed: row['theme_seed'] as String?,
+    lastSyncedAt: row['last_synced_at'] as int?,
+  );
+
+  Map<String, Object?> toRow() => {
+    'key_hash': keyHash,
+    'name': name,
+    'short_nick': shortNick,
+    'profile_image_b64': profileImageB64,
+    'avatar_border_id': avatarBorderId,
+    'shared_secret_seed': sharedSecretSeed,
+    'my_pubkey': myPubkey,
+    'peer_pubkey': peerPubkey,
+    'added_at': addedAt,
+    'is_blocked': isBlocked ? 1 : 0,
+    'theme_seed': themeSeed,
+    'last_synced_at': lastSyncedAt,
+  };
+
+  /// Derives the theme seed from the shared secret (lazy, cached in DB).
+  String getOrCreateThemeSeed() {
+    if (themeSeed != null) return themeSeed!;
+    // sha256(sharedSecretSeed + "theme")
+    // Note: actual computation done in Dart when needed, stored back to DB.
+    return '';
+  }
+}
+
+/// A locally-blocked peer — inbound contact requests are silently dropped.
+class ContactBlock {
+  final int id;
+  final String keyHash;
+  final int blockedAt;
+  final String? reason;
+
+  ContactBlock({
+    required this.id,
+    required this.keyHash,
+    required this.blockedAt,
+    this.reason,
+  });
+
+  factory ContactBlock.fromRow(Map<String, dynamic> row) => ContactBlock(
+    id: row['id'] as int,
+    keyHash: row['key_hash'] as String,
+    blockedAt: row['blocked_at'] as int,
+    reason: row['reason'] as String?,
+  );
+
+  Map<String, Object?> toRow() => {
+    'key_hash': keyHash,
+    'blocked_at': blockedAt,
+    'reason': reason,
+  };
+}

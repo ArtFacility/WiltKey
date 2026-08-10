@@ -177,6 +177,12 @@ class PaperinkComponents
   void precacheUnlock(BuildContext context) => PaperinkUnlockSequence.warmUp();
 
   @override
+  Widget profileBackdrop({
+    required Widget child,
+    int seed = 0,
+  }) => _PaperinkProfileBackdrop(seed: seed, child: child);
+
+  @override
   Widget nukeOverlay({required VoidCallback onDone}) =>
       PaperinkNukeFlood(onDone: onDone);
 
@@ -466,5 +472,155 @@ class _PaperinkGroupBudget extends StatelessWidget {
     }
 
     return Wrap(spacing: 6, runSpacing: 6, children: indicators);
+  }
+}
+
+// Paperink profile backdrop: hanging washi paper slips (ofuda) pinned to the
+// backdrop like talismans. Some sway gently in the draft.
+// Reuses Slip/SlipRender/OfudaPainter from paperink_sync_visual.dart.
+class _PaperinkProfileBackdrop extends StatefulWidget {
+  final Widget child;
+  final int seed;
+
+  const _PaperinkProfileBackdrop({required this.child, required this.seed});
+
+  @override
+  State<_PaperinkProfileBackdrop> createState() => _PaperinkProfileBackdropState();
+}
+
+class _PaperinkProfileBackdropState extends State<_PaperinkProfileBackdrop>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ticker;
+  late final List<Slip> _slips;
+  late final Stopwatch _clock;
+
+  @override
+  void initState() {
+    super.initState();
+    final r = math.Random(widget.seed);
+    _slips = List.generate(10, (i) {
+      final double rx = 0.15 + r.nextDouble() * 0.7;
+      final double strength = r.nextDouble();
+      final double w = 56 + r.nextDouble() * 30;
+      final double h = 80 + r.nextDouble() * 40;
+      final bool peer = r.nextBool();
+      final blip = SyncBlip(
+        id: 'profile_slip_$i',
+        strength: strength,
+        angle: 0,
+        isWiltkey: peer,
+        isNear: strength > 0.5,
+        isGroup: false,
+      );
+      return Slip(
+        blip,
+        0,
+        strength: strength,
+        rx: rx,
+        yJitter: (r.nextDouble() - 0.5) * 0.1,
+        swayPhase: r.nextDouble() * math.pi * 2,
+        rotPhase: r.nextDouble() * math.pi * 2,
+        flutterPhase: r.nextDouble() * math.pi * 2,
+        w: w,
+        h: h,
+        peer: peer,
+        glyph: _makeGlyph(peer, r),
+      );
+    });
+
+    _clock = Stopwatch()..start();
+    _ticker = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 1),
+    )..repeat();
+
+    if (!context.reduceMotion) {
+      _ticker.forward();
+    }
+  }
+
+  TextPainter _makeGlyph(bool peer, math.Random r) {
+    const genericKanji = ['音', '影', '遠', '客'];
+    const keyKanji = '鍵';
+    final text = peer ? keyKanji : genericKanji[r.nextInt(genericKanji.length)];
+    return TextPainter(
+      text: TextSpan(
+        text: text,
+        style: const TextStyle(
+          fontFamily: 'NotoSansJP',
+          fontSize: 28,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final wantMotion = !context.reduceMotion;
+    if (wantMotion && !_ticker.isAnimating) {
+      _ticker.repeat();
+    } else if (!wantMotion && _ticker.isAnimating) {
+      _ticker.stop();
+    }
+  }
+
+  @override
+  void dispose() {
+    for (final s in _slips) {
+      s.glyph.dispose();
+    }
+    _ticker.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.wk;
+    final reduceMotion = context.reduceMotion;
+
+    return Stack(
+      children: [
+        CustomPaint(
+          painter: OfudaPainter(
+            slips: _slips.map((s) => s.toRender(_clock.elapsedMilliseconds, reduceMotion)).toList(),
+            timeMs: _clock.elapsedMilliseconds,
+            reduceMotion: reduceMotion,
+            paper: t.surface,
+            paperEdge: t.border,
+            sumi: t.textPrimary,
+            wash: t.bgRaised,
+            dust: t.textTertiary,
+            seal: t.danger,
+            boardBase: t.bg,
+            boardGrain: t.border,
+          ),
+          size: Size.infinite,
+        ),
+        widget.child,
+      ],
+    );
+  }
+}
+
+// Profile-specific Slip render helper (pinned at rest).
+extension _ProfileSlipExt on Slip {
+  SlipRender toRender(int timeMs, bool reduceMotion) {
+    final now = timeMs;
+    final double fallPhase = reduceMotion ? 1.0 : ((now % 3000) / 3000).clamp(0.0, 1.0);
+    final double stiffen = reduceMotion ? 1.0 : fallPhase;
+    final double pinGrow = reduceMotion ? 1.0 : fallPhase;
+    final double fade = 1.0;
+
+    return SlipRender(
+      slip: this,
+      fallPhase: fallPhase,
+      stiffen: stiffen,
+      pinGrow: pinGrow,
+      recoil: 0,
+      fade: fade,
+    );
   }
 }

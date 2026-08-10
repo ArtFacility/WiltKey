@@ -43,7 +43,7 @@ class WiltkeyDatabase {
     } catch (_) {}
     _db = await openDatabase(
       path,
-      version: 18,
+      version: 19,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -192,6 +192,14 @@ class WiltkeyDatabase {
         'ALTER TABLE group_profiles ADD COLUMN wilt_expires_at TEXT',
       );
     }
+
+    // v19: Social contact list (friends list) — independent of chat contacts.
+    // social_contacts: mutual connections established via contact requests.
+    // contact_blocks: local block list to silently drop inbound requests.
+    if (oldVersion < 19) {
+      await db.execute(_createSocialContactsTableSql);
+      await db.execute(_createContactBlocksTableSql);
+    }
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -325,6 +333,12 @@ class WiltkeyDatabase {
 
     // 6. Activity feed events (see AppEvent / AppStateEvents).
     await db.execute(_createEventsTableSql);
+
+    // 7. Social contact list (friends list) — independent of chat contacts.
+    await db.execute(_createSocialContactsTableSql);
+
+    // 8. Local block list for contact requests.
+    await db.execute(_createContactBlocksTableSql);
   }
 
   // Activity-feed event log. `chat_key` (nullable) deep-links to a chat when it
@@ -340,6 +354,36 @@ class WiltkeyDatabase {
         chat_key TEXT,
         timestamp INTEGER,
         read INTEGER DEFAULT 0
+      )
+    ''';
+
+  // Social contact list (friends list) — independent of chat contacts.
+  // Established via mutual contact requests over existing 1-on-1 chats.
+  static const String _createSocialContactsTableSql = '''
+      CREATE TABLE IF NOT EXISTS social_contacts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        key_hash TEXT UNIQUE NOT NULL,
+        name TEXT NOT NULL,
+        short_nick TEXT,
+        profile_image_b64 TEXT,
+        avatar_border_id TEXT,
+        shared_secret_seed TEXT NOT NULL,
+        my_pubkey TEXT NOT NULL,
+        peer_pubkey TEXT NOT NULL,
+        added_at INTEGER NOT NULL,
+        is_blocked INTEGER DEFAULT 0,
+        theme_seed TEXT,
+        last_synced_at INTEGER
+      )
+    ''';
+
+  // Local block list — silently drops inbound contact requests from blocked peers.
+  static const String _createContactBlocksTableSql = '''
+      CREATE TABLE IF NOT EXISTS contact_blocks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        key_hash TEXT UNIQUE NOT NULL,
+        blocked_at INTEGER NOT NULL,
+        reason TEXT
       )
     ''';
 
@@ -1634,6 +1678,118 @@ class WiltkeyDatabase {
   }
 
   // ---------------------------------------------------------------------------
+  // Social Contacts (Friends List)
+  // ---------------------------------------------------------------------------
+
+  Future<int> insertSocialContact(SocialContact contact) async {
+    final db = await _database;
+    return await db.insert(
+      'social_contacts',
+      contact.toRow(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<void> upsertSocialContact(SocialContact contact) async {
+    final db = await _database;
+    await db.insert(
+      'social_contacts',
+      contact.toRow(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<List<SocialContact>> getAllSocialContacts() async {
+    final db = await _database;
+    final rows = await db.query(
+      'social_contacts',
+      orderBy: 'added_at DESC',
+    );
+    return rows.map((r) => SocialContact.fromRow(r)).toList();
+  }
+
+  Future<SocialContact?> getSocialContact(String keyHash) async {
+    final db = await _database;
+    final rows = await db.query(
+      'social_contacts',
+      where: 'key_hash = ?',
+      whereArgs: [keyHash],
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    return SocialContact.fromRow(rows.first);
+  }
+
+  Future<void> deleteSocialContact(String keyHash) async {
+    final db = await _database;
+    await db.delete('social_contacts', where: 'key_hash = ?', whereArgs: [keyHash]);
+  }
+
+  Future<void> updateSocialContactThemeSeed(String keyHash, String themeSeed) async {
+    final db = await _database;
+    await db.update(
+      'social_contacts',
+      {'theme_seed': themeSeed},
+      where: 'key_hash = ?',
+      whereArgs: [keyHash],
+    );
+  }
+
+  Future<void> updateSocialContactLastSynced(String keyHash, int timestamp) async {
+    final db = await _database;
+    await db.update(
+      'social_contacts',
+      {'last_synced_at': timestamp},
+      where: 'key_hash = ?',
+      whereArgs: [keyHash],
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Contact Blocks
+  // ---------------------------------------------------------------------------
+
+  Future<int> insertContactBlock(ContactBlock block) async {
+    final db = await _database;
+    return await db.insert(
+      'contact_blocks',
+      block.toRow(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<List<ContactBlock>> getAllContactBlocks() async {
+    final db = await _database;
+    final rows = await db.query(
+      'contact_blocks',
+      orderBy: 'blocked_at DESC',
+    );
+    return rows.map((r) => ContactBlock.fromRow(r)).toList();
+  }
+
+  Future<ContactBlock?> getContactBlock(String keyHash) async {
+    final db = await _database;
+    final rows = await db.query(
+      'contact_blocks',
+      where: 'key_hash = ?',
+      whereArgs: [keyHash],
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    return ContactBlock.fromRow(rows.first);
+  }
+
+  Future<void> deleteContactBlock(String keyHash) async {
+    final db = await _database;
+    await db.delete('contact_blocks', where: 'key_hash = ?', whereArgs: [keyHash]);
+  }
+
+  Future<bool> isContactBlocked(String keyHash) async {
+    final block = await getContactBlock(keyHash);
+    return block != null;
+  }
+
+  // ---------------------------------------------------------------------------
   // Cleanup
   // ---------------------------------------------------------------------------
 
@@ -1645,6 +1801,8 @@ class WiltkeyDatabase {
       await txn.delete('group_info');
       await txn.delete('messages');
       await txn.delete('contacts');
+      await txn.delete('social_contacts');
+      await txn.delete('contact_blocks');
       // The activity feed is plaintext ("a chat was destroyed", "host recharged
       // group X") — a nuke must wipe it too, or the new identity inherits a
       // metadata trail the rest of the app is built to avoid.

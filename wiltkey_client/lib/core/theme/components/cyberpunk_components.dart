@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../wiltkey_components.dart';
 import '../wk.dart';
@@ -181,6 +182,12 @@ class CyberpunkComponents
   @override
   void precacheUnlock(BuildContext context) {} // cheap first frame; nothing to warm
 
+  @override
+  Widget profileBackdrop({
+    required Widget child,
+    int seed = 0,
+  }) => _CyberpunkProfileBackdrop(seed: seed, child: child);
+
   // Shadows the VoiceScrubberDefaults mixin: the bespoke lit-up soundwave.
   @override
   Widget voiceScrubber({
@@ -196,4 +203,164 @@ class CyberpunkComponents
     onSeek: onSeek,
     accent: accent,
   );
+}
+
+// Cyberpunk profile backdrop: falling 0/1 rain columns (Matrix-style).
+class _CyberpunkProfileBackdrop extends StatefulWidget {
+  final Widget child;
+  final int seed;
+
+  const _CyberpunkProfileBackdrop({required this.child, required this.seed});
+
+  @override
+  State<_CyberpunkProfileBackdrop> createState() => _CyberpunkProfileBackdropState();
+}
+
+class _CyberpunkProfileBackdropState extends State<_CyberpunkProfileBackdrop>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ticker;
+  late final List<_RainColumn> _columns;
+
+  @override
+  void initState() {
+    super.initState();
+    final r = math.Random(widget.seed);
+    _columns = List.generate(18, (i) {
+      return _RainColumn(
+        x: r.nextDouble(),
+        speed: 0.3 + r.nextDouble() * 0.7,
+        length: 12 + r.nextInt(10),
+        charSet: r.nextBool()
+            ? '01'
+            : '01アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン',
+      );
+    });
+
+    _ticker = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 1),
+    )..repeat();
+
+    if (!context.reduceMotion) {
+      _ticker.forward();
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final wantMotion = !context.reduceMotion;
+    if (wantMotion && !_ticker.isAnimating) {
+      _ticker.repeat();
+    } else if (!wantMotion && _ticker.isAnimating) {
+      _ticker.stop();
+    }
+  }
+
+  @override
+  void dispose() {
+    _ticker.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.wk;
+    final reduceMotion = context.reduceMotion;
+
+    return Stack(
+      children: [
+        CustomPaint(
+          painter: _RainPainter(
+            columns: _columns,
+            time: _ticker.value,
+            reduceMotion: reduceMotion,
+            color: t.action.withValues(alpha: 0.15),
+            highlightColor: t.action.withValues(alpha: 0.4),
+          ),
+          size: Size.infinite,
+        ),
+        widget.child,
+      ],
+    );
+  }
+}
+
+class _RainColumn {
+  final double x;
+  final double speed;
+  final int length;
+  final String charSet;
+
+  const _RainColumn({
+    required this.x,
+    required this.speed,
+    required this.length,
+    required this.charSet,
+  });
+
+  int charAt(int row, double time) {
+    final idx = ((time * speed * 60 + row * 3) % charSet.length).toInt();
+    return charSet.codeUnitAt(idx);
+  }
+}
+
+class _RainPainter extends CustomPainter {
+  final List<_RainColumn> columns;
+  final double time;
+  final bool reduceMotion;
+  final Color color;
+  final Color highlightColor;
+
+  _RainPainter({
+    required this.columns,
+    required this.time,
+    required this.reduceMotion,
+    required this.color,
+    required this.highlightColor,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final textPainter = TextPainter(
+      textDirection: TextDirection.ltr,
+      textAlign: TextAlign.left,
+    );
+
+    final double colWidth = size.width / (columns.length + 1);
+    final double charHeight = 18.0;
+    final int maxRows = (size.height / charHeight).ceil() + 2;
+
+    for (int i = 0; i < columns.length; i++) {
+      final col = columns[i];
+      final double x = (i + 0.5) * colWidth;
+
+      for (int row = 0; row < maxRows; row++) {
+        final double y = size.height -
+            ((time * col.speed * size.height + row * charHeight) %
+                (size.height + charHeight * col.length));
+
+        if (y < -charHeight || y > size.height + charHeight) continue;
+
+        final int charCode = col.charAt(row, time);
+        final bool isHead = row == 0 && !reduceMotion;
+
+        textPainter.text = TextSpan(
+          text: String.fromCharCode(charCode),
+          style: TextStyle(
+            fontFamily: 'IBMPlexMono',
+            fontSize: reduceMotion ? 13 : 14,
+            color: isHead ? highlightColor : color,
+            fontWeight: isHead ? FontWeight.bold : FontWeight.normal,
+          ),
+        );
+        textPainter.layout();
+        textPainter.paint(canvas, Offset(x - textPainter.width / 2, y));
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _RainPainter old) =>
+      old.time != time || old.reduceMotion != reduceMotion;
 }

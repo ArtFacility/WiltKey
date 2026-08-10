@@ -1151,5 +1151,53 @@
       }
     }
   },
-  "timeWiltLifetimeMoments": "moments"
+  "timeWiltLifetimeMoments": "moments",
+
+  "navContacts": "Contacts",
+  "contactsTitle": "Contacts",
+  "contactsSectionFriends": "Friends",
+  "contactsEmptyTitle": "No contacts yet",
+  "contactsEmptyBody": "Add someone from an existing chat to see them here.",
+  "contactsOwnProfile": "Your Profile",
+  "contactsOwnProfileHint": "Tap to set status or wilting story",
+  "contactRequestSent": "Contact request sent to {name}",
+  "@contactRequestSent": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "contactRequestReceived": "{name} wants to add you as a contact",
+  "@contactRequestReceived": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "contactRequestApproved": "Contact request accepted",
+  "contactRequestDeclined": "Contact request declined",
+  "contactRequestApprove": "Approve",
+  "contactRequestDeny": "Deny",
+  "contactProfileOpenChat": "Open Chat",
+  "contactProfileRemove": "Remove Contact",
+  "contactProfileBlock": "Block User",
+  "contactProfileStatusPlaceholder": "No status yet",
+  "contactRemoveConfirmTitle": "Remove {name}?",
+  "@contactRemoveConfirmTitle": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "contactRemoveConfirmBody": "This removes them from your contact list. You can add them again later.",
+  "contactBlockConfirmTitle": "Block {name}?",
+  "@contactBlockConfirmTitle": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "contactBlockConfirmBody": "They won't be able to contact you or send contact requests.",
+  "settingsBlockedContacts": "Blocked Contacts",
+  "settingsBlockedEmpty": "No blocked contacts",
+  "commonRemove": "Remove",
+  "commonBlock": "Block",
+  "contactProfileChatNotFound": "No chat found for this contact — it may have been deleted",
+  "gestureSwipeForContacts": "Swipe from left edge for contacts"
 }

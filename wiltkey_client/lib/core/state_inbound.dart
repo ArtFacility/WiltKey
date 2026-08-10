@@ -249,6 +249,16 @@ extension AppStateInbound on AppState {
       return;
     }
 
+    if (contentType == 'contact_request') {
+      await _handleContactRequest(senderId, envelope);
+      return;
+    }
+
+    if (contentType == 'contact_response') {
+      await _handleContactResponse(senderId, envelope);
+      return;
+    }
+
     if (contentType == 'wilt_done') {
       await _handleWiltDone(senderId, envelope);
       return;
