@@ -89,7 +89,10 @@ class Contact {
   // [wiltExpiresAt] = whenTheyMetHost + lifetime.
   int? groupWiltLifetimeSecs;
 
-  bool get isTimeWilt => wiltExpiresAt != null || groupWiltLifetimeSecs != null;
+  bool get isTimeWilt =>
+      wiltExpiresAt != null ||
+      groupWiltLifetimeSecs != null ||
+      streamSeedHex != null;
 
   /// True for the host of a Time Wilt group. The host is "infinite" — it renders
   /// ∞ rather than a personal countdown, and only greys out once every member

@@ -667,10 +667,13 @@ extension AppStateInbound on AppState {
       // sits BELOW incomingMaxOffset and used to slip through — silently
       // draining the displayed peer budget. Derive the lane start from which
       // half our incoming ceiling points at, and require both bounds.
-      final int incomingLaneStart =
-          contact.incomingMaxOffset >= contact.maxBufferBytes
-          ? contact.maxBufferBytes ~/ 2
-          : 0;
+      final int incomingLaneStart = contact.isTimeWilt
+          ? (contact.incomingMaxOffset > WiltkeyOtpService.kWiltLaneStride
+              ? WiltkeyOtpService.kWiltLaneStride
+              : 0)
+          : (contact.incomingMaxOffset >= contact.maxBufferBytes
+              ? contact.maxBufferBytes ~/ 2
+              : 0);
       if (offset >= incomingLaneStart && offset <= contact.incomingMaxOffset) {
         final expectedOffset = contact.incomingOffset;
         if (offset > expectedOffset) {
@@ -1935,10 +1938,13 @@ extension AppStateInbound on AppState {
           } else {
             // Gap detection + incoming bookkeeping apply ONLY to the peer's primary
             // lane for peer-authored messages.
-            final int incomingLaneStart =
-                contact.incomingMaxOffset >= contact.maxBufferBytes
-                ? contact.maxBufferBytes ~/ 2
-                : 0;
+            final int incomingLaneStart = contact.isTimeWilt
+                ? (contact.incomingMaxOffset > WiltkeyOtpService.kWiltLaneStride
+                    ? WiltkeyOtpService.kWiltLaneStride
+                    : 0)
+                : (contact.incomingMaxOffset >= contact.maxBufferBytes
+                    ? contact.maxBufferBytes ~/ 2
+                    : 0);
             if (!msgIsSentByMe &&
                 offset >= incomingLaneStart &&
                 offset <= contact.incomingMaxOffset) {

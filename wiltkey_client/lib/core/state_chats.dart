@@ -904,9 +904,13 @@ extension AppStateChats on AppState {
   /// for any range not already verified clean. Returns the count of active gaps found.
   Future<int> auditAndSync1on1Gaps(Contact contact) async {
     if (contact.isGroup) return 0;
-    final int laneStart = contact.incomingMaxOffset >= contact.maxBufferBytes
-        ? contact.maxBufferBytes ~/ 2
-        : 0;
+    final int laneStart = contact.isTimeWilt
+        ? (contact.incomingMaxOffset > WiltkeyOtpService.kWiltLaneStride
+            ? WiltkeyOtpService.kWiltLaneStride
+            : 0)
+        : (contact.incomingMaxOffset >= contact.maxBufferBytes
+            ? contact.maxBufferBytes ~/ 2
+            : 0);
     final int currentIncoming = contact.incomingOffset;
     if (currentIncoming <= laneStart) return 0;
 
@@ -920,6 +924,7 @@ extension AppStateChats on AppState {
         .where(
           (m) =>
               !m.isSentByMe &&
+              !m.isSystem &&
               m.offset >= laneStart &&
               m.offset < currentIncoming,
         )
@@ -977,9 +982,13 @@ extension AppStateChats on AppState {
   /// Checks whether there are any unverified inbound gaps in a 1-on-1 chat.
   Future<bool> hasUnverified1on1Gaps(Contact contact) async {
     if (contact.isGroup) return false;
-    final int laneStart = contact.incomingMaxOffset >= contact.maxBufferBytes
-        ? contact.maxBufferBytes ~/ 2
-        : 0;
+    final int laneStart = contact.isTimeWilt
+        ? (contact.incomingMaxOffset > WiltkeyOtpService.kWiltLaneStride
+            ? WiltkeyOtpService.kWiltLaneStride
+            : 0)
+        : (contact.incomingMaxOffset >= contact.maxBufferBytes
+            ? contact.maxBufferBytes ~/ 2
+            : 0);
     final int currentIncoming = contact.incomingOffset;
     if (currentIncoming <= laneStart) return false;
 
@@ -993,6 +1002,7 @@ extension AppStateChats on AppState {
         .where(
           (m) =>
               !m.isSentByMe &&
+              !m.isSystem &&
               m.offset >= laneStart &&
               m.offset < currentIncoming,
         )
@@ -1034,9 +1044,13 @@ extension AppStateChats on AppState {
   /// Synchronous fast check using loaded in-memory messages for UI badge rendering.
   bool hasUnverified1on1GapsCached(Contact contact) {
     if (contact.isGroup) return false;
-    final int laneStart = contact.incomingMaxOffset >= contact.maxBufferBytes
-        ? contact.maxBufferBytes ~/ 2
-        : 0;
+    final int laneStart = contact.isTimeWilt
+        ? (contact.incomingMaxOffset > WiltkeyOtpService.kWiltLaneStride
+            ? WiltkeyOtpService.kWiltLaneStride
+            : 0)
+        : (contact.incomingMaxOffset >= contact.maxBufferBytes
+            ? contact.maxBufferBytes ~/ 2
+            : 0);
     final int currentIncoming = contact.incomingOffset;
     if (currentIncoming <= laneStart) return false;
 
@@ -1045,6 +1059,7 @@ extension AppStateChats on AppState {
         .where(
           (m) =>
               !m.isSentByMe &&
+              !m.isSystem &&
               m.offset >= laneStart &&
               m.offset < currentIncoming,
         )
