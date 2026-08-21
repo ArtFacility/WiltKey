@@ -229,6 +229,24 @@ class AppLocalizationsFr extends AppLocalizations {
   String get settingsProfileChipRandom => 'Aléatoire';
 
   @override
+  String get settingsProfileChipTemplateSave => 'Ajouter aux modèles';
+
+  @override
+  String get settingsProfileTemplateSaved => 'Enregistré dans les modèles';
+
+  @override
+  String get settingsProfileTemplatesButton => 'Choisir un modèle';
+
+  @override
+  String get settingsProfileTemplatesTitle => 'Modèles enregistrés';
+
+  @override
+  String get settingsProfileNoTemplates => 'Aucun modèle enregistré';
+
+  @override
+  String get settingsProfileTemplateEquipped => 'Modèle d\'avatar appliqué';
+
+  @override
   String get avatarEditButton => 'Modifier l\'avatar';
 
   @override
@@ -406,6 +424,9 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get notificationNewMessageBody => 'Tu as un message';
+
+  @override
+  String get notificationEmergencyChatBody => 'Demande de chat d\'urgence';
 
   @override
   String get notificationSecureLinkActive =>
@@ -949,6 +970,18 @@ class AppLocalizationsFr extends AppLocalizations {
   String get chatVoiceReleaseCancel => 'Relâchez pour annuler';
 
   @override
+  String get chatVoiceSlideToCancel => 'Glisser pour annuler';
+
+  @override
+  String get chatVoiceSlideToLock => 'Glisser vers le haut pour verrouiller';
+
+  @override
+  String get chatVoiceCancel => 'Annuler l\'enregistrement';
+
+  @override
+  String get chatVoiceSend => 'Envoyer le message vocal';
+
+  @override
   String get chatVoicePermissionDenied =>
       'L\'autorisation du microphone est nécessaire pour enregistrer des messages vocaux.';
 
@@ -1066,97 +1099,115 @@ class AppLocalizationsFr extends AppLocalizations {
       'L\'hôte a rechargé le groupe — recroise-le pour revenir';
 
   @override
-  String get groupTimeWiltToggle => 'Time Wilt group';
+  String get groupTimeWiltToggle => 'Groupe Time Wilt';
 
   @override
   String get groupTimeWiltToggleSub =>
-      'Limited time, unlimited budget. The group wilts to read-only when your timer runs out; meet the host again to renew it.';
+      'Durée limitée, budget illimité. Le groupe passe en lecture seule quand votre minuteur expire ; revoyez l\'hôte pour le renouveler.';
 
   @override
-  String get groupTimeWiltMembersLabel => 'Max members';
+  String get groupTimeWiltMembersLabel => 'Membres max';
 
   @override
-  String get groupTimeWiltMembersUpsell => 'Unlock up to 100 members with Plus';
+  String get groupTimeWiltMembersUpsell =>
+      'Débloquez jusqu\'à 100 membres avec Plus';
 
   @override
-  String get groupTimeWiltHostInfinite => 'Host · ∞';
+  String get groupTimeWiltHostInfinite => 'Hôte · ∞';
 
   @override
   String get groupTimeWiltRenewComposer =>
-      'Wilted — meet the host again to renew your access';
+      'Expiré — retrouvez l\'hôte pour renouveler l\'accès';
 
   @override
   String get groupTimeWiltHostAllWilted =>
-      'All members have wilted — meet someone again to revive the group';
+      'Tous les membres ont expiré — retrouvez quelqu\'un pour ranimer le groupe';
 
   @override
-  String get groupNukeProposeButton => 'Propose destroying for everyone';
+  String get groupNukeProposeButton => 'Proposer la destruction pour tous';
 
   @override
-  String get groupNukeProposeTitle => 'Destroy this group for everyone?';
+  String get groupNukeProposeTitle => 'Détruire ce groupe pour tous ?';
 
   @override
   String get groupNukeProposeBody =>
-      'Asks the other members to vote. If a majority agree, the group and its history are destroyed on every device. This can\'t be undone.';
+      'Lance un vote parmi les membres. Si la majorité accepte, le groupe et son historique sont détruits sur tous les appareils. Action irréversible.';
 
   @override
-  String get groupNukeProposeConfirm => 'Propose';
+  String get groupNukeProposeConfirm => 'Proposer';
 
   @override
-  String get groupNukeVoteTitle => 'Destroy group?';
+  String get groupNukeVoteTitle => 'Détruire le groupe ?';
 
   @override
   String get groupNukeVoteBody =>
-      'A member proposed destroying this group for everyone. If a majority agree, it\'s wiped on every device.';
+      'Un membre a proposé de détruire ce groupe pour tout le monde. Si la majorité accepte, il sera effacé sur tous les appareils.';
 
   @override
-  String get groupNukeVoteAllow => 'Agree';
+  String get groupNukeVoteAllow => 'Accepter';
 
   @override
-  String get groupNukeVoteDeny => 'Keep';
+  String get groupNukeVoteDeny => 'Garder';
 
   @override
-  String get groupNukeVotePending => 'Waiting for members to vote…';
+  String get groupNukeVotePending => 'En attente du vote des membres…';
 
   @override
-  String get groupNukeVotePassed => 'The group was destroyed by majority vote.';
+  String get groupNukeVotePassed =>
+      'Le groupe a été détruit par vote majoritaire.';
 
   @override
   String get groupNukeVoteFailed =>
-      'The proposal to destroy the group did not pass.';
+      'La proposition de destruction n\'a pas été adoptée.';
 
   @override
-  String get groupNukeVoteSent =>
-      'Proposal sent — waiting for members to vote.';
+  String get groupNukeVoteSent => 'Proposition envoyée — en attente des votes.';
 
   @override
-  String get activityTitle => 'Activity';
+  String get activityTitle => 'Activité';
 
   @override
   String get activityEmpty =>
-      'No activity yet. Events like a chat being destroyed will show up here.';
+      'Aucune activité récente. Les événements comme la destruction d\'un chat apparaîtront ici.';
 
   @override
-  String get activityClear => 'Clear';
+  String get activityClear => 'Effacer';
 
   @override
-  String get activityClearConfirmTitle => 'Clear activity?';
+  String get activityClearConfirmTitle => 'Effacer l\'activité ?';
 
   @override
   String get activityClearConfirmBody =>
-      'This removes all activity entries from this device. It can\'t be undone.';
+      'Supprime toutes les entrées d\'activité de cet appareil. Action irréversible.';
 
   @override
-  String get eventNukeReceivedTitle => 'Chat destroyed';
+  String get eventNukeReceivedTitle => 'Chat détruit';
 
   @override
-  String get eventNukeReceivedBody => 'A secure chat was destroyed.';
+  String get eventNukeReceivedBody => 'Un chat sécurisé a été détruit.';
 
   @override
-  String get eventGroupNukedTitle => 'Group destroyed';
+  String get eventGroupNukedTitle => 'Groupe détruit';
 
   @override
-  String get eventGroupNukedBody => 'A secure group was destroyed.';
+  String get eventGroupNukedBody => 'Un groupe sécurisé a été détruit.';
+
+  @override
+  String eventContactRequestTitle(String name) {
+    return '$name vous a envoyé une demande de contact';
+  }
+
+  @override
+  String get eventContactRequestBody =>
+      'Appuie pour accepter ou refuser dans ta discussion';
+
+  @override
+  String eventContactRemovedTitle(String name) {
+    return '$name vous a retiré';
+  }
+
+  @override
+  String get eventContactRemovedBody => 'Ils vous ont retiré de leurs contacts';
 
   @override
   String groupSyncingFromMember(String name) {
@@ -1448,6 +1499,56 @@ class AppLocalizationsFr extends AppLocalizations {
   String get themePreviewRowLost => 'Pad épuisé — se voir pour recharger';
 
   @override
+  String get themePreviewSectionProfile => 'Arrière-plan de profil';
+
+  @override
+  String get themePreviewFullscreenProfile => 'Aperçu plein écran du profil';
+
+  @override
+  String get linkWarningTitle => 'Lien externe';
+
+  @override
+  String get linkWarningBody =>
+      'Vous êtes sur le point d\'ouvrir un lien externe dans votre navigateur. Cela vous connectera au serveur de destination et révélera votre adresse IP.';
+
+  @override
+  String get linkWarningOpen => 'Ouvrir dans le navigateur';
+
+  @override
+  String get linkWarningCopy => 'Copier le lien';
+
+  @override
+  String get linkWarningCopied => 'Lien copié dans le presse-papiers';
+
+  @override
+  String get chatActionEdit => 'Modifier';
+
+  @override
+  String get chatActionDelete => 'Supprimer';
+
+  @override
+  String get chatEditingBanner => 'Modification du message';
+
+  @override
+  String get chatCancelEdit => 'Annuler la modification';
+
+  @override
+  String get chatDeleteTitle => 'Supprimer le message';
+
+  @override
+  String get chatDeleteBody =>
+      'Voulez-vous vraiment supprimer ce message pour tout le monde ?';
+
+  @override
+  String get chatDeleteConfirm => 'Supprimer';
+
+  @override
+  String get chatMessageDeleted => '[Message supprimé]';
+
+  @override
+  String get chatEditedTag => 'modifié';
+
+  @override
   String get accessibilityWarningTitle => 'Service d\'accessibilité actif';
 
   @override
@@ -1694,7 +1795,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get shopPlusBenefitTimeWiltGroups =>
-      'Host bigger Time Wilt groups — up to 100 members instead of 20.';
+      'Hébergez de plus grands groupes Time Wilt — jusqu\'à 100 membres au lieu de 20.';
 
   @override
   String get shopPlusBenefitSupport =>
@@ -1886,89 +1987,257 @@ class AppLocalizationsFr extends AppLocalizations {
   String get contactsTitle => 'Contacts';
 
   @override
-  String get contactsSectionFriends => 'Friends';
+  String get contactsSectionFriends => 'Amis';
 
   @override
-  String get contactsEmptyTitle => 'No contacts yet';
+  String get contactsEmptyTitle => 'Aucun contact pour l\'instant';
 
   @override
   String get contactsEmptyBody =>
-      'Add someone from an existing chat to see them here.';
+      'Ajoutez quelqu\'un depuis une discussion existante pour le voir ici.';
 
   @override
-  String get contactsOwnProfile => 'Your Profile';
+  String get contactsOwnProfile => 'Votre profil';
 
   @override
-  String get contactsOwnProfileHint => 'Tap to set status or wilting story';
+  String get contactsOwnProfileHint =>
+      'Appuyez pour définir un statut ou une story éphémère';
 
   @override
   String contactRequestSent(String name) {
-    return 'Contact request sent to $name';
+    return 'Demande de contact envoyée à $name';
   }
 
   @override
   String contactRequestReceived(String name) {
-    return '$name wants to add you as a contact';
+    return '$name souhaite vous ajouter en contact';
   }
 
   @override
-  String get contactRequestApproved => 'Contact request accepted';
+  String get contactRequestApproved => 'Demande de contact acceptée';
 
   @override
-  String get contactRequestDeclined => 'Contact request declined';
+  String get contactRequestDeclined => 'Demande de contact refusée';
 
   @override
-  String get contactRequestApprove => 'Approve';
+  String get contactRequestApprove => 'Accepter';
 
   @override
-  String get contactRequestDeny => 'Deny';
+  String get contactRequestDeny => 'Refuser';
 
   @override
-  String get contactProfileOpenChat => 'Open Chat';
+  String get contactAddTitle => 'Add contact';
 
   @override
-  String get contactProfileRemove => 'Remove Contact';
+  String contactAddBody(String name) {
+    return 'Add $name to your contacts?';
+  }
 
   @override
-  String get contactProfileBlock => 'Block User';
+  String get contactAddConfirm => 'Add contact';
 
   @override
-  String get contactProfileStatusPlaceholder => 'No status yet';
+  String get contactAddAlready => 'Already in your contacts';
+
+  @override
+  String get contactAddSent => 'Contact request sent';
+
+  @override
+  String get contactProfileOpenChat => 'Ouvrir la discussion';
+
+  @override
+  String get contactProfileRemove => 'Supprimer le contact';
+
+  @override
+  String get contactProfileBlock => 'Bloquer l\'utilisateur';
+
+  @override
+  String get contactProfileStatusPlaceholder => 'Aucun statut';
+
+  @override
+  String get contactProfileEmergencyChat => 'Chat d\'urgence';
+
+  @override
+  String get contactPin => 'Épingler en haut';
+
+  @override
+  String get contactUnpin => 'Détacher';
+
+  @override
+  String get contactUnblock => 'Débloquer';
+
+  @override
+  String get contactsSectionPinned => 'Épinglés';
+
+  @override
+  String get contactStatusLabel => 'Statut';
+
+  @override
+  String get contactStatusHint => 'Partagez un statut avec vos contacts…';
+
+  @override
+  String get contactStatusSave => 'Enregistrer le statut';
+
+  @override
+  String get contactStatusUpdated => 'Statut mis à jour';
 
   @override
   String contactRemoveConfirmTitle(String name) {
-    return 'Remove $name?';
+    return 'Supprimer $name ?';
   }
 
   @override
   String get contactRemoveConfirmBody =>
-      'This removes them from your contact list. You can add them again later.';
+      'Cette personne sera retirée de vos contacts. Vous pourrez la rajouter plus tard.';
 
   @override
   String contactBlockConfirmTitle(String name) {
-    return 'Block $name?';
+    return 'Bloquer $name ?';
   }
 
   @override
   String get contactBlockConfirmBody =>
-      'They won\'t be able to contact you or send contact requests.';
+      'Cette personne ne pourra plus vous contacter ni vous envoyer de demandes.';
 
   @override
-  String get settingsBlockedContacts => 'Blocked Contacts';
+  String get settingsBlockedContacts => 'Contacts bloqués';
 
   @override
-  String get settingsBlockedEmpty => 'No blocked contacts';
+  String get settingsBlockedEmpty => 'Aucun contact bloqué';
 
   @override
-  String get commonRemove => 'Remove';
+  String get commonRemove => 'Supprimer';
 
   @override
-  String get commonBlock => 'Block';
+  String get commonBlock => 'Bloquer';
 
   @override
   String get contactProfileChatNotFound =>
-      'No chat found for this contact — it may have been deleted';
+      'Aucun chat trouvé pour ce contact — il a peut-être été supprimé';
 
   @override
-  String get gestureSwipeForContacts => 'Swipe from left edge for contacts';
+  String get emergencyChatStart => 'Démarrer un chat d\'urgence';
+
+  @override
+  String emergencyChatConfirmTitle(String name) {
+    return 'Démarrer un chat d\'urgence avec $name ?';
+  }
+
+  @override
+  String emergencyChatConfirmBody(String name) {
+    return 'Aucun chat actif avec $name n\'existe. Cela démarre un chat Time Wilt de 12 heures créé à distance, sans appairage en personne. Le chat fané existant et ses messages seront détruits définitivement et ne pourront jamais être rechargés.';
+  }
+
+  @override
+  String get emergencyChatAlreadyActive =>
+      'Vous avez déjà un chat actif avec ce contact';
+
+  @override
+  String get emergencyChatStarted => 'Chat d\'urgence démarré';
+
+  @override
+  String get chatsEmergencyPendingSubtitle => 'Connexion du chat d\'urgence…';
+
+  @override
+  String chatsEmergencyPendingSnackBar(String name) {
+    return 'Le chat d\'urgence avec $name attend sa connexion.';
+  }
+
+  @override
+  String get emergencyChatPending => 'Chat d\'urgence en attente…';
+
+  @override
+  String get gestureSwipeForContacts =>
+      'Balayez depuis le bord gauche pour les contacts';
+
+  @override
+  String get contactProfileSafetyNumber => 'Empreinte de la clé d\'identité';
+
+  @override
+  String get contactProfileWiltedHint =>
+      'Démarrer un chat Time Wilt temporaire de 12 heures';
+
+  @override
+  String get commonCopy => 'Copier';
+
+  @override
+  String get commonCopied => 'Copié dans le presse-papiers';
+
+  @override
+  String eventMentionTitle(String name) {
+    return '$name vous a mentionné';
+  }
+
+  @override
+  String eventReplyTitle(String name) {
+    return '$name vous a répondu';
+  }
+
+  @override
+  String get chatNotificationModeAll => 'Tous les messages';
+
+  @override
+  String get chatNotificationModeMentions => 'Mentions et réponses uniquement';
+
+  @override
+  String get chatNotificationModeMuted => 'En sourdine (Silencieux)';
+
+  @override
+  String get chatNotificationSettingsTitle => 'Notifications';
+
+  @override
+  String get chatMuteTitle => 'Mettre la discussion en sourdine';
+
+  @override
+  String get chatUnmuteTitle => 'Réactiver le son de la discussion';
+
+  @override
+  String get settingsNotifyCategories => 'Catégories';
+
+  @override
+  String get settingsNotifyDirectMessages => 'Messages directs';
+
+  @override
+  String get settingsNotifyDirectMessagesSubtitle =>
+      'Notifications pour les discussions 1:1';
+
+  @override
+  String get settingsNotifyGroupMessages => 'Messages de groupe';
+
+  @override
+  String get settingsNotifyGroupMessagesSubtitle =>
+      'Notifications pour les discussions de groupe';
+
+  @override
+  String get settingsNotifyEvents => 'Événements de sécurité et d\'activité';
+
+  @override
+  String get settingsNotifyEventsSubtitle =>
+      'Demandes de contact, votes de destruction de groupe, alertes de capture d\'écran';
+
+  @override
+  String get settingsMutedChatsTitle => 'Discussions en sourdine';
+
+  @override
+  String get settingsNoMutedChats => 'Aucune discussion en sourdine';
+
+  @override
+  String get settingsUnmute => 'Réactiver le son';
+
+  @override
+  String get settingsCheckForUpdates => 'Rechercher des mises à jour';
+
+  @override
+  String get settingsCheckingUpdates => 'Recherche de mises à jour...';
+
+  @override
+  String settingsUpdateAvailable(String version) {
+    return 'Mise à jour disponible : v$version';
+  }
+
+  @override
+  String get settingsUpToDate => 'WiltKey est à jour';
+
+  @override
+  String get settingsWhatsNew => 'Nouveautés';
 }

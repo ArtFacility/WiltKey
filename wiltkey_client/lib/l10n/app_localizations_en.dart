@@ -227,6 +227,24 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsProfileChipRandom => 'Random';
 
   @override
+  String get settingsProfileChipTemplateSave => 'Add to templates';
+
+  @override
+  String get settingsProfileTemplateSaved => 'Saved to templates';
+
+  @override
+  String get settingsProfileTemplatesButton => 'Select from template';
+
+  @override
+  String get settingsProfileTemplatesTitle => 'Saved Templates';
+
+  @override
+  String get settingsProfileNoTemplates => 'No saved templates yet';
+
+  @override
+  String get settingsProfileTemplateEquipped => 'Avatar template equipped';
+
+  @override
   String get avatarEditButton => 'Edit avatar';
 
   @override
@@ -395,6 +413,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get notificationNewMessageBody => 'You got a message';
+
+  @override
+  String get notificationEmergencyChatBody => 'Emergency chat request';
 
   @override
   String get notificationSecureLinkActive => 'Syncing secure messages';
@@ -927,6 +948,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatVoiceReleaseCancel => 'Release to cancel';
 
   @override
+  String get chatVoiceSlideToCancel => 'Slide to cancel';
+
+  @override
+  String get chatVoiceSlideToLock => 'Slide up to lock';
+
+  @override
+  String get chatVoiceCancel => 'Cancel recording';
+
+  @override
+  String get chatVoiceSend => 'Send voice message';
+
+  @override
   String get chatVoicePermissionDenied =>
       'Microphone permission is needed to record voice messages.';
 
@@ -1141,6 +1174,22 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get eventGroupNukedBody => 'A secure group was destroyed.';
+
+  @override
+  String eventContactRequestTitle(String name) {
+    return '$name sent you a contact request';
+  }
+
+  @override
+  String get eventContactRequestBody => 'Tap to accept or decline in your chat';
+
+  @override
+  String eventContactRemovedTitle(String name) {
+    return '$name removed you';
+  }
+
+  @override
+  String get eventContactRemovedBody => 'They removed you from their contacts';
 
   @override
   String groupSyncingFromMember(String name) {
@@ -1430,6 +1479,56 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get themePreviewRowLost => 'Out of pad — meet up to recharge';
+
+  @override
+  String get themePreviewSectionProfile => 'Profile backdrop';
+
+  @override
+  String get themePreviewFullscreenProfile => 'Fullscreen profile preview';
+
+  @override
+  String get linkWarningTitle => 'External link warning';
+
+  @override
+  String get linkWarningBody =>
+      'You are about to open an external link in your browser. This will connect to the destination server and reveal your IP address.';
+
+  @override
+  String get linkWarningOpen => 'Open in browser';
+
+  @override
+  String get linkWarningCopy => 'Copy link';
+
+  @override
+  String get linkWarningCopied => 'Link copied to clipboard';
+
+  @override
+  String get chatActionEdit => 'Edit';
+
+  @override
+  String get chatActionDelete => 'Delete';
+
+  @override
+  String get chatEditingBanner => 'Editing message';
+
+  @override
+  String get chatCancelEdit => 'Cancel edit';
+
+  @override
+  String get chatDeleteTitle => 'Delete message';
+
+  @override
+  String get chatDeleteBody =>
+      'Are you sure you want to delete this message for everyone?';
+
+  @override
+  String get chatDeleteConfirm => 'Delete';
+
+  @override
+  String get chatMessageDeleted => '[Message deleted]';
+
+  @override
+  String get chatEditedTag => 'edited';
 
   @override
   String get accessibilityWarningTitle => 'Accessibility service active';
@@ -1902,6 +2001,23 @@ class AppLocalizationsEn extends AppLocalizations {
   String get contactRequestDeny => 'Deny';
 
   @override
+  String get contactAddTitle => 'Add contact';
+
+  @override
+  String contactAddBody(String name) {
+    return 'Add $name to your contacts?';
+  }
+
+  @override
+  String get contactAddConfirm => 'Add contact';
+
+  @override
+  String get contactAddAlready => 'Already in your contacts';
+
+  @override
+  String get contactAddSent => 'Contact request sent';
+
+  @override
   String get contactProfileOpenChat => 'Open Chat';
 
   @override
@@ -1912,6 +2028,33 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get contactProfileStatusPlaceholder => 'No status yet';
+
+  @override
+  String get contactProfileEmergencyChat => 'Emergency chat';
+
+  @override
+  String get contactPin => 'Pin to top';
+
+  @override
+  String get contactUnpin => 'Unpin';
+
+  @override
+  String get contactUnblock => 'Unblock';
+
+  @override
+  String get contactsSectionPinned => 'Pinned';
+
+  @override
+  String get contactStatusLabel => 'Status';
+
+  @override
+  String get contactStatusHint => 'Share a status with your contacts…';
+
+  @override
+  String get contactStatusSave => 'Save status';
+
+  @override
+  String get contactStatusUpdated => 'Status updated';
 
   @override
   String contactRemoveConfirmTitle(String name) {
@@ -1948,5 +2091,127 @@ class AppLocalizationsEn extends AppLocalizations {
       'No chat found for this contact — it may have been deleted';
 
   @override
+  String get emergencyChatStart => 'Start emergency chat';
+
+  @override
+  String emergencyChatConfirmTitle(String name) {
+    return 'Start emergency chat with $name?';
+  }
+
+  @override
+  String emergencyChatConfirmBody(String name) {
+    return 'This starts a 12-hour Time Wilt chat created remotely, without pairing in person. Any existing chat and messages with $name will be permanently replaced, and the session will be active once $name connects.';
+  }
+
+  @override
+  String get emergencyChatAlreadyActive =>
+      'You already have an active chat with this contact';
+
+  @override
+  String get emergencyChatStarted => 'Emergency chat requested';
+
+  @override
+  String get chatsEmergencyPendingSubtitle => 'Connecting emergency chat…';
+
+  @override
+  String chatsEmergencyPendingSnackBar(String name) {
+    return 'Emergency chat with $name is waiting for them to connect.';
+  }
+
+  @override
+  String get emergencyChatPending => 'Emergency chat pending…';
+
+  @override
   String get gestureSwipeForContacts => 'Swipe from left edge for contacts';
+
+  @override
+  String get contactProfileSafetyNumber => 'Identity Key Fingerprint';
+
+  @override
+  String get contactProfileWiltedHint =>
+      'Start a temporary 12-hour Time Wilt chat';
+
+  @override
+  String get commonCopy => 'Copy';
+
+  @override
+  String get commonCopied => 'Copied to clipboard';
+
+  @override
+  String eventMentionTitle(String name) {
+    return '$name mentioned you';
+  }
+
+  @override
+  String eventReplyTitle(String name) {
+    return '$name replied to you';
+  }
+
+  @override
+  String get chatNotificationModeAll => 'All messages';
+
+  @override
+  String get chatNotificationModeMentions => 'Mentions & replies only';
+
+  @override
+  String get chatNotificationModeMuted => 'Mute (Silent)';
+
+  @override
+  String get chatNotificationSettingsTitle => 'Notifications';
+
+  @override
+  String get chatMuteTitle => 'Mute chat';
+
+  @override
+  String get chatUnmuteTitle => 'Unmute chat';
+
+  @override
+  String get settingsNotifyCategories => 'Categories';
+
+  @override
+  String get settingsNotifyDirectMessages => 'Direct Messages';
+
+  @override
+  String get settingsNotifyDirectMessagesSubtitle =>
+      'Notifications for 1:1 chat messages';
+
+  @override
+  String get settingsNotifyGroupMessages => 'Group Messages';
+
+  @override
+  String get settingsNotifyGroupMessagesSubtitle =>
+      'Notifications for group chat messages';
+
+  @override
+  String get settingsNotifyEvents => 'Security & Activity Events';
+
+  @override
+  String get settingsNotifyEventsSubtitle =>
+      'Contact requests, group nuke votes, screenshot alerts';
+
+  @override
+  String get settingsMutedChatsTitle => 'Muted Chats';
+
+  @override
+  String get settingsNoMutedChats => 'No muted chats';
+
+  @override
+  String get settingsUnmute => 'Unmute';
+
+  @override
+  String get settingsCheckForUpdates => 'Check for updates';
+
+  @override
+  String get settingsCheckingUpdates => 'Checking for updates...';
+
+  @override
+  String settingsUpdateAvailable(String version) {
+    return 'Update available: v$version';
+  }
+
+  @override
+  String get settingsUpToDate => 'WiltKey is up to date';
+
+  @override
+  String get settingsWhatsNew => 'What\'s new';
 }

@@ -73,6 +73,12 @@
   "settingsProfileChipIdenticon": "Identicon",
   "settingsProfileChipClear": "Clear",
   "settingsProfileChipRandom": "Random",
+  "settingsProfileChipTemplateSave": "Add to templates",
+  "settingsProfileTemplateSaved": "Saved to templates",
+  "settingsProfileTemplatesButton": "Select from template",
+  "settingsProfileTemplatesTitle": "Saved Templates",
+  "settingsProfileNoTemplates": "No saved templates yet",
+  "settingsProfileTemplateEquipped": "Avatar template equipped",
   "avatarEditButton": "Edit avatar",
   "groupCreateEditIcon": "Edit icon",
   "settingsProfileUsername": "Username",
@@ -127,6 +133,7 @@
   "notificationModeInstant": "Instant",
   "notificationModeInstantDesc": "Optional. Keeps an end-to-end-encrypted connection open in the background to sync your incoming messages in real time, shown by an ongoing notification. Wiltkey uses this instead of Google or Apple push services for privacy, so it works even without Google Play Services — at the cost of more battery.",
   "notificationNewMessageBody": "You got a message",
+  "notificationEmergencyChatBody": "Emergency chat request",
   "notificationSecureLinkActive": "Syncing secure messages",
   "onboardingNotificationsTitle": "Alerts",
   "onboardingNotificationsExplanation": "Wiltkey doesn't use Google or Apple push notifications — nothing about your messages ever touches their servers. Choose how you'd like to be alerted. You can change this any time in Settings.",
@@ -474,6 +481,10 @@
   "chatVoiceComingSoon": "Voice messages are coming soon.",
   "chatVoiceHoldHint": "Hold to record a voice message.",
   "chatVoiceReleaseCancel": "Release to cancel",
+  "chatVoiceSlideToCancel": "Slide to cancel",
+  "chatVoiceSlideToLock": "Slide up to lock",
+  "chatVoiceCancel": "Cancel recording",
+  "chatVoiceSend": "Send voice message",
   "chatVoicePermissionDenied": "Microphone permission is needed to record voice messages.",
   "chatVoiceQualityLofi": "Lo-fi",
   "chatVoiceQualityVoice": "Voice",
@@ -561,6 +572,24 @@
   "eventNukeReceivedBody": "A secure chat was destroyed.",
   "eventGroupNukedTitle": "Group destroyed",
   "eventGroupNukedBody": "A secure group was destroyed.",
+  "eventContactRequestTitle": "{name} sent you a contact request",
+  "@eventContactRequestTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "eventContactRequestBody": "Tap to accept or decline in your chat",
+  "eventContactRemovedTitle": "{name} removed you",
+  "@eventContactRemovedTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "eventContactRemovedBody": "They removed you from their contacts",
   "groupSyncingFromMember": "Syncing details and messages from {name}...",
   "@groupSyncingFromMember": {
     "placeholders": {
@@ -735,6 +764,22 @@
   "themePreviewMsgThem2": "deal, bringing snacks 🍿",
   "themePreviewRowPhoto": "Photo from the bouldering gym 🧗",
   "themePreviewRowLost": "Out of pad — meet up to recharge",
+  "themePreviewSectionProfile": "Profile backdrop",
+  "themePreviewFullscreenProfile": "Fullscreen profile preview",
+  "linkWarningTitle": "External link warning",
+  "linkWarningBody": "You are about to open an external link in your browser. This will connect to the destination server and reveal your IP address.",
+  "linkWarningOpen": "Open in browser",
+  "linkWarningCopy": "Copy link",
+  "linkWarningCopied": "Link copied to clipboard",
+  "chatActionEdit": "Edit",
+  "chatActionDelete": "Delete",
+  "chatEditingBanner": "Editing message",
+  "chatCancelEdit": "Cancel edit",
+  "chatDeleteTitle": "Delete message",
+  "chatDeleteBody": "Are you sure you want to delete this message for everyone?",
+  "chatDeleteConfirm": "Delete",
+  "chatMessageDeleted": "[Message deleted]",
+  "chatEditedTag": "edited",
   "@themePickerPlayExclusive": {
     "description": "Snackbar shown on the FOSS build when tapping a locked premium theme (which can only be bought in the Play version)."
   },
@@ -1176,10 +1221,29 @@
   "contactRequestDeclined": "Contact request declined",
   "contactRequestApprove": "Approve",
   "contactRequestDeny": "Deny",
+  "contactAddTitle": "Add contact",
+  "contactAddBody": "Add {name} to your contacts?",
+  "@contactAddBody": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "contactAddConfirm": "Add contact",
+  "contactAddAlready": "Already in your contacts",
+  "contactAddSent": "Contact request sent",
   "contactProfileOpenChat": "Open Chat",
   "contactProfileRemove": "Remove Contact",
   "contactProfileBlock": "Block User",
   "contactProfileStatusPlaceholder": "No status yet",
+  "contactProfileEmergencyChat": "Emergency chat",
+  "contactPin": "Pin to top",
+  "contactUnpin": "Unpin",
+  "contactUnblock": "Unblock",
+  "contactsSectionPinned": "Pinned",
+  "contactStatusLabel": "Status",
+  "contactStatusHint": "Share a status with your contacts…",
+  "contactStatusSave": "Save status",
+  "contactStatusUpdated": "Status updated",
   "contactRemoveConfirmTitle": "Remove {name}?",
   "@contactRemoveConfirmTitle": {
     "placeholders": {
@@ -1199,5 +1263,70 @@
   "commonRemove": "Remove",
   "commonBlock": "Block",
   "contactProfileChatNotFound": "No chat found for this contact — it may have been deleted",
-  "gestureSwipeForContacts": "Swipe from left edge for contacts"
+  "emergencyChatStart": "Start emergency chat",
+  "emergencyChatConfirmTitle": "Start emergency chat with {name}?",
+  "@emergencyChatConfirmTitle": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "emergencyChatConfirmBody": "This starts a 12-hour Time Wilt chat created remotely, without pairing in person. Any existing chat and messages with {name} will be permanently replaced, and the session will be active once {name} connects.",
+  "@emergencyChatConfirmBody": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "emergencyChatAlreadyActive": "You already have an active chat with this contact",
+  "emergencyChatStarted": "Emergency chat requested",
+  "chatsEmergencyPendingSubtitle": "Connecting emergency chat…",
+  "chatsEmergencyPendingSnackBar": "Emergency chat with {name} is waiting for them to connect.",
+  "@chatsEmergencyPendingSnackBar": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "emergencyChatPending": "Emergency chat pending…",
+  "gestureSwipeForContacts": "Swipe from left edge for contacts",
+  "contactProfileSafetyNumber": "Identity Key Fingerprint",
+  "contactProfileWiltedHint": "Start a temporary 12-hour Time Wilt chat",
+  "commonCopy": "Copy",
+  "commonCopied": "Copied to clipboard",
+  "eventMentionTitle": "{name} mentioned you",
+  "@eventMentionTitle": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "eventReplyTitle": "{name} replied to you",
+  "@eventReplyTitle": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "chatNotificationModeAll": "All messages",
+  "chatNotificationModeMentions": "Mentions & replies only",
+  "chatNotificationModeMuted": "Mute (Silent)",
+  "chatNotificationSettingsTitle": "Notifications",
+  "chatMuteTitle": "Mute chat",
+  "chatUnmuteTitle": "Unmute chat",
+  "settingsNotifyCategories": "Categories",
+  "settingsNotifyDirectMessages": "Direct Messages",
+  "settingsNotifyDirectMessagesSubtitle": "Notifications for 1:1 chat messages",
+  "settingsNotifyGroupMessages": "Group Messages",
+  "settingsNotifyGroupMessagesSubtitle": "Notifications for group chat messages",
+  "settingsNotifyEvents": "Security & Activity Events",
+  "settingsNotifyEventsSubtitle": "Contact requests, group nuke votes, screenshot alerts",
+  "settingsMutedChatsTitle": "Muted Chats",
+  "settingsNoMutedChats": "No muted chats",
+  "settingsUnmute": "Unmute",
+  "settingsCheckForUpdates": "Check for updates",
+  "settingsCheckingUpdates": "Checking for updates...",
+  "settingsUpdateAvailable": "Update available: v{version}",
+  "@settingsUpdateAvailable": {
+    "placeholders": {
+      "version": { "type": "String" }
+    }
+  },
+  "settingsUpToDate": "WiltKey is up to date",
+  "settingsWhatsNew": "What's new"
 }

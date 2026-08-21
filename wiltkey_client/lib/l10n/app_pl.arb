@@ -120,6 +120,7 @@
   "notificationModeInstant": "Natychmiastowe",
   "notificationModeInstantDesc": "Opcjonalne. Utrzymuje w tle otwarte połączenie szyfrowane end-to-end, aby synchronizować przychodzące wiadomości w czasie rzeczywistym, co sygnalizuje stałe powiadomienie. Wiltkey używa tego zamiast usług push Google lub Apple ze względu na prywatność, dzięki czemu działa nawet bez Usług Google Play – kosztem większego zużycia baterii.",
   "notificationNewMessageBody": "Masz nową wiadomość",
+  "notificationEmergencyChatBody": "Prośba o czat awaryjny",
   "notificationSecureLinkActive": "Synchronizowanie bezpiecznych wiadomości",
   "onboardingNotificationsTitle": "Powiadomienia",
   "onboardingNotificationsExplanation": "Wiltkey nie korzysta z powiadomień push Google ani Apple — nic o Twoich wiadomościach nie trafia na ich serwery. Wybierz, jak chcesz otrzymywać powiadomienia. Możesz to zmienić w każdej chwili w Ustawieniach.",
@@ -272,6 +273,10 @@
   "chatVoiceComingSoon": "Wiadomości głosowe już wkrótce.",
   "chatVoiceHoldHint": "Przytrzymaj, aby nagrać wiadomość głosową.",
   "chatVoiceReleaseCancel": "Puść, aby anulować",
+  "chatVoiceSlideToCancel": "Przesuń, aby anulować",
+  "chatVoiceSlideToLock": "Przesuń w górę, aby zablokować",
+  "chatVoiceCancel": "Anuluj nagrywanie",
+  "chatVoiceSend": "Wyślij wiadomość głosową",
   "chatVoicePermissionDenied": "Do nagrywania wiadomości głosowych potrzebne jest uprawnienie do mikrofonu.",
   "chatVoiceQualityLofi": "Lo-fi",
   "chatVoiceQualityVoice": "Głos",
@@ -310,6 +315,24 @@
   "groupHost": "Host",
   "groupMember": "Członek",
   "groupDepleted": "Wyczerpany",
+  "eventContactRequestTitle": "Prośba o kontakt od {name}",
+  "@eventContactRequestTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "eventContactRequestBody": "Stuknij, aby zaakceptować lub odrzucić w czacie",
+  "eventContactRemovedTitle": "{name} usunął cię",
+  "@eventContactRemovedTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "eventContactRemovedBody": "Usunął cię ze swoich kontaktów",
   "groupSyncingFromMember": "Synchronizowanie szczegółów i wiadomości od {name}...",
   "groupInviteMember": "Zaproś członka",
   "groupLeaveGroup": "Opuść grupę",
@@ -518,5 +541,161 @@
   "timeWiltLifetimeHours": "{count, plural, =1{1 godzina} few{{count} godziny} many{{count} godzin} other{{count} godzin}}",
   "timeWiltLifetimeMinutes": "{count} min",
   "timeWiltLifetimeMonths": "{count, plural, =1{1 miesiąc} few{{count} miesiące} many{{count} miesięcy} other{{count} miesięcy}}",
-  "timeWiltLifetimeMoments": "chwilę"
+  "timeWiltLifetimeMoments": "chwilę",
+  "contactAddTitle": "Add contact",
+  "contactAddBody": "Add {name} to your contacts?",
+  "contactAddConfirm": "Add contact",
+  "contactAddAlready": "Already in your contacts",
+  "contactAddSent": "Contact request sent",
+  "contactPin": "Przypnij na górze",
+  "contactUnpin": "Odepnij",
+  "contactUnblock": "Odblokuj",
+  "contactsSectionPinned": "Przypięte",
+  "contactStatusLabel": "Status",
+  "contactStatusHint": "Podziel się statusem ze swoimi kontaktami…",
+  "contactStatusSave": "Zapisz status",
+  "contactStatusUpdated": "Status zaktualizowany",
+  "contactProfileEmergencyChat": "Czat awaryjny",
+  "emergencyChatStart": "Rozpocznij czat awaryjny",
+  "emergencyChatConfirmTitle": "Rozpocząć czat awaryjny z {name}?",
+  "@emergencyChatConfirmTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "emergencyChatConfirmBody": "Nie istnieje aktywny czat z {name}. Spowoduje to rozpoczęcie 12-godzinnego czatu Time Wilt utworzonego zdalnie, bez parowania osobiście. Istniejący zwiędły czat i jego wiadomości zostaną trwale zniszczone i nigdy nie będzie można go naładować.",
+  "@emergencyChatConfirmBody": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "emergencyChatAlreadyActive": "Masz już aktywny czat z tym kontaktem",
+  "emergencyChatStarted": "Czat awaryjny rozpoczęty",
+  "settingsProfileChipTemplateSave": "Zapisz jako szablon",
+  "settingsProfileTemplateSaved": "Zapisano w szablonach",
+  "settingsProfileTemplatesButton": "Wybierz z szablonu",
+  "settingsProfileTemplatesTitle": "Zapisane szablony",
+  "settingsProfileNoTemplates": "Brak zapisanych szablonów",
+  "settingsProfileTemplateEquipped": "Zastosowano szablon awatara",
+  "groupTimeWiltToggle": "Grupa Time Wilt",
+  "groupTimeWiltToggleSub": "Ograniczony czas, nieograniczony transfer. Grupa przechodzi w tryb tylko do odczytu po wygaśnięciu licznika; spotkaj się ponownie z gospodarzem, aby ją odnowić.",
+  "groupTimeWiltMembersLabel": "Maks. liczba członków",
+  "groupTimeWiltMembersUpsell": "Odblokuj do 100 członków z Plus",
+  "groupTimeWiltHostInfinite": "Gospodarz · ∞",
+  "groupTimeWiltRenewComposer": "Wygasło — spotkaj się z gospodarzem, aby odnowić dostęp",
+  "groupTimeWiltHostAllWilted": "Wszyscy członkowie wygasli — spotkaj się z kimś, aby ożywić grupę",
+  "groupNukeProposeButton": "Zaproponuj zniszczenie dla wszystkich",
+  "groupNukeProposeTitle": "Zniszczyć tę grupę dla wszystkich?",
+  "groupNukeProposeBody": "Rozpoczyna głosowanie wśród członków. W przypadku większości grupa i historia zostaną usunięte na każdym urządzeniu. Nie można cofnąć.",
+  "groupNukeProposeConfirm": "Zaproponuj",
+  "groupNukeVoteTitle": "Zniszczyć grupę?",
+  "groupNukeVoteBody": "Członek zaproponował zniszczenie tej grupy dla wszystkich. Jeśli większość się zgodzi, zostanie wyczyszczona na każdym urządzeniu.",
+  "groupNukeVoteAllow": "Zgoda",
+  "groupNukeVoteDeny": "Zachowaj",
+  "groupNukeVotePending": "Oczekiwanie na głosy członków…",
+  "groupNukeVotePassed": "Grupa została zniszczona większością głosów.",
+  "groupNukeVoteFailed": "Wniosek o zniszczenie grupy został odrzucony.",
+  "groupNukeVoteSent": "Wniosek wysłany — oczekiwanie na głosowanie.",
+  "activityTitle": "Aktywność",
+  "activityEmpty": "Brak aktywności. Zdarzenia takie jak zniszczenie czatu pojawią się tutaj.",
+  "activityClear": "Wyczyść",
+  "activityClearConfirmTitle": "Wyczyścić aktywność?",
+  "activityClearConfirmBody": "Usuwa wszystkie wpisy aktywności z tego urządzenia. Nie można cofnąć.",
+  "eventNukeReceivedTitle": "Czat zniszczony",
+  "eventNukeReceivedBody": "Bezpieczny czat został zniszczony.",
+  "eventGroupNukedTitle": "Grupa zniszczona",
+  "eventGroupNukedBody": "Bezpieczna grupa została zniszczona.",
+  "themePreviewSectionProfile": "Tło profilu",
+  "themePreviewFullscreenProfile": "Podgląd pełnoekranowy profilu",
+  "linkWarningTitle": "Ostrzeżenie o linku zewnętrznym",
+  "linkWarningBody": "Zamierzasz otworzyć link zewnętrzny w przeglądarce. Spowoduje to połączenie z serwerem docelowym i ujawnienie Twojego adresu IP.",
+  "linkWarningOpen": "Otwórz w przeglądarce",
+  "linkWarningCopy": "Kopiuj link",
+  "linkWarningCopied": "Link skopiowany do schowka",
+  "chatActionEdit": "Edytuj",
+  "chatActionDelete": "Usuń",
+  "chatEditingBanner": "Edytowanie wiadomości",
+  "chatCancelEdit": "Anuluj edycję",
+  "chatDeleteTitle": "Usuń wiadomość",
+  "chatDeleteBody": "Czy na pewno chcesz usunąć tę wiadomość dla wszystkich?",
+  "chatDeleteConfirm": "Usuń",
+  "chatMessageDeleted": "[Wiadomość usunięta]",
+  "chatEditedTag": "edytowano",
+  "shopPlusBenefitTimeWiltGroups": "Twórz większe grupy Time Wilt — do 100 członków zamiast 20.",
+  "navContacts": "Kontakty",
+  "contactsTitle": "Kontakty",
+  "contactsSectionFriends": "Znajomi",
+  "contactsEmptyTitle": "Brak kontaktów",
+  "contactsEmptyBody": "Dodaj kogoś z istniejącego czatu, aby zobaczyć go tutaj.",
+  "contactsOwnProfile": "Twój profil",
+  "contactsOwnProfileHint": "Dotknij, aby ustawić status lub znikającą relację",
+  "contactRequestSent": "Wysłano prośbę o kontakt do {name}",
+  "contactRequestReceived": "{name} chce dodać Cię do kontaktów",
+  "contactRequestApproved": "Prośba o kontakt zaakceptowana",
+  "contactRequestDeclined": "Prośba o kontakt odrzucona",
+  "contactRequestApprove": "Zaakceptuj",
+  "contactRequestDeny": "Odrzuć",
+  "contactProfileOpenChat": "Otwórz czat",
+  "contactProfileRemove": "Usuń kontakt",
+  "contactProfileBlock": "Zablokuj użytkownika",
+  "contactProfileStatusPlaceholder": "Brak statusu",
+  "contactRemoveConfirmTitle": "Usunąć {name}?",
+  "contactRemoveConfirmBody": "Usuwa tę osobę z listy kontaktów. Możesz dodać ją ponownie później.",
+  "contactBlockConfirmTitle": "Zablokować {name}?",
+  "contactBlockConfirmBody": "Ta osoba nie będzie mogła się z Tobą kontaktować ani wysyłać próśb o kontakt.",
+  "settingsBlockedContacts": "Zablokowane kontakty",
+  "settingsBlockedEmpty": "Brak zablokowanych kontaktów",
+  "commonRemove": "Usuń",
+  "commonBlock": "Zablokuj",
+  "contactProfileChatNotFound": "Nie znaleziono czatu dla tego kontaktu — mógł zostać usunięty",
+  "chatsEmergencyPendingSubtitle": "Łączenie czatu awaryjnego…",
+  "chatsEmergencyPendingSnackBar": "Czat awaryjny z {name} oczekuje na połączenie.",
+  "emergencyChatPending": "Czat awaryjny w toku…",
+  "gestureSwipeForContacts": "Przesuń od lewej krawędzi, aby otworzyć kontakty",
+  "contactProfileSafetyNumber": "Odcisk klucza tożsamości",
+  "contactProfileWiltedHint": "Rozpocznij tymczasowy 12-godzinny czat Time Wilt",
+  "commonCopy": "Kopiuj",
+  "commonCopied": "Skopiowano do schowka",
+  "eventMentionTitle": "{name} wspomniał o Tobie",
+  "@eventMentionTitle": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "eventReplyTitle": "{name} odpowiedział Ci",
+  "@eventReplyTitle": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "chatNotificationModeAll": "Wszystkie wiadomości",
+  "chatNotificationModeMentions": "Tylko wzmianki i odpowiedzi",
+  "chatNotificationModeMuted": "Wycisz (Bez dźwięku)",
+  "chatNotificationSettingsTitle": "Powiadomienia",
+  "chatMuteTitle": "Wycisz czat",
+  "chatUnmuteTitle": "Wyłącz wyciszenie czatu",
+  "settingsNotifyCategories": "Kategorie",
+  "settingsNotifyDirectMessages": "Wiadomości bezpośrednie",
+  "settingsNotifyDirectMessagesSubtitle": "Powiadomienia dla czatów 1:1",
+  "settingsNotifyGroupMessages": "Wiadomości grupowe",
+  "settingsNotifyGroupMessagesSubtitle": "Powiadomienia dla czatów grupowych",
+  "settingsNotifyEvents": "Zdarzenia bezpieczeństwa i aktywności",
+  "settingsNotifyEventsSubtitle": "Prośby o kontakt, głosowania nad zniszczeniem grupy, alerty o zrzutach ekranu",
+  "settingsMutedChatsTitle": "Wyciszone czaty",
+  "settingsNoMutedChats": "Brak wyciszonych czatów",
+  "settingsUnmute": "Wyłącz wyciszenie",
+  "settingsCheckForUpdates": "Sprawdź aktualizacje",
+  "settingsCheckingUpdates": "Sprawdzanie aktualizacji...",
+  "settingsUpdateAvailable": "Dostępna aktualizacja: v{version}",
+  "@settingsUpdateAvailable": {
+    "placeholders": {
+      "version": { "type": "String" }
+    }
+  },
+  "settingsUpToDate": "WiltKey jest aktualny",
+  "settingsWhatsNew": "Co nowego"
 }

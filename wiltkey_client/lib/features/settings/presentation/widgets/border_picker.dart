@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../../../core/cosmetics/avatar_border_controller.dart';
 import '../../../../core/cosmetics/avatar_border_registry.dart';
@@ -43,6 +44,7 @@ class BorderPicker extends StatelessWidget {
               final locked = !WkAvatarBorderRegistry.canEquip(b);
               return GestureDetector(
                 onTap: () {
+                  HapticFeedback.selectionClick();
                   if (locked) {
                     Navigator.push(
                       context,

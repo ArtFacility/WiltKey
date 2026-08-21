@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:wiltkey_client/l10n/app_localizations.dart';
 import '../../../../core/state.dart';
 import '../../../../core/models.dart';
 import '../../../../core/custom_emoji.dart';
@@ -217,16 +218,19 @@ class ReactionsRow extends StatelessWidget {
 }
 
 /// Bottom-sheet reaction picker: quick unicode reactions, the chat's custom emoji
-/// pool, and a "+" that opens the full curated emoji set. Picking any toggles it
-/// on [message] and closes the sheet.
+/// pool, and a "+" that opens the full curated emoji set. Also shows Edit/Delete
+/// options for messages authored by the user.
 Future<void> showReactionPicker(
   BuildContext context, {
   required AppState appState,
   required Contact contact,
   required ChatMessage message,
   required Map<String, CustomEmoji> emojiMap,
+  VoidCallback? onEdit,
+  VoidCallback? onDelete,
 }) {
   final t = context.wk;
+  final l10n = AppLocalizations.of(context);
   return showModalBottomSheet(
     context: context,
     backgroundColor: t.surface,
@@ -246,6 +250,15 @@ Future<void> showReactionPicker(
       }
 
       final customTokens = [for (final name in emojiMap.keys) ':$name:'];
+      final bool canEdit = message.isSentByMe &&
+          !message.wilted &&
+          !message.isDeleted &&
+          message.contentType == 'text' &&
+          onEdit != null;
+      final bool canDelete = message.isSentByMe &&
+          !message.wilted &&
+          !message.isDeleted &&
+          onDelete != null;
 
       return SafeArea(
         child: Padding(
@@ -297,6 +310,62 @@ Future<void> showReactionPicker(
                         t,
                         reactionTokenGlyph(token, emojiMap, 26),
                         () => pick(token),
+                      ),
+                  ],
+                ),
+              ],
+              if (canEdit || canDelete) ...[
+                const SizedBox(height: 14),
+                Divider(color: t.border, height: 1),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    if (canEdit)
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            onEdit();
+                          },
+                          icon: Icon(Icons.edit_outlined, size: 18, color: t.action),
+                          label: Text(
+                            l10n?.chatActionEdit ?? 'Edit',
+                            style: t.body.copyWith(
+                              color: t.action,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(color: t.border),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(t.radiusControl),
+                            ),
+                          ),
+                        ),
+                      ),
+                    if (canEdit && canDelete) const SizedBox(width: 10),
+                    if (canDelete)
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            onDelete();
+                          },
+                          icon: Icon(Icons.delete_outline, size: 18, color: t.danger),
+                          label: Text(
+                            l10n?.chatActionDelete ?? 'Delete',
+                            style: t.body.copyWith(
+                              color: t.danger,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(color: t.border),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(t.radiusControl),
+                            ),
+                          ),
+                        ),
                       ),
                   ],
                 ),

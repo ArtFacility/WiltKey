@@ -220,6 +220,24 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsProfileChipRandom => '随机';
 
   @override
+  String get settingsProfileChipTemplateSave => '保存为模板';
+
+  @override
+  String get settingsProfileTemplateSaved => '已保存到模板';
+
+  @override
+  String get settingsProfileTemplatesButton => '从模板选择';
+
+  @override
+  String get settingsProfileTemplatesTitle => '已保存的模板';
+
+  @override
+  String get settingsProfileNoTemplates => '暂无保存的模板';
+
+  @override
+  String get settingsProfileTemplateEquipped => '已应用头像模板';
+
+  @override
   String get avatarEditButton => '编辑头像';
 
   @override
@@ -384,6 +402,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get notificationNewMessageBody => '你收到一条消息';
+
+  @override
+  String get notificationEmergencyChatBody => '紧急聊天请求';
 
   @override
   String get notificationSecureLinkActive => '正在同步安全消息';
@@ -896,6 +917,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatVoiceReleaseCancel => '松开以取消';
 
   @override
+  String get chatVoiceSlideToCancel => '滑动以取消';
+
+  @override
+  String get chatVoiceSlideToLock => '上滑以锁定';
+
+  @override
+  String get chatVoiceCancel => '取消录音';
+
+  @override
+  String get chatVoiceSend => '发送语音消息';
+
+  @override
   String get chatVoicePermissionDenied => '录制语音消息需要麦克风权限。';
 
   @override
@@ -1008,97 +1041,105 @@ class AppLocalizationsZh extends AppLocalizations {
   String get groupRechargeNeededComposer => '群主重新充能了群组 — 再次见面即可重新加入';
 
   @override
-  String get groupTimeWiltToggle => 'Time Wilt group';
+  String get groupTimeWiltToggle => 'Time Wilt 群组';
 
   @override
-  String get groupTimeWiltToggleSub =>
-      'Limited time, unlimited budget. The group wilts to read-only when your timer runs out; meet the host again to renew it.';
+  String get groupTimeWiltToggleSub => '限时有效，无限流量。倒计时结束后群组变为只读；再次与房主面对面即可续期。';
 
   @override
-  String get groupTimeWiltMembersLabel => 'Max members';
+  String get groupTimeWiltMembersLabel => '最大成员数';
 
   @override
-  String get groupTimeWiltMembersUpsell => 'Unlock up to 100 members with Plus';
+  String get groupTimeWiltMembersUpsell => '升级 Plus 解锁最多 100 位成员';
 
   @override
-  String get groupTimeWiltHostInfinite => 'Host · ∞';
+  String get groupTimeWiltHostInfinite => '房主 · ∞';
 
   @override
-  String get groupTimeWiltRenewComposer =>
-      'Wilted — meet the host again to renew your access';
+  String get groupTimeWiltRenewComposer => '已过期 — 请再次与房主碰面以续期访问权限';
 
   @override
-  String get groupTimeWiltHostAllWilted =>
-      'All members have wilted — meet someone again to revive the group';
+  String get groupTimeWiltHostAllWilted => '所有成员均已过期 — 与任意成员碰面即可重新激活群组';
 
   @override
-  String get groupNukeProposeButton => 'Propose destroying for everyone';
+  String get groupNukeProposeButton => '发起全员销毁提案';
 
   @override
-  String get groupNukeProposeTitle => 'Destroy this group for everyone?';
+  String get groupNukeProposeTitle => '为所有人销毁此群组？';
 
   @override
   String get groupNukeProposeBody =>
-      'Asks the other members to vote. If a majority agree, the group and its history are destroyed on every device. This can\'t be undone.';
+      '将发起全员投票。若多数同意，群组及历史记录将在所有设备上彻底销毁。此操作无法撤销。';
 
   @override
-  String get groupNukeProposeConfirm => 'Propose';
+  String get groupNukeProposeConfirm => '发起提案';
 
   @override
-  String get groupNukeVoteTitle => 'Destroy group?';
+  String get groupNukeVoteTitle => '销毁群组？';
 
   @override
-  String get groupNukeVoteBody =>
-      'A member proposed destroying this group for everyone. If a majority agree, it\'s wiped on every device.';
+  String get groupNukeVoteBody => '有成员提议为所有人销毁此群组。若多数同意，将在所有设备上彻底清除。';
 
   @override
-  String get groupNukeVoteAllow => 'Agree';
+  String get groupNukeVoteAllow => '同意';
 
   @override
-  String get groupNukeVoteDeny => 'Keep';
+  String get groupNukeVoteDeny => '保留';
 
   @override
-  String get groupNukeVotePending => 'Waiting for members to vote…';
+  String get groupNukeVotePending => '等待成员投票中…';
 
   @override
-  String get groupNukeVotePassed => 'The group was destroyed by majority vote.';
+  String get groupNukeVotePassed => '群组已被多数投票销毁。';
 
   @override
-  String get groupNukeVoteFailed =>
-      'The proposal to destroy the group did not pass.';
+  String get groupNukeVoteFailed => '销毁群组的提案未获通过。';
 
   @override
-  String get groupNukeVoteSent =>
-      'Proposal sent — waiting for members to vote.';
+  String get groupNukeVoteSent => '提案已发送 — 正在等待成员投票。';
 
   @override
-  String get activityTitle => 'Activity';
+  String get activityTitle => '动态';
 
   @override
-  String get activityEmpty =>
-      'No activity yet. Events like a chat being destroyed will show up here.';
+  String get activityEmpty => '暂无动态记录。聊天销毁等事件将显示在此处。';
 
   @override
-  String get activityClear => 'Clear';
+  String get activityClear => '清除';
 
   @override
-  String get activityClearConfirmTitle => 'Clear activity?';
+  String get activityClearConfirmTitle => '清除所有动态？';
 
   @override
-  String get activityClearConfirmBody =>
-      'This removes all activity entries from this device. It can\'t be undone.';
+  String get activityClearConfirmBody => '这将从此设备清除所有动态记录。此操作无法撤销。';
 
   @override
-  String get eventNukeReceivedTitle => 'Chat destroyed';
+  String get eventNukeReceivedTitle => '聊天已销毁';
 
   @override
-  String get eventNukeReceivedBody => 'A secure chat was destroyed.';
+  String get eventNukeReceivedBody => '一条加密聊天已被销毁。';
 
   @override
-  String get eventGroupNukedTitle => 'Group destroyed';
+  String get eventGroupNukedTitle => '群组已销毁';
 
   @override
-  String get eventGroupNukedBody => 'A secure group was destroyed.';
+  String get eventGroupNukedBody => '一个加密群组已被销毁。';
+
+  @override
+  String eventContactRequestTitle(String name) {
+    return '$name 向你发送了联系人请求';
+  }
+
+  @override
+  String get eventContactRequestBody => '轻触以在聊天中接受或拒绝';
+
+  @override
+  String eventContactRemovedTitle(String name) {
+    return '$name 移除了你';
+  }
+
+  @override
+  String get eventContactRemovedBody => '对方已把你从联系人中移除';
 
   @override
   String groupSyncingFromMember(String name) {
@@ -1379,6 +1420,54 @@ class AppLocalizationsZh extends AppLocalizations {
   String get themePreviewRowLost => '密钥本用完了——见面充值吧';
 
   @override
+  String get themePreviewSectionProfile => '个人主页背景';
+
+  @override
+  String get themePreviewFullscreenProfile => '全屏个人主页预览';
+
+  @override
+  String get linkWarningTitle => '外部链接警告';
+
+  @override
+  String get linkWarningBody => '您即将通过浏览器打开外部链接。这将连接到目标服务器并暴露您的 IP 地址。';
+
+  @override
+  String get linkWarningOpen => '在浏览器中打开';
+
+  @override
+  String get linkWarningCopy => '复制链接';
+
+  @override
+  String get linkWarningCopied => '链接已复制到剪贴板';
+
+  @override
+  String get chatActionEdit => '编辑';
+
+  @override
+  String get chatActionDelete => '删除';
+
+  @override
+  String get chatEditingBanner => '正在编辑消息';
+
+  @override
+  String get chatCancelEdit => '取消编辑';
+
+  @override
+  String get chatDeleteTitle => '删除消息';
+
+  @override
+  String get chatDeleteBody => '确定要为所有人删除此消息吗？';
+
+  @override
+  String get chatDeleteConfirm => '删除';
+
+  @override
+  String get chatMessageDeleted => '[消息已删除]';
+
+  @override
+  String get chatEditedTag => '已编辑';
+
+  @override
   String get accessibilityWarningTitle => '无障碍服务已启用';
 
   @override
@@ -1612,7 +1701,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get shopPlusBenefitTimeWiltGroups =>
-      'Host bigger Time Wilt groups — up to 100 members instead of 20.';
+      '主持更大的 Time Wilt 群组 — 最多 100 人（免费版为 20 人）。';
 
   @override
   String get shopPlusBenefitSupport => '你让中继服务器持续运行，并保持 WiltKey 的独立性。';
@@ -1767,95 +1856,252 @@ class AppLocalizationsZh extends AppLocalizations {
   String get timeWiltLifetimeMoments => '片刻';
 
   @override
-  String get navContacts => 'Contacts';
+  String get navContacts => '联系人';
 
   @override
-  String get contactsTitle => 'Contacts';
+  String get contactsTitle => '联系人';
 
   @override
-  String get contactsSectionFriends => 'Friends';
+  String get contactsSectionFriends => '好友';
 
   @override
-  String get contactsEmptyTitle => 'No contacts yet';
+  String get contactsEmptyTitle => '暂无联系人';
 
   @override
-  String get contactsEmptyBody =>
-      'Add someone from an existing chat to see them here.';
+  String get contactsEmptyBody => '从现有聊天中添加好友即可显示在此处。';
 
   @override
-  String get contactsOwnProfile => 'Your Profile';
+  String get contactsOwnProfile => '您的个人资料';
 
   @override
-  String get contactsOwnProfileHint => 'Tap to set status or wilting story';
+  String get contactsOwnProfileHint => '点击设置状态或限时动态';
 
   @override
   String contactRequestSent(String name) {
-    return 'Contact request sent to $name';
+    return '已向 $name 发送联系人请求';
   }
 
   @override
   String contactRequestReceived(String name) {
-    return '$name wants to add you as a contact';
+    return '$name 请求添加您为联系人';
   }
 
   @override
-  String get contactRequestApproved => 'Contact request accepted';
+  String get contactRequestApproved => '已接受联系人请求';
 
   @override
-  String get contactRequestDeclined => 'Contact request declined';
+  String get contactRequestDeclined => '已拒绝联系人请求';
 
   @override
-  String get contactRequestApprove => 'Approve';
+  String get contactRequestApprove => '接受';
 
   @override
-  String get contactRequestDeny => 'Deny';
+  String get contactRequestDeny => '拒绝';
 
   @override
-  String get contactProfileOpenChat => 'Open Chat';
+  String get contactAddTitle => 'Add contact';
 
   @override
-  String get contactProfileRemove => 'Remove Contact';
+  String contactAddBody(String name) {
+    return 'Add $name to your contacts?';
+  }
 
   @override
-  String get contactProfileBlock => 'Block User';
+  String get contactAddConfirm => 'Add contact';
 
   @override
-  String get contactProfileStatusPlaceholder => 'No status yet';
+  String get contactAddAlready => 'Already in your contacts';
+
+  @override
+  String get contactAddSent => 'Contact request sent';
+
+  @override
+  String get contactProfileOpenChat => '打开聊天';
+
+  @override
+  String get contactProfileRemove => '删除联系人';
+
+  @override
+  String get contactProfileBlock => '屏蔽用户';
+
+  @override
+  String get contactProfileStatusPlaceholder => '暂无状态';
+
+  @override
+  String get contactProfileEmergencyChat => '紧急聊天';
+
+  @override
+  String get contactPin => '置顶';
+
+  @override
+  String get contactUnpin => '取消置顶';
+
+  @override
+  String get contactUnblock => '解除屏蔽';
+
+  @override
+  String get contactsSectionPinned => '置顶';
+
+  @override
+  String get contactStatusLabel => '状态';
+
+  @override
+  String get contactStatusHint => '和你的联系人分享状态…';
+
+  @override
+  String get contactStatusSave => '保存状态';
+
+  @override
+  String get contactStatusUpdated => '状态已更新';
 
   @override
   String contactRemoveConfirmTitle(String name) {
-    return 'Remove $name?';
+    return '删除联系人 $name？';
   }
 
   @override
-  String get contactRemoveConfirmBody =>
-      'This removes them from your contact list. You can add them again later.';
+  String get contactRemoveConfirmBody => '将从此联系人列表中移除。您稍后可以重新添加。';
 
   @override
   String contactBlockConfirmTitle(String name) {
-    return 'Block $name?';
+    return '屏蔽 $name？';
   }
 
   @override
-  String get contactBlockConfirmBody =>
-      'They won\'t be able to contact you or send contact requests.';
+  String get contactBlockConfirmBody => '对方将无法联系您或向您发送联系人请求。';
 
   @override
-  String get settingsBlockedContacts => 'Blocked Contacts';
+  String get settingsBlockedContacts => '已屏蔽的联系人';
 
   @override
-  String get settingsBlockedEmpty => 'No blocked contacts';
+  String get settingsBlockedEmpty => '无屏蔽联系人';
 
   @override
-  String get commonRemove => 'Remove';
+  String get commonRemove => '删除';
 
   @override
-  String get commonBlock => 'Block';
+  String get commonBlock => '屏蔽';
 
   @override
-  String get contactProfileChatNotFound =>
-      'No chat found for this contact — it may have been deleted';
+  String get contactProfileChatNotFound => '未找到此联系人的聊天记录 — 可能已被删除';
 
   @override
-  String get gestureSwipeForContacts => 'Swipe from left edge for contacts';
+  String get emergencyChatStart => '开始紧急聊天';
+
+  @override
+  String emergencyChatConfirmTitle(String name) {
+    return '和 $name 开始紧急聊天？';
+  }
+
+  @override
+  String emergencyChatConfirmBody(String name) {
+    return '目前没有与 $name 的活跃聊天。这将创建一个远程的 12 小时 Time Wilt 聊天，无需面对面配对。现有的已枯萎聊天及其消息将被永久销毁，并且永远无法重新充能。';
+  }
+
+  @override
+  String get emergencyChatAlreadyActive => '你已经与这位联系人有一个活跃的聊天';
+
+  @override
+  String get emergencyChatStarted => '紧急聊天已开始';
+
+  @override
+  String get chatsEmergencyPendingSubtitle => '正在连接紧急聊天…';
+
+  @override
+  String chatsEmergencyPendingSnackBar(String name) {
+    return '与 $name 的紧急聊天正在等待对方连接。';
+  }
+
+  @override
+  String get emergencyChatPending => '紧急聊天连接中…';
+
+  @override
+  String get gestureSwipeForContacts => '从左边缘滑动即可打开联系人';
+
+  @override
+  String get contactProfileSafetyNumber => '身份密钥指纹';
+
+  @override
+  String get contactProfileWiltedHint => '发起临时 12 小时 Time Wilt 聊天';
+
+  @override
+  String get commonCopy => '复制';
+
+  @override
+  String get commonCopied => '已复制到剪贴板';
+
+  @override
+  String eventMentionTitle(String name) {
+    return '$name 提到了你';
+  }
+
+  @override
+  String eventReplyTitle(String name) {
+    return '$name 回复了你';
+  }
+
+  @override
+  String get chatNotificationModeAll => '所有消息';
+
+  @override
+  String get chatNotificationModeMentions => '仅提及与回复';
+
+  @override
+  String get chatNotificationModeMuted => '静音（无声）';
+
+  @override
+  String get chatNotificationSettingsTitle => '通知';
+
+  @override
+  String get chatMuteTitle => '静音聊天';
+
+  @override
+  String get chatUnmuteTitle => '取消静音聊天';
+
+  @override
+  String get settingsNotifyCategories => '类别';
+
+  @override
+  String get settingsNotifyDirectMessages => '私聊消息';
+
+  @override
+  String get settingsNotifyDirectMessagesSubtitle => '一对一聊天消息通知';
+
+  @override
+  String get settingsNotifyGroupMessages => '群聊消息';
+
+  @override
+  String get settingsNotifyGroupMessagesSubtitle => '群聊消息通知';
+
+  @override
+  String get settingsNotifyEvents => '安全与动态事件';
+
+  @override
+  String get settingsNotifyEventsSubtitle => '联系人请求、群组全员销毁投票、截图警报';
+
+  @override
+  String get settingsMutedChatsTitle => '已静音的聊天';
+
+  @override
+  String get settingsNoMutedChats => '无静音聊天';
+
+  @override
+  String get settingsUnmute => '取消静音';
+
+  @override
+  String get settingsCheckForUpdates => '检查更新';
+
+  @override
+  String get settingsCheckingUpdates => '正在检查更新...';
+
+  @override
+  String settingsUpdateAvailable(String version) {
+    return '有可用更新: v$version';
+  }
+
+  @override
+  String get settingsUpToDate => 'WiltKey 已是最新版本';
+
+  @override
+  String get settingsWhatsNew => '更新内容';
 }

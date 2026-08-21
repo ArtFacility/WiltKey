@@ -19,6 +19,7 @@ const Set<String> _notifyContentTypes = {
   'image',
   'voice',
   'group_message',
+  'emergency_chat',
 };
 
 const _secure = FlutterSecureStorage(
@@ -174,8 +175,15 @@ class _MessageTaskHandler extends TaskHandler {
           if (_notifyContentTypes.contains(contentType)) {
             // sender_id is the 1:1 peer's keyHash, enabling a deep-link on tap.
             // (Group frames carry a member id, which won't resolve to a chat —
-            // those simply fall back to the dashboard.)
-            WiltkeyNotifications.showMessageNotification(chatKey: senderId);
+            // those simply fall back to the dashboard.) An emergency-chat frame
+            // gets the distinct "emergency chat" copy.
+            if (contentType == 'emergency_chat') {
+              WiltkeyNotifications.showEmergencyChatNotification(
+                chatKey: senderId,
+              );
+            } else {
+              WiltkeyNotifications.showMessageNotification(chatKey: senderId);
+            }
           }
           break;
         case 'FILE_OFFER':
@@ -185,7 +193,13 @@ class _MessageTaskHandler extends TaskHandler {
           final senderId = msg['sender_id'] as String? ?? '';
           final contentType = msg['content_type'] as String? ?? 'text';
           if (_notifyContentTypes.contains(contentType)) {
-            WiltkeyNotifications.showMessageNotification(chatKey: senderId);
+            if (contentType == 'emergency_chat') {
+              WiltkeyNotifications.showEmergencyChatNotification(
+                chatKey: senderId,
+              );
+            } else {
+              WiltkeyNotifications.showMessageNotification(chatKey: senderId);
+            }
           }
           break;
       }

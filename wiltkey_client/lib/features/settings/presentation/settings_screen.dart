@@ -8,6 +8,7 @@ import '../../../core/state.dart';
 import '../../../core/auth/biometric_auth.dart';
 import '../../../core/debug_clipboard.dart';
 import '../../../core/notifications/notification_service.dart';
+import '../../../core/persistence.dart';
 import '../../../core/pixel_art_avatar.dart';
 import '../../../core/pixel_art_editor.dart';
 import '../../../core/theme/wk.dart';
@@ -21,6 +22,7 @@ import '../../shop/presentation/shop_screen.dart';
 import 'widgets/border_picker.dart';
 import 'theme_selector_screen.dart';
 import 'change_pin_screen.dart';
+import '../../../core/update/update_service.dart';
 
 /// Publisher shown in the Settings "About" footer. The version string itself is
 /// read from the build at runtime (package_info_plus), so pubspec.yaml's
@@ -165,6 +167,134 @@ class _SettingsScreenState extends State<SettingsScreen>
       // Save locally + one debounced announce to peers and groups.
       _saveProfile();
     }
+  }
+
+  Future<void> _openTemplateSelector() async {
+    final l10n = AppLocalizations.of(context)!;
+    final t = context.wk;
+    final templates = (await WiltkeyPersistence().loadAvatarTemplates()).toList();
+
+    if (!mounted) return;
+
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: t.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(t.radiusCard)),
+        side: BorderSide(color: t.border),
+      ),
+      builder: (sheetCtx) {
+        return StatefulBuilder(
+          builder: (ctx, setModalState) {
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(18, 16, 18, 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        t.uppercaseLabels
+                            ? l10n.settingsProfileTemplatesTitle.toUpperCase()
+                            : l10n.settingsProfileTemplatesTitle,
+                        style: t.screenTitle.copyWith(fontSize: 16),
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.close, size: 20, color: t.textSecondary),
+                        onPressed: () => Navigator.pop(sheetCtx),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  if (templates.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 24),
+                      child: Center(
+                        child: Text(
+                          l10n.settingsProfileNoTemplates,
+                          style: t.bodySecondary.copyWith(fontSize: 13),
+                        ),
+                      ),
+                    )
+                  else
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxHeight: 280),
+                      child: GridView.builder(
+                        shrinkWrap: true,
+                        itemCount: templates.length,
+                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 5,
+                          crossAxisSpacing: 10,
+                          mainAxisSpacing: 10,
+                          childAspectRatio: 0.85,
+                        ),
+                        itemBuilder: (ctx, i) {
+                          final tmpl = templates[i];
+                          return GestureDetector(
+                            onTap: () {
+                              setState(() => _pixelGrid = tmpl.split(''));
+                              _saveProfile();
+                              Navigator.pop(sheetCtx);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(l10n.settingsProfileTemplateEquipped),
+                                  duration: const Duration(seconds: 2),
+                                ),
+                              );
+                            },
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Stack(
+                                  clipBehavior: Clip.none,
+                                  children: [
+                                    Container(
+                                      decoration: BoxDecoration(
+                                        border: Border.all(color: t.border),
+                                      ),
+                                      child: PixelArtAvatar(
+                                        hexString: tmpl,
+                                        size: 48,
+                                      ),
+                                    ),
+                                    Positioned(
+                                      top: -6,
+                                      right: -6,
+                                      child: GestureDetector(
+                                        onTap: () async {
+                                          await WiltkeyPersistence().deleteAvatarTemplate(tmpl);
+                                          templates.removeAt(i);
+                                          setModalState(() {});
+                                          if (mounted) setState(() {});
+                                        },
+                                        child: Container(
+                                          padding: const EdgeInsets.all(2),
+                                          decoration: BoxDecoration(
+                                            color: t.bg,
+                                            shape: BoxShape.circle,
+                                            border: Border.all(color: t.border),
+                                          ),
+                                          child: Icon(Icons.close, size: 10, color: t.danger),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   void _confirmResetIdentity() {
@@ -377,11 +507,59 @@ class _SettingsScreenState extends State<SettingsScreen>
             listenable: AvatarBorderController.instance,
             builder: (context, _) => Center(
               child: GestureDetector(
-                onTap: _editAvatar,
-                child: PixelArtAvatar(
-                  hexString: _pixelGrid.join(),
-                  size: 96,
-                  borderId: AvatarBorderController.instance.borderId,
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  _editAvatar();
+                },
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    PixelArtAvatar(
+                      hexString: _pixelGrid.join(),
+                      size: 96,
+                      borderId: AvatarBorderController.instance.borderId,
+                    ),
+                    Positioned(
+                      bottom: 0,
+                      right: 0,
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: t.action,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: t.surface, width: 2),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.3),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Icon(Icons.edit, size: 14, color: t.onAction),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Center(
+            child: TextButton.icon(
+              onPressed: () {
+                HapticFeedback.selectionClick();
+                _openTemplateSelector();
+              },
+              icon: Icon(Icons.collections_bookmark_outlined, size: 15, color: t.action),
+              label: Text(
+                t.uppercaseLabels
+                    ? l10n.settingsProfileTemplatesButton.toUpperCase()
+                    : l10n.settingsProfileTemplatesButton,
+                style: t.dataMono.copyWith(
+                  color: t.action,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
             ),
@@ -456,6 +634,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                 ),
                 GestureDetector(
                   onTap: () {
+                    HapticFeedback.lightImpact();
                     Clipboard.setData(ClipboardData(text: _appState.userId));
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
@@ -471,20 +650,9 @@ class _SettingsScreenState extends State<SettingsScreen>
           ),
           const SizedBox(height: 20),
 
-          // --- Actions: Shop + Pixel Art Editor ---
-          IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Expanded(child: _buildShopCard(t, l10n)),
-                const SizedBox(width: 12),
-                Expanded(child: _buildPixelEditorCard(t, l10n)),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          // --- Theme selector (opens its own screen) ---
+          // --- Actions: Shop & Theme ---
+          _buildShopCard(t, l10n),
+          const SizedBox(height: 10),
           _buildThemeCard(t, l10n),
           Divider(color: t.border, height: 32),
 
@@ -619,8 +787,12 @@ class _SettingsScreenState extends State<SettingsScreen>
                         divisions: 8,
                         activeColor: t.action,
                         label: '${(_appState.chatTextScale * 100).round()}%',
-                        onChanged: (v) =>
-                            setState(() => _appState.setChatTextScale(v)),
+                        onChanged: (v) {
+                          if (v != _appState.chatTextScale) {
+                            HapticFeedback.selectionClick();
+                          }
+                          setState(() => _appState.setChatTextScale(v));
+                        },
                       ),
                     ),
                     Text(
@@ -635,7 +807,9 @@ class _SettingsScreenState extends State<SettingsScreen>
               ],
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 28),
+          _buildAboutFooter(t, l10n),
+          const SizedBox(height: 12),
         ],
       ),
     );
@@ -673,7 +847,12 @@ class _SettingsScreenState extends State<SettingsScreen>
                       Switch(
                         value: _appState.biometricUnlockEnabled,
                         activeColor: t.action,
-                        onChanged: _biometricBusy ? null : _onBiometricToggle,
+                        onChanged: _biometricBusy
+                            ? null
+                            : (val) {
+                                HapticFeedback.lightImpact();
+                                _onBiometricToggle(val);
+                              },
                       ),
                     ],
                   ),
@@ -725,6 +904,9 @@ class _SettingsScreenState extends State<SettingsScreen>
                               _appState.biometricIdleHours),
                       onChanged: (val) {
                         final pos = val.round();
+                        if (pos != (_appState.biometricIdleHours <= 0 ? 25 : _appState.biometricIdleHours)) {
+                          HapticFeedback.selectionClick();
+                        }
                         _appState.setBiometricIdleHours(pos >= 25 ? 0 : pos);
                         setState(() {});
                       },
@@ -742,12 +924,15 @@ class _SettingsScreenState extends State<SettingsScreen>
 
           Center(
             child: OutlinedButton.icon(
-              onPressed: _openChangePin,
+              onPressed: () {
+                HapticFeedback.lightImpact();
+                _openChangePin();
+              },
               icon: const Icon(Icons.lock_outline, size: 16),
               label: Text(l10n.settingsProfileChangePinButton),
               style: OutlinedButton.styleFrom(
                 foregroundColor: t.action,
-                side: BorderSide(color: t.action, width: 1.5),
+                side: BorderSide(color: t.action, width: t.borderWidth),
                 minimumSize: const Size.fromHeight(45),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(t.radiusControl),
@@ -759,19 +944,63 @@ class _SettingsScreenState extends State<SettingsScreen>
 
           _section(t, l10n.settingsSecuritySectionDanger),
           const SizedBox(height: 12),
-          Center(
-            child: ElevatedButton.icon(
-              onPressed: _confirmResetIdentity,
-              icon: const Icon(Icons.flash_on, size: 16),
-              label: Text(l10n.settingsProfileResetIdentityButton),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: t.danger,
-                foregroundColor: Colors.white,
-                minimumSize: const Size.fromHeight(45),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(t.radiusControl),
-                ),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: t.danger.withValues(alpha: 0.08),
+              border: Border.all(
+                color: t.danger.withValues(alpha: 0.25),
+                width: t.borderWidth,
               ),
+              borderRadius: BorderRadius.circular(t.radiusCard),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.warning_amber_rounded, size: 20, color: t.danger),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        l10n.settingsProfileResetIdentityButton,
+                        style: t.body.copyWith(
+                          color: t.danger,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  l10n.settingsResetConfirmBody,
+                  style: t.bodySecondary.copyWith(fontSize: 12, height: 1.4),
+                ),
+                const SizedBox(height: 14),
+                SizedBox(
+                  width: double.infinity,
+                  height: 42,
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      HapticFeedback.mediumImpact();
+                      _confirmResetIdentity();
+                    },
+                    icon: const Icon(Icons.flash_on, size: 16),
+                    label: Text(
+                      l10n.settingsProfileResetIdentityButton,
+                      style: t.badgeLabel.copyWith(color: t.danger, fontSize: 13),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: t.danger,
+                      side: BorderSide(color: t.danger, width: t.borderWidth),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(t.radiusControl),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 16),
@@ -920,6 +1149,10 @@ class _SettingsScreenState extends State<SettingsScreen>
 
   Widget _buildNotificationsTab(WiltkeyTokens t, AppLocalizations l10n) {
     final current = _appState.notificationMode;
+    final mutedOrFilteredContacts = _appState.contacts
+        .where((c) => c.isMuted || c.isMentionsOnly)
+        .toList();
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(18),
       child: Column(
@@ -940,7 +1173,7 @@ class _SettingsScreenState extends State<SettingsScreen>
               ],
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -954,30 +1187,283 @@ class _SettingsScreenState extends State<SettingsScreen>
               ),
             ],
           ),
+          const SizedBox(height: 24),
+
+          // Categories section
+          _section(t, l10n.settingsNotifyCategories),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            decoration: _panel(t),
+            child: Column(
+              children: [
+                SwitchListTile(
+                  title: Text(
+                    l10n.settingsNotifyDirectMessages,
+                    style: t.body.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: Text(
+                    l10n.settingsNotifyDirectMessagesSubtitle,
+                    style: t.bodySecondary,
+                  ),
+                  value: _appState.notifyDirectMessages,
+                  activeThumbColor: t.action,
+                  onChanged: (val) async {
+                    await _appState.setNotifyDirectMessages(val);
+                    if (mounted) setState(() {});
+                  },
+                ),
+                Divider(color: t.border, height: 1, indent: 16, endIndent: 16),
+                SwitchListTile(
+                  title: Text(
+                    l10n.settingsNotifyGroupMessages,
+                    style: t.body.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: Text(
+                    l10n.settingsNotifyGroupMessagesSubtitle,
+                    style: t.bodySecondary,
+                  ),
+                  value: _appState.notifyGroupMessages,
+                  activeThumbColor: t.action,
+                  onChanged: (val) async {
+                    await _appState.setNotifyGroupMessages(val);
+                    if (mounted) setState(() {});
+                  },
+                ),
+                Divider(color: t.border, height: 1, indent: 16, endIndent: 16),
+                SwitchListTile(
+                  title: Text(
+                    l10n.settingsNotifyEvents,
+                    style: t.body.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: Text(
+                    l10n.settingsNotifyEventsSubtitle,
+                    style: t.bodySecondary,
+                  ),
+                  value: _appState.notifyEvents,
+                  activeThumbColor: t.action,
+                  onChanged: (val) async {
+                    await _appState.setNotifyEvents(val);
+                    if (mounted) setState(() {});
+                  },
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // Muted Chats & Groups section
+          _section(t, l10n.settingsMutedChatsTitle),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: _panel(t),
+            child: mutedOrFilteredContacts.isEmpty
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 12.0),
+                      child: Text(
+                        l10n.settingsNoMutedChats,
+                        style: t.bodySecondary,
+                      ),
+                    ),
+                  )
+                : Column(
+                    children: [
+                      for (int i = 0; i < mutedOrFilteredContacts.length; i++) ...[
+                        if (i > 0)
+                          Divider(color: t.border, height: 16),
+                        Row(
+                          children: [
+                            PixelArtAvatar(
+                              hexString: mutedOrFilteredContacts[i].isGroup
+                                  ? (mutedOrFilteredContacts[i].groupIconHex ??
+                                      PixelArtAvatar.generateIdenticon(
+                                        mutedOrFilteredContacts[i].keyHash,
+                                      ))
+                                  : (mutedOrFilteredContacts[i].profileImageB64 ??
+                                      PixelArtAvatar.generateIdenticon(
+                                        mutedOrFilteredContacts[i].keyHash,
+                                      )),
+                              size: 32,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    mutedOrFilteredContacts[i].name,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: t.body.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  Text(
+                                    mutedOrFilteredContacts[i].isMuted
+                                        ? l10n.chatNotificationModeMuted
+                                        : l10n.chatNotificationModeMentions,
+                                    style: t.dataMono.copyWith(
+                                      fontSize: 11,
+                                      color: mutedOrFilteredContacts[i].isMuted
+                                          ? t.danger
+                                          : t.action,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: () async {
+                                await _appState.setChatNotificationMode(
+                                  mutedOrFilteredContacts[i],
+                                  'all',
+                                );
+                                if (mounted) setState(() {});
+                              },
+                              child: Text(
+                                l10n.settingsUnmute,
+                                style: t.body.copyWith(
+                                  color: t.action,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
+          ),
           const SizedBox(height: 32),
-          _buildAboutFooter(t),
+          _buildAboutFooter(t, l10n),
         ],
       ),
     );
   }
 
-  // App identity footer. Uses only proper nouns (name / version / publisher) so
-  // it needs no localization.
-  Widget _buildAboutFooter(WiltkeyTokens t) => Center(
-    child: Column(
-      children: [
-        Text(
-          'WiltKey',
-          style: t.screenTitle.copyWith(fontSize: 15, letterSpacing: 1.5),
+  bool _checkingUpdates = false;
+
+  Future<void> _checkUpdatesManual(AppLocalizations l10n) async {
+    if (_checkingUpdates) return;
+    setState(() => _checkingUpdates = true);
+    final info = await UpdateService.instance.checkForUpdates(force: true);
+    if (!mounted) return;
+    setState(() => _checkingUpdates = false);
+
+    if (info != null &&
+        info.isUpdateAvailable(UpdateService.instance.currentBuildNumber)) {
+      UpdateService.showWhatsNewSheet(context);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(l10n.settingsUpToDate),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
         ),
-        const SizedBox(height: 4),
-        Text(
-          _appVersion.isEmpty ? kAppPublisher : '$_appVersion · $kAppPublisher',
-          style: t.dataMono,
-        ),
-      ],
-    ),
-  );
+      );
+    }
+  }
+
+  // App identity footer with version, publisher, update status, and "What's New".
+  Widget _buildAboutFooter(WiltkeyTokens t, AppLocalizations l10n) {
+    final updateService = UpdateService.instance;
+    final isAvailable = updateService.isUpdateAvailable;
+    final info = updateService.cachedInfo;
+
+    return Center(
+      child: Column(
+        children: [
+          Text(
+            'WiltKey',
+            style: t.screenTitle.copyWith(fontSize: 15, letterSpacing: 1.5),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            _appVersion.isEmpty ? kAppPublisher : '$_appVersion · $kAppPublisher',
+            style: t.dataMono,
+          ),
+          const SizedBox(height: 10),
+          if (isAvailable && info != null) ...[
+            InkWell(
+              borderRadius: BorderRadius.circular(t.radiusPill),
+              onTap: () => UpdateService.showWhatsNewSheet(context),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                decoration: BoxDecoration(
+                  color: t.action.withValues(alpha: 0.1),
+                  border: Border.all(color: t.action, width: t.borderWidth),
+                  borderRadius: BorderRadius.circular(t.radiusPill),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.system_update_alt, size: 13, color: t.action),
+                    const SizedBox(width: 6),
+                    Text(
+                      l10n.settingsUpdateAvailable(info.latestVersion),
+                      style: t.body.copyWith(
+                        fontSize: 11,
+                        color: t.action,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextButton(
+                onPressed: () => UpdateService.showWhatsNewSheet(context),
+                style: TextButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                ),
+                child: Text(
+                  l10n.settingsWhatsNew,
+                  style: t.bodySecondary.copyWith(
+                    fontSize: 12,
+                    color: t.action,
+                  ),
+                ),
+              ),
+              Text('·', style: t.dataMono.copyWith(color: t.textTertiary)),
+              TextButton(
+                onPressed:
+                    _checkingUpdates ? null : () => _checkUpdatesManual(l10n),
+                style: TextButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                ),
+                child: _checkingUpdates
+                    ? SizedBox(
+                        width: 12,
+                        height: 12,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: t.action,
+                        ),
+                      )
+                    : Text(
+                        l10n.settingsCheckForUpdates,
+                        style: t.bodySecondary.copyWith(
+                          fontSize: 12,
+                          color: t.textSecondary,
+                        ),
+                      ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _modeTile(
     WiltkeyTokens t,
@@ -1117,25 +1603,52 @@ class _SettingsScreenState extends State<SettingsScreen>
   // picks its face from the flavor.
   Widget _buildShopCard(WiltkeyTokens t, AppLocalizations l10n) {
     final isPlay = EntitlementService.instance.billingAvailable;
-    return _compactActionCard(
-      t,
-      icon: isPlay ? Icons.storefront : Icons.volunteer_activism,
-      label: isPlay ? l10n.shopEntryTitle : l10n.supportEntryTitle,
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const ShopScreen()),
+    return InkWell(
+      borderRadius: BorderRadius.circular(t.radiusControl),
+      onTap: () {
+        HapticFeedback.lightImpact();
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const ShopScreen()),
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        decoration: BoxDecoration(
+          color: t.surface,
+          border: Border.all(color: t.border),
+          borderRadius: BorderRadius.circular(t.radiusControl),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              isPlay ? Icons.storefront : Icons.volunteer_activism,
+              color: t.action,
+              size: 22,
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    isPlay ? l10n.shopEntryTitle : l10n.supportEntryTitle,
+                    style: t.body.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    isPlay
+                        ? (l10n.shopEntrySubtitle)
+                        : (l10n.supportEntrySubtitle),
+                    style: t.bodySecondary.copyWith(fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right, color: t.textTertiary, size: 20),
+          ],
+        ),
       ),
-    );
-  }
-
-  // Pixel-art editor action card — opens the shared avatar editor popup (same as
-  // tapping the avatar preview above).
-  Widget _buildPixelEditorCard(WiltkeyTokens t, AppLocalizations l10n) {
-    return _compactActionCard(
-      t,
-      icon: Icons.grid_on,
-      label: l10n.settingsPixelArtEditor,
-      onTap: _editAvatar,
     );
   }
 
@@ -1148,10 +1661,13 @@ class _SettingsScreenState extends State<SettingsScreen>
         final current = WiltkeyThemeRegistry.byId(ThemeController().themeId);
         return InkWell(
           borderRadius: BorderRadius.circular(t.radiusControl),
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const ThemeSelectorScreen()),
-          ),
+          onTap: () {
+            HapticFeedback.lightImpact();
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ThemeSelectorScreen()),
+            );
+          },
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
             decoration: BoxDecoration(
@@ -1185,41 +1701,6 @@ class _SettingsScreenState extends State<SettingsScreen>
           ),
         );
       },
-    );
-  }
-
-  // A compact, square-ish tappable card (icon over label) used for the side-by-side
-  // Shop / Pixel-editor row. Stretches to its Row cell height via IntrinsicHeight.
-  Widget _compactActionCard(
-    WiltkeyTokens t, {
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(t.radiusControl),
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-        decoration: BoxDecoration(
-          color: t.surface,
-          border: Border.all(color: t.action),
-          borderRadius: BorderRadius.circular(t.radiusControl),
-          boxShadow: t.glow(t.action),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: t.action, size: 26),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              textAlign: TextAlign.center,
-              style: t.body.copyWith(fontWeight: FontWeight.w700),
-            ),
-          ],
-        ),
-      ),
     );
   }
 

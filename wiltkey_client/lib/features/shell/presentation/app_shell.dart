@@ -48,14 +48,35 @@ class AppShell extends StatefulWidget {
 }
 
 class _AppShellState extends State<AppShell>
-    with WidgetsBindingObserver
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver
     implements ShellNavigator {
   final AppState _appState = AppState();
   int _index = ShellTab.chats;
 
+  // Slide transition between tabs: the outgoing page drifts off while the
+  // incoming page slides in from the side the user swiped toward (it starts at
+  // ±screen width and eases in). All four tabs stay mounted via Offstage (state
+  // is preserved, same as the old IndexedStack) — only the active and in-flight
+  // pages are on-stage and translated.
+  late final AnimationController _slide;
+  int _fromIndex = -1; // <0 when idle, else the outgoing tab index
+  late final List<Widget> _tabs = [
+    // Social contacts list (friends list) — independent of chat contacts.
+    const ContactListScreen(),
+    const ChatsTab(),
+    // The Connect hub itself mounts no BLE — scanning only starts when the user
+    // pushes into an in-person mode from here.
+    const ConnectHubScreen(),
+    const SettingsScreen(embedded: true),
+  ];
+
   @override
   void initState() {
     super.initState();
+    _slide = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 280),
+    );
     _appState.addListener(_onState);
     WidgetsBinding.instance.addObserver(this);
     // The shell mounts right after unlock — if we were opened from a message
@@ -176,6 +197,7 @@ class _AppShellState extends State<AppShell>
     _appState.removeListener(_onState);
     _appState.incomingScreenshotRequest.removeListener(_onScreenshotRequest);
     WidgetsBinding.instance.removeObserver(this);
+    _slide.dispose();
     super.dispose();
   }
 
@@ -185,8 +207,56 @@ class _AppShellState extends State<AppShell>
 
   @override
   void selectTab(int index) {
-    if (index == _index) return;
-    setState(() => _index = index);
+    if (index == _index || index < 0 || index >= _tabs.length) return;
+    // Reduced-motion users get an instant switch instead of the slide.
+    if (context.reduceMotion) {
+      setState(() {
+        _fromIndex = -1;
+        _index = index;
+      });
+      return;
+    }
+    _slide.stop();
+    setState(() {
+      _fromIndex = _index;
+      _index = index;
+    });
+    _slide.forward(from: 0).whenComplete(() {
+      if (mounted) setState(() => _fromIndex = -1);
+    });
+  }
+
+  /// Positions one tab during the slide transition. When idle only the active
+  /// tab is on-stage at offset 0; while animating the outgoing tab drifts off
+  /// one side while the incoming tab slides in from the other. Offstage keeps
+  /// every tab mounted+laid out so per-tab state (scroll, BLE, search) survives.
+  Widget _buildSlideableTab(
+    int i,
+    double width,
+    bool animating,
+    int from,
+    double t,
+    double dir,
+  ) {
+    final bool visible;
+    double dx = 0;
+    if (animating) {
+      visible = i == from || i == _index;
+      if (i == _index) {
+        dx = dir * width * (1 - t);
+      } else if (i == from) {
+        dx = -dir * width * t;
+      }
+    } else {
+      visible = i == _index;
+    }
+    return Offstage(
+      offstage: !visible,
+      child: Transform.translate(
+        offset: Offset(dx, 0),
+        child: _tabs[i],
+      ),
+    );
   }
 
   @override
@@ -203,17 +273,23 @@ class _AppShellState extends State<AppShell>
             bottom: false,
             child: Stack(
               children: [
-                IndexedStack(
-                  index: _index,
-                  children: [
-                    // Social contacts list (friends list) — independent of chat contacts.
-                    const ContactListScreen(),
-                    const ChatsTab(),
-                    // The Connect hub itself mounts no BLE — scanning only starts
-                    // when the user pushes into an in-person mode from here.
-                    const ConnectHubScreen(),
-                    const SettingsScreen(embedded: true),
-                  ],
+                AnimatedBuilder(
+                  animation: _slide,
+                  builder: (context, _) {
+                    final double width = MediaQuery.sizeOf(context).width;
+                    final bool animating = _fromIndex >= 0;
+                    final int from = _fromIndex;
+                    final double t =
+                        Curves.easeOutCubic.transform(_slide.value);
+                    final double dir =
+                        animating ? (_index - from).sign.toDouble() : 0;
+                    return Stack(
+                      children: [
+                        for (int i = 0; i < _tabs.length; i++)
+                          _buildSlideableTab(i, width, animating, from, t, dir),
+                      ],
+                    );
+                  },
                 ),
                 // In-app heads-up for messages that land while the app is open and
                 // you're not in that chat (so busy users aren't blind to them).

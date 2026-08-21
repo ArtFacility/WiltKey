@@ -510,6 +510,42 @@ abstract class AppLocalizations {
   /// **'Random'**
   String get settingsProfileChipRandom;
 
+  /// No description provided for @settingsProfileChipTemplateSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Add to templates'**
+  String get settingsProfileChipTemplateSave;
+
+  /// No description provided for @settingsProfileTemplateSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved to templates'**
+  String get settingsProfileTemplateSaved;
+
+  /// No description provided for @settingsProfileTemplatesButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Select from template'**
+  String get settingsProfileTemplatesButton;
+
+  /// No description provided for @settingsProfileTemplatesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved Templates'**
+  String get settingsProfileTemplatesTitle;
+
+  /// No description provided for @settingsProfileNoTemplates.
+  ///
+  /// In en, this message translates to:
+  /// **'No saved templates yet'**
+  String get settingsProfileNoTemplates;
+
+  /// No description provided for @settingsProfileTemplateEquipped.
+  ///
+  /// In en, this message translates to:
+  /// **'Avatar template equipped'**
+  String get settingsProfileTemplateEquipped;
+
   /// No description provided for @avatarEditButton.
   ///
   /// In en, this message translates to:
@@ -833,6 +869,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'You got a message'**
   String get notificationNewMessageBody;
+
+  /// No description provided for @notificationEmergencyChatBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Emergency chat request'**
+  String get notificationEmergencyChatBody;
 
   /// No description provided for @notificationSecureLinkActive.
   ///
@@ -1746,6 +1788,30 @@ abstract class AppLocalizations {
   /// **'Release to cancel'**
   String get chatVoiceReleaseCancel;
 
+  /// No description provided for @chatVoiceSlideToCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Slide to cancel'**
+  String get chatVoiceSlideToCancel;
+
+  /// No description provided for @chatVoiceSlideToLock.
+  ///
+  /// In en, this message translates to:
+  /// **'Slide up to lock'**
+  String get chatVoiceSlideToLock;
+
+  /// No description provided for @chatVoiceCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel recording'**
+  String get chatVoiceCancel;
+
+  /// No description provided for @chatVoiceSend.
+  ///
+  /// In en, this message translates to:
+  /// **'Send voice message'**
+  String get chatVoiceSend;
+
   /// No description provided for @chatVoicePermissionDenied.
   ///
   /// In en, this message translates to:
@@ -2123,6 +2189,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'A secure group was destroyed.'**
   String get eventGroupNukedBody;
+
+  /// No description provided for @eventContactRequestTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} sent you a contact request'**
+  String eventContactRequestTitle(String name);
+
+  /// No description provided for @eventContactRequestBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to accept or decline in your chat'**
+  String get eventContactRequestBody;
+
+  /// No description provided for @eventContactRemovedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} removed you'**
+  String eventContactRemovedTitle(String name);
+
+  /// No description provided for @eventContactRemovedBody.
+  ///
+  /// In en, this message translates to:
+  /// **'They removed you from their contacts'**
+  String get eventContactRemovedBody;
 
   /// No description provided for @groupSyncingFromMember.
   ///
@@ -2627,6 +2717,102 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Out of pad — meet up to recharge'**
   String get themePreviewRowLost;
+
+  /// No description provided for @themePreviewSectionProfile.
+  ///
+  /// In en, this message translates to:
+  /// **'Profile backdrop'**
+  String get themePreviewSectionProfile;
+
+  /// No description provided for @themePreviewFullscreenProfile.
+  ///
+  /// In en, this message translates to:
+  /// **'Fullscreen profile preview'**
+  String get themePreviewFullscreenProfile;
+
+  /// No description provided for @linkWarningTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'External link warning'**
+  String get linkWarningTitle;
+
+  /// No description provided for @linkWarningBody.
+  ///
+  /// In en, this message translates to:
+  /// **'You are about to open an external link in your browser. This will connect to the destination server and reveal your IP address.'**
+  String get linkWarningBody;
+
+  /// No description provided for @linkWarningOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Open in browser'**
+  String get linkWarningOpen;
+
+  /// No description provided for @linkWarningCopy.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy link'**
+  String get linkWarningCopy;
+
+  /// No description provided for @linkWarningCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Link copied to clipboard'**
+  String get linkWarningCopied;
+
+  /// No description provided for @chatActionEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get chatActionEdit;
+
+  /// No description provided for @chatActionDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get chatActionDelete;
+
+  /// No description provided for @chatEditingBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'Editing message'**
+  String get chatEditingBanner;
+
+  /// No description provided for @chatCancelEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel edit'**
+  String get chatCancelEdit;
+
+  /// No description provided for @chatDeleteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete message'**
+  String get chatDeleteTitle;
+
+  /// No description provided for @chatDeleteBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to delete this message for everyone?'**
+  String get chatDeleteBody;
+
+  /// No description provided for @chatDeleteConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get chatDeleteConfirm;
+
+  /// No description provided for @chatMessageDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'[Message deleted]'**
+  String get chatMessageDeleted;
+
+  /// No description provided for @chatEditedTag.
+  ///
+  /// In en, this message translates to:
+  /// **'edited'**
+  String get chatEditedTag;
 
   /// No description provided for @accessibilityWarningTitle.
   ///
@@ -3420,6 +3606,36 @@ abstract class AppLocalizations {
   /// **'Deny'**
   String get contactRequestDeny;
 
+  /// No description provided for @contactAddTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Add contact'**
+  String get contactAddTitle;
+
+  /// No description provided for @contactAddBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Add {name} to your contacts?'**
+  String contactAddBody(String name);
+
+  /// No description provided for @contactAddConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Add contact'**
+  String get contactAddConfirm;
+
+  /// No description provided for @contactAddAlready.
+  ///
+  /// In en, this message translates to:
+  /// **'Already in your contacts'**
+  String get contactAddAlready;
+
+  /// No description provided for @contactAddSent.
+  ///
+  /// In en, this message translates to:
+  /// **'Contact request sent'**
+  String get contactAddSent;
+
   /// No description provided for @contactProfileOpenChat.
   ///
   /// In en, this message translates to:
@@ -3443,6 +3659,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No status yet'**
   String get contactProfileStatusPlaceholder;
+
+  /// No description provided for @contactProfileEmergencyChat.
+  ///
+  /// In en, this message translates to:
+  /// **'Emergency chat'**
+  String get contactProfileEmergencyChat;
+
+  /// No description provided for @contactPin.
+  ///
+  /// In en, this message translates to:
+  /// **'Pin to top'**
+  String get contactPin;
+
+  /// No description provided for @contactUnpin.
+  ///
+  /// In en, this message translates to:
+  /// **'Unpin'**
+  String get contactUnpin;
+
+  /// No description provided for @contactUnblock.
+  ///
+  /// In en, this message translates to:
+  /// **'Unblock'**
+  String get contactUnblock;
+
+  /// No description provided for @contactsSectionPinned.
+  ///
+  /// In en, this message translates to:
+  /// **'Pinned'**
+  String get contactsSectionPinned;
+
+  /// No description provided for @contactStatusLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Status'**
+  String get contactStatusLabel;
+
+  /// No description provided for @contactStatusHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Share a status with your contacts…'**
+  String get contactStatusHint;
+
+  /// No description provided for @contactStatusSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save status'**
+  String get contactStatusSave;
+
+  /// No description provided for @contactStatusUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Status updated'**
+  String get contactStatusUpdated;
 
   /// No description provided for @contactRemoveConfirmTitle.
   ///
@@ -3498,11 +3768,221 @@ abstract class AppLocalizations {
   /// **'No chat found for this contact — it may have been deleted'**
   String get contactProfileChatNotFound;
 
+  /// No description provided for @emergencyChatStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Start emergency chat'**
+  String get emergencyChatStart;
+
+  /// No description provided for @emergencyChatConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Start emergency chat with {name}?'**
+  String emergencyChatConfirmTitle(String name);
+
+  /// No description provided for @emergencyChatConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This starts a 12-hour Time Wilt chat created remotely, without pairing in person. Any existing chat and messages with {name} will be permanently replaced, and the session will be active once {name} connects.'**
+  String emergencyChatConfirmBody(String name);
+
+  /// No description provided for @emergencyChatAlreadyActive.
+  ///
+  /// In en, this message translates to:
+  /// **'You already have an active chat with this contact'**
+  String get emergencyChatAlreadyActive;
+
+  /// No description provided for @emergencyChatStarted.
+  ///
+  /// In en, this message translates to:
+  /// **'Emergency chat requested'**
+  String get emergencyChatStarted;
+
+  /// No description provided for @chatsEmergencyPendingSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Connecting emergency chat…'**
+  String get chatsEmergencyPendingSubtitle;
+
+  /// No description provided for @chatsEmergencyPendingSnackBar.
+  ///
+  /// In en, this message translates to:
+  /// **'Emergency chat with {name} is waiting for them to connect.'**
+  String chatsEmergencyPendingSnackBar(String name);
+
+  /// No description provided for @emergencyChatPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Emergency chat pending…'**
+  String get emergencyChatPending;
+
   /// No description provided for @gestureSwipeForContacts.
   ///
   /// In en, this message translates to:
   /// **'Swipe from left edge for contacts'**
   String get gestureSwipeForContacts;
+
+  /// No description provided for @contactProfileSafetyNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Identity Key Fingerprint'**
+  String get contactProfileSafetyNumber;
+
+  /// No description provided for @contactProfileWiltedHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Start a temporary 12-hour Time Wilt chat'**
+  String get contactProfileWiltedHint;
+
+  /// No description provided for @commonCopy.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy'**
+  String get commonCopy;
+
+  /// No description provided for @commonCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Copied to clipboard'**
+  String get commonCopied;
+
+  /// No description provided for @eventMentionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} mentioned you'**
+  String eventMentionTitle(String name);
+
+  /// No description provided for @eventReplyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} replied to you'**
+  String eventReplyTitle(String name);
+
+  /// No description provided for @chatNotificationModeAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All messages'**
+  String get chatNotificationModeAll;
+
+  /// No description provided for @chatNotificationModeMentions.
+  ///
+  /// In en, this message translates to:
+  /// **'Mentions & replies only'**
+  String get chatNotificationModeMentions;
+
+  /// No description provided for @chatNotificationModeMuted.
+  ///
+  /// In en, this message translates to:
+  /// **'Mute (Silent)'**
+  String get chatNotificationModeMuted;
+
+  /// No description provided for @chatNotificationSettingsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Notifications'**
+  String get chatNotificationSettingsTitle;
+
+  /// No description provided for @chatMuteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Mute chat'**
+  String get chatMuteTitle;
+
+  /// No description provided for @chatUnmuteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Unmute chat'**
+  String get chatUnmuteTitle;
+
+  /// No description provided for @settingsNotifyCategories.
+  ///
+  /// In en, this message translates to:
+  /// **'Categories'**
+  String get settingsNotifyCategories;
+
+  /// No description provided for @settingsNotifyDirectMessages.
+  ///
+  /// In en, this message translates to:
+  /// **'Direct Messages'**
+  String get settingsNotifyDirectMessages;
+
+  /// No description provided for @settingsNotifyDirectMessagesSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Notifications for 1:1 chat messages'**
+  String get settingsNotifyDirectMessagesSubtitle;
+
+  /// No description provided for @settingsNotifyGroupMessages.
+  ///
+  /// In en, this message translates to:
+  /// **'Group Messages'**
+  String get settingsNotifyGroupMessages;
+
+  /// No description provided for @settingsNotifyGroupMessagesSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Notifications for group chat messages'**
+  String get settingsNotifyGroupMessagesSubtitle;
+
+  /// No description provided for @settingsNotifyEvents.
+  ///
+  /// In en, this message translates to:
+  /// **'Security & Activity Events'**
+  String get settingsNotifyEvents;
+
+  /// No description provided for @settingsNotifyEventsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Contact requests, group nuke votes, screenshot alerts'**
+  String get settingsNotifyEventsSubtitle;
+
+  /// No description provided for @settingsMutedChatsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Muted Chats'**
+  String get settingsMutedChatsTitle;
+
+  /// No description provided for @settingsNoMutedChats.
+  ///
+  /// In en, this message translates to:
+  /// **'No muted chats'**
+  String get settingsNoMutedChats;
+
+  /// No description provided for @settingsUnmute.
+  ///
+  /// In en, this message translates to:
+  /// **'Unmute'**
+  String get settingsUnmute;
+
+  /// No description provided for @settingsCheckForUpdates.
+  ///
+  /// In en, this message translates to:
+  /// **'Check for updates'**
+  String get settingsCheckForUpdates;
+
+  /// No description provided for @settingsCheckingUpdates.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking for updates...'**
+  String get settingsCheckingUpdates;
+
+  /// No description provided for @settingsUpdateAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Update available: v{version}'**
+  String settingsUpdateAvailable(String version);
+
+  /// No description provided for @settingsUpToDate.
+  ///
+  /// In en, this message translates to:
+  /// **'WiltKey is up to date'**
+  String get settingsUpToDate;
+
+  /// No description provided for @settingsWhatsNew.
+  ///
+  /// In en, this message translates to:
+  /// **'What\'s new'**
+  String get settingsWhatsNew;
 }
 
 class _AppLocalizationsDelegate

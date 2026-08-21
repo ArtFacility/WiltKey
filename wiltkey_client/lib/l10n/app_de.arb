@@ -120,6 +120,7 @@
   "notificationModeInstant": "Sofort",
   "notificationModeInstantDesc": "Optional. Hält im Hintergrund eine Ende-zu-Ende-verschlüsselte Verbindung offen, um eingehende Nachrichten in Echtzeit zu synchronisieren, angezeigt durch eine dauerhafte Benachrichtigung. Wiltkey nutzt dies aus Datenschutzgründen anstelle von Push-Diensten von Google oder Apple und funktioniert daher auch ohne Google Play Services – auf Kosten von mehr Akkuverbrauch.",
   "notificationNewMessageBody": "Du hast eine Nachricht",
+  "notificationEmergencyChatBody": "Notfall-Chat-Anfrage",
   "notificationSecureLinkActive": "Sichere Nachrichten werden synchronisiert",
   "onboardingNotificationsTitle": "Benachrichtigungen",
   "onboardingNotificationsExplanation": "Wiltkey verwendet keine Push-Dienste von Google oder Apple – nichts über deine Nachrichten erreicht deren Server. Wähle, wie du benachrichtigt werden möchtest. Du kannst dies jederzeit in den Einstellungen ändern.",
@@ -272,6 +273,10 @@
   "chatVoiceComingSoon": "Sprachnachrichten kommen bald.",
   "chatVoiceHoldHint": "Zum Aufnehmen einer Sprachnachricht gedrückt halten.",
   "chatVoiceReleaseCancel": "Loslassen zum Abbrechen",
+  "chatVoiceSlideToCancel": "Wischen zum Abbrechen",
+  "chatVoiceSlideToLock": "Nach oben wischen zum Sperren",
+  "chatVoiceCancel": "Aufnahme abbrechen",
+  "chatVoiceSend": "Sprachnachricht senden",
   "chatVoicePermissionDenied": "Zum Aufnehmen von Sprachnachrichten wird die Mikrofonberechtigung benötigt.",
   "chatVoiceQualityLofi": "Lo-fi",
   "chatVoiceQualityVoice": "Sprache",
@@ -310,6 +315,24 @@
   "groupHost": "Host",
   "groupMember": "Mitglied",
   "groupDepleted": "Aufgebraucht",
+  "eventContactRequestTitle": "{name} hat dir eine Kontaktanfrage gesendet",
+  "@eventContactRequestTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "eventContactRequestBody": "Tippen, um die Anfrage im Chat anzunehmen oder abzulehnen",
+  "eventContactRemovedTitle": "{name} hat dich entfernt",
+  "@eventContactRemovedTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "eventContactRemovedBody": "Du wurdest aus ihren Kontakten entfernt",
   "groupSyncingFromMember": "Synchronisiere Details und Nachrichten von {name}...",
   "groupInviteMember": "Mitglied einladen",
   "groupLeaveGroup": "Gruppe verlassen",
@@ -518,5 +541,161 @@
   "timeWiltLifetimeHours": "{count, plural, =1{1 Stunde} other{{count} Stunden}}",
   "timeWiltLifetimeMinutes": "{count} Min.",
   "timeWiltLifetimeMonths": "{count, plural, =1{1 Monat} other{{count} Monate}}",
-  "timeWiltLifetimeMoments": "wenigen Augenblicken"
+  "timeWiltLifetimeMoments": "wenigen Augenblicken",
+  "contactAddTitle": "Add contact",
+  "contactAddBody": "Add {name} to your contacts?",
+  "contactAddConfirm": "Add contact",
+  "contactAddAlready": "Already in your contacts",
+  "contactAddSent": "Contact request sent",
+  "contactPin": "Oben anpinnen",
+  "contactUnpin": "Lösen",
+  "contactUnblock": "Entsperren",
+  "contactsSectionPinned": "Angepinnt",
+  "contactStatusLabel": "Status",
+  "contactStatusHint": "Teile einen Status mit deinen Kontakten…",
+  "contactStatusSave": "Status speichern",
+  "contactStatusUpdated": "Status aktualisiert",
+  "contactProfileEmergencyChat": "Notfall-Chat",
+  "emergencyChatStart": "Notfall-Chat starten",
+  "emergencyChatConfirmTitle": "Notfall-Chat mit {name} starten?",
+  "@emergencyChatConfirmTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "emergencyChatConfirmBody": "Es besteht kein aktiver Chat mit {name}. Dadurch wird ein 12-Stunden-Time-Wilt-Chat aus der Ferne erstellt, ohne persönliches Pairing. Der bestehende verwelkte Chat und seine Nachrichten werden dauerhaft gelöscht und können nie wieder aufgeladen werden.",
+  "@emergencyChatConfirmBody": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "emergencyChatAlreadyActive": "Du hast bereits einen aktiven Chat mit diesem Kontakt",
+  "emergencyChatStarted": "Notfall-Chat gestartet",
+  "settingsProfileChipTemplateSave": "Als Vorlage speichern",
+  "settingsProfileTemplateSaved": "Als Vorlage gespeichert",
+  "settingsProfileTemplatesButton": "Aus Vorlage wählen",
+  "settingsProfileTemplatesTitle": "Gespeicherte Vorlagen",
+  "settingsProfileNoTemplates": "Noch keine Vorlagen gespeichert",
+  "settingsProfileTemplateEquipped": "Profilbild-Vorlage ausgewählt",
+  "groupTimeWiltToggle": "Time-Wilt-Gruppe",
+  "groupTimeWiltToggleSub": "Begrenzte Zeit, unbegrenztes Budget. Die Gruppe wird schreibgeschützt, wenn der Timer abläuft; triff den Host erneut, um sie zu verlängern.",
+  "groupTimeWiltMembersLabel": "Max. Mitglieder",
+  "groupTimeWiltMembersUpsell": "Bis zu 100 Mitglieder mit Plus freischalten",
+  "groupTimeWiltHostInfinite": "Host · ∞",
+  "groupTimeWiltRenewComposer": "Abgelaufen — triff den Host, um den Zugriff zu erneuern",
+  "groupTimeWiltHostAllWilted": "Alle Mitglieder sind abgelaufen — triff jemanden, um die Gruppe zu reaktivieren",
+  "groupNukeProposeButton": "Löschung für alle vorschlagen",
+  "groupNukeProposeTitle": "Diese Gruppe für alle löschen?",
+  "groupNukeProposeBody": "Startet eine Abstimmung unter den Mitgliedern. Bei Mehrheit werden die Gruppe und der Verlauf auf allen Geräten gelöscht. Dies kann nicht rückgängig gemacht werden.",
+  "groupNukeProposeConfirm": "Vorschlagen",
+  "groupNukeVoteTitle": "Gruppe löschen?",
+  "groupNukeVoteBody": "Ein Mitglied hat vorgeschlagen, diese Gruppe für alle zu löschen. Bei Mehrheit wird sie auf allen Geräten gelöscht.",
+  "groupNukeVoteAllow": "Zustimmen",
+  "groupNukeVoteDeny": "Behalten",
+  "groupNukeVotePending": "Warte auf Stimmen der Mitglieder…",
+  "groupNukeVotePassed": "Die Gruppe wurde durch Mehrheitsbeschluss gelöscht.",
+  "groupNukeVoteFailed": "Der Vorschlag zur Löschung der Gruppe wurde abgelehnt.",
+  "groupNukeVoteSent": "Vorschlag gesendet — warte auf Abstimmung der Mitglieder.",
+  "activityTitle": "Aktivität",
+  "activityEmpty": "Noch keine Aktivitäten. Ereignisse wie gelöschte Chats werden hier angezeigt.",
+  "activityClear": "Leeren",
+  "activityClearConfirmTitle": "Aktivitäten leeren?",
+  "activityClearConfirmBody": "Entfernt alle Aktivitätseinträge von diesem Gerät. Dies kann nicht rückgängig gemacht werden.",
+  "eventNukeReceivedTitle": "Chat gelöscht",
+  "eventNukeReceivedBody": "Ein sicherer Chat wurde gelöscht.",
+  "eventGroupNukedTitle": "Gruppe gelöscht",
+  "eventGroupNukedBody": "Eine sichere Gruppe wurde gelöscht.",
+  "themePreviewSectionProfile": "Profilhintergrund",
+  "themePreviewFullscreenProfile": "Vollbild-Profilvorschau",
+  "linkWarningTitle": "Externer Link",
+  "linkWarningBody": "Du öffnest einen externen Link im Browser. Dadurch wird eine Verbindung zum Zielserver hergestellt und deine IP-Adresse offengelegt.",
+  "linkWarningOpen": "Im Browser öffnen",
+  "linkWarningCopy": "Link kopieren",
+  "linkWarningCopied": "Link in die Zwischenablage kopiert",
+  "chatActionEdit": "Bearbeiten",
+  "chatActionDelete": "Löschen",
+  "chatEditingBanner": "Nachricht bearbeiten",
+  "chatCancelEdit": "Bearbeitung abbrechen",
+  "chatDeleteTitle": "Nachricht löschen",
+  "chatDeleteBody": "Möchtest du diese Nachricht wirklich für alle löschen?",
+  "chatDeleteConfirm": "Löschen",
+  "chatMessageDeleted": "[Nachricht gelöscht]",
+  "chatEditedTag": "bearbeitet",
+  "shopPlusBenefitTimeWiltGroups": "Größere Time-Wilt-Gruppen hosten — bis zu 100 statt 20 Mitglieder.",
+  "navContacts": "Kontakte",
+  "contactsTitle": "Kontakte",
+  "contactsSectionFriends": "Freunde",
+  "contactsEmptyTitle": "Noch keine Kontakte",
+  "contactsEmptyBody": "Füge jemanden aus einem Chat hinzu, um ihn hier zu sehen.",
+  "contactsOwnProfile": "Dein Profil",
+  "contactsOwnProfileHint": "Tippen, um Status oder ablaufende Story festzulegen",
+  "contactRequestSent": "Kontaktanfrage an {name} gesendet",
+  "contactRequestReceived": "{name} möchte dich als Kontakt hinzufügen",
+  "contactRequestApproved": "Kontaktanfrage angenommen",
+  "contactRequestDeclined": "Kontaktanfrage abgelehnt",
+  "contactRequestApprove": "Annehmen",
+  "contactRequestDeny": "Ablehnen",
+  "contactProfileOpenChat": "Chat öffnen",
+  "contactProfileRemove": "Kontakt entfernen",
+  "contactProfileBlock": "Benutzer blockieren",
+  "contactProfileStatusPlaceholder": "Noch kein Status",
+  "contactRemoveConfirmTitle": "{name} entfernen?",
+  "contactRemoveConfirmBody": "Entfernt diese Person aus deiner Kontaktliste. Du kannst sie später wieder hinzufügen.",
+  "contactBlockConfirmTitle": "{name} blockieren?",
+  "contactBlockConfirmBody": "Die Person kann dich nicht mehr kontaktieren oder Kontaktanfragen senden.",
+  "settingsBlockedContacts": "Blockierte Kontakte",
+  "settingsBlockedEmpty": "Keine blockierten Kontakte",
+  "commonRemove": "Entfernen",
+  "commonBlock": "Blockieren",
+  "contactProfileChatNotFound": "Kein Chat für diesen Kontakt gefunden — möglicherweise gelöscht",
+  "chatsEmergencyPendingSubtitle": "Notfall-Chat wird verbunden…",
+  "chatsEmergencyPendingSnackBar": "Notfall-Chat mit {name} wartet auf Verbindung.",
+  "emergencyChatPending": "Notfall-Chat ausstehend…",
+  "gestureSwipeForContacts": "Vom linken Rand wischen für Kontakte",
+  "contactProfileSafetyNumber": "Identitätsschlüssel-Fingerabdruck",
+  "contactProfileWiltedHint": "Temporären 12-Stunden-Time-Wilt-Chat starten",
+  "commonCopy": "Kopieren",
+  "commonCopied": "In die Zwischenablage kopiert",
+  "eventMentionTitle": "{name} hat dich erwähnt",
+  "@eventMentionTitle": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "eventReplyTitle": "{name} hat dir geantwortet",
+  "@eventReplyTitle": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "chatNotificationModeAll": "Alle Nachrichten",
+  "chatNotificationModeMentions": "Nur Erwähnungen & Antworten",
+  "chatNotificationModeMuted": "Stumm (Lautlos)",
+  "chatNotificationSettingsTitle": "Benachrichtigungen",
+  "chatMuteTitle": "Chat stummschalten",
+  "chatUnmuteTitle": "Stummschaltung aufheben",
+  "settingsNotifyCategories": "Kategorien",
+  "settingsNotifyDirectMessages": "Direktnachrichten",
+  "settingsNotifyDirectMessagesSubtitle": "Benachrichtigungen für 1:1-Chats",
+  "settingsNotifyGroupMessages": "Gruppennachrichten",
+  "settingsNotifyGroupMessagesSubtitle": "Benachrichtigungen für Gruppenchats",
+  "settingsNotifyEvents": "Sicherheits- & Aktivitätsereignisse",
+  "settingsNotifyEventsSubtitle": "Kontaktanfragen, Gruppen-Löschabstimmungen, Screenshot-Warnungen",
+  "settingsMutedChatsTitle": "Stummgeschaltete Chats",
+  "settingsNoMutedChats": "Keine stummgeschalteten Chats",
+  "settingsUnmute": "Stummschaltung aufheben",
+  "settingsCheckForUpdates": "Nach Updates suchen",
+  "settingsCheckingUpdates": "Nach Updates suchen...",
+  "settingsUpdateAvailable": "Update verfügbar: v{version}",
+  "@settingsUpdateAvailable": {
+    "placeholders": {
+      "version": { "type": "String" }
+    }
+  },
+  "settingsUpToDate": "WiltKey ist auf dem neuesten Stand",
+  "settingsWhatsNew": "Was gibt's Neues"
 }

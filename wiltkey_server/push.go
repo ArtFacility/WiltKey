@@ -84,10 +84,12 @@ func handlePushRegister(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := rdb.SetPushToken(req.ID, req.Token); err != nil {
+		log.Printf("[Push Register Error] Failed to store FCM token for %s: %v", req.ID, err)
 		http.Error(w, "Database error storing token", http.StatusInternalServerError)
 		return
 	}
 
+	log.Printf("[Push Register Success] Stored FCM token for %s (token length: %d)", req.ID, len(req.Token))
 	w.Header().Set("Content-Type", "application/json")
 	w.Write([]byte(`{"status":"registered"}`))
 }
@@ -113,10 +115,12 @@ func handlePushUnregister(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := rdb.DeletePushToken(req.ID); err != nil {
+		log.Printf("[Push Unregister Error] Failed to clear FCM token for %s: %v", req.ID, err)
 		http.Error(w, "Database error clearing token", http.StatusInternalServerError)
 		return
 	}
 
+	log.Printf("[Push Unregister Success] Cleared FCM token for %s", req.ID)
 	w.Header().Set("Content-Type", "application/json")
 	w.Write([]byte(`{"status":"unregistered"}`))
 }
@@ -127,7 +131,7 @@ func handlePushUnregister(w http.ResponseWriter, r *http.Request) {
 // string is the HTTP queue/post path (a genuine message whose type isn't tagged).
 func pushWorthyContentType(ct string) bool {
 	switch ct {
-	case "", "text", "image", "voice", "group_message":
+	case "", "text", "image", "voice", "group_message", "emergency_chat":
 		return true
 	default:
 		return false
@@ -148,15 +152,23 @@ func (h *Hub) sendWakePush(recipientID string, senderID string, contentType stri
 		return
 	}
 	token, err := h.rdb.GetPushToken(recipientID)
-	if err != nil || token == "" {
+	if err != nil {
+		log.Printf("[Push] Error fetching push token for offline recipient %s: %v", recipientID, err)
 		return
 	}
-	if err := h.push.Send(token, senderID); err != nil {
+	if token == "" {
+		log.Printf("[Push] No push token registered for offline recipient %s (FOSS/no instant mode)", recipientID)
+		return
+	}
+	log.Printf("[Push] Dispatching FCM wake push for offline recipient %s from sender %s (type: %s)", recipientID, senderID, contentType)
+	if err := h.push.Send(token, senderID, contentType); err != nil {
 		if errors.Is(err, errTokenUnregistered) {
 			_ = h.rdb.DeletePushToken(recipientID)
 			log.Printf("[Push] Pruned unregistered token for %s", recipientID)
 		} else {
 			log.Printf("[Push] Wake-up send failed for %s: %v", recipientID, err)
 		}
+	} else {
+		log.Printf("[Push] FCM wake push successfully sent to %s", recipientID)
 	}
 }

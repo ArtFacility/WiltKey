@@ -120,6 +120,7 @@
   "notificationModeInstant": "Instantané",
   "notificationModeInstantDesc": "Optionnel. Maintient une connexion chiffrée de bout en bout en arrière-plan pour synchroniser tes messages entrants en temps réel, signalée par une notification permanente. Wiltkey utilise ceci au lieu des services de notifications push de Google ou Apple pour la confidentialité, ce qui lui permet de fonctionner même sans les services Google Play – au prix d'une consommation de batterie plus élevée.",
   "notificationNewMessageBody": "Tu as un message",
+  "notificationEmergencyChatBody": "Demande de chat d'urgence",
   "notificationSecureLinkActive": "Synchronisation des messages sécurisés",
   "onboardingNotificationsTitle": "Alertes",
   "onboardingNotificationsExplanation": "Wiltkey n'utilise pas les notifications push de Google ou d'Apple — rien concernant vos messages ne transite par leurs serveurs. Choisissez comment vous souhaitez être alerté. Vous pourrez modifier ce choix à tout moment dans les Paramètres.",
@@ -272,6 +273,10 @@
   "chatVoiceComingSoon": "Les messages vocaux arrivent bientôt.",
   "chatVoiceHoldHint": "Maintenez pour enregistrer un message vocal.",
   "chatVoiceReleaseCancel": "Relâchez pour annuler",
+  "chatVoiceSlideToCancel": "Glisser pour annuler",
+  "chatVoiceSlideToLock": "Glisser vers le haut pour verrouiller",
+  "chatVoiceCancel": "Annuler l'enregistrement",
+  "chatVoiceSend": "Envoyer le message vocal",
   "chatVoicePermissionDenied": "L'autorisation du microphone est nécessaire pour enregistrer des messages vocaux.",
   "chatVoiceQualityLofi": "Lo-fi",
   "chatVoiceQualityVoice": "Voix",
@@ -310,6 +315,24 @@
   "groupHost": "Hôte",
   "groupMember": "Membre",
   "groupDepleted": "Épuisé",
+  "eventContactRequestTitle": "{name} vous a envoyé une demande de contact",
+  "@eventContactRequestTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "eventContactRequestBody": "Appuie pour accepter ou refuser dans ta discussion",
+  "eventContactRemovedTitle": "{name} vous a retiré",
+  "@eventContactRemovedTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "eventContactRemovedBody": "Ils vous ont retiré de leurs contacts",
   "groupSyncingFromMember": "Synchronisation des détails et messages depuis {name}...",
   "groupInviteMember": "Inviter un membre",
   "groupLeaveGroup": "Quitter le groupe",
@@ -518,5 +541,161 @@
   "timeWiltLifetimeHours": "{count, plural, =1{1 heure} other{{count} heures}}",
   "timeWiltLifetimeMinutes": "{count} min",
   "timeWiltLifetimeMonths": "{count, plural, =1{1 mois} other{{count} mois}}",
-  "timeWiltLifetimeMoments": "quelques instants"
+  "timeWiltLifetimeMoments": "quelques instants",
+  "contactAddTitle": "Add contact",
+  "contactAddBody": "Add {name} to your contacts?",
+  "contactAddConfirm": "Add contact",
+  "contactAddAlready": "Already in your contacts",
+  "contactAddSent": "Contact request sent",
+  "contactPin": "Épingler en haut",
+  "contactUnpin": "Détacher",
+  "contactUnblock": "Débloquer",
+  "contactsSectionPinned": "Épinglés",
+  "contactStatusLabel": "Statut",
+  "contactStatusHint": "Partagez un statut avec vos contacts…",
+  "contactStatusSave": "Enregistrer le statut",
+  "contactStatusUpdated": "Statut mis à jour",
+  "contactProfileEmergencyChat": "Chat d'urgence",
+  "emergencyChatStart": "Démarrer un chat d'urgence",
+  "emergencyChatConfirmTitle": "Démarrer un chat d'urgence avec {name} ?",
+  "@emergencyChatConfirmTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "emergencyChatConfirmBody": "Aucun chat actif avec {name} n'existe. Cela démarre un chat Time Wilt de 12 heures créé à distance, sans appairage en personne. Le chat fané existant et ses messages seront détruits définitivement et ne pourront jamais être rechargés.",
+  "@emergencyChatConfirmBody": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "emergencyChatAlreadyActive": "Vous avez déjà un chat actif avec ce contact",
+  "emergencyChatStarted": "Chat d'urgence démarré",
+  "settingsProfileChipTemplateSave": "Ajouter aux modèles",
+  "settingsProfileTemplateSaved": "Enregistré dans les modèles",
+  "settingsProfileTemplatesButton": "Choisir un modèle",
+  "settingsProfileTemplatesTitle": "Modèles enregistrés",
+  "settingsProfileNoTemplates": "Aucun modèle enregistré",
+  "settingsProfileTemplateEquipped": "Modèle d'avatar appliqué",
+  "groupTimeWiltToggle": "Groupe Time Wilt",
+  "groupTimeWiltToggleSub": "Durée limitée, budget illimité. Le groupe passe en lecture seule quand votre minuteur expire ; revoyez l'hôte pour le renouveler.",
+  "groupTimeWiltMembersLabel": "Membres max",
+  "groupTimeWiltMembersUpsell": "Débloquez jusqu'à 100 membres avec Plus",
+  "groupTimeWiltHostInfinite": "Hôte · ∞",
+  "groupTimeWiltRenewComposer": "Expiré — retrouvez l'hôte pour renouveler l'accès",
+  "groupTimeWiltHostAllWilted": "Tous les membres ont expiré — retrouvez quelqu'un pour ranimer le groupe",
+  "groupNukeProposeButton": "Proposer la destruction pour tous",
+  "groupNukeProposeTitle": "Détruire ce groupe pour tous ?",
+  "groupNukeProposeBody": "Lance un vote parmi les membres. Si la majorité accepte, le groupe et son historique sont détruits sur tous les appareils. Action irréversible.",
+  "groupNukeProposeConfirm": "Proposer",
+  "groupNukeVoteTitle": "Détruire le groupe ?",
+  "groupNukeVoteBody": "Un membre a proposé de détruire ce groupe pour tout le monde. Si la majorité accepte, il sera effacé sur tous les appareils.",
+  "groupNukeVoteAllow": "Accepter",
+  "groupNukeVoteDeny": "Garder",
+  "groupNukeVotePending": "En attente du vote des membres…",
+  "groupNukeVotePassed": "Le groupe a été détruit par vote majoritaire.",
+  "groupNukeVoteFailed": "La proposition de destruction n'a pas été adoptée.",
+  "groupNukeVoteSent": "Proposition envoyée — en attente des votes.",
+  "activityTitle": "Activité",
+  "activityEmpty": "Aucune activité récente. Les événements comme la destruction d'un chat apparaîtront ici.",
+  "activityClear": "Effacer",
+  "activityClearConfirmTitle": "Effacer l'activité ?",
+  "activityClearConfirmBody": "Supprime toutes les entrées d'activité de cet appareil. Action irréversible.",
+  "eventNukeReceivedTitle": "Chat détruit",
+  "eventNukeReceivedBody": "Un chat sécurisé a été détruit.",
+  "eventGroupNukedTitle": "Groupe détruit",
+  "eventGroupNukedBody": "Un groupe sécurisé a été détruit.",
+  "themePreviewSectionProfile": "Arrière-plan de profil",
+  "themePreviewFullscreenProfile": "Aperçu plein écran du profil",
+  "linkWarningTitle": "Lien externe",
+  "linkWarningBody": "Vous êtes sur le point d'ouvrir un lien externe dans votre navigateur. Cela vous connectera au serveur de destination et révélera votre adresse IP.",
+  "linkWarningOpen": "Ouvrir dans le navigateur",
+  "linkWarningCopy": "Copier le lien",
+  "linkWarningCopied": "Lien copié dans le presse-papiers",
+  "chatActionEdit": "Modifier",
+  "chatActionDelete": "Supprimer",
+  "chatEditingBanner": "Modification du message",
+  "chatCancelEdit": "Annuler la modification",
+  "chatDeleteTitle": "Supprimer le message",
+  "chatDeleteBody": "Voulez-vous vraiment supprimer ce message pour tout le monde ?",
+  "chatDeleteConfirm": "Supprimer",
+  "chatMessageDeleted": "[Message supprimé]",
+  "chatEditedTag": "modifié",
+  "shopPlusBenefitTimeWiltGroups": "Hébergez de plus grands groupes Time Wilt — jusqu'à 100 membres au lieu de 20.",
+  "navContacts": "Contacts",
+  "contactsTitle": "Contacts",
+  "contactsSectionFriends": "Amis",
+  "contactsEmptyTitle": "Aucun contact pour l'instant",
+  "contactsEmptyBody": "Ajoutez quelqu'un depuis une discussion existante pour le voir ici.",
+  "contactsOwnProfile": "Votre profil",
+  "contactsOwnProfileHint": "Appuyez pour définir un statut ou une story éphémère",
+  "contactRequestSent": "Demande de contact envoyée à {name}",
+  "contactRequestReceived": "{name} souhaite vous ajouter en contact",
+  "contactRequestApproved": "Demande de contact acceptée",
+  "contactRequestDeclined": "Demande de contact refusée",
+  "contactRequestApprove": "Accepter",
+  "contactRequestDeny": "Refuser",
+  "contactProfileOpenChat": "Ouvrir la discussion",
+  "contactProfileRemove": "Supprimer le contact",
+  "contactProfileBlock": "Bloquer l'utilisateur",
+  "contactProfileStatusPlaceholder": "Aucun statut",
+  "contactRemoveConfirmTitle": "Supprimer {name} ?",
+  "contactRemoveConfirmBody": "Cette personne sera retirée de vos contacts. Vous pourrez la rajouter plus tard.",
+  "contactBlockConfirmTitle": "Bloquer {name} ?",
+  "contactBlockConfirmBody": "Cette personne ne pourra plus vous contacter ni vous envoyer de demandes.",
+  "settingsBlockedContacts": "Contacts bloqués",
+  "settingsBlockedEmpty": "Aucun contact bloqué",
+  "commonRemove": "Supprimer",
+  "commonBlock": "Bloquer",
+  "contactProfileChatNotFound": "Aucun chat trouvé pour ce contact — il a peut-être été supprimé",
+  "chatsEmergencyPendingSubtitle": "Connexion du chat d'urgence…",
+  "chatsEmergencyPendingSnackBar": "Le chat d'urgence avec {name} attend sa connexion.",
+  "emergencyChatPending": "Chat d'urgence en attente…",
+  "gestureSwipeForContacts": "Balayez depuis le bord gauche pour les contacts",
+  "contactProfileSafetyNumber": "Empreinte de la clé d'identité",
+  "contactProfileWiltedHint": "Démarrer un chat Time Wilt temporaire de 12 heures",
+  "commonCopy": "Copier",
+  "commonCopied": "Copié dans le presse-papiers",
+  "eventMentionTitle": "{name} vous a mentionné",
+  "@eventMentionTitle": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "eventReplyTitle": "{name} vous a répondu",
+  "@eventReplyTitle": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "chatNotificationModeAll": "Tous les messages",
+  "chatNotificationModeMentions": "Mentions et réponses uniquement",
+  "chatNotificationModeMuted": "En sourdine (Silencieux)",
+  "chatNotificationSettingsTitle": "Notifications",
+  "chatMuteTitle": "Mettre la discussion en sourdine",
+  "chatUnmuteTitle": "Réactiver le son de la discussion",
+  "settingsNotifyCategories": "Catégories",
+  "settingsNotifyDirectMessages": "Messages directs",
+  "settingsNotifyDirectMessagesSubtitle": "Notifications pour les discussions 1:1",
+  "settingsNotifyGroupMessages": "Messages de groupe",
+  "settingsNotifyGroupMessagesSubtitle": "Notifications pour les discussions de groupe",
+  "settingsNotifyEvents": "Événements de sécurité et d'activité",
+  "settingsNotifyEventsSubtitle": "Demandes de contact, votes de destruction de groupe, alertes de capture d'écran",
+  "settingsMutedChatsTitle": "Discussions en sourdine",
+  "settingsNoMutedChats": "Aucune discussion en sourdine",
+  "settingsUnmute": "Réactiver le son",
+  "settingsCheckForUpdates": "Rechercher des mises à jour",
+  "settingsCheckingUpdates": "Recherche de mises à jour...",
+  "settingsUpdateAvailable": "Mise à jour disponible : v{version}",
+  "@settingsUpdateAvailable": {
+    "placeholders": {
+      "version": { "type": "String" }
+    }
+  },
+  "settingsUpToDate": "WiltKey est à jour",
+  "settingsWhatsNew": "Nouveautés"
 }

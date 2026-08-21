@@ -43,162 +43,163 @@ class WiltkeyDatabase {
     } catch (_) {}
     _db = await openDatabase(
       path,
-      version: 19,
+      version: 25,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
+  }
+
+  static Future<void> _safeAddColumn(
+    Database db,
+    String table,
+    String column,
+    String type,
+  ) async {
+    try {
+      final info = await db.rawQuery('PRAGMA table_info($table)');
+      final exists = info.any((col) => col['name'] == column);
+      if (!exists) {
+        await db.execute('ALTER TABLE $table ADD COLUMN $column $type');
+      }
+    } catch (_) {
+      // Fallback: ignore if already present or if table is created with latest schema
+    }
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     // v2: archived chats keep their (master-key encrypted) messages but drop the
     // OTP pad to save space; flagged read-only via is_archived.
     if (oldVersion < 2) {
-      await db.execute(
-        'ALTER TABLE contacts ADD COLUMN is_archived INTEGER DEFAULT 0',
-      );
+      await _safeAddColumn(db, 'contacts', 'is_archived', 'INTEGER DEFAULT 0');
     }
     // v3: user-pinned chats float to the top of the list.
     if (oldVersion < 3) {
-      await db.execute(
-        'ALTER TABLE contacts ADD COLUMN is_pinned INTEGER DEFAULT 0',
-      );
+      await _safeAddColumn(db, 'contacts', 'is_pinned', 'INTEGER DEFAULT 0');
     }
-    // v4: index for windowed message loading + unread counts (paging and the
-    // per-chat COUNT both filter by chat_id and order/range by timestamp).
+    // v4: index for windowed message loading + unread counts.
     if (oldVersion < 4) {
-      await db.execute(
-        'CREATE INDEX IF NOT EXISTS idx_messages_chat_time ON messages(chat_id, timestamp)',
-      );
+      try {
+        await db.execute(
+          'CREATE INDEX IF NOT EXISTS idx_messages_chat_time ON messages(chat_id, timestamp)',
+        );
+      } catch (_) {}
     }
-    // v5: persist failed-send state so an abandoned failed message can be
-    // auto-refunded on next launch (see autoRefundAbandonedFailures).
+    // v5: persist failed-send state so an abandoned failed message can be auto-refunded.
     if (oldVersion < 5) {
-      await db.execute(
-        'ALTER TABLE messages ADD COLUMN is_failed INTEGER DEFAULT 0',
-      );
+      await _safeAddColumn(db, 'messages', 'is_failed', 'INTEGER DEFAULT 0');
     }
-    // v6: emoji reactions — mutable side-metadata synced over the AES meta
-    // channel (not the OTP pad). JSON: {token: [reactorId, ...]}. Low-sensitivity
-    // (emoji + already-known key hashes), so stored plaintext for cheap in-place
-    // updates, unlike the master-encrypted message body.
+    // v6: emoji reactions.
     if (oldVersion < 6) {
-      await db.execute('ALTER TABLE messages ADD COLUMN reactions TEXT');
+      await _safeAddColumn(db, 'messages', 'reactions', 'TEXT');
     }
-    // v7: per-image sender opt-in to let the recipient save/download it. Rides as
-    // frame metadata, not in the OTP body. Legacy rows default 0 (non-downloadable).
+    // v7: allow_save for image downloads.
     if (oldVersion < 7) {
-      await db.execute(
-        'ALTER TABLE messages ADD COLUMN allow_save INTEGER DEFAULT 0',
-      );
+      await _safeAddColumn(db, 'messages', 'allow_save', 'INTEGER DEFAULT 0');
     }
-    // v8: wilting (disappearing) messages. `ephemeral`/`ttl_seconds` are the
-    // sender's config (ride the OTP envelope as eph/ttl); `opened_at`/`expires_at`
-    // are recipient-local timing set on first reveal; `wilted` marks a destroyed
-    // row (its text_otp/text_encrypted_master are blanked in place); `wilted_by`
-    // is the sender-side confirmation set (JSON list of reactor ids), synced over
-    // the AES meta channel like reactions. Legacy rows default to non-ephemeral.
+    // v8: wilting (disappearing) messages.
     if (oldVersion < 8) {
-      await db.execute(
-        'ALTER TABLE messages ADD COLUMN ephemeral INTEGER DEFAULT 0',
-      );
-      await db.execute(
-        'ALTER TABLE messages ADD COLUMN ttl_seconds INTEGER DEFAULT 0',
-      );
-      await db.execute('ALTER TABLE messages ADD COLUMN opened_at INTEGER');
-      await db.execute('ALTER TABLE messages ADD COLUMN expires_at INTEGER');
-      await db.execute(
-        'ALTER TABLE messages ADD COLUMN wilted INTEGER DEFAULT 0',
-      );
-      await db.execute('ALTER TABLE messages ADD COLUMN wilted_by TEXT');
+      await _safeAddColumn(db, 'messages', 'ephemeral', 'INTEGER DEFAULT 0');
+      await _safeAddColumn(db, 'messages', 'ttl_seconds', 'INTEGER DEFAULT 0');
+      await _safeAddColumn(db, 'messages', 'opened_at', 'INTEGER');
+      await _safeAddColumn(db, 'messages', 'expires_at', 'INTEGER');
+      await _safeAddColumn(db, 'messages', 'wilted', 'INTEGER DEFAULT 0');
+      await _safeAddColumn(db, 'messages', 'wilted_by', 'TEXT');
     }
-    // v9: reply-to. Optional id of the message this one quotes. Immutable content
-    // metadata that rides the message envelope (`re`), threaded through
-    // send/inbound/resync like `allow_save`. Legacy rows default null (not a reply).
+    // v9: reply-to.
     if (oldVersion < 9) {
-      await db.execute('ALTER TABLE messages ADD COLUMN reply_to_id TEXT');
+      await _safeAddColumn(db, 'messages', 'reply_to_id', 'TEXT');
     }
-    // v10: a peer's equipped avatar border id, synced over the 1-on-1 metadata
-    // channel alongside their avatar/nick. Legacy rows default null (no border).
+    // v10: avatar border on contacts.
     if (oldVersion < 10) {
-      await db.execute('ALTER TABLE contacts ADD COLUMN avatar_border TEXT');
+      await _safeAddColumn(db, 'contacts', 'avatar_border', 'TEXT');
     }
-    // v11: a group member's equipped avatar border id, synced over the
-    // full-mesh group_member_profile channel alongside their avatar/nick.
-    // Legacy rows default null (no border).
+    // v11: avatar border on group profiles.
     if (oldVersion < 11) {
-      await db.execute(
-        'ALTER TABLE group_profiles ADD COLUMN avatar_border TEXT',
-      );
+      await _safeAddColumn(db, 'group_profiles', 'avatar_border', 'TEXT');
     }
-    // v12: large message bodies (big images/voice) move OUT of the row into a
-    // sidecar file to stay under Android's 2 MB CursorWindow per-row limit —
-    // otherwise a single big image made the whole chat unreadable after restart.
-    // `media_path` (when set) is the file base; text_otp/text_encrypted_master
-    // are then blanked in the row and reconstructed from the file on read.
+    // v12: large message bodies sidecar path.
     if (oldVersion < 12) {
-      await db.execute('ALTER TABLE messages ADD COLUMN media_path TEXT');
+      await _safeAddColumn(db, 'messages', 'media_path', 'TEXT');
     }
-    // v13: pending large-file downloads. The relay now advertises a big payload
-    // (FILE_OFFER) instead of pushing it, so a message can exist locally as a
-    // placeholder whose body still lives in the relay's bucket. `remote_file_id`
-    // is the relay message id to fetch (cleared once downloaded + stored);
-    // `remote_size` is the advertised byte size, for the download bubble.
+    // v13: pending large-file downloads.
     if (oldVersion < 13) {
-      await db.execute('ALTER TABLE messages ADD COLUMN remote_file_id TEXT');
-      await db.execute(
-        'ALTER TABLE messages ADD COLUMN remote_size INTEGER DEFAULT 0',
-      );
+      await _safeAddColumn(db, 'messages', 'remote_file_id', 'TEXT');
+      await _safeAddColumn(db, 'messages', 'remote_size', 'INTEGER DEFAULT 0');
     }
 
-    // v14: Time Wilt chats — an absolute expiry (unix millis; non-null marks the
-    // chat as Time Wilt) and a persisted stream seed (1:1 Time Wilt keeps no pad
-    // file, so it derives keystream from this seed on demand).
+    // v14: Time Wilt chats.
     if (oldVersion < 14) {
-      await db.execute('ALTER TABLE contacts ADD COLUMN wilt_expires_at INTEGER');
-      await db.execute('ALTER TABLE contacts ADD COLUMN stream_seed TEXT');
-      await db.execute('ALTER TABLE contacts ADD COLUMN wilt_created_at INTEGER');
+      await _safeAddColumn(db, 'contacts', 'wilt_expires_at', 'INTEGER');
+      await _safeAddColumn(db, 'contacts', 'stream_seed', 'TEXT');
+      await _safeAddColumn(db, 'contacts', 'wilt_created_at', 'INTEGER');
     }
 
-    // v15: a group member awaiting a re-meet after the host recharged the group
-    // (their old lane/seed is dead — the composer locks to a "meet host" prompt).
+    // v15: group recharge pending.
     if (oldVersion < 15) {
-      await db.execute(
-        'ALTER TABLE contacts ADD COLUMN group_recharge_pending INTEGER DEFAULT 0',
-      );
+      await _safeAddColumn(db, 'contacts', 'group_recharge_pending', 'INTEGER DEFAULT 0');
     }
 
-    // v16: activity-feed event log. Upgrading devices only run _onUpgrade, so
-    // the table must be created here too (fresh installs get it from _onCreate).
+    // v16: activity-feed event log.
     if (oldVersion < 16) {
-      await db.execute(_createEventsTableSql);
+      try {
+        await db.execute(_createEventsTableSql);
+      } catch (_) {}
     }
 
-    // v17: group Time Wilt — the group's configured lifetime in seconds. Non-null
-    // marks a Time Wilt group (host stores no personal wilt_expires_at under the
-    // per-member model, so this is the marker + the value stamped on invites).
+    // v17: group Time Wilt lifetime.
     if (oldVersion < 17) {
-      await db.execute(
-        'ALTER TABLE contacts ADD COLUMN group_wilt_lifetime_secs INTEGER',
-      );
+      await _safeAddColumn(db, 'contacts', 'group_wilt_lifetime_secs', 'INTEGER');
     }
 
-    // v18: per-member Time Wilt expiry in the group roster. Under the per-member
-    // model each member's clock (whenTheyMetHost + lifetime) is authoritative on
-    // their OWN device; the host stamps it here at register/re-meet time and
-    // broadcasts it (group_info_update members_profiles) so everyone can show
-    // each member's remaining time in the members sheet. Legacy rows null.
+    // v18: per-member Time Wilt expiry.
     if (oldVersion < 18) {
-      await db.execute(
-        'ALTER TABLE group_profiles ADD COLUMN wilt_expires_at TEXT',
-      );
+      await _safeAddColumn(db, 'group_profiles', 'wilt_expires_at', 'TEXT');
     }
 
-    // v19: Social contact list (friends list) — independent of chat contacts.
-    // social_contacts: mutual connections established via contact requests.
-    // contact_blocks: local block list to silently drop inbound requests.
+    // v19: Social contact list (friends list) & block list.
     if (oldVersion < 19) {
-      await db.execute(_createSocialContactsTableSql);
-      await db.execute(_createContactBlocksTableSql);
+      try {
+        await db.execute(_createSocialContactsTableSql);
+      } catch (_) {}
+      try {
+        await db.execute(_createContactBlocksTableSql);
+      } catch (_) {}
+    }
+
+    // v20: user-pinned social contacts & status message.
+    if (oldVersion < 20) {
+      await _safeAddColumn(db, 'social_contacts', 'is_pinned', 'INTEGER DEFAULT 0');
+      await _safeAddColumn(db, 'social_contacts', 'status', 'TEXT');
+    }
+
+    // v21: theme_id on social_contacts and contacts.
+    if (oldVersion < 21) {
+      await _safeAddColumn(db, 'social_contacts', 'theme_id', 'TEXT');
+      await _safeAddColumn(db, 'contacts', 'theme_id', 'TEXT');
+    }
+
+    // v22: message editing and deletion.
+    if (oldVersion < 22) {
+      await _safeAddColumn(db, 'messages', 'is_edited', 'INTEGER DEFAULT 0');
+      await _safeAddColumn(db, 'messages', 'edit_target_id', 'TEXT');
+      await _safeAddColumn(db, 'messages', 'edited_at', 'INTEGER');
+      await _safeAddColumn(db, 'messages', 'is_deleted', 'INTEGER DEFAULT 0');
+    }
+
+    // v23: is_pending_emergency flag on contacts.
+    if (oldVersion < 23) {
+      await _safeAddColumn(db, 'contacts', 'is_pending_emergency', 'INTEGER DEFAULT 0');
+    }
+
+    // v24: status_emoji and status_expires_at on social_contacts for rich status & ephemeral expiry.
+    if (oldVersion < 24) {
+      await _safeAddColumn(db, 'social_contacts', 'status_emoji', 'TEXT');
+      await _safeAddColumn(db, 'social_contacts', 'status_expires_at', 'INTEGER');
+    }
+
+    // v25: notification_mode on contacts ('all', 'mentions_only', 'muted').
+    if (oldVersion < 25) {
+      await _safeAddColumn(db, 'contacts', 'notification_mode', "TEXT DEFAULT 'all'");
     }
   }
 
@@ -280,6 +281,7 @@ class WiltkeyDatabase {
         joined_at TEXT,
         short_nick TEXT,
         profile_image_b64 TEXT,
+        theme_id TEXT,
         avatar_border TEXT,
         outgoing_offset INTEGER,
         outgoing_max_offset INTEGER,
@@ -294,7 +296,9 @@ class WiltkeyDatabase {
         total_group_size INTEGER,
         slot_index INTEGER,
         additional_slots TEXT,
-        group_recharge_pending INTEGER DEFAULT 0
+        group_recharge_pending INTEGER DEFAULT 0,
+        is_pending_emergency INTEGER DEFAULT 0,
+        notification_mode TEXT DEFAULT 'all'
       )
     ''');
 
@@ -323,7 +327,11 @@ class WiltkeyDatabase {
         reply_to_id TEXT,
         media_path TEXT,
         remote_file_id TEXT,
-        remote_size INTEGER DEFAULT 0
+        remote_size INTEGER DEFAULT 0,
+        is_edited INTEGER DEFAULT 0,
+        edit_target_id TEXT,
+        edited_at INTEGER,
+        is_deleted INTEGER DEFAULT 0
       )
     ''');
     // Speeds windowed paging (chat_id + timestamp ORDER/LIMIT) and unread counts.
@@ -367,13 +375,18 @@ class WiltkeyDatabase {
         short_nick TEXT,
         profile_image_b64 TEXT,
         avatar_border_id TEXT,
+        theme_id TEXT,
         shared_secret_seed TEXT NOT NULL,
         my_pubkey TEXT NOT NULL,
         peer_pubkey TEXT NOT NULL,
         added_at INTEGER NOT NULL,
         is_blocked INTEGER DEFAULT 0,
         theme_seed TEXT,
-        last_synced_at INTEGER
+        last_synced_at INTEGER,
+        is_pinned INTEGER DEFAULT 0,
+        status TEXT,
+        status_emoji TEXT,
+        status_expires_at INTEGER
       )
     ''';
 
@@ -421,6 +434,7 @@ class WiltkeyDatabase {
       'joined_at': contact.joinedAt?.toIso8601String(),
       'short_nick': contact.shortNick,
       'profile_image_b64': contact.profileImageB64,
+      'theme_id': contact.themeId,
       'avatar_border': contact.avatarBorderId,
       'outgoing_offset': contact.outgoingOffset,
       'outgoing_max_offset': contact.outgoingMaxOffset,
@@ -436,6 +450,8 @@ class WiltkeyDatabase {
       'slot_index': contact.slotIndex,
       'additional_slots': jsonEncode(contact.additionalSlots),
       'group_recharge_pending': contact.groupRechargePending ? 1 : 0,
+      'is_pending_emergency': contact.isPendingEmergency ? 1 : 0,
+      'notification_mode': contact.notificationMode,
     }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
@@ -475,6 +491,7 @@ class WiltkeyDatabase {
             : null,
         shortNick: row['short_nick'] as String?,
         profileImageB64: row['profile_image_b64'] as String?,
+        themeId: row['theme_id'] as String?,
         avatarBorderId: row['avatar_border'] as String?,
         outgoingOffset: row['outgoing_offset'] as int? ?? 0,
         outgoingMaxOffset: row['outgoing_max_offset'] as int? ?? 0,
@@ -498,8 +515,37 @@ class WiltkeyDatabase {
                 .cast<int>(),
         groupRechargePending:
             (row['group_recharge_pending'] as int? ?? 0) == 1,
+        isPendingEmergency:
+            (row['is_pending_emergency'] as int? ?? 0) == 1,
+        notificationMode: row['notification_mode'] as String? ?? 'all',
       );
     }).toList();
+  }
+
+  Future<void> updateContactNotificationMode(
+    String keyHash,
+    String mode,
+  ) async {
+    final db = await _database;
+    await db.update(
+      'contacts',
+      {'notification_mode': mode},
+      where: 'key_hash = ?',
+      whereArgs: [keyHash],
+    );
+  }
+
+  Future<void> updateContactPendingEmergency(
+    String keyHash,
+    bool isPending,
+  ) async {
+    final db = await _database;
+    await db.update(
+      'contacts',
+      {'is_pending_emergency': isPending ? 1 : 0},
+      where: 'key_hash = ?',
+      whereArgs: [keyHash],
+    );
   }
 
   Future<void> deleteContactRecord(String chatId) async {
@@ -776,6 +822,10 @@ class WiltkeyDatabase {
       // A wilted placeholder must never stay fetchable.
       'remote_file_id': wilted ? null : msg.remoteFileId,
       'remote_size': msg.remoteSize,
+      'is_edited': msg.isEdited ? 1 : 0,
+      'edit_target_id': msg.editTargetId,
+      'edited_at': msg.editedAt,
+      'is_deleted': msg.isDeleted ? 1 : 0,
     }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
@@ -951,7 +1001,15 @@ class WiltkeyDatabase {
   /// the master-key copy when [masterKeyHex] is given (system lines store
   /// plaintext in text_otp). Pass a null key to skip decryption — fine for
   /// resync forwarding, which only needs the OTP ciphertext + metadata.
-  ChatMessage _rowToMessage(Map<String, Object?> row, {String? masterKeyHex}) {
+  /// Decodes a raw `messages` row into a [ChatMessage], decrypting the body from
+  /// the master-key copy when [masterKeyHex] is given (system lines store
+  /// plaintext in text_otp). Pass a null key to skip decryption — fine for
+  /// resync forwarding, which only needs the OTP ciphertext + metadata.
+  ChatMessage _rowToMessage(
+    Map<String, Object?> row, {
+    String? masterKeyHex,
+    bool eagerOtp = false,
+  }) {
     final senderId = row['sender_id'] as String;
     final contentType = row['content_type'] as String;
     final wilted = (row['wilted'] as int? ?? 0) == 1;
@@ -965,7 +1023,10 @@ class WiltkeyDatabase {
     // froze chats full of large images. Wilting/hidden images keep the eager path
     // (special lifecycle / need a pre-reveal size).
     final bool deferImage =
-        !wilted && contentType == 'image' && (row['ephemeral'] as int? ?? 0) == 0;
+        !eagerOtp &&
+        !wilted &&
+        contentType == 'image' &&
+        (row['ephemeral'] as int? ?? 0) == 0;
 
     String textOtp = (row['text_otp'] as String?) ?? '';
     String? textEncryptedMaster = row['text_encrypted_master'] as String?;
@@ -980,10 +1041,17 @@ class WiltkeyDatabase {
       // body rather than throwing, so one lost file can't brick the chat.
     }
 
+    final isDeleted = (row['is_deleted'] as int? ?? 0) == 1;
+    final isEdited = (row['is_edited'] as int? ?? 0) == 1;
+    final editTargetId = row['edit_target_id'] as String?;
+    final editedAt = row['edited_at'] as int?;
+
     String? decryptedText;
     if (wilted || deferImage) {
       // wilted: destroyed content. deferImage: body fetched on demand when the
       // thumbnail scrolls into view — nothing to decrypt here.
+    } else if (isDeleted) {
+      decryptedText = '[Message deleted]';
     } else if (senderId == 'system') {
       decryptedText = textOtp;
     } else if (textEncryptedMaster != null && masterKeyHex != null) {
@@ -1010,6 +1078,7 @@ class WiltkeyDatabase {
       allowSave: (row['allow_save'] as int? ?? 0) == 1,
       decryptedText: decryptedText,
       decodedImageBytes: (!deferImage &&
+              !isDeleted &&
               contentType == 'image' &&
               decryptedText != null)
           ? base64Decode(decryptedText)
@@ -1024,6 +1093,91 @@ class WiltkeyDatabase {
       replyToId: row['reply_to_id'] as String?,
       remoteFileId: row['remote_file_id'] as String?,
       remoteSize: row['remote_size'] as int? ?? 0,
+      isEdited: isEdited,
+      editTargetId: editTargetId,
+      editedAt: editedAt,
+      isDeleted: isDeleted,
+    );
+  }
+
+  /// Retrieves a single message by ID.
+  Future<ChatMessage?> getMessageById(
+    String messageId, {
+    String? chatId,
+    String? masterKeyHex,
+  }) async {
+    final db = await _database;
+    final where = chatId != null ? 'id = ? AND chat_id = ?' : 'id = ?';
+    final whereArgs = chatId != null ? [messageId, chatId] : [messageId];
+    final rows = await db.query(
+      'messages',
+      where: where,
+      whereArgs: whereArgs,
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    return _rowToMessage(rows.first, masterKeyHex: masterKeyHex);
+  }
+
+  /// Updates message content when edited.
+  Future<void> updateMessageContent(
+    String messageId, {
+    String? chatId,
+    required String newText,
+    required bool isEdited,
+    required bool isDeleted,
+    int? editedAt,
+    String? masterKeyHex,
+  }) async {
+    final db = await _database;
+    final updateMap = <String, Object?>{
+      'is_edited': isEdited ? 1 : 0,
+      'is_deleted': isDeleted ? 1 : 0,
+      if (editedAt != null) 'edited_at': editedAt,
+    };
+    if (masterKeyHex != null) {
+      updateMap['text_encrypted_master'] = WiltkeyPersistence().encryptString(
+        newText,
+        masterKeyHex,
+      );
+    }
+    final where = chatId != null ? 'id = ? AND chat_id = ?' : 'id = ?';
+    final whereArgs = chatId != null ? [messageId, chatId] : [messageId];
+    await db.update(
+      'messages',
+      updateMap,
+      where: where,
+      whereArgs: whereArgs,
+    );
+  }
+
+  /// Wipes media files and marks a row as deleted.
+  Future<void> deleteMessageRow(String messageId, {String? chatId}) async {
+    final db = await _database;
+    final where = chatId != null ? 'id = ? AND chat_id = ?' : 'id = ?';
+    final whereArgs = chatId != null ? [messageId, chatId] : [messageId];
+    final existing = await db.query(
+      'messages',
+      columns: ['media_path'],
+      where: where,
+      whereArgs: whereArgs,
+      limit: 1,
+    );
+    final base =
+        existing.isNotEmpty ? existing.first['media_path'] as String? : null;
+    if (base != null && base.isNotEmpty) {
+      await _deleteMediaFiles(base);
+    }
+    await db.update(
+      'messages',
+      {
+        'is_deleted': 1,
+        'text_otp': '',
+        'text_encrypted_master': null,
+        'media_path': null,
+      },
+      where: where,
+      whereArgs: whereArgs,
     );
   }
 
@@ -1194,6 +1348,30 @@ class WiltkeyDatabase {
     return false;
   }
 
+  /// Returns the most recent non-system sender in [chatId] excluding [excludeUserId].
+  Future<String?> getMostRecentSender(
+    String chatId, {
+    String? excludeUserId,
+  }) async {
+    final db = await _database;
+    final where = excludeUserId != null
+        ? "chat_id = ? AND sender_id != 'system' AND sender_id != ? AND is_sent_by_me = 0"
+        : "chat_id = ? AND sender_id != 'system' AND is_sent_by_me = 0";
+    final whereArgs = excludeUserId != null
+        ? [chatId, excludeUserId]
+        : [chatId];
+    final rows = await db.query(
+      'messages',
+      columns: ['sender_id'],
+      where: where,
+      whereArgs: whereArgs,
+      orderBy: 'timestamp DESC',
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    return rows.first['sender_id'] as String?;
+  }
+
   /// Non-system messages in [startOffset, endOffset) for a chat — the source for
   /// answering a peer's resync request. No decryption (forwards OTP ciphertext).
   Future<List<ChatMessage>> getMessagesInOffsetRange(
@@ -1209,7 +1387,7 @@ class WiltkeyDatabase {
       whereArgs: [chatId, startOffset, endOffset],
       orderBy: 'timestamp ASC',
     );
-    return [for (final r in rows) _rowToMessage(r)];
+    return [for (final r in rows) _rowToMessage(r, eagerOtp: true)];
   }
 
   /// Failed-send messages for a chat (master-key decrypted when [masterKeyHex]
@@ -1703,7 +1881,7 @@ class WiltkeyDatabase {
     final db = await _database;
     final rows = await db.query(
       'social_contacts',
-      orderBy: 'added_at DESC',
+      orderBy: 'is_pinned DESC, added_at DESC',
     );
     return rows.map((r) => SocialContact.fromRow(r)).toList();
   }
@@ -1740,6 +1918,49 @@ class WiltkeyDatabase {
     await db.update(
       'social_contacts',
       {'last_synced_at': timestamp},
+      where: 'key_hash = ?',
+      whereArgs: [keyHash],
+    );
+  }
+
+  Future<void> updateSocialContactPinned(String keyHash, bool pinned) async {
+    final db = await _database;
+    await db.update(
+      'social_contacts',
+      {'is_pinned': pinned ? 1 : 0},
+      where: 'key_hash = ?',
+      whereArgs: [keyHash],
+    );
+  }
+
+  /// Apply an incoming profile_update snapshot from [keyHash]. Passing null for a
+  /// field leaves it untouched; passing an empty string clears a nullable field.
+  Future<void> updateSocialContactProfile({
+    required String keyHash,
+    String? name,
+    String? shortNick,
+    String? profileImageB64,
+    String? avatarBorderId,
+    String? themeId,
+    String? status,
+    String? statusEmoji,
+    int? statusExpiresAt,
+    int? lastSyncedAt,
+  }) async {
+    final db = await _database;
+    await db.update(
+      'social_contacts',
+      {
+        'name': ?name,
+        'short_nick': ?shortNick,
+        'profile_image_b64': ?profileImageB64,
+        'avatar_border_id': ?avatarBorderId,
+        'theme_id': ?themeId,
+        'status': ?status,
+        'status_emoji': ?statusEmoji,
+        'status_expires_at': ?statusExpiresAt,
+        'last_synced_at': ?lastSyncedAt,
+      },
       where: 'key_hash = ?',
       whereArgs: [keyHash],
     );

@@ -21,8 +21,11 @@ import 'build_flavor.dart';
 import 'notifications/notification_service.dart';
 import 'notifications/pending_inbox.dart';
 import 'notifications/push_channel.dart';
+import 'package:synchronized/synchronized.dart';
 import 'entitlements/entitlement_service.dart';
 import 'cosmetics/avatar_border_controller.dart';
+import 'theme/theme_controller.dart';
+import 'update/update_service.dart';
 
 part 'state_auth.dart';
 part 'state_chats.dart';
@@ -41,6 +44,7 @@ part 'state_wilting.dart';
 part 'state_downloads.dart';
 part 'state_events.dart';
 part 'state_contacts.dart';
+part 'state_notifications.dart';
 
 enum AppStatus { normal, nuked }
 
@@ -154,6 +158,17 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   String deviceName = '';
   String shortNick = '';
   String profileImageB64 = '';
+  String statusMessage = '';
+  String statusEmoji = '';
+  int? statusExpiresAtMs;
+
+  bool get isOwnStatusExpired =>
+      statusExpiresAtMs != null &&
+      statusExpiresAtMs! > 0 &&
+      DateTime.now().millisecondsSinceEpoch > statusExpiresAtMs!;
+
+  String get effectiveStatusMessage => isOwnStatusExpired ? '' : statusMessage;
+  String get effectiveStatusEmoji => isOwnStatusExpired ? '' : statusEmoji;
 
   String get effectiveShortNick {
     if (shortNick.isNotEmpty) return shortNick;
@@ -181,6 +196,17 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   // Background notification preference (off / lowPower / instant). Drives what,
   // if anything, runs while the app is backgrounded/locked. See notifications/.
   NotificationMode notificationMode = NotificationMode.off;
+
+  // Category notification toggles (DMs, Group chats, Events, Mentions & Replies)
+  bool notifyDirectMessages = true;
+  bool notifyGroupMessages = true;
+  bool notifyEvents = true;
+  bool notifyMentionsAndReplies = true;
+
+  // Lock map to serialize group outbound lane allocation and encryption per group
+  final Map<String, Lock> _groupSendLocks = {};
+  Lock _getGroupLock(String groupId) =>
+      _groupSendLocks.putIfAbsent(groupId, () => Lock());
 
   // Local Dev settings for custom laptop relays. Off by default — the app uses
   // the production relay unless a tester explicitly enables dev mode in Settings.
@@ -270,10 +296,20 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   /// Emit an in-app heads-up cue for [contact], unless the user is already in
   /// that chat, the app is backgrounded/locked, or we're replaying frames the
   /// background socket buffered while away (those were already tray-notified).
-  void emitMessageAlert(Contact contact) {
+  void emitMessageAlert(Contact contact, {bool isMentionOrReply = false}) {
     if (!isAppForeground) return;
     if (isDrainingPendingInbox) return;
     if (visibleChatId == contact.id) return; // already looking at this chat
+
+    // Category toggles check
+    final isEffectiveMentionOrReply = isMentionOrReply && notifyMentionsAndReplies;
+    if (!notifyDirectMessages && !contact.isGroup) return;
+    if (!notifyGroupMessages && contact.isGroup && !isEffectiveMentionOrReply) return;
+
+    // Per-chat mute / mentions_only check
+    if (contact.isMuted) return;
+    if (contact.isMentionsOnly && !isEffectiveMentionOrReply) return;
+
     messageAlert.value = InAppMessageAlert(contact, ++_messageAlertSeq);
   }
 
@@ -367,6 +403,15 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
 
   // Debounce for group auto-sync (groupId -> last sweep time)
   final Map<String, DateTime> lastGroupAutoSync = {};
+
+  // Active in-flight group audit mutex (groupId -> active)
+  final Set<String> activeGroupSyncs = {};
+
+  // Clean/verified gap audit cache ("$groupId:$slotIndex:$startOffset:$endOffset" -> timestamp)
+  final Map<String, int> cleanGapAuditCache = {};
+
+  // Active sync candidate fallback timers ("$groupId:$slotIndex:$startOffset:$endOffset" -> Timer)
+  final Map<String, Timer> syncCandidateTimers = {};
 
   // Serializes inbound message processing so concurrent deliveries (offline queue
   // re-delivery + resync responses) can't interleave their read-check-append and

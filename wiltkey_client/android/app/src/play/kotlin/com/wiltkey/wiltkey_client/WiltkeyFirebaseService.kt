@@ -32,7 +32,8 @@ class WiltkeyFirebaseService : FirebaseMessagingService() {
 
     override fun onMessageReceived(remoteMessage: RemoteMessage) {
         val senderId = remoteMessage.data["sender_id"]
-        showMessageNotification(applicationContext, senderId)
+        val contentType = remoteMessage.data["content_type"]
+        showMessageNotification(applicationContext, senderId, contentType)
     }
 
     companion object {
@@ -43,7 +44,32 @@ class WiltkeyFirebaseService : FirebaseMessagingService() {
         const val NOTIFICATION_ID = 1
         const val EXTRA_PENDING_CHAT = "wk_pending_chat"
 
-        fun showMessageNotification(context: Context, senderId: String?) {
+        fun showMessageNotification(
+            context: Context,
+            senderId: String?,
+            contentType: String?,
+        ) {
+            if (!senderId.isNullOrEmpty()) {
+                try {
+                    val prefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+                    if (contentType == "group_message") {
+                        val mutedGroupMembersRaw = prefs.getString("flutter.wk_muted_group_members", null)
+                        val mutedGroupMembersSet = try { prefs.getStringSet("flutter.wk_muted_group_members", null) } catch (_: Exception) { null }
+                        if ((mutedGroupMembersRaw != null && mutedGroupMembersRaw.contains(senderId)) ||
+                            (mutedGroupMembersSet != null && mutedGroupMembersSet.contains(senderId))) {
+                            return
+                        }
+                    } else {
+                        val mutedRaw = prefs.getString("flutter.wk_muted_chats", null)
+                        val mutedSet = try { prefs.getStringSet("flutter.wk_muted_chats", null) } catch (_: Exception) { null }
+                        if ((mutedRaw != null && mutedRaw.contains(senderId)) ||
+                            (mutedSet != null && mutedSet.contains(senderId))) {
+                            return
+                        }
+                    }
+                } catch (_: Exception) {}
+            }
+
             ensureChannel(context)
 
             // Tap → launch MainActivity carrying the target chat so the app can
@@ -59,12 +85,18 @@ class WiltkeyFirebaseService : FirebaseMessagingService() {
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
             )
 
+            val text = if (contentType == "emergency_chat") {
+                "Emergency chat request"
+            } else {
+                "New secure message"
+            }
+
             val notification = NotificationCompat.Builder(context, CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_stat_notif)
                 .setContentTitle("Wiltkey")
                 // Content-free by design — the message stays encrypted on the relay
                 // until the device unlocks and pulls it.
-                .setContentText("New secure message")
+                .setContentText(text)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setAutoCancel(true)
                 .setContentIntent(pending)

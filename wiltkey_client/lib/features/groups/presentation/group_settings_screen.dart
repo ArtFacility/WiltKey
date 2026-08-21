@@ -372,6 +372,62 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
                 ],
               ),
             ),
+            Divider(color: t.border, height: 24),
+
+            // Notification Preference
+            _sectionTitle(t, l10n.chatNotificationSettingsTitle, t.action),
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.all(4),
+              decoration: _panelDeco(t),
+              child: Column(
+                children: [
+                  RadioListTile<String>(
+                    value: 'all',
+                    groupValue: group.notificationMode,
+                    activeColor: t.action,
+                    title: Text(l10n.chatNotificationModeAll, style: t.body),
+                    onChanged: (val) {
+                      if (val != null) {
+                        _appState.setChatNotificationMode(group, val);
+                        setState(() {});
+                      }
+                    },
+                  ),
+                  Divider(color: t.border, height: 1, indent: 16, endIndent: 16),
+                  RadioListTile<String>(
+                    value: 'mentions_only',
+                    groupValue: group.notificationMode,
+                    activeColor: t.action,
+                    title: Text(l10n.chatNotificationModeMentions, style: t.body),
+                    onChanged: (val) {
+                      if (val != null) {
+                        _appState.setChatNotificationMode(group, val);
+                        setState(() {});
+                      }
+                    },
+                  ),
+                  Divider(color: t.border, height: 1, indent: 16, endIndent: 16),
+                  RadioListTile<String>(
+                    value: 'muted',
+                    groupValue: group.notificationMode,
+                    activeColor: t.danger,
+                    title: Text(
+                      l10n.chatNotificationModeMuted,
+                      style: t.body.copyWith(
+                        color: group.notificationMode == 'muted' ? t.danger : null,
+                      ),
+                    ),
+                    onChanged: (val) {
+                      if (val != null) {
+                        _appState.setChatNotificationMode(group, val);
+                        setState(() {});
+                      }
+                    },
+                  ),
+                ],
+              ),
+            ),
             Divider(color: t.border, height: 32),
 
             // Host policies

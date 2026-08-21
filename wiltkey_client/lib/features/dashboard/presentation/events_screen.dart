@@ -6,6 +6,7 @@ import '../../../core/theme/wk.dart';
 import '../../../core/theme/wiltkey_tokens.dart';
 import '../../chat/presentation/chat_screen.dart';
 import '../../chat/presentation/group_chat_screen.dart';
+import '../../../core/update/update_service.dart';
 
 /// The activity feed — a log of things that happened when the user wasn't
 /// looking or that have no chat to live in (a nuke that deleted the chat). Rows
@@ -116,9 +117,10 @@ class _EventsScreenState extends State<EventsScreen> {
 
   Widget _row(WiltkeyTokens t, AppLocalizations l10n, AppEvent e) {
     final (icon, title, body) = _present(l10n, e);
-    final bool tappable =
-        e.chatKey != null &&
-        _appState.contacts.any((c) => c.keyHash == e.chatKey);
+    final bool isUpdate = e.type == 'update_available';
+    final bool tappable = isUpdate ||
+        (e.chatKey != null &&
+            _appState.contacts.any((c) => c.keyHash == e.chatKey));
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
@@ -130,13 +132,20 @@ class _EventsScreenState extends State<EventsScreen> {
         borderRadius: BorderRadius.circular(t.radiusCard),
       ),
       child: ListTile(
-        onTap: tappable ? () => _openChat(e.chatKey!) : null,
+        onTap: isUpdate
+            ? () => UpdateService.showWhatsNewSheet(context)
+            : (tappable ? () => _openChat(e.chatKey!) : null),
         leading: Icon(icon, color: t.action, size: 22),
         title: Text(
           title,
           style: t.body.copyWith(fontWeight: FontWeight.w600),
         ),
-        subtitle: Text(body, style: t.bodySecondary),
+        subtitle: Text(
+          body,
+          style: t.bodySecondary,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
         trailing: Text(
           _relTime(e.timestamp),
           style: t.dataMono.copyWith(fontSize: 11, color: t.textTertiary),
@@ -149,6 +158,12 @@ class _EventsScreenState extends State<EventsScreen> {
   /// stored English strings for any type this build doesn't recognize.
   (IconData, String, String) _present(AppLocalizations l10n, AppEvent e) {
     switch (e.type) {
+      case 'update_available':
+        return (
+          Icons.system_update_alt,
+          e.title,
+          e.body,
+        );
       case 'nuke_received':
         return (
           Icons.local_fire_department_outlined,
@@ -160,6 +175,30 @@ class _EventsScreenState extends State<EventsScreen> {
           Icons.local_fire_department_outlined,
           l10n.eventGroupNukedTitle,
           l10n.eventGroupNukedBody,
+        );
+      case 'contact_request':
+        return (
+          Icons.person_add_alt_1,
+          l10n.eventContactRequestTitle(e.title),
+          l10n.eventContactRequestBody,
+        );
+      case 'contact_removed':
+        return (
+          Icons.person_remove_outlined,
+          l10n.eventContactRemovedTitle(e.title),
+          l10n.eventContactRemovedBody,
+        );
+      case 'mention':
+        return (
+          Icons.alternate_email,
+          l10n.eventMentionTitle(e.title),
+          e.body,
+        );
+      case 'reply':
+        return (
+          Icons.reply,
+          l10n.eventReplyTitle(e.title),
+          e.body,
         );
       default:
         return (Icons.info_outline, e.title, e.body);

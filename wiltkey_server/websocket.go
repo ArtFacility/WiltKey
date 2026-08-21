@@ -207,8 +207,9 @@ func (c *Client) SendJSON(v interface{}) {
 	}()
 	select {
 	case c.send <- data:
-	default:
-		// Send buffer full: treat as a dead/slow consumer and evict it.
+	case <-time.After(100 * time.Millisecond):
+		// Send buffer saturated for >100ms: evict slow/dead consumer gracefully
+		log.Printf("[WebSocket] Send buffer saturated for client %s — disconnecting dead/slow consumer", c.id)
 		c.hub.unregister <- c
 		c.conn.Close()
 	}
@@ -434,7 +435,7 @@ func ServeWS(hub *Hub, w http.ResponseWriter, r *http.Request) {
 	client := &Client{
 		id:         userID,
 		conn:       conn,
-		send:       make(chan []byte, 256),
+		send:       make(chan []byte, 512),
 		hub:        hub,
 		tokens:     wsBucketCapacity,
 		lastRefill: time.Now(),

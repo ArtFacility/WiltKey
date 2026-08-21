@@ -227,6 +227,24 @@ class AppLocalizationsPl extends AppLocalizations {
   String get settingsProfileChipRandom => 'Losowo';
 
   @override
+  String get settingsProfileChipTemplateSave => 'Zapisz jako szablon';
+
+  @override
+  String get settingsProfileTemplateSaved => 'Zapisano w szablonach';
+
+  @override
+  String get settingsProfileTemplatesButton => 'Wybierz z szablonu';
+
+  @override
+  String get settingsProfileTemplatesTitle => 'Zapisane szablony';
+
+  @override
+  String get settingsProfileNoTemplates => 'Brak zapisanych szablonów';
+
+  @override
+  String get settingsProfileTemplateEquipped => 'Zastosowano szablon awatara';
+
+  @override
   String get avatarEditButton => 'Edytuj awatar';
 
   @override
@@ -398,6 +416,9 @@ class AppLocalizationsPl extends AppLocalizations {
 
   @override
   String get notificationNewMessageBody => 'Masz nową wiadomość';
+
+  @override
+  String get notificationEmergencyChatBody => 'Prośba o czat awaryjny';
 
   @override
   String get notificationSecureLinkActive =>
@@ -938,6 +959,18 @@ class AppLocalizationsPl extends AppLocalizations {
   String get chatVoiceReleaseCancel => 'Puść, aby anulować';
 
   @override
+  String get chatVoiceSlideToCancel => 'Przesuń, aby anulować';
+
+  @override
+  String get chatVoiceSlideToLock => 'Przesuń w górę, aby zablokować';
+
+  @override
+  String get chatVoiceCancel => 'Anuluj nagrywanie';
+
+  @override
+  String get chatVoiceSend => 'Wyślij wiadomość głosową';
+
+  @override
   String get chatVoicePermissionDenied =>
       'Do nagrywania wiadomości głosowych potrzebne jest uprawnienie do mikrofonu.';
 
@@ -1062,97 +1095,115 @@ class AppLocalizationsPl extends AppLocalizations {
       'Host odświeżył tę grupę — spotkaj się z nim znowu, aby dołączyć';
 
   @override
-  String get groupTimeWiltToggle => 'Time Wilt group';
+  String get groupTimeWiltToggle => 'Grupa Time Wilt';
 
   @override
   String get groupTimeWiltToggleSub =>
-      'Limited time, unlimited budget. The group wilts to read-only when your timer runs out; meet the host again to renew it.';
+      'Ograniczony czas, nieograniczony transfer. Grupa przechodzi w tryb tylko do odczytu po wygaśnięciu licznika; spotkaj się ponownie z gospodarzem, aby ją odnowić.';
 
   @override
-  String get groupTimeWiltMembersLabel => 'Max members';
+  String get groupTimeWiltMembersLabel => 'Maks. liczba członków';
 
   @override
-  String get groupTimeWiltMembersUpsell => 'Unlock up to 100 members with Plus';
+  String get groupTimeWiltMembersUpsell => 'Odblokuj do 100 członków z Plus';
 
   @override
-  String get groupTimeWiltHostInfinite => 'Host · ∞';
+  String get groupTimeWiltHostInfinite => 'Gospodarz · ∞';
 
   @override
   String get groupTimeWiltRenewComposer =>
-      'Wilted — meet the host again to renew your access';
+      'Wygasło — spotkaj się z gospodarzem, aby odnowić dostęp';
 
   @override
   String get groupTimeWiltHostAllWilted =>
-      'All members have wilted — meet someone again to revive the group';
+      'Wszyscy członkowie wygasli — spotkaj się z kimś, aby ożywić grupę';
 
   @override
-  String get groupNukeProposeButton => 'Propose destroying for everyone';
+  String get groupNukeProposeButton => 'Zaproponuj zniszczenie dla wszystkich';
 
   @override
-  String get groupNukeProposeTitle => 'Destroy this group for everyone?';
+  String get groupNukeProposeTitle => 'Zniszczyć tę grupę dla wszystkich?';
 
   @override
   String get groupNukeProposeBody =>
-      'Asks the other members to vote. If a majority agree, the group and its history are destroyed on every device. This can\'t be undone.';
+      'Rozpoczyna głosowanie wśród członków. W przypadku większości grupa i historia zostaną usunięte na każdym urządzeniu. Nie można cofnąć.';
 
   @override
-  String get groupNukeProposeConfirm => 'Propose';
+  String get groupNukeProposeConfirm => 'Zaproponuj';
 
   @override
-  String get groupNukeVoteTitle => 'Destroy group?';
+  String get groupNukeVoteTitle => 'Zniszczyć grupę?';
 
   @override
   String get groupNukeVoteBody =>
-      'A member proposed destroying this group for everyone. If a majority agree, it\'s wiped on every device.';
+      'Członek zaproponował zniszczenie tej grupy dla wszystkich. Jeśli większość się zgodzi, zostanie wyczyszczona na każdym urządzeniu.';
 
   @override
-  String get groupNukeVoteAllow => 'Agree';
+  String get groupNukeVoteAllow => 'Zgoda';
 
   @override
-  String get groupNukeVoteDeny => 'Keep';
+  String get groupNukeVoteDeny => 'Zachowaj';
 
   @override
-  String get groupNukeVotePending => 'Waiting for members to vote…';
+  String get groupNukeVotePending => 'Oczekiwanie na głosy członków…';
 
   @override
-  String get groupNukeVotePassed => 'The group was destroyed by majority vote.';
+  String get groupNukeVotePassed =>
+      'Grupa została zniszczona większością głosów.';
 
   @override
   String get groupNukeVoteFailed =>
-      'The proposal to destroy the group did not pass.';
+      'Wniosek o zniszczenie grupy został odrzucony.';
 
   @override
   String get groupNukeVoteSent =>
-      'Proposal sent — waiting for members to vote.';
+      'Wniosek wysłany — oczekiwanie na głosowanie.';
 
   @override
-  String get activityTitle => 'Activity';
+  String get activityTitle => 'Aktywność';
 
   @override
   String get activityEmpty =>
-      'No activity yet. Events like a chat being destroyed will show up here.';
+      'Brak aktywności. Zdarzenia takie jak zniszczenie czatu pojawią się tutaj.';
 
   @override
-  String get activityClear => 'Clear';
+  String get activityClear => 'Wyczyść';
 
   @override
-  String get activityClearConfirmTitle => 'Clear activity?';
+  String get activityClearConfirmTitle => 'Wyczyścić aktywność?';
 
   @override
   String get activityClearConfirmBody =>
-      'This removes all activity entries from this device. It can\'t be undone.';
+      'Usuwa wszystkie wpisy aktywności z tego urządzenia. Nie można cofnąć.';
 
   @override
-  String get eventNukeReceivedTitle => 'Chat destroyed';
+  String get eventNukeReceivedTitle => 'Czat zniszczony';
 
   @override
-  String get eventNukeReceivedBody => 'A secure chat was destroyed.';
+  String get eventNukeReceivedBody => 'Bezpieczny czat został zniszczony.';
 
   @override
-  String get eventGroupNukedTitle => 'Group destroyed';
+  String get eventGroupNukedTitle => 'Grupa zniszczona';
 
   @override
-  String get eventGroupNukedBody => 'A secure group was destroyed.';
+  String get eventGroupNukedBody => 'Bezpieczna grupa została zniszczona.';
+
+  @override
+  String eventContactRequestTitle(String name) {
+    return 'Prośba o kontakt od $name';
+  }
+
+  @override
+  String get eventContactRequestBody =>
+      'Stuknij, aby zaakceptować lub odrzucić w czacie';
+
+  @override
+  String eventContactRemovedTitle(String name) {
+    return '$name usunął cię';
+  }
+
+  @override
+  String get eventContactRemovedBody => 'Usunął cię ze swoich kontaktów';
 
   @override
   String groupSyncingFromMember(String name) {
@@ -1448,6 +1499,56 @@ class AppLocalizationsPl extends AppLocalizations {
       'Pad wyczerpany — spotkajcie się, by doładować';
 
   @override
+  String get themePreviewSectionProfile => 'Tło profilu';
+
+  @override
+  String get themePreviewFullscreenProfile => 'Podgląd pełnoekranowy profilu';
+
+  @override
+  String get linkWarningTitle => 'Ostrzeżenie o linku zewnętrznym';
+
+  @override
+  String get linkWarningBody =>
+      'Zamierzasz otworzyć link zewnętrzny w przeglądarce. Spowoduje to połączenie z serwerem docelowym i ujawnienie Twojego adresu IP.';
+
+  @override
+  String get linkWarningOpen => 'Otwórz w przeglądarce';
+
+  @override
+  String get linkWarningCopy => 'Kopiuj link';
+
+  @override
+  String get linkWarningCopied => 'Link skopiowany do schowka';
+
+  @override
+  String get chatActionEdit => 'Edytuj';
+
+  @override
+  String get chatActionDelete => 'Usuń';
+
+  @override
+  String get chatEditingBanner => 'Edytowanie wiadomości';
+
+  @override
+  String get chatCancelEdit => 'Anuluj edycję';
+
+  @override
+  String get chatDeleteTitle => 'Usuń wiadomość';
+
+  @override
+  String get chatDeleteBody =>
+      'Czy na pewno chcesz usunąć tę wiadomość dla wszystkich?';
+
+  @override
+  String get chatDeleteConfirm => 'Usuń';
+
+  @override
+  String get chatMessageDeleted => '[Wiadomość usunięta]';
+
+  @override
+  String get chatEditedTag => 'edytowano';
+
+  @override
   String get accessibilityWarningTitle => 'Usługa ułatwień dostępu aktywna';
 
   @override
@@ -1691,7 +1792,7 @@ class AppLocalizationsPl extends AppLocalizations {
 
   @override
   String get shopPlusBenefitTimeWiltGroups =>
-      'Host bigger Time Wilt groups — up to 100 members instead of 20.';
+      'Twórz większe grupy Time Wilt — do 100 członków zamiast 20.';
 
   @override
   String get shopPlusBenefitSupport =>
@@ -1882,95 +1983,263 @@ class AppLocalizationsPl extends AppLocalizations {
   String get timeWiltLifetimeMoments => 'chwilę';
 
   @override
-  String get navContacts => 'Contacts';
+  String get navContacts => 'Kontakty';
 
   @override
-  String get contactsTitle => 'Contacts';
+  String get contactsTitle => 'Kontakty';
 
   @override
-  String get contactsSectionFriends => 'Friends';
+  String get contactsSectionFriends => 'Znajomi';
 
   @override
-  String get contactsEmptyTitle => 'No contacts yet';
+  String get contactsEmptyTitle => 'Brak kontaktów';
 
   @override
   String get contactsEmptyBody =>
-      'Add someone from an existing chat to see them here.';
+      'Dodaj kogoś z istniejącego czatu, aby zobaczyć go tutaj.';
 
   @override
-  String get contactsOwnProfile => 'Your Profile';
+  String get contactsOwnProfile => 'Twój profil';
 
   @override
-  String get contactsOwnProfileHint => 'Tap to set status or wilting story';
+  String get contactsOwnProfileHint =>
+      'Dotknij, aby ustawić status lub znikającą relację';
 
   @override
   String contactRequestSent(String name) {
-    return 'Contact request sent to $name';
+    return 'Wysłano prośbę o kontakt do $name';
   }
 
   @override
   String contactRequestReceived(String name) {
-    return '$name wants to add you as a contact';
+    return '$name chce dodać Cię do kontaktów';
   }
 
   @override
-  String get contactRequestApproved => 'Contact request accepted';
+  String get contactRequestApproved => 'Prośba o kontakt zaakceptowana';
 
   @override
-  String get contactRequestDeclined => 'Contact request declined';
+  String get contactRequestDeclined => 'Prośba o kontakt odrzucona';
 
   @override
-  String get contactRequestApprove => 'Approve';
+  String get contactRequestApprove => 'Zaakceptuj';
 
   @override
-  String get contactRequestDeny => 'Deny';
+  String get contactRequestDeny => 'Odrzuć';
 
   @override
-  String get contactProfileOpenChat => 'Open Chat';
+  String get contactAddTitle => 'Add contact';
 
   @override
-  String get contactProfileRemove => 'Remove Contact';
+  String contactAddBody(String name) {
+    return 'Add $name to your contacts?';
+  }
 
   @override
-  String get contactProfileBlock => 'Block User';
+  String get contactAddConfirm => 'Add contact';
 
   @override
-  String get contactProfileStatusPlaceholder => 'No status yet';
+  String get contactAddAlready => 'Already in your contacts';
+
+  @override
+  String get contactAddSent => 'Contact request sent';
+
+  @override
+  String get contactProfileOpenChat => 'Otwórz czat';
+
+  @override
+  String get contactProfileRemove => 'Usuń kontakt';
+
+  @override
+  String get contactProfileBlock => 'Zablokuj użytkownika';
+
+  @override
+  String get contactProfileStatusPlaceholder => 'Brak statusu';
+
+  @override
+  String get contactProfileEmergencyChat => 'Czat awaryjny';
+
+  @override
+  String get contactPin => 'Przypnij na górze';
+
+  @override
+  String get contactUnpin => 'Odepnij';
+
+  @override
+  String get contactUnblock => 'Odblokuj';
+
+  @override
+  String get contactsSectionPinned => 'Przypięte';
+
+  @override
+  String get contactStatusLabel => 'Status';
+
+  @override
+  String get contactStatusHint => 'Podziel się statusem ze swoimi kontaktami…';
+
+  @override
+  String get contactStatusSave => 'Zapisz status';
+
+  @override
+  String get contactStatusUpdated => 'Status zaktualizowany';
 
   @override
   String contactRemoveConfirmTitle(String name) {
-    return 'Remove $name?';
+    return 'Usunąć $name?';
   }
 
   @override
   String get contactRemoveConfirmBody =>
-      'This removes them from your contact list. You can add them again later.';
+      'Usuwa tę osobę z listy kontaktów. Możesz dodać ją ponownie później.';
 
   @override
   String contactBlockConfirmTitle(String name) {
-    return 'Block $name?';
+    return 'Zablokować $name?';
   }
 
   @override
   String get contactBlockConfirmBody =>
-      'They won\'t be able to contact you or send contact requests.';
+      'Ta osoba nie będzie mogła się z Tobą kontaktować ani wysyłać próśb o kontakt.';
 
   @override
-  String get settingsBlockedContacts => 'Blocked Contacts';
+  String get settingsBlockedContacts => 'Zablokowane kontakty';
 
   @override
-  String get settingsBlockedEmpty => 'No blocked contacts';
+  String get settingsBlockedEmpty => 'Brak zablokowanych kontaktów';
 
   @override
-  String get commonRemove => 'Remove';
+  String get commonRemove => 'Usuń';
 
   @override
-  String get commonBlock => 'Block';
+  String get commonBlock => 'Zablokuj';
 
   @override
   String get contactProfileChatNotFound =>
-      'No chat found for this contact — it may have been deleted';
+      'Nie znaleziono czatu dla tego kontaktu — mógł zostać usunięty';
 
   @override
-  String get gestureSwipeForContacts => 'Swipe from left edge for contacts';
+  String get emergencyChatStart => 'Rozpocznij czat awaryjny';
+
+  @override
+  String emergencyChatConfirmTitle(String name) {
+    return 'Rozpocząć czat awaryjny z $name?';
+  }
+
+  @override
+  String emergencyChatConfirmBody(String name) {
+    return 'Nie istnieje aktywny czat z $name. Spowoduje to rozpoczęcie 12-godzinnego czatu Time Wilt utworzonego zdalnie, bez parowania osobiście. Istniejący zwiędły czat i jego wiadomości zostaną trwale zniszczone i nigdy nie będzie można go naładować.';
+  }
+
+  @override
+  String get emergencyChatAlreadyActive =>
+      'Masz już aktywny czat z tym kontaktem';
+
+  @override
+  String get emergencyChatStarted => 'Czat awaryjny rozpoczęty';
+
+  @override
+  String get chatsEmergencyPendingSubtitle => 'Łączenie czatu awaryjnego…';
+
+  @override
+  String chatsEmergencyPendingSnackBar(String name) {
+    return 'Czat awaryjny z $name oczekuje na połączenie.';
+  }
+
+  @override
+  String get emergencyChatPending => 'Czat awaryjny w toku…';
+
+  @override
+  String get gestureSwipeForContacts =>
+      'Przesuń od lewej krawędzi, aby otworzyć kontakty';
+
+  @override
+  String get contactProfileSafetyNumber => 'Odcisk klucza tożsamości';
+
+  @override
+  String get contactProfileWiltedHint =>
+      'Rozpocznij tymczasowy 12-godzinny czat Time Wilt';
+
+  @override
+  String get commonCopy => 'Kopiuj';
+
+  @override
+  String get commonCopied => 'Skopiowano do schowka';
+
+  @override
+  String eventMentionTitle(String name) {
+    return '$name wspomniał o Tobie';
+  }
+
+  @override
+  String eventReplyTitle(String name) {
+    return '$name odpowiedział Ci';
+  }
+
+  @override
+  String get chatNotificationModeAll => 'Wszystkie wiadomości';
+
+  @override
+  String get chatNotificationModeMentions => 'Tylko wzmianki i odpowiedzi';
+
+  @override
+  String get chatNotificationModeMuted => 'Wycisz (Bez dźwięku)';
+
+  @override
+  String get chatNotificationSettingsTitle => 'Powiadomienia';
+
+  @override
+  String get chatMuteTitle => 'Wycisz czat';
+
+  @override
+  String get chatUnmuteTitle => 'Wyłącz wyciszenie czatu';
+
+  @override
+  String get settingsNotifyCategories => 'Kategorie';
+
+  @override
+  String get settingsNotifyDirectMessages => 'Wiadomości bezpośrednie';
+
+  @override
+  String get settingsNotifyDirectMessagesSubtitle =>
+      'Powiadomienia dla czatów 1:1';
+
+  @override
+  String get settingsNotifyGroupMessages => 'Wiadomości grupowe';
+
+  @override
+  String get settingsNotifyGroupMessagesSubtitle =>
+      'Powiadomienia dla czatów grupowych';
+
+  @override
+  String get settingsNotifyEvents => 'Zdarzenia bezpieczeństwa i aktywności';
+
+  @override
+  String get settingsNotifyEventsSubtitle =>
+      'Prośby o kontakt, głosowania nad zniszczeniem grupy, alerty o zrzutach ekranu';
+
+  @override
+  String get settingsMutedChatsTitle => 'Wyciszone czaty';
+
+  @override
+  String get settingsNoMutedChats => 'Brak wyciszonych czatów';
+
+  @override
+  String get settingsUnmute => 'Wyłącz wyciszenie';
+
+  @override
+  String get settingsCheckForUpdates => 'Sprawdź aktualizacje';
+
+  @override
+  String get settingsCheckingUpdates => 'Sprawdzanie aktualizacji...';
+
+  @override
+  String settingsUpdateAvailable(String version) {
+    return 'Dostępna aktualizacja: v$version';
+  }
+
+  @override
+  String get settingsUpToDate => 'WiltKey jest aktualny';
+
+  @override
+  String get settingsWhatsNew => 'Co nowego';
 }

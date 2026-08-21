@@ -78,6 +78,12 @@ extension AppStateDownloads on AppState {
     String meta,
     int size,
   ) async {
+    // Hard block: drop file offers from blocked peers immediately.
+    if (await WiltkeyDatabase.instance.isContactBlocked(senderId)) {
+      log('[Download] Dropping FILE_OFFER from blocked peer $senderId');
+      return;
+    }
+
     Map<String, dynamic> env;
     try {
       env = jsonDecode(meta) as Map<String, dynamic>;

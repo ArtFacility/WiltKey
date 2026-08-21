@@ -127,6 +127,7 @@
   "notificationModeInstant": "即时通知",
   "notificationModeInstantDesc": "可选。在后台保持一条端到端加密连接，实时同步收到的消息，并通过一条常驻通知显示。出于隐私考虑，Wiltkey 使用此方式而非 Google 或 Apple 的推送服务，因此即使没有 Google Play 服务也能正常工作——代价是更耗电。",
   "notificationNewMessageBody": "你收到一条消息",
+  "notificationEmergencyChatBody": "紧急聊天请求",
   "notificationSecureLinkActive": "正在同步安全消息",
   "onboardingNotificationsTitle": "通知",
   "onboardingNotificationsExplanation": "Wiltkey 不使用 Google 或 Apple 的推送通知——你的消息不会以任何形式经过它们的服务器。请选择你希望的提醒方式。你随时可以在“设置”中更改。",
@@ -460,6 +461,10 @@
   "chatVoiceComingSoon": "语音消息即将推出。",
   "chatVoiceHoldHint": "按住以录制语音消息。",
   "chatVoiceReleaseCancel": "松开以取消",
+  "chatVoiceSlideToCancel": "滑动以取消",
+  "chatVoiceSlideToLock": "上滑以锁定",
+  "chatVoiceCancel": "取消录音",
+  "chatVoiceSend": "发送语音消息",
   "chatVoicePermissionDenied": "录制语音消息需要麦克风权限。",
   "chatVoiceQualityLofi": "低保真",
   "chatVoiceQualityVoice": "语音",
@@ -512,6 +517,24 @@
   "groupHost": "房主",
   "groupMember": "成员",
   "groupDepleted": "容量已耗尽",
+  "eventContactRequestTitle": "{name} 向你发送了联系人请求",
+  "@eventContactRequestTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "eventContactRequestBody": "轻触以在聊天中接受或拒绝",
+  "eventContactRemovedTitle": "{name} 移除了你",
+  "@eventContactRemovedTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "eventContactRemovedBody": "对方已把你从联系人中移除",
   "groupSyncingFromMember": "正在从 {name} 同步群组详情和消息...",
   "@groupSyncingFromMember": {
     "placeholders": {
@@ -807,5 +830,161 @@
   "timeWiltLifetimeHours": "{count} 小时",
   "timeWiltLifetimeMinutes": "{count} 分钟",
   "timeWiltLifetimeMonths": "{count} 个月",
-  "timeWiltLifetimeMoments": "片刻"
+  "timeWiltLifetimeMoments": "片刻",
+  "contactAddTitle": "Add contact",
+  "contactAddBody": "Add {name} to your contacts?",
+  "contactAddConfirm": "Add contact",
+  "contactAddAlready": "Already in your contacts",
+  "contactAddSent": "Contact request sent",
+  "contactPin": "置顶",
+  "contactUnpin": "取消置顶",
+  "contactUnblock": "解除屏蔽",
+  "contactsSectionPinned": "置顶",
+  "contactStatusLabel": "状态",
+  "contactStatusHint": "和你的联系人分享状态…",
+  "contactStatusSave": "保存状态",
+  "contactStatusUpdated": "状态已更新",
+  "contactProfileEmergencyChat": "紧急聊天",
+  "emergencyChatStart": "开始紧急聊天",
+  "emergencyChatConfirmTitle": "和 {name} 开始紧急聊天？",
+  "@emergencyChatConfirmTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "emergencyChatConfirmBody": "目前没有与 {name} 的活跃聊天。这将创建一个远程的 12 小时 Time Wilt 聊天，无需面对面配对。现有的已枯萎聊天及其消息将被永久销毁，并且永远无法重新充能。",
+  "@emergencyChatConfirmBody": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "emergencyChatAlreadyActive": "你已经与这位联系人有一个活跃的聊天",
+  "emergencyChatStarted": "紧急聊天已开始",
+  "settingsProfileChipTemplateSave": "保存为模板",
+  "settingsProfileTemplateSaved": "已保存到模板",
+  "settingsProfileTemplatesButton": "从模板选择",
+  "settingsProfileTemplatesTitle": "已保存的模板",
+  "settingsProfileNoTemplates": "暂无保存的模板",
+  "settingsProfileTemplateEquipped": "已应用头像模板",
+  "groupTimeWiltToggle": "Time Wilt 群组",
+  "groupTimeWiltToggleSub": "限时有效，无限流量。倒计时结束后群组变为只读；再次与房主面对面即可续期。",
+  "groupTimeWiltMembersLabel": "最大成员数",
+  "groupTimeWiltMembersUpsell": "升级 Plus 解锁最多 100 位成员",
+  "groupTimeWiltHostInfinite": "房主 · ∞",
+  "groupTimeWiltRenewComposer": "已过期 — 请再次与房主碰面以续期访问权限",
+  "groupTimeWiltHostAllWilted": "所有成员均已过期 — 与任意成员碰面即可重新激活群组",
+  "groupNukeProposeButton": "发起全员销毁提案",
+  "groupNukeProposeTitle": "为所有人销毁此群组？",
+  "groupNukeProposeBody": "将发起全员投票。若多数同意，群组及历史记录将在所有设备上彻底销毁。此操作无法撤销。",
+  "groupNukeProposeConfirm": "发起提案",
+  "groupNukeVoteTitle": "销毁群组？",
+  "groupNukeVoteBody": "有成员提议为所有人销毁此群组。若多数同意，将在所有设备上彻底清除。",
+  "groupNukeVoteAllow": "同意",
+  "groupNukeVoteDeny": "保留",
+  "groupNukeVotePending": "等待成员投票中…",
+  "groupNukeVotePassed": "群组已被多数投票销毁。",
+  "groupNukeVoteFailed": "销毁群组的提案未获通过。",
+  "groupNukeVoteSent": "提案已发送 — 正在等待成员投票。",
+  "activityTitle": "动态",
+  "activityEmpty": "暂无动态记录。聊天销毁等事件将显示在此处。",
+  "activityClear": "清除",
+  "activityClearConfirmTitle": "清除所有动态？",
+  "activityClearConfirmBody": "这将从此设备清除所有动态记录。此操作无法撤销。",
+  "eventNukeReceivedTitle": "聊天已销毁",
+  "eventNukeReceivedBody": "一条加密聊天已被销毁。",
+  "eventGroupNukedTitle": "群组已销毁",
+  "eventGroupNukedBody": "一个加密群组已被销毁。",
+  "themePreviewSectionProfile": "个人主页背景",
+  "themePreviewFullscreenProfile": "全屏个人主页预览",
+  "linkWarningTitle": "外部链接警告",
+  "linkWarningBody": "您即将通过浏览器打开外部链接。这将连接到目标服务器并暴露您的 IP 地址。",
+  "linkWarningOpen": "在浏览器中打开",
+  "linkWarningCopy": "复制链接",
+  "linkWarningCopied": "链接已复制到剪贴板",
+  "chatActionEdit": "编辑",
+  "chatActionDelete": "删除",
+  "chatEditingBanner": "正在编辑消息",
+  "chatCancelEdit": "取消编辑",
+  "chatDeleteTitle": "删除消息",
+  "chatDeleteBody": "确定要为所有人删除此消息吗？",
+  "chatDeleteConfirm": "删除",
+  "chatMessageDeleted": "[消息已删除]",
+  "chatEditedTag": "已编辑",
+  "shopPlusBenefitTimeWiltGroups": "主持更大的 Time Wilt 群组 — 最多 100 人（免费版为 20 人）。",
+  "navContacts": "联系人",
+  "contactsTitle": "联系人",
+  "contactsSectionFriends": "好友",
+  "contactsEmptyTitle": "暂无联系人",
+  "contactsEmptyBody": "从现有聊天中添加好友即可显示在此处。",
+  "contactsOwnProfile": "您的个人资料",
+  "contactsOwnProfileHint": "点击设置状态或限时动态",
+  "contactRequestSent": "已向 {name} 发送联系人请求",
+  "contactRequestReceived": "{name} 请求添加您为联系人",
+  "contactRequestApproved": "已接受联系人请求",
+  "contactRequestDeclined": "已拒绝联系人请求",
+  "contactRequestApprove": "接受",
+  "contactRequestDeny": "拒绝",
+  "contactProfileOpenChat": "打开聊天",
+  "contactProfileRemove": "删除联系人",
+  "contactProfileBlock": "屏蔽用户",
+  "contactProfileStatusPlaceholder": "暂无状态",
+  "contactRemoveConfirmTitle": "删除联系人 {name}？",
+  "contactRemoveConfirmBody": "将从此联系人列表中移除。您稍后可以重新添加。",
+  "contactBlockConfirmTitle": "屏蔽 {name}？",
+  "contactBlockConfirmBody": "对方将无法联系您或向您发送联系人请求。",
+  "settingsBlockedContacts": "已屏蔽的联系人",
+  "settingsBlockedEmpty": "无屏蔽联系人",
+  "commonRemove": "删除",
+  "commonBlock": "屏蔽",
+  "contactProfileChatNotFound": "未找到此联系人的聊天记录 — 可能已被删除",
+  "chatsEmergencyPendingSubtitle": "正在连接紧急聊天…",
+  "chatsEmergencyPendingSnackBar": "与 {name} 的紧急聊天正在等待对方连接。",
+  "emergencyChatPending": "紧急聊天连接中…",
+  "gestureSwipeForContacts": "从左边缘滑动即可打开联系人",
+  "contactProfileSafetyNumber": "身份密钥指纹",
+  "contactProfileWiltedHint": "发起临时 12 小时 Time Wilt 聊天",
+  "commonCopy": "复制",
+  "commonCopied": "已复制到剪贴板",
+  "eventMentionTitle": "{name} 提到了你",
+  "@eventMentionTitle": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "eventReplyTitle": "{name} 回复了你",
+  "@eventReplyTitle": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "chatNotificationModeAll": "所有消息",
+  "chatNotificationModeMentions": "仅提及与回复",
+  "chatNotificationModeMuted": "静音（无声）",
+  "chatNotificationSettingsTitle": "通知",
+  "chatMuteTitle": "静音聊天",
+  "chatUnmuteTitle": "取消静音聊天",
+  "settingsNotifyCategories": "类别",
+  "settingsNotifyDirectMessages": "私聊消息",
+  "settingsNotifyDirectMessagesSubtitle": "一对一聊天消息通知",
+  "settingsNotifyGroupMessages": "群聊消息",
+  "settingsNotifyGroupMessagesSubtitle": "群聊消息通知",
+  "settingsNotifyEvents": "安全与动态事件",
+  "settingsNotifyEventsSubtitle": "联系人请求、群组全员销毁投票、截图警报",
+  "settingsMutedChatsTitle": "已静音的聊天",
+  "settingsNoMutedChats": "无静音聊天",
+  "settingsUnmute": "取消静音",
+  "settingsCheckForUpdates": "检查更新",
+  "settingsCheckingUpdates": "正在检查更新...",
+  "settingsUpdateAvailable": "有可用更新: v{version}",
+  "@settingsUpdateAvailable": {
+    "placeholders": {
+      "version": { "type": "String" }
+    }
+  },
+  "settingsUpToDate": "WiltKey 已是最新版本",
+  "settingsWhatsNew": "更新内容"
 }

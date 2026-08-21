@@ -143,6 +143,19 @@ class _ChatsTabState extends State<ChatsTab> {
   }
 
   void _openContact(Contact c) {
+    if (c.isPendingEmergency) {
+      final l10n = AppLocalizations.of(context)!;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: context.wk.surface,
+          content: Text(
+            l10n.chatsEmergencyPendingSnackBar(c.name),
+            style: context.wk.bodySecondary.copyWith(color: context.wk.warning),
+          ),
+        ),
+      );
+      return;
+    }
     _appState.selectContact(c);
     Navigator.push(
       context,
@@ -180,59 +193,196 @@ class _ChatsTabState extends State<ChatsTab> {
                   ),
                 ),
               ),
-              if (!c.isArchived)
+              if (c.isPendingEmergency) ...[
                 ListTile(
-                  leading: Icon(
-                    c.isPinned ? Icons.push_pin : Icons.push_pin_outlined,
-                    color: t.action,
-                  ),
+                  leading: Icon(Icons.delete_outline, color: t.danger),
                   title: Text(
-                    c.isPinned ? l10n.chatsActionUnpin : l10n.chatsActionPin,
-                    style: t.body,
+                    l10n.chatsActionDelete,
+                    style: t.body.copyWith(color: t.danger),
                   ),
                   onTap: () {
                     Navigator.pop(sheetContext);
-                    _appState.togglePin(c.keyHash);
-                  },
-                ),
-              if (!c.isArchived)
-                ListTile(
-                  leading: Icon(Icons.inventory_2_outlined, color: t.action),
-                  title: Text(l10n.chatsActionArchive, style: t.body),
-                  onTap: () {
-                    Navigator.pop(sheetContext);
-                    _confirmArchive(c);
-                  },
-                ),
-              ListTile(
-                leading: Icon(
-                  c.isArchived
-                      ? Icons.delete_outline
-                      : Icons.local_fire_department_outlined,
-                  color: t.danger,
-                ),
-                title: Text(
-                  c.isArchived ? l10n.chatsActionDelete : l10n.chatsActionNuke,
-                  style: t.body.copyWith(color: t.danger),
-                ),
-                onTap: () {
-                  Navigator.pop(sheetContext);
-                  if (c.isArchived) {
                     NukeConfirmDialog.show(
                       context,
                       () => _appState.deleteChatLocally(c.keyHash),
                     );
-                  } else {
-                    NukeConfirmDialog.show(
-                      context,
-                      () => _appState.nukeContact(
-                        c.keyHash,
-                        receivedFromPeer: false,
-                      ),
-                    );
-                  }
+                  },
+                ),
+              ] else ...[
+                if (!c.isArchived)
+                  ListTile(
+                    leading: Icon(
+                      c.isPinned ? Icons.push_pin : Icons.push_pin_outlined,
+                      color: t.action,
+                    ),
+                    title: Text(
+                      c.isPinned ? l10n.chatsActionUnpin : l10n.chatsActionPin,
+                      style: t.body,
+                    ),
+                    onTap: () {
+                      Navigator.pop(sheetContext);
+                      _appState.togglePin(c.keyHash);
+                    },
+                  ),
+                if (!c.isArchived)
+                  ListTile(
+                    leading: Icon(
+                      c.isMuted
+                          ? Icons.notifications_off_outlined
+                          : (c.isMentionsOnly
+                              ? Icons.alternate_email
+                              : Icons.notifications_outlined),
+                      color: t.action,
+                    ),
+                    title: Text(
+                      c.isGroup
+                          ? l10n.chatNotificationSettingsTitle
+                          : (c.isMuted ? l10n.chatUnmuteTitle : l10n.chatMuteTitle),
+                      style: t.body,
+                    ),
+                    subtitle: c.isGroup
+                        ? Text(
+                            c.isMuted
+                                ? l10n.chatNotificationModeMuted
+                                : (c.isMentionsOnly
+                                    ? l10n.chatNotificationModeMentions
+                                    : l10n.chatNotificationModeAll),
+                            style: t.bodySecondary.copyWith(fontSize: 12),
+                          )
+                        : null,
+                    onTap: () {
+                      Navigator.pop(sheetContext);
+                      if (c.isGroup) {
+                        _showGroupNotificationSettingsSheet(c);
+                      } else {
+                        _appState.setChatNotificationMode(
+                          c,
+                          c.isMuted ? 'all' : 'muted',
+                        );
+                      }
+                    },
+                  ),
+                if (!c.isArchived)
+                  ListTile(
+                    leading: Icon(Icons.inventory_2_outlined, color: t.action),
+                    title: Text(l10n.chatsActionArchive, style: t.body),
+                    onTap: () {
+                      Navigator.pop(sheetContext);
+                      _confirmArchive(c);
+                    },
+                  ),
+                ListTile(
+                  leading: Icon(
+                    c.isArchived
+                        ? Icons.delete_outline
+                        : Icons.local_fire_department_outlined,
+                    color: t.danger,
+                  ),
+                  title: Text(
+                    c.isArchived ? l10n.chatsActionDelete : l10n.chatsActionNuke,
+                    style: t.body.copyWith(color: t.danger),
+                  ),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    if (c.isArchived) {
+                      NukeConfirmDialog.show(
+                        context,
+                        () => _appState.deleteChatLocally(c.keyHash),
+                      );
+                    } else {
+                      NukeConfirmDialog.show(
+                        context,
+                        () => _appState.nukeContact(
+                          c.keyHash,
+                          receivedFromPeer: false,
+                        ),
+                      );
+                    }
+                  },
+                ),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showGroupNotificationSettingsSheet(Contact group) {
+    final t = context.wk;
+    final l10n = AppLocalizations.of(context)!;
+    final currentMode = group.notificationMode;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: t.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(t.radiusCard)),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+                child: Row(
+                  children: [
+                    Icon(Icons.notifications_outlined, color: t.action, size: 20),
+                    const SizedBox(width: 10),
+                    Text(
+                      l10n.chatNotificationSettingsTitle,
+                      style: t.screenTitle.copyWith(fontSize: 16),
+                    ),
+                  ],
+                ),
+              ),
+              ListTile(
+                leading: Icon(
+                  currentMode == 'all'
+                      ? Icons.radio_button_checked
+                      : Icons.radio_button_unchecked,
+                  color: currentMode == 'all' ? t.action : t.textTertiary,
+                ),
+                title: Text(l10n.chatNotificationModeAll, style: t.body),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _appState.setChatNotificationMode(group, 'all');
                 },
               ),
+              ListTile(
+                leading: Icon(
+                  currentMode == 'mentions_only'
+                      ? Icons.radio_button_checked
+                      : Icons.radio_button_unchecked,
+                  color:
+                      currentMode == 'mentions_only' ? t.action : t.textTertiary,
+                ),
+                title: Text(l10n.chatNotificationModeMentions, style: t.body),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _appState.setChatNotificationMode(group, 'mentions_only');
+                },
+              ),
+              ListTile(
+                leading: Icon(
+                  currentMode == 'muted'
+                      ? Icons.radio_button_checked
+                      : Icons.radio_button_unchecked,
+                  color: currentMode == 'muted' ? t.danger : t.textTertiary,
+                ),
+                title: Text(
+                  l10n.chatNotificationModeMuted,
+                  style: t.body.copyWith(
+                    color: currentMode == 'muted' ? t.danger : null,
+                  ),
+                ),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _appState.setChatNotificationMode(group, 'muted');
+                },
+              ),
+              const SizedBox(height: 8),
             ],
           ),
         );
@@ -532,7 +682,9 @@ class _ContactRow extends StatelessWidget {
 
     final l10n = AppLocalizations.of(context)!;
     final String subtitle;
-    if (c.isArchived) {
+    if (c.isPendingEmergency) {
+      subtitle = l10n.chatsEmergencyPendingSubtitle;
+    } else if (c.isArchived) {
       subtitle = l10n.chatsArchivedSubtitle;
     } else if (c.isWilted) {
       subtitle = l10n.chatsLockedSubtitle;
@@ -549,9 +701,13 @@ class _ContactRow extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 6),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: wilted ? Colors.transparent : t.surface,
+          color: c.isPendingEmergency
+              ? t.warning.withValues(alpha: 0.05)
+              : (wilted ? Colors.transparent : t.surface),
           border: Border.all(
-            color: wilted ? t.budgetWilted.withValues(alpha: 0.4) : t.border,
+            color: c.isPendingEmergency
+                ? t.warning.withValues(alpha: 0.4)
+                : (wilted ? t.budgetWilted.withValues(alpha: 0.4) : t.border),
             width: t.borderWidth,
           ),
           borderRadius: BorderRadius.circular(t.radiusCard),
@@ -579,7 +735,47 @@ class _ContactRow extends StatelessWidget {
                           style: t.body.copyWith(fontWeight: FontWeight.w600),
                         ),
                       ),
-                      if (c.isArchived) ...[
+                      if (c.isPendingEmergency) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: t.warning.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(t.radiusPill),
+                            border: Border.all(
+                              color: t.warning,
+                              width: t.borderWidth,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              SizedBox(
+                                width: 8,
+                                height: 8,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 1.5,
+                                  color: t.warning,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                t.uppercaseLabels
+                                    ? 'CONNECTING'
+                                    : 'Connecting',
+                                style: t.badgeLabel.copyWith(
+                                  color: t.warning,
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ] else if (c.isArchived) ...[
                         const SizedBox(width: 8),
                         context.wkc.statusBadge(
                           context,
@@ -596,6 +792,21 @@ class _ContactRow extends StatelessWidget {
                         const SizedBox(width: 6),
                         Icon(Icons.push_pin, size: 13, color: t.textTertiary),
                       ],
+                      if (c.isMuted) ...[
+                        const SizedBox(width: 6),
+                        Icon(
+                          Icons.notifications_off_outlined,
+                          size: 13,
+                          color: t.textTertiary,
+                        ),
+                      ] else if (c.isMentionsOnly) ...[
+                        const SizedBox(width: 6),
+                        Icon(
+                          Icons.alternate_email,
+                          size: 13,
+                          color: t.textTertiary,
+                        ),
+                      ],
                     ],
                   ),
                   const SizedBox(height: 2),
@@ -603,12 +814,19 @@ class _ContactRow extends StatelessWidget {
                     subtitle,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: t.bodySecondary,
+                    style: t.bodySecondary.copyWith(
+                      color: c.isPendingEmergency ? t.warning : null,
+                    ),
                   ),
                   const SizedBox(height: 4),
                   // Time Wilt has no byte budget — the "row below" carries the
                   // lifetime countdown instead of the me/peer byte readout.
-                  if (c.isTimeWilt)
+                  if (c.isPendingEmergency)
+                    Text(
+                      'Waiting for contact to connect…',
+                      style: t.dataMono.copyWith(color: t.warning),
+                    )
+                  else if (c.isTimeWilt)
                     Text(
                       c.isArchived
                           ? (t.uppercaseLabels ? 'WILTED' : 'Wilted')

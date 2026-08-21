@@ -5,6 +5,7 @@ import '../../../core/models.dart';
 import '../../../core/pixel_art_avatar.dart';
 import '../../../core/theme/wk.dart';
 import '../../../features/shell/presentation/app_shell.dart';
+import 'blocked_contacts_screen.dart';
 import 'contact_profile_screen.dart';
 
 /// The Contacts tab: a panel showing the user's own profile row at the top,
@@ -105,6 +106,20 @@ class _ContactListScreenState extends State<ContactListScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            ListTile(
+              leading: Icon(
+                contact.isPinned ? Icons.push_pin : Icons.push_pin_outlined,
+                color: contact.isPinned ? t.action : t.textPrimary,
+              ),
+              title: Text(
+                contact.isPinned ? l10n.contactUnpin : l10n.contactPin,
+                style: t.body,
+              ),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                _appState.togglePinSocialContact(contact.keyHash);
+              },
+            ),
             ListTile(
               leading: Icon(Icons.person_remove_outlined, color: t.action),
               title: Text(l10n.contactProfileRemove, style: t.body),
@@ -246,36 +261,59 @@ class _ContactListScreenState extends State<ContactListScreen> {
           ),
           backgroundColor: t.bg,
           elevation: 0,
+          actions: [
+            IconButton(
+              tooltip: l10n.settingsBlockedContacts,
+              icon: Icon(Icons.block_outlined, color: t.textTertiary),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const BlockedContactsScreen(),
+                  ),
+                );
+              },
+            ),
+          ],
         ),
-        body: contacts.isEmpty
-            ? _EmptyState()
-            : ListView(
-                padding: EdgeInsets.fromLTRB(
-                  16,
-                  8,
-                  16,
-                  24 + MediaQuery.of(context).viewPadding.bottom,
+        body: ListView(
+              padding: EdgeInsets.fromLTRB(
+                16,
+                8,
+                16,
+                24 + MediaQuery.of(context).viewPadding.bottom,
+              ),
+              children: [
+                // Own profile row (always visible, pinned top)
+                _OwnProfileRow(
+                  avatarHex: _ownAvatarHex(),
+                  name: _appState.effectiveDeviceName,
+                  shortNick: _appState.effectiveShortNick,
+                  avatarBorderId: _appState.equippedAvatarBorderId,
+                  statusEmoji: _appState.effectiveStatusEmoji,
+                  statusMessage: _appState.effectiveStatusMessage,
+                  onTap: _openSelfProfile,
                 ),
-                children: [
-                  // Own profile row (thicker, clickable)
-                  _OwnProfileRow(
-                    avatarHex: _ownAvatarHex(),
-                    name: _appState.effectiveDeviceName,
-                    shortNick: _appState.effectiveShortNick,
-                    avatarBorderId: _appState.equippedAvatarBorderId,
-                    onTap: _openSelfProfile,
-                  ),
-                  const SizedBox(height: 16),
+                const SizedBox(height: 16),
+                if (contacts.isEmpty) ...[
+                  // Empty state below the own profile
+                  _EmptyState(),
+                ] else ...[
+                  // Pinned favorites float to the top (DB already orders them
+                  // pinned-first); split into its own section when present.
+                  if (contacts.any((c) => c.isPinned)) ...[
+                    _SectionLabel(text: l10n.contactsSectionPinned),
+                    ...contacts
+                        .where((c) => c.isPinned)
+                        .map((c) => _ContactRow(
+                              contact: c,
+                              avatarHex: _avatarHex(c),
+                              onTap: () => _openContactProfile(c),
+                              onLongPress: () => _showContactActions(c),
+                            )),
+                  ],
                   // Section label
-                  Padding(
-                    padding: const EdgeInsets.only(left: 4, bottom: 8),
-                    child: Text(
-                      t.uppercaseLabels
-                          ? l10n.contactsSectionFriends.toUpperCase()
-                          : l10n.contactsSectionFriends,
-                      style: t.sectionLabel.copyWith(color: t.textTertiary),
-                    ),
-                  ),
+                  _SectionLabel(text: l10n.contactsSectionFriends),
                   // Contact list
                   ...contacts.map((c) => _ContactRow(
                         contact: c,
@@ -284,7 +322,8 @@ class _ContactListScreenState extends State<ContactListScreen> {
                         onLongPress: () => _showContactActions(c),
                       )),
                 ],
-              ),
+              ],
+            ),
       ),
     );
   }
@@ -295,6 +334,8 @@ class _OwnProfileRow extends StatelessWidget {
   final String name;
   final String shortNick;
   final String? avatarBorderId;
+  final String statusEmoji;
+  final String statusMessage;
   final VoidCallback onTap;
 
   const _OwnProfileRow({
@@ -302,6 +343,8 @@ class _OwnProfileRow extends StatelessWidget {
     required this.name,
     required this.shortNick,
     this.avatarBorderId,
+    this.statusEmoji = '',
+    this.statusMessage = '',
     required this.onTap,
   });
 
@@ -319,10 +362,37 @@ class _OwnProfileRow extends StatelessWidget {
         ),
         child: Row(
           children: [
-            PixelArtAvatar(
-              hexString: avatarHex,
-              size: 56,
-              borderId: avatarBorderId,
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                PixelArtAvatar(
+                  hexString: avatarHex,
+                  size: 56,
+                  borderId: avatarBorderId,
+                ),
+                if (statusEmoji.isNotEmpty)
+                  Positioned(
+                    bottom: -2,
+                    right: -2,
+                    child: Container(
+                      width: 22,
+                      height: 22,
+                      decoration: BoxDecoration(
+                        color: t.surface,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: t.border,
+                          width: t.borderWidth,
+                        ),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        statusEmoji,
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -362,8 +432,17 @@ class _OwnProfileRow extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    AppLocalizations.of(context)!.contactsOwnProfileHint,
-                    style: t.bodySecondary.copyWith(fontSize: 12),
+                    statusMessage.isNotEmpty
+                        ? statusMessage
+                        : AppLocalizations.of(context)!.contactsOwnProfileHint,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: t.bodySecondary.copyWith(
+                      fontSize: 12,
+                      color: statusMessage.isNotEmpty
+                          ? t.textPrimary
+                          : t.textSecondary,
+                    ),
                   ),
                 ],
               ),
@@ -371,6 +450,24 @@ class _OwnProfileRow extends StatelessWidget {
             Icon(Icons.chevron_right, color: t.textTertiary, size: 20),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _SectionLabel extends StatelessWidget {
+  final String text;
+
+  const _SectionLabel({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.wk;
+    return Padding(
+      padding: const EdgeInsets.only(left: 4, bottom: 8, top: 4),
+      child: Text(
+        t.uppercaseLabels ? text.toUpperCase() : text,
+        style: t.sectionLabel.copyWith(color: t.textTertiary),
       ),
     );
   }
@@ -392,6 +489,12 @@ class _ContactRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.wk;
+    final status = contact.activeStatus;
+    final emoji = contact.activeStatusEmoji;
+    final hasStatus =
+        (status != null && status.isNotEmpty) ||
+        (emoji != null && emoji.isNotEmpty);
+
     return GestureDetector(
       onTap: onTap,
       onLongPress: onLongPress,
@@ -405,10 +508,34 @@ class _ContactRow extends StatelessWidget {
         ),
         child: Row(
           children: [
-            PixelArtAvatar(
-              hexString: avatarHex,
-              size: 44,
-              borderId: contact.avatarBorderId,
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                PixelArtAvatar(
+                  hexString: avatarHex,
+                  size: 44,
+                  borderId: contact.avatarBorderId,
+                ),
+                if (emoji != null && emoji.isNotEmpty)
+                  Positioned(
+                    bottom: -2,
+                    right: -2,
+                    child: Container(
+                      width: 18,
+                      height: 18,
+                      decoration: BoxDecoration(
+                        color: t.surface,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: t.border,
+                          width: t.borderWidth,
+                        ),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(emoji, style: const TextStyle(fontSize: 10)),
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(width: 13),
             Expanded(
@@ -416,16 +543,39 @@ class _ContactRow extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    contact.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: t.body.copyWith(fontWeight: FontWeight.w600),
+                  Row(
+                    children: [
+                      if (contact.isPinned) ...[
+                        Icon(Icons.push_pin, size: 14, color: t.action),
+                        const SizedBox(width: 4),
+                      ],
+                      Flexible(
+                        child: Text(
+                          contact.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: t.body.copyWith(fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 2),
-                  if (contact.shortNick != null && contact.shortNick!.isNotEmpty)
+                  if (hasStatus)
+                    Text(
+                      status ?? '',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: t.bodySecondary.copyWith(
+                        fontSize: 12,
+                        color: t.textPrimary,
+                      ),
+                    )
+                  else if (contact.shortNick != null &&
+                      contact.shortNick!.isNotEmpty)
                     Text(
                       '@${contact.shortNick}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: t.bodySecondary.copyWith(fontSize: 12),
                     ),
                 ],

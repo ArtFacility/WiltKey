@@ -128,6 +128,9 @@ extension AppStateAuth on AppState {
     deviceName = fullData['deviceName'] ?? '';
     shortNick = fullData['shortNick'] ?? '';
     profileImageB64 = fullData['profileImageB64'] ?? '';
+    statusMessage = fullData['statusMessage'] ?? '';
+    statusEmoji = fullData['statusEmoji'] ?? '';
+    statusExpiresAtMs = fullData['statusExpiresAtMs'] as int?;
 
     if (fullData['useLocalDevRelay'] != null) {
       useLocalDevRelay = fullData['useLocalDevRelay']!;
@@ -159,6 +162,8 @@ extension AppStateAuth on AppState {
     await WiltkeyDatabase.instance.init();
     contacts = await WiltkeyDatabase.instance.getAllContacts();
     await loadEvents(); // hydrate the activity feed + its unread badge
+    await loadSocialContacts(); // hydrate the friends list (persisted between launches)
+    await loadNotificationPreferences(); // hydrate notification category preferences & muted list
     log(
       '[Load] ${contacts.length} contact(s): '
       '${contacts.map((c) => "${c.id}:${c.keyHash.substring(0, c.keyHash.length >= 8 ? 8 : c.keyHash.length)}").join(", ")}',
@@ -238,6 +243,9 @@ extension AppStateAuth on AppState {
     // permission so they don't have to toggle the mode by hand). Fire-and-forget
     // so a permission prompt / network call doesn't stall the unlock.
     reconcileInstantModeAfterUpgrade();
+
+    // Check for available updates in the background (throttled).
+    UpdateService.instance.checkForUpdates();
 
     log('App unlocked. WebSocket connected.');
   }

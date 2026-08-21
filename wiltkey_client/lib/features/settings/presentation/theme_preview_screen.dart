@@ -5,6 +5,7 @@ import '../../../core/pixel_art_avatar.dart';
 import '../../../core/theme/theme_controller.dart';
 import '../../../core/theme/theme_registry.dart';
 import '../../../core/theme/wiltkey_components.dart';
+import '../../../core/theme/wiltkey_tokens.dart';
 import '../../../core/theme/wk.dart';
 import '../../shop/presentation/shop_screen.dart';
 
@@ -245,6 +246,15 @@ class _ThemePreviewScreenState extends State<ThemePreviewScreen> {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 22),
+
+                  // --- Placeholder Contact Profile ---
+                  context.wkc.screenTitle(
+                    context,
+                    l10n.themePreviewSectionProfile,
+                  ),
+                  const SizedBox(height: 12),
+                  _sampleProfileCard(context, t, l10n),
                 ],
               ),
             ),
@@ -460,6 +470,376 @@ class _ThemePreviewScreenState extends State<ThemePreviewScreen> {
         child: Text(
           text,
           style: t.body.copyWith(color: me ? t.bubbleMeText : t.textPrimary),
+        ),
+      ),
+    );
+  }
+
+  Widget _sampleProfileCard(
+    BuildContext context,
+    WiltkeyTokens t,
+    AppLocalizations l10n,
+  ) {
+    const String sampleGrid =
+        '0000000000000000000000000000000000000000000000000000000000000000';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          height: 380,
+          decoration: BoxDecoration(
+            border: Border.all(color: t.border, width: t.borderWidth),
+            borderRadius: BorderRadius.circular(t.radiusCard),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.25),
+                blurRadius: 8,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: context.wkc.profileBackdrop(
+            seed: 42,
+            child: Scaffold(
+              backgroundColor: Colors.transparent,
+              appBar: AppBar(
+                automaticallyImplyLeading: false,
+                backgroundColor: Colors.transparent,
+                elevation: 0,
+                title: Text(
+                  'Réka Kovács',
+                  style: t.screenTitle.copyWith(fontSize: 16),
+                ),
+                actions: [
+                  IconButton(
+                    icon: Icon(Icons.push_pin_outlined, color: t.textSecondary, size: 20),
+                    onPressed: () {},
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.more_vert, color: t.textPrimary, size: 20),
+                    onPressed: () {},
+                  ),
+                ],
+              ),
+              body: ListView(
+                physics: const NeverScrollableScrollPhysics(),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                children: [
+                  Center(
+                    child: Column(
+                      children: [
+                        const PixelArtAvatar(
+                          hexString: sampleGrid,
+                          size: 72,
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          'Réka Kovács',
+                          style: t.screenTitle.copyWith(fontSize: 18),
+                        ),
+                        const SizedBox(height: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: t.action.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(t.radiusPill),
+                          ),
+                          child: Text(
+                            '@REKA',
+                            style: t.badgeLabel.copyWith(
+                              color: t.action,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: t.surface,
+                      border: Border.all(color: t.border, width: t.borderWidth),
+                      borderRadius: BorderRadius.circular(t.radiusCard),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          l10n.contactStatusLabel,
+                          style: t.body.copyWith(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '🌿 Cultivating cryptographic peace & one-time pads',
+                          style: t.bodySecondary.copyWith(fontSize: 11.5),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  SizedBox(
+                    height: 40,
+                    child: ElevatedButton.icon(
+                      icon: const Icon(Icons.chat_bubble_rounded, size: 16),
+                      label: Text(
+                        l10n.contactProfileOpenChat,
+                        style: t.badgeLabel.copyWith(
+                          color: t.onAction,
+                          fontSize: 12,
+                        ),
+                      ),
+                      onPressed: () {},
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: t.action,
+                        foregroundColor: t.onAction,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(t.radiusControl),
+                        ),
+                        elevation: 0,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          width: double.infinity,
+          height: 42,
+          child: OutlinedButton.icon(
+            icon: const Icon(Icons.fullscreen, size: 18),
+            label: Text(
+              l10n.themePreviewFullscreenProfile,
+              style: t.badgeLabel.copyWith(fontSize: 12),
+            ),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => Theme(
+                    data: Theme.of(context),
+                    child: _FullscreenProfilePreview(
+                      descriptor: widget.descriptor,
+                    ),
+                  ),
+                ),
+              );
+            },
+            style: OutlinedButton.styleFrom(
+              foregroundColor: t.action,
+              side: BorderSide(color: t.action, width: t.borderWidth),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(t.radiusControl),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _FullscreenProfilePreview extends StatelessWidget {
+  final WiltkeyThemeDescriptor descriptor;
+  const _FullscreenProfilePreview({required this.descriptor});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.wk;
+    final l10n = AppLocalizations.of(context)!;
+    const String sampleGrid =
+        '0000000000000000000000000000000000000000000000000000000000000000';
+
+    return context.wkc.profileBackdrop(
+      seed: 42,
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          leading: IconButton(
+            icon: Icon(Icons.arrow_back, color: t.textPrimary),
+            onPressed: () => Navigator.pop(context),
+          ),
+          title: Text(
+            'Réka Kovács',
+            style: t.screenTitle.copyWith(fontSize: 18),
+          ),
+          actions: [
+            IconButton(
+              icon: Icon(Icons.push_pin_outlined, color: t.textSecondary),
+              tooltip: l10n.contactPin,
+              onPressed: () {},
+            ),
+            PopupMenuButton<String>(
+              icon: Icon(Icons.more_vert, color: t.textPrimary),
+              color: t.surface,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(t.radiusCard),
+                side: BorderSide(color: t.border, width: t.borderWidth),
+              ),
+              itemBuilder: (ctx) => [
+                PopupMenuItem(
+                  value: 'remove',
+                  child: Row(
+                    children: [
+                      Icon(Icons.person_remove_outlined, size: 18, color: t.warning),
+                      const SizedBox(width: 12),
+                      Text(l10n.contactProfileRemove, style: t.body.copyWith(color: t.warning)),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'block',
+                  child: Row(
+                    children: [
+                      Icon(Icons.block, size: 18, color: t.danger),
+                      const SizedBox(width: 12),
+                      Text(l10n.contactProfileBlock, style: t.body.copyWith(color: t.danger)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        body: ListView(
+          padding: EdgeInsets.fromLTRB(
+            20,
+            16,
+            20,
+            24 + MediaQuery.of(context).viewPadding.bottom,
+          ),
+          children: [
+            Center(
+              child: Column(
+                children: [
+                  const PixelArtAvatar(
+                    hexString: sampleGrid,
+                    size: 96,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Réka Kovács',
+                    style: t.screenTitle.copyWith(fontSize: 24),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: t.action.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(t.radiusPill),
+                    ),
+                    child: Text(
+                      '@REKA',
+                      style: t.badgeLabel.copyWith(
+                        color: t.action,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: t.surface,
+                border: Border.all(color: t.border, width: t.borderWidth),
+                borderRadius: BorderRadius.circular(t.radiusCard),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    l10n.contactStatusLabel,
+                    style: t.body.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '🌿 Cultivating cryptographic peace & one-time pads with full forward secrecy.',
+                    style: t.bodySecondary.copyWith(height: 1.5),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: t.surface,
+                border: Border.all(color: t.border, width: t.borderWidth),
+                borderRadius: BorderRadius.circular(t.radiusCard),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.fingerprint, size: 22, color: t.textSecondary),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          l10n.contactProfileSafetyNumber,
+                          style: t.badgeLabel.copyWith(
+                            color: t.textTertiary,
+                            fontSize: 11,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'a8f9c1e4b301...9d742e185c02',
+                          style: t.dataMono.copyWith(fontSize: 13, color: t.textPrimary),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(Icons.copy, size: 18, color: t.action),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton.icon(
+                icon: const Icon(Icons.chat_bubble_rounded, size: 20),
+                label: Text(
+                  l10n.contactProfileOpenChat,
+                  style: t.badgeLabel.copyWith(
+                    color: t.onAction,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                onPressed: () => Navigator.pop(context),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: t.action,
+                  foregroundColor: t.onAction,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(t.radiusControl),
+                  ),
+                  elevation: 0,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

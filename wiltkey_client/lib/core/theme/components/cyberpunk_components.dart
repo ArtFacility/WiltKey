@@ -205,7 +205,7 @@ class CyberpunkComponents
   );
 }
 
-// Cyberpunk profile backdrop: falling 0/1 rain columns (Matrix-style).
+// Cyberpunk profile backdrop: falling 0/1 & Katakana rain streams (Matrix-style).
 class _CyberpunkProfileBackdrop extends StatefulWidget {
   final Widget child;
   final int seed;
@@ -220,30 +220,30 @@ class _CyberpunkProfileBackdropState extends State<_CyberpunkProfileBackdrop>
     with SingleTickerProviderStateMixin {
   late final AnimationController _ticker;
   late final List<_RainColumn> _columns;
+  late final Stopwatch _clock;
 
   @override
   void initState() {
     super.initState();
     final r = math.Random(widget.seed);
-    _columns = List.generate(18, (i) {
+    const int colCount = 18;
+    _columns = List.generate(colCount, (i) {
       return _RainColumn(
-        x: r.nextDouble(),
-        speed: 0.3 + r.nextDouble() * 0.7,
-        length: 12 + r.nextInt(10),
+        xRatio: (i + 0.5 + (r.nextDouble() - 0.5) * 0.3) / colCount,
+        speed: 0.35 + r.nextDouble() * 0.65,
+        length: 10 + r.nextInt(12),
+        phase: r.nextDouble(),
         charSet: r.nextBool()
-            ? '01'
-            : '01アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン',
+            ? '01011001010111001010'
+            : '0123456789ABCDEFアイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン',
       );
     });
 
+    _clock = Stopwatch()..start();
     _ticker = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 1),
+      duration: const Duration(seconds: 10),
     )..repeat();
-
-    if (!context.reduceMotion) {
-      _ticker.forward();
-    }
   }
 
   @override
@@ -268,17 +268,28 @@ class _CyberpunkProfileBackdropState extends State<_CyberpunkProfileBackdrop>
     final t = context.wk;
     final reduceMotion = context.reduceMotion;
 
+    Widget buildRain() => CustomPaint(
+      painter: _RainPainter(
+        columns: _columns,
+        timeMs: _clock.elapsedMilliseconds,
+        reduceMotion: reduceMotion,
+        color: t.action,
+        highlightColor: t.identity,
+        gridColor: t.border,
+      ),
+      size: Size.infinite,
+    );
+
     return Stack(
       children: [
-        CustomPaint(
-          painter: _RainPainter(
-            columns: _columns,
-            time: _ticker.value,
-            reduceMotion: reduceMotion,
-            color: t.action.withValues(alpha: 0.15),
-            highlightColor: t.action.withValues(alpha: 0.4),
-          ),
-          size: Size.infinite,
+        ColoredBox(color: t.bg),
+        Positioned.fill(
+          child: reduceMotion
+              ? buildRain()
+              : AnimatedBuilder(
+                  animation: _ticker,
+                  builder: (_, _) => buildRain(),
+                ),
         ),
         widget.child,
       ],
@@ -287,71 +298,108 @@ class _CyberpunkProfileBackdropState extends State<_CyberpunkProfileBackdrop>
 }
 
 class _RainColumn {
-  final double x;
+  final double xRatio;
   final double speed;
   final int length;
+  final double phase;
   final String charSet;
 
   const _RainColumn({
-    required this.x,
+    required this.xRatio,
     required this.speed,
     required this.length,
+    required this.phase,
     required this.charSet,
   });
 
-  int charAt(int row, double time) {
-    final idx = ((time * speed * 60 + row * 3) % charSet.length).toInt();
-    return charSet.codeUnitAt(idx);
+  String charAt(int step, int timeMs) {
+    final idx = ((timeMs ~/ 150 + step * 3) % charSet.length);
+    return charSet[idx];
   }
 }
 
 class _RainPainter extends CustomPainter {
   final List<_RainColumn> columns;
-  final double time;
+  final int timeMs;
   final bool reduceMotion;
   final Color color;
   final Color highlightColor;
+  final Color gridColor;
 
   _RainPainter({
     required this.columns,
-    required this.time,
+    required this.timeMs,
     required this.reduceMotion,
     required this.color,
     required this.highlightColor,
+    required this.gridColor,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
+    if (size.width <= 0 || size.height <= 0) return;
+
+    // Subtle ambient perspective grid in background
+    final gridPaint = Paint()
+      ..color = gridColor.withValues(alpha: 0.06)
+      ..strokeWidth = 1.0;
+    final horizonY = size.height * 0.75;
+    for (double x = 0; x <= size.width; x += 36) {
+      canvas.drawLine(
+        Offset(size.width * 0.5, horizonY),
+        Offset(x * 1.6 - size.width * 0.3, size.height),
+        gridPaint,
+      );
+    }
+    for (double y = horizonY; y <= size.height; y += (size.height - horizonY) / 5) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
+    }
+
     final textPainter = TextPainter(
       textDirection: TextDirection.ltr,
-      textAlign: TextAlign.left,
+      textAlign: TextAlign.center,
     );
 
-    final double colWidth = size.width / (columns.length + 1);
-    final double charHeight = 18.0;
-    final int maxRows = (size.height / charHeight).ceil() + 2;
+    const double charHeight = 17.0;
+    final double tSec = timeMs / 1000.0;
 
     for (int i = 0; i < columns.length; i++) {
       final col = columns[i];
-      final double x = (i + 0.5) * colWidth;
+      final double x = col.xRatio * size.width;
+      final double totalSpan = size.height + col.length * charHeight + 120;
 
-      for (int row = 0; row < maxRows; row++) {
-        final double y = size.height -
-            ((time * col.speed * size.height + row * charHeight) %
-                (size.height + charHeight * col.length));
+      // Stream drops downward
+      final double headY = reduceMotion
+          ? ((col.phase * totalSpan) - col.length * charHeight)
+          : (((tSec * col.speed * 170 + col.phase * totalSpan) % totalSpan) - 40);
 
+      for (int step = 0; step < col.length; step++) {
+        final double y = headY - step * charHeight;
         if (y < -charHeight || y > size.height + charHeight) continue;
 
-        final int charCode = col.charAt(row, time);
-        final bool isHead = row == 0 && !reduceMotion;
+        final bool isHead = step == 0 && !reduceMotion;
+        final double tailRatio = 1.0 - (step / col.length);
+        final double alpha = isHead ? 0.90 : (0.05 + 0.32 * tailRatio);
+
+        final charStr = col.charAt(step, timeMs);
 
         textPainter.text = TextSpan(
-          text: String.fromCharCode(charCode),
+          text: charStr,
           style: TextStyle(
             fontFamily: 'IBMPlexMono',
-            fontSize: reduceMotion ? 13 : 14,
-            color: isHead ? highlightColor : color,
-            fontWeight: isHead ? FontWeight.bold : FontWeight.normal,
+            fontSize: isHead ? 14 : 12,
+            color: isHead
+                ? highlightColor.withValues(alpha: alpha)
+                : color.withValues(alpha: alpha),
+            fontWeight: isHead ? FontWeight.w900 : FontWeight.w500,
+            shadows: isHead
+                ? [
+                    Shadow(
+                      color: highlightColor.withValues(alpha: 0.7),
+                      blurRadius: 6,
+                    ),
+                  ]
+                : null,
           ),
         );
         textPainter.layout();
@@ -362,5 +410,5 @@ class _RainPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _RainPainter old) =>
-      old.time != time || old.reduceMotion != reduceMotion;
+      old.timeMs != timeMs || old.reduceMotion != reduceMotion;
 }

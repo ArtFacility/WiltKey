@@ -498,26 +498,30 @@ class _PaperinkProfileBackdropState extends State<_PaperinkProfileBackdrop>
   void initState() {
     super.initState();
     final r = math.Random(widget.seed);
-    _slips = List.generate(10, (i) {
-      final double rx = 0.15 + r.nextDouble() * 0.7;
-      final double strength = r.nextDouble();
-      final double w = 56 + r.nextDouble() * 30;
-      final double h = 80 + r.nextDouble() * 40;
+    const int count = 8;
+    _slips = List.generate(count, (i) {
+      // 2-3 columns spread across the board
+      final double col = (i % 3).toDouble();
+      final double row = (i ~/ 3).toDouble();
+      final double rx = 0.08 + col * 0.38 + (r.nextDouble() - 0.5) * 0.08;
+      final double strength = (0.15 + row * 0.35 + (r.nextDouble() - 0.5) * 0.1).clamp(0.05, 0.95);
+      final double w = 64 + r.nextDouble() * 24;
+      final double h = 95 + r.nextDouble() * 32;
       final bool peer = r.nextBool();
       final blip = SyncBlip(
         id: 'profile_slip_$i',
         strength: strength,
-        angle: 0,
+        angle: (r.nextDouble() - 0.5) * 0.5,
         isWiltkey: peer,
-        isNear: strength > 0.5,
+        isNear: true,
         isGroup: false,
       );
       return Slip(
         blip,
         0,
         strength: strength,
-        rx: rx,
-        yJitter: (r.nextDouble() - 0.5) * 0.1,
+        rx: rx.clamp(0.05, 0.95),
+        yJitter: (r.nextDouble() - 0.5) * 0.2,
         swayPhase: r.nextDouble() * math.pi * 2,
         rotPhase: r.nextDouble() * math.pi * 2,
         flutterPhase: r.nextDouble() * math.pi * 2,
@@ -531,16 +535,12 @@ class _PaperinkProfileBackdropState extends State<_PaperinkProfileBackdrop>
     _clock = Stopwatch()..start();
     _ticker = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 1),
+      duration: const Duration(seconds: 6),
     )..repeat();
-
-    if (!context.reduceMotion) {
-      _ticker.forward();
-    }
   }
 
   TextPainter _makeGlyph(bool peer, math.Random r) {
-    const genericKanji = ['音', '影', '遠', '客'];
+    const genericKanji = ['音', '影', '遠', '客', '風', '月', '心', '花'];
     const keyKanji = '鍵';
     final text = peer ? keyKanji : genericKanji[r.nextInt(genericKanji.length)];
     return TextPainter(
@@ -548,7 +548,7 @@ class _PaperinkProfileBackdropState extends State<_PaperinkProfileBackdrop>
         text: text,
         style: const TextStyle(
           fontFamily: 'NotoSansJP',
-          fontSize: 28,
+          fontSize: 26,
           fontWeight: FontWeight.w600,
         ),
       ),
@@ -581,23 +581,33 @@ class _PaperinkProfileBackdropState extends State<_PaperinkProfileBackdrop>
     final t = context.wk;
     final reduceMotion = context.reduceMotion;
 
+    Widget buildBoard() => CustomPaint(
+      painter: OfudaPainter(
+        slips: _slips.map((s) => s.toRender(_clock.elapsedMilliseconds, reduceMotion)).toList(),
+        timeMs: _clock.elapsedMilliseconds,
+        reduceMotion: reduceMotion,
+        paper: t.surface,
+        paperEdge: t.border,
+        sumi: t.textPrimary,
+        wash: t.bgRaised,
+        dust: t.textTertiary,
+        seal: t.danger,
+        boardBase: t.bg,
+        boardGrain: t.border,
+      ),
+      size: Size.infinite,
+    );
+
     return Stack(
       children: [
-        CustomPaint(
-          painter: OfudaPainter(
-            slips: _slips.map((s) => s.toRender(_clock.elapsedMilliseconds, reduceMotion)).toList(),
-            timeMs: _clock.elapsedMilliseconds,
-            reduceMotion: reduceMotion,
-            paper: t.surface,
-            paperEdge: t.border,
-            sumi: t.textPrimary,
-            wash: t.bgRaised,
-            dust: t.textTertiary,
-            seal: t.danger,
-            boardBase: t.bg,
-            boardGrain: t.border,
-          ),
-          size: Size.infinite,
+        ColoredBox(color: t.bg),
+        Positioned.fill(
+          child: reduceMotion
+              ? buildBoard()
+              : AnimatedBuilder(
+                  animation: _ticker,
+                  builder: (_, _) => buildBoard(),
+                ),
         ),
         widget.child,
       ],
@@ -605,22 +615,16 @@ class _PaperinkProfileBackdropState extends State<_PaperinkProfileBackdrop>
   }
 }
 
-// Profile-specific Slip render helper (pinned at rest).
+// Profile-specific Slip render helper (pinned at rest with gentle flutter).
 extension _ProfileSlipExt on Slip {
   SlipRender toRender(int timeMs, bool reduceMotion) {
-    final now = timeMs;
-    final double fallPhase = reduceMotion ? 1.0 : ((now % 3000) / 3000).clamp(0.0, 1.0);
-    final double stiffen = reduceMotion ? 1.0 : fallPhase;
-    final double pinGrow = reduceMotion ? 1.0 : fallPhase;
-    final double fade = 1.0;
-
     return SlipRender(
       slip: this,
-      fallPhase: fallPhase,
-      stiffen: stiffen,
-      pinGrow: pinGrow,
+      fallPhase: 1.0, // Settled on the board
+      stiffen: reduceMotion ? 1.0 : 0.82, // Pin holds top, bottom flutters
+      pinGrow: 1.0, // Red pin visible
       recoil: 0,
-      fade: fade,
+      fade: 1.0,
     );
   }
 }

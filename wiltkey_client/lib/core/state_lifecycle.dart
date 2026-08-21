@@ -182,6 +182,7 @@ extension AppStateLifecycle on AppState {
       });
     }
 
+    await syncMutedChatsToPrefs();
     notifyListeners();
     await _persistence.saveState(this);
   }
@@ -517,6 +518,7 @@ extension AppStateLifecycle on AppState {
       keyHash,
       DateTime.now().millisecondsSinceEpoch,
     );
+    sendProfileUpdateTo(keyHash);
     notifyListeners();
     _persistence.saveState(this);
   }
@@ -622,6 +624,7 @@ extension AppStateLifecycle on AppState {
       keyHash,
       DateTime.now().millisecondsSinceEpoch,
     );
+    sendProfileUpdateTo(keyHash);
     notifyListeners();
     _persistence.saveState(this);
   }

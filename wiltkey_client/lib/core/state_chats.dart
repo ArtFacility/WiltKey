@@ -128,6 +128,14 @@ extension AppStateChats on AppState {
     }
     final contact = activeContact!;
     log('Sending to contact: ${contact.name} (${contact.keyHash})');
+
+    // A blocked peer is fully silent on our side — we don't send them anything
+    // either (blocking is a hard nuke, not a request filter).
+    if (await WiltkeyDatabase.instance.isContactBlocked(contact.keyHash)) {
+      log('sendMessage error: peer is blocked');
+      return 'This user is blocked';
+    }
+
     log(
       'Outgoing offset: ${contact.outgoingOffset}, max: ${contact.outgoingMaxOffset}, remaining: ${contact.remainingBufferBytes}',
     );
@@ -286,6 +294,493 @@ extension AppStateChats on AppState {
     return null; // success
   }
 
+  /// Edits an existing message previously authored by the user.
+  /// Sends a new edit frame advancing keystream/pad offsets without crypto reuse.
+  Future<String?> editMessage(
+    Contact contact,
+    ChatMessage originalMessage,
+    String newText,
+  ) async {
+    final bool isMine = originalMessage.isSentByMe ||
+        originalMessage.senderId == 'me' ||
+        originalMessage.senderId == userId;
+    if (!isMine || originalMessage.isDeleted || originalMessage.wilted) {
+      return 'Cannot edit this message';
+    }
+    if (status == AppStatus.nuked) return 'App is nuked';
+
+    final wireText = ChatMessage.buildEditBody(originalMessage.id, newText);
+    final payloadBytes = utf8.encode(wireText).length;
+
+    await ensureWebSocketConnected();
+
+    if (contact.isGroup) {
+      final groupId = contact.keyHash;
+      if (contact.isTimeWilt) {
+        final bool memberWilted = !contact.isTimeWiltGroupHost &&
+            (contact.isArchived || contact.timeWiltRemainingFraction <= 0);
+        final bool hostWilted =
+            contact.isTimeWiltGroupHost && contact.isArchived;
+        if (memberWilted || hostWilted) {
+          return 'This Time Wilt group has wilted — meet again to renew.';
+        }
+      }
+
+      if (contact.maxMessageSize != null &&
+          payloadBytes > contact.maxMessageSize!) {
+        return 'Message exceeds max size (${contact.maxMessageSize} bytes)';
+      }
+
+      final error = await _getGroupLock(groupId).synchronized(() async {
+        final lanes = await GroupDatabase.instance.getAllLanes(groupId);
+        final myLanes = lanes
+            .where(
+              (l) =>
+                  l['member_key_hash'] == userId &&
+                  (l['slot_index'] as int) != 0,
+            )
+            .toList();
+        if (myLanes.isEmpty) {
+          return 'No lane assigned to you in this group';
+        }
+
+        Map<String, dynamic>? activeLane;
+        for (final lane in myLanes) {
+          final start = lane['start_offset'] as int;
+          final max = lane['max_offset'] as int;
+          final current = lane['current_write_offset'] as int;
+          final headerWritten = (lane['header_written'] as int) == 1;
+          final neededSpace =
+              headerWritten ? payloadBytes : (512 + payloadBytes);
+          if (current + neededSpace <= (max - start)) {
+            activeLane = lane;
+            break;
+          }
+        }
+
+        if (activeLane == null) {
+          return 'Lane depleted. Request refill from Host.';
+        }
+
+        final slotIndex = activeLane['slot_index'] as int;
+        final startOffset = activeLane['start_offset'] as int;
+        final maxOffset = activeLane['max_offset'] as int;
+        int currentWriteOffset = activeLane['current_write_offset'] as int;
+        bool headerWritten = (activeLane['header_written'] as int) == 1;
+
+        if (!headerWritten) {
+          log('[Group] Writing lane header for slot $slotIndex');
+          final headerBytes = buildLaneHeader(
+            name: deviceName.isNotEmpty ? deviceName : 'Member',
+            profileImage: profileImageB64,
+            arrivalOrder: slotIndex,
+          );
+          final cipherHeader = await WiltkeyOtpService.xorWithGroupKeystream(
+            groupId,
+            headerBytes,
+            startOffset,
+          );
+          final headerEnvelope = jsonEncode({
+            'group_id': groupId,
+            'sender_id': userId,
+            'slot_index': slotIndex,
+            'offset': startOffset,
+            'd': base64Encode(cipherHeader),
+            't': 'group_lane_header',
+          });
+          _fanOutGroupFrame(
+            contact.memberKeyHashes.where((h) => h != userId).toList(),
+            headerEnvelope,
+            'group_lane_header',
+          );
+          currentWriteOffset = 512;
+          await GroupDatabase.instance.upsertLane(
+            groupId: groupId,
+            slotIndex: slotIndex,
+            memberKeyHash: userId,
+            startOffset: startOffset,
+            maxOffset: maxOffset,
+            currentWriteOffset: 512,
+            headerWritten: true,
+          );
+        }
+
+        final rawBytes = utf8.encode(wireText);
+        final writeOffset = startOffset + currentWriteOffset;
+        final cipherBytes = await WiltkeyOtpService.xorWithGroupKeystream(
+          groupId,
+          rawBytes,
+          writeOffset,
+        );
+        final base64Cipher = base64Encode(cipherBytes);
+        final sentTs = DateTime.now().millisecondsSinceEpoch;
+        final wireId = 'edit_${DateTime.now().microsecondsSinceEpoch}';
+
+        final newWriteOffset = currentWriteOffset + rawBytes.length;
+        await GroupDatabase.instance.updateLaneWriteOffset(
+          groupId,
+          slotIndex,
+          newWriteOffset,
+        );
+
+        final editedAt = sentTs;
+        originalMessage.isEdited = true;
+        originalMessage.editedAt = editedAt;
+        originalMessage.decryptedText = newText;
+
+        await WiltkeyDatabase.instance.updateMessageContent(
+          originalMessage.id,
+          chatId: groupId,
+          newText: newText,
+          isEdited: true,
+          isDeleted: false,
+          editedAt: editedAt,
+          masterKeyHex: masterKeyHex,
+        );
+        notifyListeners();
+
+        final envelope = jsonEncode({
+          'group_id': groupId,
+          'sender_id': userId,
+          'slot_index': slotIndex,
+          'offset': writeOffset,
+          'd': base64Cipher,
+          't': 'text',
+          'id': wireId,
+          'ts': sentTs,
+        });
+
+        _fanOutGroupFrame(
+          contact.memberKeyHashes.where((h) => h != userId).toList(),
+          envelope,
+          'group_message',
+        );
+
+        return null;
+      });
+
+      return error;
+    }
+
+    // 1-on-1 Chats (OTP Pad or Time Wilt)
+    final int currentOffset;
+    if (contact.isTimeWilt) {
+      final exp = contact.wiltExpiresAt;
+      final expired =
+          contact.isArchived || (exp != null && !DateTime.now().isBefore(exp));
+      if (expired) {
+        return 'This chat has wilted — it\'s read-only now.';
+      }
+      currentOffset = contact.outgoingOffset;
+      contact.outgoingOffset += payloadBytes;
+    } else {
+      if (contact.remainingBufferBytes < 74) {
+        requestBorrow(contact);
+        return 'Out of keystream — asked your peer for more bytes. Try again in a moment.';
+      }
+      final int? picked = _pickSendOffset(contact, payloadBytes);
+      if (picked == null) {
+        requestBorrow(contact);
+        return 'Out of keystream in your lane — asked your peer for more bytes. Try again in a moment.';
+      }
+      currentOffset = picked;
+      _advanceSendPointer(contact, currentOffset, payloadBytes);
+      contact.remainingBufferBytes = _sendCapacity(contact);
+      contact.isWilted = contact.remainingBufferBytes < 74;
+    }
+
+    final List<int> cipherBytes;
+    try {
+      final rawBytes = utf8.encode(wireText);
+      cipherBytes = await xorForContact(contact, rawBytes, currentOffset);
+    } catch (e) {
+      log('Edit encryption error: $e');
+      if (contact.isTimeWilt) {
+        contact.outgoingOffset -= payloadBytes;
+      } else {
+        _rollbackSendPointer(contact, currentOffset, payloadBytes);
+        contact.remainingBufferBytes = _sendCapacity(contact);
+        contact.isWilted = contact.remainingBufferBytes < 74;
+      }
+      notifyListeners();
+      return 'Encryption failed: $e';
+    }
+
+    final base64Cipher = base64Encode(cipherBytes);
+    final wireId = 'edit_${DateTime.now().microsecondsSinceEpoch}';
+
+    final editedAt = DateTime.now().millisecondsSinceEpoch;
+    originalMessage.isEdited = true;
+    originalMessage.editedAt = editedAt;
+    originalMessage.decryptedText = newText;
+
+    await WiltkeyDatabase.instance.updateMessageContent(
+      originalMessage.id,
+      chatId: contact.id,
+      newText: newText,
+      isEdited: true,
+      isDeleted: false,
+      editedAt: editedAt,
+      masterKeyHex: masterKeyHex,
+    );
+    await WiltkeyDatabase.instance.upsertContact(contact);
+    notifyListeners();
+    _persistence.saveState(this);
+
+    if (!contact.isTimeWilt && contact.remainingBufferBytes < 500) {
+      requestBorrow(contact);
+    }
+
+    if (WebSocketClient().isConnected) {
+      final Map<String, dynamic> envelope = {
+        't': 'text',
+        'd': base64Cipher,
+        'offset': currentOffset,
+        'id': wireId,
+      };
+      WebSocketClient().sendWSMessage({
+        'type': 'SEND_MESSAGE',
+        'recipient_id': contact.keyHash,
+        'envelope': jsonEncode(envelope),
+        'content_type': 'text',
+      });
+    }
+
+    return null;
+  }
+
+  /// Deletes an existing message previously authored by the user for everyone.
+  /// Sends a new delete frame advancing keystream/pad offsets.
+  Future<String?> deleteMessage(
+    Contact contact,
+    ChatMessage originalMessage,
+  ) async {
+    final bool isMine = originalMessage.isSentByMe ||
+        originalMessage.senderId == 'me' ||
+        originalMessage.senderId == userId;
+    if (!isMine || originalMessage.wilted) {
+      return 'Cannot delete this message';
+    }
+    if (status == AppStatus.nuked) return 'App is nuked';
+
+    final wireText = ChatMessage.buildDeleteBody(originalMessage.id);
+    final payloadBytes = utf8.encode(wireText).length;
+
+    await ensureWebSocketConnected();
+
+    if (contact.isGroup) {
+      final groupId = contact.keyHash;
+      if (contact.isTimeWilt) {
+        final bool memberWilted = !contact.isTimeWiltGroupHost &&
+            (contact.isArchived || contact.timeWiltRemainingFraction <= 0);
+        final bool hostWilted =
+            contact.isTimeWiltGroupHost && contact.isArchived;
+        if (memberWilted || hostWilted) {
+          return 'This Time Wilt group has wilted — meet again to renew.';
+        }
+      }
+
+      final error = await _getGroupLock(groupId).synchronized(() async {
+        final lanes = await GroupDatabase.instance.getAllLanes(groupId);
+        final myLanes = lanes
+            .where(
+              (l) =>
+                  l['member_key_hash'] == userId &&
+                  (l['slot_index'] as int) != 0,
+            )
+            .toList();
+        if (myLanes.isEmpty) {
+          return 'No lane assigned to you in this group';
+        }
+
+        Map<String, dynamic>? activeLane;
+        for (final lane in myLanes) {
+          final start = lane['start_offset'] as int;
+          final max = lane['max_offset'] as int;
+          final current = lane['current_write_offset'] as int;
+          final headerWritten = (lane['header_written'] as int) == 1;
+          final neededSpace =
+              headerWritten ? payloadBytes : (512 + payloadBytes);
+          if (current + neededSpace <= (max - start)) {
+            activeLane = lane;
+            break;
+          }
+        }
+
+        if (activeLane == null) {
+          return 'Lane depleted. Request refill from Host.';
+        }
+
+        final slotIndex = activeLane['slot_index'] as int;
+        final startOffset = activeLane['start_offset'] as int;
+        final maxOffset = activeLane['max_offset'] as int;
+        int currentWriteOffset = activeLane['current_write_offset'] as int;
+        bool headerWritten = (activeLane['header_written'] as int) == 1;
+
+        if (!headerWritten) {
+          log('[Group] Writing lane header for slot $slotIndex');
+          final headerBytes = buildLaneHeader(
+            name: deviceName.isNotEmpty ? deviceName : 'Member',
+            profileImage: profileImageB64,
+            arrivalOrder: slotIndex,
+          );
+          final cipherHeader = await WiltkeyOtpService.xorWithGroupKeystream(
+            groupId,
+            headerBytes,
+            startOffset,
+          );
+          final headerEnvelope = jsonEncode({
+            'group_id': groupId,
+            'sender_id': userId,
+            'slot_index': slotIndex,
+            'offset': startOffset,
+            'd': base64Encode(cipherHeader),
+            't': 'group_lane_header',
+          });
+          _fanOutGroupFrame(
+            contact.memberKeyHashes.where((h) => h != userId).toList(),
+            headerEnvelope,
+            'group_lane_header',
+          );
+          currentWriteOffset = 512;
+          await GroupDatabase.instance.upsertLane(
+            groupId: groupId,
+            slotIndex: slotIndex,
+            memberKeyHash: userId,
+            startOffset: startOffset,
+            maxOffset: maxOffset,
+            currentWriteOffset: 512,
+            headerWritten: true,
+          );
+        }
+
+        final rawBytes = utf8.encode(wireText);
+        final writeOffset = startOffset + currentWriteOffset;
+        final cipherBytes = await WiltkeyOtpService.xorWithGroupKeystream(
+          groupId,
+          rawBytes,
+          writeOffset,
+        );
+        final base64Cipher = base64Encode(cipherBytes);
+        final sentTs = DateTime.now().millisecondsSinceEpoch;
+        final wireId = 'del_${DateTime.now().microsecondsSinceEpoch}';
+
+        final newWriteOffset = currentWriteOffset + rawBytes.length;
+        await GroupDatabase.instance.updateLaneWriteOffset(
+          groupId,
+          slotIndex,
+          newWriteOffset,
+        );
+
+        originalMessage.deleteInMemory();
+        await WiltkeyDatabase.instance.deleteMessageRow(
+          originalMessage.id,
+          chatId: groupId,
+        );
+        notifyListeners();
+
+        final envelope = jsonEncode({
+          'group_id': groupId,
+          'sender_id': userId,
+          'slot_index': slotIndex,
+          'offset': writeOffset,
+          'd': base64Cipher,
+          't': 'text',
+          'id': wireId,
+          'ts': sentTs,
+        });
+
+        _fanOutGroupFrame(
+          contact.memberKeyHashes.where((h) => h != userId).toList(),
+          envelope,
+          'group_message',
+        );
+
+        return null;
+      });
+
+      return error;
+    }
+
+    // 1-on-1 Chats (OTP Pad or Time Wilt)
+    final int currentOffset;
+    if (contact.isTimeWilt) {
+      final exp = contact.wiltExpiresAt;
+      final expired =
+          contact.isArchived || (exp != null && !DateTime.now().isBefore(exp));
+      if (expired) {
+        return 'This chat has wilted — it\'s read-only now.';
+      }
+      currentOffset = contact.outgoingOffset;
+      contact.outgoingOffset += payloadBytes;
+    } else {
+      if (contact.remainingBufferBytes < 74) {
+        requestBorrow(contact);
+        return 'Out of keystream — asked your peer for more bytes. Try again in a moment.';
+      }
+      final int? picked = _pickSendOffset(contact, payloadBytes);
+      if (picked == null) {
+        requestBorrow(contact);
+        return 'Out of keystream in your lane — asked your peer for more bytes. Try again in a moment.';
+      }
+      currentOffset = picked;
+      _advanceSendPointer(contact, currentOffset, payloadBytes);
+      contact.remainingBufferBytes = _sendCapacity(contact);
+      contact.isWilted = contact.remainingBufferBytes < 74;
+    }
+
+    final List<int> cipherBytes;
+    try {
+      final rawBytes = utf8.encode(wireText);
+      cipherBytes = await xorForContact(contact, rawBytes, currentOffset);
+    } catch (e) {
+      log('Delete encryption error: $e');
+      if (contact.isTimeWilt) {
+        contact.outgoingOffset -= payloadBytes;
+      } else {
+        _rollbackSendPointer(contact, currentOffset, payloadBytes);
+        contact.remainingBufferBytes = _sendCapacity(contact);
+        contact.isWilted = contact.remainingBufferBytes < 74;
+      }
+      notifyListeners();
+      return 'Encryption failed: $e';
+    }
+
+    final base64Cipher = base64Encode(cipherBytes);
+    final wireId = 'del_${DateTime.now().microsecondsSinceEpoch}';
+
+    originalMessage.deleteInMemory();
+
+    await WiltkeyDatabase.instance.deleteMessageRow(
+      originalMessage.id,
+      chatId: contact.id,
+    );
+    await WiltkeyDatabase.instance.upsertContact(contact);
+    notifyListeners();
+    _persistence.saveState(this);
+
+    if (!contact.isTimeWilt && contact.remainingBufferBytes < 500) {
+      requestBorrow(contact);
+    }
+
+    if (WebSocketClient().isConnected) {
+      final Map<String, dynamic> envelope = {
+        't': 'text',
+        'd': base64Cipher,
+        'offset': currentOffset,
+        'id': wireId,
+      };
+      WebSocketClient().sendWSMessage({
+        'type': 'SEND_MESSAGE',
+        'recipient_id': contact.keyHash,
+        'envelope': jsonEncode(envelope),
+        'content_type': 'text',
+      });
+    }
+
+    return null;
+  }
+
   Future<void> clearFailedMessage(Contact contact, ChatMessage message) async {
     final list = messages[contact.id] ?? [];
     final updatedList = list.where((m) => m.id != message.id).toList();
@@ -405,19 +900,204 @@ extension AppStateChats on AppState {
   ///      missing. This recovers from a lost one-shot delivery receipt (e.g. the
   ///      app was closed past the receipt's relay-queue TTL).
   /// No-op for groups (they have their own multi-candidate resync) and offline.
+  /// Audits actual inbound message gaps for a 1-on-1 chat and requests resync
+  /// for any range not already verified clean. Returns the count of active gaps found.
+  Future<int> auditAndSync1on1Gaps(Contact contact) async {
+    if (contact.isGroup) return 0;
+    final int laneStart = contact.incomingMaxOffset >= contact.maxBufferBytes
+        ? contact.maxBufferBytes ~/ 2
+        : 0;
+    final int currentIncoming = contact.incomingOffset;
+    if (currentIncoming <= laneStart) return 0;
+
+    final allMessages = await WiltkeyDatabase.instance.getMessagesInOffsetRange(
+      contact.id,
+      laneStart,
+      currentIncoming,
+    );
+
+    final incomingMessages = allMessages
+        .where(
+          (m) =>
+              !m.isSentByMe &&
+              m.offset >= laneStart &&
+              m.offset < currentIncoming,
+        )
+        .toList()
+      ..sort((a, b) => a.offset.compareTo(b.offset));
+
+    int gapCount = 0;
+    int cursor = laneStart;
+    for (final msg in incomingMessages) {
+      if (msg.offset > cursor) {
+        final startOffset = cursor;
+        final endOffset = msg.offset;
+        final cacheKey = '${contact.keyHash}:0:$startOffset:$endOffset';
+        final lastAudit = cleanGapAuditCache[cacheKey];
+        final bool isClean = lastAudit != null &&
+            DateTime.now().millisecondsSinceEpoch - lastAudit < 1000 * 60 * 15;
+        if (!isClean) {
+          _requestChatResync(contact, startOffset, endOffset);
+          gapCount++;
+        }
+      }
+      int msgLen = 0;
+      try {
+        if (msg.text.isNotEmpty) {
+          msgLen = base64Decode(msg.text).length;
+        }
+      } catch (_) {}
+      if (msgLen <= 0) {
+        msgLen = max(1, msg.text.length);
+      }
+      cursor = max(cursor, msg.offset + msgLen);
+    }
+
+    if (currentIncoming > cursor) {
+      final startOffset = cursor;
+      final endOffset = currentIncoming;
+      final cacheKey = '${contact.keyHash}:0:$startOffset:$endOffset';
+      final lastAudit = cleanGapAuditCache[cacheKey];
+      final bool isClean = lastAudit != null &&
+          DateTime.now().millisecondsSinceEpoch - lastAudit < 1000 * 60 * 15;
+      if (!isClean) {
+        _requestChatResync(contact, startOffset, endOffset);
+        gapCount++;
+      }
+    }
+
+    if (gapCount > 0) {
+      log(
+        '[1:1 Smart Sync] Detected and requested $gapCount gap range(s) for ${contact.name}',
+      );
+    }
+    return gapCount;
+  }
+
+  /// Checks whether there are any unverified inbound gaps in a 1-on-1 chat.
+  Future<bool> hasUnverified1on1Gaps(Contact contact) async {
+    if (contact.isGroup) return false;
+    final int laneStart = contact.incomingMaxOffset >= contact.maxBufferBytes
+        ? contact.maxBufferBytes ~/ 2
+        : 0;
+    final int currentIncoming = contact.incomingOffset;
+    if (currentIncoming <= laneStart) return false;
+
+    final allMessages = await WiltkeyDatabase.instance.getMessagesInOffsetRange(
+      contact.id,
+      laneStart,
+      currentIncoming,
+    );
+
+    final incomingMessages = allMessages
+        .where(
+          (m) =>
+              !m.isSentByMe &&
+              m.offset >= laneStart &&
+              m.offset < currentIncoming,
+        )
+        .toList()
+      ..sort((a, b) => a.offset.compareTo(b.offset));
+
+    int cursor = laneStart;
+    for (final msg in incomingMessages) {
+      if (msg.offset > cursor) {
+        final cacheKey = '${contact.keyHash}:0:$cursor:${msg.offset}';
+        final lastAudit = cleanGapAuditCache[cacheKey];
+        final bool isClean = lastAudit != null &&
+            DateTime.now().millisecondsSinceEpoch - lastAudit < 1000 * 60 * 15;
+        if (!isClean) return true;
+      }
+      int msgLen = 0;
+      try {
+        if (msg.text.isNotEmpty) {
+          msgLen = base64Decode(msg.text).length;
+        }
+      } catch (_) {}
+      if (msgLen <= 0) {
+        msgLen = max(1, msg.text.length);
+      }
+      cursor = max(cursor, msg.offset + msgLen);
+    }
+
+    if (currentIncoming > cursor) {
+      final cacheKey = '${contact.keyHash}:0:$cursor:$currentIncoming';
+      final lastAudit = cleanGapAuditCache[cacheKey];
+      final bool isClean = lastAudit != null &&
+          DateTime.now().millisecondsSinceEpoch - lastAudit < 1000 * 60 * 15;
+      if (!isClean) return true;
+    }
+
+    return false;
+  }
+
+  /// Synchronous fast check using loaded in-memory messages for UI badge rendering.
+  bool hasUnverified1on1GapsCached(Contact contact) {
+    if (contact.isGroup) return false;
+    final int laneStart = contact.incomingMaxOffset >= contact.maxBufferBytes
+        ? contact.maxBufferBytes ~/ 2
+        : 0;
+    final int currentIncoming = contact.incomingOffset;
+    if (currentIncoming <= laneStart) return false;
+
+    final list = messages[contact.id] ?? [];
+    final incomingMessages = list
+        .where(
+          (m) =>
+              !m.isSentByMe &&
+              m.offset >= laneStart &&
+              m.offset < currentIncoming,
+        )
+        .toList()
+      ..sort((a, b) => a.offset.compareTo(b.offset));
+
+    int cursor = laneStart;
+    for (final msg in incomingMessages) {
+      if (msg.offset > cursor) {
+        final cacheKey = '${contact.keyHash}:0:$cursor:${msg.offset}';
+        final lastAudit = cleanGapAuditCache[cacheKey];
+        final bool isClean = lastAudit != null &&
+            DateTime.now().millisecondsSinceEpoch - lastAudit < 1000 * 60 * 15;
+        if (!isClean) return true;
+      }
+      int msgLen = 0;
+      try {
+        if (msg.text.isNotEmpty) {
+          msgLen = base64Decode(msg.text).length;
+        }
+      } catch (_) {}
+      if (msgLen <= 0) {
+        msgLen = max(1, msg.text.length);
+      }
+      cursor = max(cursor, msg.offset + msgLen);
+    }
+
+    if (currentIncoming > cursor) {
+      final cacheKey = '${contact.keyHash}:0:$cursor:$currentIncoming';
+      final lastAudit = cleanGapAuditCache[cacheKey];
+      final bool isClean = lastAudit != null &&
+          DateTime.now().millisecondsSinceEpoch - lastAudit < 1000 * 60 * 15;
+      if (!isClean) return true;
+    }
+
+    return false;
+  }
+
+  /// Manual / one-shot reconciliation for a 1-on-1 chat. Two directions:
+  ///   1. Audit & pull any inbound messages we're missing across unverified gaps
+  ///      (ignoring gaps that were already checked or verified clean).
+  ///   2. Reconcile our outbound deliveries — send the peer a `delivery_check`
+  ///      of our still-undelivered sent messages; they confirm the ones they
+  ///      hold (so the tick double-checks) and we resend the ones they're
+  ///      missing.
+  /// No-op for groups (they have their own multi-candidate resync) and offline.
   Future<bool> syncOneOnOneChat(Contact contact) async {
     if (contact.isGroup) return false;
     await ensureWebSocketConnected();
     if (!WebSocketClient().isConnected) return false;
 
-    // 1. Pull missing inbound history.
-    if (contact.incomingMaxOffset > contact.incomingOffset) {
-      _requestChatResync(
-        contact,
-        contact.incomingOffset,
-        contact.incomingMaxOffset,
-      );
-    }
+    // 1. Audit & pull missing inbound history across verified gaps
+    final gapsFound = await auditAndSync1on1Gaps(contact);
 
     // 2. Verify outbound deliveries (cap the list so a very stuck chat can't
     // build an oversized frame).
@@ -438,7 +1118,7 @@ extension AppStateChats on AppState {
       });
     }
     log(
-      '[Delivery Sync] Manual sync for ${contact.name}: pulled inbound, '
+      '[Delivery Sync] Manual sync for ${contact.name}: checked $gapsFound gap(s), '
       'checked ${capped.length} undelivered message(s)',
     );
     return true;
@@ -454,13 +1134,11 @@ extension AppStateChats on AppState {
     if (contact.isGroup) return;
     if (_autoReconcileInFlight.contains(contact.id)) return;
 
-    final hasInboundGap = contact.incomingMaxOffset > contact.incomingOffset;
-    bool hasStuckOutbound = false;
-    if (!hasInboundGap) {
-      final undelivered = await WiltkeyDatabase.instance
-          .getUndeliveredSentMessages(contact.id);
-      hasStuckOutbound = undelivered.isNotEmpty;
-    }
+    final undelivered = await WiltkeyDatabase.instance
+        .getUndeliveredSentMessages(contact.id);
+    final hasStuckOutbound = undelivered.isNotEmpty;
+    final hasInboundGap = await hasUnverified1on1Gaps(contact);
+
     if (!hasInboundGap && !hasStuckOutbound) return;
 
     _autoReconcileInFlight.add(contact.id);

@@ -487,8 +487,8 @@ class _FireflyPainter extends CustomPainter {
   bool shouldRepaint(_FireflyPainter old) => old.progress != progress;
 }
 
-// Garden profile backdrop: a living meadow with grass blades and flowers.
-// Reuses MeadowPainter from garden_sync_visual.dart with seeded flowers.
+// Garden profile backdrop: a living dusk meadow with grounded grass, blooming
+// flowers at the base, and delicate blossom petals drifting in the breeze.
 class _GardenProfileBackdrop extends StatefulWidget {
   final Widget child;
   final int seed;
@@ -502,43 +502,66 @@ class _GardenProfileBackdrop extends StatefulWidget {
 class _GardenProfileBackdropState extends State<_GardenProfileBackdrop>
     with SingleTickerProviderStateMixin {
   late final AnimationController _ticker;
-  late final List<FlowerRender> _flowers;
   late final Stopwatch _clock;
+  late final List<_GardenBlade> _backBlades;
+  late final List<_GardenBlade> _frontBlades;
+  late final List<_GardenProfileFlower> _flowers;
+  late final List<_FloatingPetal> _petals;
 
   @override
   void initState() {
     super.initState();
     final r = math.Random(widget.seed);
-    _flowers = List.generate(12, (i) {
-      final double x = r.nextDouble();
-      final double y = 0.35 + r.nextDouble() * 0.55;
-      return _makeFlower(x, y);
+
+    _backBlades = List.generate(24, (i) {
+      return _GardenBlade(
+        x: (i + r.nextDouble() * 0.5) / 24,
+        height: 45 + r.nextDouble() * 40,
+        phase: r.nextDouble() * math.pi * 2,
+        width: 3.0 + r.nextDouble() * 2.5,
+        shade: r.nextDouble(),
+        lean: (r.nextDouble() - 0.5) * 0.4,
+      );
+    });
+
+    _frontBlades = List.generate(14, (i) {
+      return _GardenBlade(
+        x: (i + r.nextDouble() * 0.6) / 14,
+        height: 60 + r.nextDouble() * 50,
+        phase: r.nextDouble() * math.pi * 2,
+        width: 4.0 + r.nextDouble() * 3.0,
+        shade: r.nextDouble(),
+        lean: (r.nextDouble() - 0.5) * 0.5,
+      );
+    });
+
+    _flowers = List.generate(8, (i) {
+      return _GardenProfileFlower(
+        x: 0.08 + (i / 8) * 0.84 + (r.nextDouble() - 0.5) * 0.08,
+        stemHeight: 35 + r.nextDouble() * 35,
+        scale: 0.75 + r.nextDouble() * 0.45,
+        angle: r.nextDouble() * math.pi * 2,
+        colorIndex: r.nextInt(4),
+      );
+    });
+
+    _petals = List.generate(10, (i) {
+      return _FloatingPetal(
+        xInit: r.nextDouble(),
+        yInit: 0.15 + r.nextDouble() * 0.65,
+        speed: 0.4 + r.nextDouble() * 0.6,
+        driftAmp: 15 + r.nextDouble() * 25,
+        scale: 0.7 + r.nextDouble() * 0.5,
+        rotPhase: r.nextDouble() * math.pi * 2,
+        colorIndex: r.nextInt(3),
+      );
     });
 
     _clock = Stopwatch()..start();
     _ticker = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 4),
+      duration: const Duration(seconds: 8),
     )..repeat();
-
-    if (!context.reduceMotion) {
-      _ticker.forward();
-    }
-  }
-
-  FlowerRender _makeFlower(double x, double y) {
-    return FlowerRender(
-      blip: SyncBlip(
-        id: 'profile_flower_${x}_$y',
-        strength: y,
-        angle: 0,
-        isWiltkey: false,
-        isNear: false,
-        isGroup: false,
-      ),
-      grow: 1.0,
-      fade: 1.0,
-    );
   }
 
   @override
@@ -563,31 +586,317 @@ class _GardenProfileBackdropState extends State<_GardenProfileBackdrop>
     final t = context.wk;
     final reduceMotion = context.reduceMotion;
 
+    Widget buildMeadow() => CustomPaint(
+      painter: _GardenProfilePainter(
+        backBlades: _backBlades,
+        frontBlades: _frontBlades,
+        flowers: _flowers,
+        petals: _petals,
+        timeMs: _clock.elapsedMilliseconds,
+        reduceMotion: reduceMotion,
+        grass: t.positive,
+        soil: t.bg,
+        petalColors: [t.budgetFill, t.action, t.identity, t.surfacePressed],
+        halo: t.action,
+        center: t.surfacePressed,
+      ),
+      size: Size.infinite,
+    );
+
     return Stack(
       children: [
-        CustomPaint(
-          painter: MeadowPainter(
-            flowers: _flowers,
-            timeMs: _clock.elapsedMilliseconds,
-            reduceMotion: reduceMotion,
-            grass: t.positive,
-            soil: t.bg,
-            peer: t.budgetFill,
-            group: t.identity,
-            unknown: t.textTertiary,
-            center: t.surfacePressed,
-            halo: t.action,
-            easeGrow: (double t) => 1 - math.pow(1 - t, 3).toDouble(),
-            easeBloom: (double t) {
-              const c = 1.70158;
-              final u = t - 1;
-              return 1 + (c + 1) * u * u * u + c * u * u;
-            },
+        // Dusk garden atmosphere: rich dark greenish sky fading to deep fertile soil
+        Positioned.fill(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: t.bg,
+              gradient: const LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Color(0xFF222B20), // Dark greenish dusk sky
+                  Color(0xFF181D17), // Deep soil
+                  Color(0xFF131711), // Root bed
+                ],
+                stops: [0.0, 0.65, 1.0],
+              ),
+            ),
           ),
-          size: Size.infinite,
+        ),
+        // Dusk lilac atmospheric glow (top-left)
+        Positioned.fill(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: RadialGradient(
+                center: const Alignment(-0.6, -0.9),
+                radius: 1.3,
+                colors: [
+                  t.identity.withValues(alpha: 0.12),
+                  Colors.transparent,
+                ],
+                stops: const [0.0, 0.7],
+              ),
+            ),
+          ),
+        ),
+        // Warm marigold earth glow (bottom-right)
+        Positioned.fill(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: RadialGradient(
+                center: const Alignment(0.7, 0.9),
+                radius: 1.2,
+                colors: [
+                  t.action.withValues(alpha: 0.08),
+                  Colors.transparent,
+                ],
+                stops: const [0.0, 0.6],
+              ),
+            ),
+          ),
+        ),
+        // Living meadow with swaying grass, blooming flowers, and floating petals
+        Positioned.fill(
+          child: reduceMotion
+              ? buildMeadow()
+              : AnimatedBuilder(
+                  animation: _ticker,
+                  builder: (_, _) => buildMeadow(),
+                ),
         ),
         widget.child,
       ],
     );
   }
+}
+
+class _GardenBlade {
+  final double x;
+  final double height;
+  final double phase;
+  final double width;
+  final double shade;
+  final double lean;
+
+  const _GardenBlade({
+    required this.x,
+    required this.height,
+    required this.phase,
+    required this.width,
+    required this.shade,
+    required this.lean,
+  });
+}
+
+class _GardenProfileFlower {
+  final double x;
+  final double stemHeight;
+  final double scale;
+  final double angle;
+  final int colorIndex;
+
+  const _GardenProfileFlower({
+    required this.x,
+    required this.stemHeight,
+    required this.scale,
+    required this.angle,
+    required this.colorIndex,
+  });
+}
+
+class _FloatingPetal {
+  final double xInit;
+  final double yInit;
+  final double speed;
+  final double driftAmp;
+  final double scale;
+  final double rotPhase;
+  final int colorIndex;
+
+  const _FloatingPetal({
+    required this.xInit,
+    required this.yInit,
+    required this.speed,
+    required this.driftAmp,
+    required this.scale,
+    required this.rotPhase,
+    required this.colorIndex,
+  });
+}
+
+class _GardenProfilePainter extends CustomPainter {
+  final List<_GardenBlade> backBlades;
+  final List<_GardenBlade> frontBlades;
+  final List<_GardenProfileFlower> flowers;
+  final List<_FloatingPetal> petals;
+  final int timeMs;
+  final bool reduceMotion;
+  final Color grass;
+  final Color soil;
+  final List<Color> petalColors;
+  final Color halo;
+  final Color center;
+
+  _GardenProfilePainter({
+    required this.backBlades,
+    required this.frontBlades,
+    required this.flowers,
+    required this.petals,
+    required this.timeMs,
+    required this.reduceMotion,
+    required this.grass,
+    required this.soil,
+    required this.petalColors,
+    required this.halo,
+    required this.center,
+  });
+
+  double get _t => timeMs / 1000.0;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (size.width <= 0 || size.height <= 0) return;
+
+    final baseY = size.height + 4.0;
+    final gust = reduceMotion ? 0.0 : 0.5 + 0.5 * math.sin(_t * 0.7);
+
+    // 1. Drifting blossom petals across the air
+    if (!reduceMotion) {
+      for (final p in petals) {
+        final double prog = (_t * 0.08 * p.speed + p.xInit) % 1.0;
+        final double x = (prog * (size.width + 80)) - 40;
+        final double y = p.yInit * size.height + math.sin(_t * 1.2 + p.rotPhase) * p.driftAmp;
+        final double rot = _t * 1.1 + p.rotPhase;
+
+        final petalColor = petalColors[p.colorIndex % petalColors.length];
+        final petalPaint = Paint()..color = petalColor.withValues(alpha: 0.35);
+
+        canvas.save();
+        canvas.translate(x, y);
+        canvas.rotate(rot);
+        canvas.drawOval(
+          Rect.fromCenter(
+            center: Offset.zero,
+            width: 10.0 * p.scale,
+            height: 5.5 * p.scale,
+          ),
+          petalPaint,
+        );
+        canvas.restore();
+      }
+
+      // Floating pollen sparkles
+      for (int i = 0; i < 6; i++) {
+        final seed = (i * 0.61803398875) % 1.0;
+        final ph = (_t * 0.06 + seed) % 1.0;
+        final x = size.width * (0.08 + 0.84 * ((seed * 7) % 1.0) + 0.03 * math.sin(ph * 2 * math.pi));
+        final y = size.height * (0.88 - ph * 0.75);
+        final tw = 0.06 + 0.08 * (0.5 + 0.5 * math.sin(ph * 6 * math.pi));
+        canvas.drawCircle(Offset(x, y), 1.5, Paint()..color = halo.withValues(alpha: tw));
+      }
+    }
+
+    // 2. Back grass blades
+    for (final b in backBlades) {
+      _drawBlade(
+        canvas,
+        size,
+        b,
+        baseY,
+        Color.lerp(grass, soil, 0.35 + b.shade * 0.25)!,
+        gust,
+        0.55,
+      );
+    }
+
+    // 3. Grounded flowers nestled in the meadow
+    for (final f in flowers) {
+      final double x = f.x * size.width;
+      final double groundY = baseY;
+      final double scale = f.scale;
+      final Color pColor = petalColors[f.colorIndex % petalColors.length];
+
+      final double stemSway = reduceMotion ? 0.0 : math.sin(_t * 0.9 + f.angle) * 3.0 * scale;
+      final double bob = reduceMotion ? 0.0 : math.sin(_t * 1.4 + f.angle * 2) * 1.5 * scale;
+      final double topX = x + stemSway;
+      final double topY = groundY - f.stemHeight + bob;
+
+      // Stem
+      final stemPaint = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.0 * scale
+        ..strokeCap = StrokeCap.round
+        ..color = Color.lerp(grass, soil, 0.15)!.withValues(alpha: 0.75);
+      canvas.drawPath(
+        Path()
+          ..moveTo(x, groundY)
+          ..quadraticBezierTo(x + stemSway * 0.4, groundY - f.stemHeight * 0.5, topX, topY),
+        stemPaint,
+      );
+
+      // Bloom: 6 petals
+      final double petalLen = 6.0 * scale;
+      final double petalW = 3.4 * scale;
+      final petalPaint = Paint()..color = pColor.withValues(alpha: 0.85);
+
+      for (int i = 0; i < 6; i++) {
+        final double a = (i / 6) * math.pi * 2 + f.angle;
+        canvas.save();
+        canvas.translate(topX + math.cos(a) * petalLen * 0.55, topY + math.sin(a) * petalLen * 0.55);
+        canvas.rotate(a);
+        canvas.drawOval(
+          Rect.fromCenter(center: Offset.zero, width: petalLen, height: petalW),
+          petalPaint,
+        );
+        canvas.restore();
+      }
+
+      // Center disc
+      canvas.drawCircle(Offset(topX, topY), 2.6 * scale, Paint()..color = center);
+    }
+
+    // 4. Front grass blades
+    for (final b in frontBlades) {
+      _drawBlade(
+        canvas,
+        size,
+        b,
+        baseY,
+        Color.lerp(grass, halo, 0.15 * b.shade)!,
+        gust,
+        0.85,
+      );
+    }
+  }
+
+  void _drawBlade(
+    Canvas canvas,
+    Size size,
+    _GardenBlade b,
+    double baseY,
+    Color color,
+    double gust,
+    double alpha,
+  ) {
+    final bx = b.x * size.width;
+    final h = b.height;
+    final sway = reduceMotion
+        ? b.lean * h * 0.12
+        : (b.lean + 0.18 * math.sin(_t * 1.1 + b.phase) * (0.6 + 0.8 * gust)) * h * 0.16;
+    final tipX = bx + sway;
+    final tipY = baseY - h;
+    final midY = baseY - h * 0.5;
+    final w = b.width;
+
+    final path = Path()
+      ..moveTo(bx - w / 2, baseY)
+      ..quadraticBezierTo(bx - w * 0.1 + sway * 0.4, midY, tipX, tipY)
+      ..quadraticBezierTo(bx + w * 0.1 + sway * 0.4, midY, bx + w / 2, baseY)
+      ..close();
+    canvas.drawPath(path, Paint()..color = color.withValues(alpha: alpha));
+  }
+
+  @override
+  bool shouldRepaint(covariant _GardenProfilePainter old) =>
+      old.timeMs != timeMs || old.reduceMotion != reduceMotion;
 }

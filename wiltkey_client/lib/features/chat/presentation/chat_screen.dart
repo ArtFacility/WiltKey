@@ -8,6 +8,7 @@ import '../../../core/state.dart';
 import '../../../core/payload_limits.dart';
 import '../../../core/models.dart';
 import '../../../core/custom_emoji.dart';
+import '../../contacts/presentation/contact_request_ui.dart';
 import 'widgets/image_source_sheet.dart';
 import 'widgets/screenshot_ui.dart';
 import 'widgets/wilt_duration_sheet.dart';
@@ -65,6 +66,9 @@ class _ChatScreenState extends State<ChatScreen>
 
   // The message the composer is currently replying to (null = normal send).
   ChatMessage? _replyingTo;
+
+  // The message currently being edited (null = normal send).
+  ChatMessage? _editingMessage;
 
   // Wraps the message list so a consented screenshot can render it to an image.
   final GlobalKey _captureBoundaryKey = GlobalKey();
@@ -570,9 +574,98 @@ class _ChatScreenState extends State<ChatScreen>
     });
   }
 
+  void _startEditing(ChatMessage message) {
+    setState(() {
+      _editingMessage = message;
+      _replyingTo = null;
+      _messageController.text = message.decryptedText ?? message.text;
+      _messageController.selection = TextSelection.fromPosition(
+        TextPosition(offset: _messageController.text.length),
+      );
+    });
+    _inputFocus.requestFocus();
+  }
+
+  void _cancelEditing() {
+    setState(() {
+      _editingMessage = null;
+      _messageController.clear();
+    });
+  }
+
+  Future<void> _confirmDeleteMessage(ChatMessage message) async {
+    final t = context.wk;
+    final l10n = AppLocalizations.of(context)!;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: t.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(t.radiusCard),
+          side: BorderSide(color: t.border),
+        ),
+        title: Row(
+          children: [
+            Icon(Icons.delete_outline, color: t.danger, size: 22),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                l10n.chatDeleteTitle,
+                style: t.screenTitle.copyWith(fontSize: 16),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          l10n.chatDeleteBody,
+          style: t.bodySecondary.copyWith(fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(
+              l10n.commonCancel,
+              style: t.body.copyWith(color: t.textSecondary),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: t.danger,
+              foregroundColor: Colors.white,
+            ),
+            child: Text(l10n.chatDeleteConfirm),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      final contact = _appState.activeContact;
+      if (contact != null) {
+        final error = await _appState.deleteMessage(contact, message);
+        if (error != null && mounted) _errorSnack(error);
+      }
+    }
+  }
+
   void _handleSend() async {
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
+
+    if (_editingMessage != null) {
+      final editing = _editingMessage!;
+      final contact = _appState.activeContact;
+      _cancelEditing();
+      if (contact != null) {
+        final error = await _appState.editMessage(contact, editing, text);
+        if (error != null && mounted) {
+          _errorSnack(error);
+          _messageController.text = text;
+        }
+      }
+      return;
+    }
 
     _sendBloom.forward(from: 0); // bloom on tap
 
@@ -644,6 +737,9 @@ class _ChatScreenState extends State<ChatScreen>
         return true; // undelivered older than a delivered one → stuck receipt
       }
     }
+    if (!contact.isGroup && _appState.hasUnverified1on1GapsCached(contact)) {
+      return true; // unverified inbound gap in 1-on-1 chat
+    }
     return false;
   }
 
@@ -671,6 +767,12 @@ class _ChatScreenState extends State<ChatScreen>
         builder: (context) => ChatDetailsScreen(contact: contact),
       ),
     );
+  }
+
+  /// Tapping the peer's avatar offers to add them as a contact (the name block
+  /// beside it still opens the chat details).
+  void _promptAddContact(Contact contact) {
+    showAddContactFlow(context, appState: _appState, contact: contact);
   }
 
   @override
@@ -704,7 +806,7 @@ class _ChatScreenState extends State<ChatScreen>
                 children: [
                   GestureDetector(
                     behavior: HitTestBehavior.opaque,
-                    onTap: () => _openChatDetails(contact),
+                    onTap: () => _promptAddContact(contact),
                     child: Row(
                       children: [
                         PixelArtAvatar(
@@ -938,6 +1040,8 @@ class _ChatScreenState extends State<ChatScreen>
                             onQuoteTap: message.replyToId == null
                                 ? null
                                 : () => _revealQuotedMessage(message.replyToId),
+                            onEdit: _startEditing,
+                            onDelete: _confirmDeleteMessage,
                           ),
                         );
 
@@ -1073,6 +1177,54 @@ class _ChatScreenState extends State<ChatScreen>
     final overBudget = cost > contact.remainingBufferBytes;
     return Column(
       children: [
+        if (_editingMessage != null)
+          Container(
+            margin: const EdgeInsets.only(bottom: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: t.surface,
+              borderRadius: BorderRadius.circular(t.radiusCard),
+              border: Border.all(color: t.action.withValues(alpha: 0.4)),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.edit_outlined, size: 16, color: t.action),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        l10n.chatEditingBanner,
+                        style: t.badgeLabel.copyWith(
+                          color: t.action,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 11,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        _editingMessage!.decryptedText ?? '',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: t.bodySecondary.copyWith(fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close, size: 16),
+                  color: t.textTertiary,
+                  onPressed: _cancelEditing,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  splashRadius: 16,
+                  tooltip: l10n.chatCancelEdit,
+                ),
+              ],
+            ),
+          ),
         if (_replyingTo != null)
           Padding(
             padding: const EdgeInsets.only(bottom: 6),
@@ -1157,8 +1309,8 @@ class _ChatScreenState extends State<ChatScreen>
               ),
             ],
             const SizedBox(width: 8),
-            if (_charCount == 0)
-              // Empty field → hold-to-record mic (tap it for the quality picker).
+            if (_charCount == 0 || isRecordingVoice)
+              // Empty field or recording → hold-to-record mic / locked send button.
               buildVoiceButton(t, l10n)
             else
               Padding(

@@ -23,6 +23,7 @@ extension AppStateChatMeta on AppState {
       'short_nick': effectiveShortNick,
       'profile_image': profileImageB64,
       'avatar_border': AvatarBorderController.instance.borderId,
+      'theme_id': ThemeController().themeId,
       'images_allowed': contact.imagesAllowed ?? true,
       'relay_url': activeRelayUrl, // advertise our relay for peer fallback
       'v': 1,
@@ -132,6 +133,7 @@ extension AppStateChatMeta on AppState {
       final nick = (p['short_nick'] as String?)?.trim();
       final img = (p['profile_image'] as String?)?.trim();
       final border = (p['avatar_border'] as String?)?.trim();
+      final themeId = (p['theme_id'] as String?)?.trim();
       final imagesAllowed = p['images_allowed'] as bool?;
 
       // Remember the peer's relay as a connection fallback (filtered + persisted).
@@ -141,6 +143,7 @@ extension AppStateChatMeta on AppState {
         name: (name != null && name.isNotEmpty) ? name : null,
         shortNick: (nick != null && nick.isNotEmpty) ? nick : null,
         profileImageB64: (img != null && img.isNotEmpty) ? img : null,
+        themeId: (themeId != null && themeId.isNotEmpty) ? themeId : null,
         // 'none' (a real value) unequips; absent/empty (old peer) keeps current.
         avatarBorderId: (border != null && border.isNotEmpty) ? border : null,
         imagesAllowed: imagesAllowed,
@@ -148,6 +151,32 @@ extension AppStateChatMeta on AppState {
       contacts[idx] = updated;
       if (activeContact?.keyHash == senderId) activeContact = updated;
       await WiltkeyDatabase.instance.upsertContact(updated);
+
+      final scIdx = socialContacts.indexWhere((c) => c.keyHash == senderId);
+      if (scIdx != -1) {
+        final sc = socialContacts[scIdx];
+        final updatedSc = SocialContact(
+          id: sc.id,
+          keyHash: sc.keyHash,
+          name: updated.name,
+          shortNick: updated.shortNick,
+          profileImageB64: updated.profileImageB64,
+          avatarBorderId: updated.avatarBorderId,
+          themeId: updated.themeId ?? sc.themeId,
+          sharedSecretSeed: sc.sharedSecretSeed,
+          myPubkey: sc.myPubkey,
+          peerPubkey: sc.peerPubkey,
+          addedAt: sc.addedAt,
+          isBlocked: sc.isBlocked,
+          themeSeed: sc.themeSeed,
+          lastSyncedAt: sc.lastSyncedAt,
+          isPinned: sc.isPinned,
+          status: sc.status,
+        );
+        socialContacts[scIdx] = updatedSc;
+        await WiltkeyDatabase.instance.upsertSocialContact(updatedSc);
+      }
+
       notifyListeners();
       _persistence.saveState(this);
       log('[ChatInfo] Applied profile/permission update from ${updated.name}');

@@ -180,9 +180,11 @@ func (p *PushSender) getAccessToken() (string, error) {
 
 // Send delivers a content-free, high-priority data ping to one device token.
 // [senderID] is the sender's key hash (already a one-way hash, not identity) so
-// the client can deep-link; it's the only field that ever reaches Google.
+// the client can deep-link; [contentType] lets the client render a fitting alert
+// (e.g. "emergency chat request" vs the generic "new secure message"). These are
+// the only fields that ever reach Google.
 // Returns errTokenUnregistered when the token is dead so the caller can prune it.
-func (p *PushSender) Send(token string, senderID string) error {
+func (p *PushSender) Send(token string, senderID string, contentType string) error {
 	if !p.Enabled() {
 		return nil
 	}
@@ -198,7 +200,8 @@ func (p *PushSender) Send(token string, senderID string) error {
 			// Data-only (no "notification" key) so the client's own service posts
 			// the alert — that keeps the content generic and lets us deep-link.
 			"data": map[string]string{
-				"sender_id": senderID,
+				"sender_id":    senderID,
+				"content_type": contentType,
 			},
 			"android": map[string]any{
 				"priority": "HIGH",

@@ -285,10 +285,11 @@ func (r *RedisClient) GetActiveQueueCount(recipientID string) (int64, error) {
 // _notifyContentTypes (background_handler.dart). Group traffic all rides as
 // "group_message" (the media type is inside the encrypted envelope).
 var notifiableContentTypes = map[string]bool{
-	"text":          true,
-	"image":         true,
-	"voice":         true,
-	"group_message": true,
+	"text":            true,
+	"image":           true,
+	"voice":           true,
+	"group_message":   true,
+	"emergency_chat":  true,
 }
 
 // isNotifiable reports whether a queued content type should raise a "new

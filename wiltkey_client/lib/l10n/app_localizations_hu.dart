@@ -228,6 +228,24 @@ class AppLocalizationsHu extends AppLocalizations {
   String get settingsProfileChipRandom => 'Véletlenszerű';
 
   @override
+  String get settingsProfileChipTemplateSave => 'Mentés sablonként';
+
+  @override
+  String get settingsProfileTemplateSaved => 'Sablonok közé mentve';
+
+  @override
+  String get settingsProfileTemplatesButton => 'Választás sablonból';
+
+  @override
+  String get settingsProfileTemplatesTitle => 'Mentett sablonok';
+
+  @override
+  String get settingsProfileNoTemplates => 'Nincsenek mentett sablonok';
+
+  @override
+  String get settingsProfileTemplateEquipped => 'Profilkép-sablon beállítva';
+
+  @override
   String get avatarEditButton => 'Avatar szerkesztése';
 
   @override
@@ -402,6 +420,9 @@ class AppLocalizationsHu extends AppLocalizations {
 
   @override
   String get notificationNewMessageBody => 'Új üzeneted érkezett';
+
+  @override
+  String get notificationEmergencyChatBody => 'Vészhelyzeti chat kérés';
 
   @override
   String get notificationSecureLinkActive =>
@@ -947,6 +968,18 @@ class AppLocalizationsHu extends AppLocalizations {
   String get chatVoiceReleaseCancel => 'Engedd el a megszakításhoz';
 
   @override
+  String get chatVoiceSlideToCancel => 'Csúsztasd a megszakításhoz';
+
+  @override
+  String get chatVoiceSlideToLock => 'Csúsztasd fel a zároláshoz';
+
+  @override
+  String get chatVoiceCancel => 'Felvétel megszakítása';
+
+  @override
+  String get chatVoiceSend => 'Hangüzenet küldése';
+
+  @override
   String get chatVoicePermissionDenied =>
       'A hangüzenetek rögzítéséhez mikrofon-engedély szükséges.';
 
@@ -1064,97 +1097,115 @@ class AppLocalizationsHu extends AppLocalizations {
       'A házigazda újratöltötte a csoportot — találkozz vele újra az újracsatlakozáshoz';
 
   @override
-  String get groupTimeWiltToggle => 'Time Wilt group';
+  String get groupTimeWiltToggle => 'Time Wilt csoport';
 
   @override
   String get groupTimeWiltToggleSub =>
-      'Limited time, unlimited budget. The group wilts to read-only when your timer runs out; meet the host again to renew it.';
+      'Korlátozott idő, korlátlan keret. A csoport írásvédetté válik, ha az időzítő lejár; találkozz újra a házigazdával a megújításhoz.';
 
   @override
-  String get groupTimeWiltMembersLabel => 'Max members';
+  String get groupTimeWiltMembersLabel => 'Max. taglétszám';
 
   @override
-  String get groupTimeWiltMembersUpsell => 'Unlock up to 100 members with Plus';
+  String get groupTimeWiltMembersUpsell => 'Akár 100 tag a Plus csomaggal';
 
   @override
-  String get groupTimeWiltHostInfinite => 'Host · ∞';
+  String get groupTimeWiltHostInfinite => 'Házigazda · ∞';
 
   @override
   String get groupTimeWiltRenewComposer =>
-      'Wilted — meet the host again to renew your access';
+      'Lejárt — találkozz a házigazdával a hozzáférés megújításához';
 
   @override
   String get groupTimeWiltHostAllWilted =>
-      'All members have wilted — meet someone again to revive the group';
+      'Minden tagnak lejárt az ideje — találkozz valakivel a csoport újraindításához';
 
   @override
-  String get groupNukeProposeButton => 'Propose destroying for everyone';
+  String get groupNukeProposeButton => 'Megsemmisítés javaslata mindenkinek';
 
   @override
-  String get groupNukeProposeTitle => 'Destroy this group for everyone?';
+  String get groupNukeProposeTitle => 'Csoport megsemmisítése mindenkinek?';
 
   @override
   String get groupNukeProposeBody =>
-      'Asks the other members to vote. If a majority agree, the group and its history are destroyed on every device. This can\'t be undone.';
+      'Szavazást indít a tagok között. Többségi döntés esetén a csoport és előzményei minden eszközről törlődnek. Nem vonható vissza.';
 
   @override
-  String get groupNukeProposeConfirm => 'Propose';
+  String get groupNukeProposeConfirm => 'Javaslat';
 
   @override
-  String get groupNukeVoteTitle => 'Destroy group?';
+  String get groupNukeVoteTitle => 'Csoport megsemmisítése?';
 
   @override
   String get groupNukeVoteBody =>
-      'A member proposed destroying this group for everyone. If a majority agree, it\'s wiped on every device.';
+      'Egy tag javasolta a csoport törlését mindenki számára. Többség esetén minden eszközről törlődik.';
 
   @override
-  String get groupNukeVoteAllow => 'Agree';
+  String get groupNukeVoteAllow => 'Egyetértek';
 
   @override
-  String get groupNukeVoteDeny => 'Keep';
+  String get groupNukeVoteDeny => 'Megtartás';
 
   @override
-  String get groupNukeVotePending => 'Waiting for members to vote…';
+  String get groupNukeVotePending => 'Várakozás a tagok szavazataira…';
 
   @override
-  String get groupNukeVotePassed => 'The group was destroyed by majority vote.';
+  String get groupNukeVotePassed =>
+      'A csoport többségi szavazással megsemmisült.';
 
   @override
   String get groupNukeVoteFailed =>
-      'The proposal to destroy the group did not pass.';
+      'A csoport törlésére tett javaslat nem kapott többséget.';
 
   @override
   String get groupNukeVoteSent =>
-      'Proposal sent — waiting for members to vote.';
+      'Javaslat elküldve — várakozás a tagok szavazatára.';
 
   @override
-  String get activityTitle => 'Activity';
+  String get activityTitle => 'Aktivitás';
 
   @override
   String get activityEmpty =>
-      'No activity yet. Events like a chat being destroyed will show up here.';
+      'Nincs korábbi aktivitás. Az olyan események, mint a csevegés törlése, itt jelennek meg.';
 
   @override
-  String get activityClear => 'Clear';
+  String get activityClear => 'Törlés';
 
   @override
-  String get activityClearConfirmTitle => 'Clear activity?';
+  String get activityClearConfirmTitle => 'Aktivitáslista törlése?';
 
   @override
   String get activityClearConfirmBody =>
-      'This removes all activity entries from this device. It can\'t be undone.';
+      'Eltávolítja az összes bejegyzést erről az eszközről. Nem vonható vissza.';
 
   @override
-  String get eventNukeReceivedTitle => 'Chat destroyed';
+  String get eventNukeReceivedTitle => 'Csevegés megsemmisült';
 
   @override
-  String get eventNukeReceivedBody => 'A secure chat was destroyed.';
+  String get eventNukeReceivedBody => 'Egy biztonságos csevegés megsemmisült.';
 
   @override
-  String get eventGroupNukedTitle => 'Group destroyed';
+  String get eventGroupNukedTitle => 'Csoport megsemmisült';
 
   @override
-  String get eventGroupNukedBody => 'A secure group was destroyed.';
+  String get eventGroupNukedBody => 'Egy biztonságos csoport megsemmisült.';
+
+  @override
+  String eventContactRequestTitle(String name) {
+    return '$name kapcsolatkérelmet küldött neked';
+  }
+
+  @override
+  String get eventContactRequestBody =>
+      'Koppints az elfogadáshoz vagy az elutasításhoz a csevegésben';
+
+  @override
+  String eventContactRemovedTitle(String name) {
+    return '$name eltávolított téged';
+  }
+
+  @override
+  String get eventContactRemovedBody => 'Eltávolított a kapcsolatai közül';
 
   @override
   String groupSyncingFromMember(String name) {
@@ -1450,6 +1501,57 @@ class AppLocalizationsHu extends AppLocalizations {
       'Elfogyott a pad — találkozz a feltöltéshez';
 
   @override
+  String get themePreviewSectionProfile => 'Profil háttér';
+
+  @override
+  String get themePreviewFullscreenProfile =>
+      'Teljes képernyős profil előnézet';
+
+  @override
+  String get linkWarningTitle => 'Külső hivatkozás';
+
+  @override
+  String get linkWarningBody =>
+      'Külső hivatkozást készülsz megnyitni a böngésződben. Ez kapcsolatot létesít a célszerverrel, és felfedi az IP-címedet.';
+
+  @override
+  String get linkWarningOpen => 'Megnyitás böngészőben';
+
+  @override
+  String get linkWarningCopy => 'Hivatkozás másolása';
+
+  @override
+  String get linkWarningCopied => 'Hivatkozás a vágólapra másolva';
+
+  @override
+  String get chatActionEdit => 'Szerkesztés';
+
+  @override
+  String get chatActionDelete => 'Törlés';
+
+  @override
+  String get chatEditingBanner => 'Üzenet szerkesztése';
+
+  @override
+  String get chatCancelEdit => 'Szerkesztés elvetése';
+
+  @override
+  String get chatDeleteTitle => 'Üzenet törlése';
+
+  @override
+  String get chatDeleteBody =>
+      'Biztosan törlöd ezt az üzenetet mindenki számára?';
+
+  @override
+  String get chatDeleteConfirm => 'Törlés';
+
+  @override
+  String get chatMessageDeleted => '[Üzenet törölve]';
+
+  @override
+  String get chatEditedTag => 'szerkesztve';
+
+  @override
   String get accessibilityWarningTitle => 'Kisegítő szolgáltatás aktív';
 
   @override
@@ -1697,7 +1799,7 @@ class AppLocalizationsHu extends AppLocalizations {
 
   @override
   String get shopPlusBenefitTimeWiltGroups =>
-      'Host bigger Time Wilt groups — up to 100 members instead of 20.';
+      'Nagyobb Time Wilt csoportok indítása — 20 helyett akár 100 tagig.';
 
   @override
   String get shopPlusBenefitSupport =>
@@ -1883,95 +1985,263 @@ class AppLocalizationsHu extends AppLocalizations {
   String get timeWiltLifetimeMoments => 'pár pillanat';
 
   @override
-  String get navContacts => 'Contacts';
+  String get navContacts => 'Névjegyek';
 
   @override
-  String get contactsTitle => 'Contacts';
+  String get contactsTitle => 'Névjegyek';
 
   @override
-  String get contactsSectionFriends => 'Friends';
+  String get contactsSectionFriends => 'Barátok';
 
   @override
-  String get contactsEmptyTitle => 'No contacts yet';
+  String get contactsEmptyTitle => 'Még nincsenek névjegyek';
 
   @override
   String get contactsEmptyBody =>
-      'Add someone from an existing chat to see them here.';
+      'Adj hozzá valakit egy létező csevegésből, hogy itt lásd.';
 
   @override
-  String get contactsOwnProfile => 'Your Profile';
+  String get contactsOwnProfile => 'Saját profilod';
 
   @override
-  String get contactsOwnProfileHint => 'Tap to set status or wilting story';
+  String get contactsOwnProfileHint =>
+      'Érintsd meg állapot vagy történet megadásához';
 
   @override
   String contactRequestSent(String name) {
-    return 'Contact request sent to $name';
+    return 'Kapcsolatfelvételi kérelem elküldve neki: $name';
   }
 
   @override
   String contactRequestReceived(String name) {
-    return '$name wants to add you as a contact';
+    return '$name szeretne felvenni a névjegyei közé';
   }
 
   @override
-  String get contactRequestApproved => 'Contact request accepted';
+  String get contactRequestApproved => 'Kapcsolatfelvételi kérelem elfogadva';
 
   @override
-  String get contactRequestDeclined => 'Contact request declined';
+  String get contactRequestDeclined => 'Kapcsolatfelvételi kérelem elutasítva';
 
   @override
-  String get contactRequestApprove => 'Approve';
+  String get contactRequestApprove => 'Elfogadás';
 
   @override
-  String get contactRequestDeny => 'Deny';
+  String get contactRequestDeny => 'Elutasítás';
 
   @override
-  String get contactProfileOpenChat => 'Open Chat';
+  String get contactAddTitle => 'Add contact';
 
   @override
-  String get contactProfileRemove => 'Remove Contact';
+  String contactAddBody(String name) {
+    return 'Add $name to your contacts?';
+  }
 
   @override
-  String get contactProfileBlock => 'Block User';
+  String get contactAddConfirm => 'Add contact';
 
   @override
-  String get contactProfileStatusPlaceholder => 'No status yet';
+  String get contactAddAlready => 'Already in your contacts';
+
+  @override
+  String get contactAddSent => 'Contact request sent';
+
+  @override
+  String get contactProfileOpenChat => 'Csevegés megnyitása';
+
+  @override
+  String get contactProfileRemove => 'Névjegy eltávolítása';
+
+  @override
+  String get contactProfileBlock => 'Felhasználó letiltása';
+
+  @override
+  String get contactProfileStatusPlaceholder => 'Nincs állapot megadva';
+
+  @override
+  String get contactProfileEmergencyChat => 'Vészhelyzeti chat';
+
+  @override
+  String get contactPin => 'Rögzítés';
+
+  @override
+  String get contactUnpin => 'Rögzítés feloldása';
+
+  @override
+  String get contactUnblock => 'Feloldás';
+
+  @override
+  String get contactsSectionPinned => 'Rögzítve';
+
+  @override
+  String get contactStatusLabel => 'Státusz';
+
+  @override
+  String get contactStatusHint => 'Oszd meg a státuszodat a kapcsolataiddal…';
+
+  @override
+  String get contactStatusSave => 'Státusz mentése';
+
+  @override
+  String get contactStatusUpdated => 'Státusz frissítve';
 
   @override
   String contactRemoveConfirmTitle(String name) {
-    return 'Remove $name?';
+    return '$name eltávolítása?';
   }
 
   @override
   String get contactRemoveConfirmBody =>
-      'This removes them from your contact list. You can add them again later.';
+      'Eltávolítja őt a névjegyeid közül. Később újra hozzáadhatod.';
 
   @override
   String contactBlockConfirmTitle(String name) {
-    return 'Block $name?';
+    return '$name letiltása?';
   }
 
   @override
   String get contactBlockConfirmBody =>
-      'They won\'t be able to contact you or send contact requests.';
+      'Nem fog tudni üzenetet vagy kapcsolatfelvételi kérelmet küldeni neked.';
 
   @override
-  String get settingsBlockedContacts => 'Blocked Contacts';
+  String get settingsBlockedContacts => 'Letiltott névjegyek';
 
   @override
-  String get settingsBlockedEmpty => 'No blocked contacts';
+  String get settingsBlockedEmpty => 'Nincsenek letiltott névjegyek';
 
   @override
-  String get commonRemove => 'Remove';
+  String get commonRemove => 'Eltávolítás';
 
   @override
-  String get commonBlock => 'Block';
+  String get commonBlock => 'Letiltás';
 
   @override
   String get contactProfileChatNotFound =>
-      'No chat found for this contact — it may have been deleted';
+      'Nem található csevegés ehhez a névjegyhez — lehet, hogy törölték';
 
   @override
-  String get gestureSwipeForContacts => 'Swipe from left edge for contacts';
+  String get emergencyChatStart => 'Vészhelyzeti chat indítása';
+
+  @override
+  String emergencyChatConfirmTitle(String name) {
+    return 'Vészhelyzeti chat indítása ezzel: $name?';
+  }
+
+  @override
+  String emergencyChatConfirmBody(String name) {
+    return 'Nincs aktív chat ezzel: $name. Ez egy 12 órás, távolról létrehozott Time Wilt chatet indít, személyes párosítás nélkül. A meglévő elhervadt chat és üzenetei véglegesen megsemmisülnek, és soha nem tölthetők újra.';
+  }
+
+  @override
+  String get emergencyChatAlreadyActive =>
+      'Már van aktív chated ezzel a kapcsolattal';
+
+  @override
+  String get emergencyChatStarted => 'Vészhelyzeti chat elindítva';
+
+  @override
+  String get chatsEmergencyPendingSubtitle =>
+      'Vészhelyzeti csevegés kapcsolódása…';
+
+  @override
+  String chatsEmergencyPendingSnackBar(String name) {
+    return 'A vészhelyzeti csevegés $name felével kapcsolódásra vár.';
+  }
+
+  @override
+  String get emergencyChatPending => 'Vészhelyzeti csevegés folyamatban…';
+
+  @override
+  String get gestureSwipeForContacts => 'Húzd el a bal szélről a névjegyekhez';
+
+  @override
+  String get contactProfileSafetyNumber => 'Azonosítókulcs ujjlenyomata';
+
+  @override
+  String get contactProfileWiltedHint =>
+      'Ideiglenes, 12 órás Time Wilt csevegés indítása';
+
+  @override
+  String get commonCopy => 'Másolás';
+
+  @override
+  String get commonCopied => 'Vágólapra másolva';
+
+  @override
+  String eventMentionTitle(String name) {
+    return '$name megemlített téged';
+  }
+
+  @override
+  String eventReplyTitle(String name) {
+    return '$name válaszolt neked';
+  }
+
+  @override
+  String get chatNotificationModeAll => 'Minden üzenet';
+
+  @override
+  String get chatNotificationModeMentions => 'Csak említések és válaszok';
+
+  @override
+  String get chatNotificationModeMuted => 'Némítás (Csendes)';
+
+  @override
+  String get chatNotificationSettingsTitle => 'Értesítések';
+
+  @override
+  String get chatMuteTitle => 'Csevegés némítása';
+
+  @override
+  String get chatUnmuteTitle => 'Csevegés némításának feloldása';
+
+  @override
+  String get settingsNotifyCategories => 'Kategóriák';
+
+  @override
+  String get settingsNotifyDirectMessages => 'Közvetlen üzenetek';
+
+  @override
+  String get settingsNotifyDirectMessagesSubtitle =>
+      'Értesítések 1:1 csevegésekhez';
+
+  @override
+  String get settingsNotifyGroupMessages => 'Csoportos üzenetek';
+
+  @override
+  String get settingsNotifyGroupMessagesSubtitle =>
+      'Értesítések csoportos csevegésekhez';
+
+  @override
+  String get settingsNotifyEvents => 'Biztonsági és aktivitási események';
+
+  @override
+  String get settingsNotifyEventsSubtitle =>
+      'Kapcsolatfelvételi kérelmek, csoportmegsemmisítési szavazások, képernyőkép-riasztások';
+
+  @override
+  String get settingsMutedChatsTitle => 'Némított csevegések';
+
+  @override
+  String get settingsNoMutedChats => 'Nincsenek némított csevegések';
+
+  @override
+  String get settingsUnmute => 'Némítás feloldása';
+
+  @override
+  String get settingsCheckForUpdates => 'Frissítések keresése';
+
+  @override
+  String get settingsCheckingUpdates => 'Frissítések keresése...';
+
+  @override
+  String settingsUpdateAvailable(String version) {
+    return 'Frissítés elérhető: v$version';
+  }
+
+  @override
+  String get settingsUpToDate => 'A WiltKey naprakész';
+
+  @override
+  String get settingsWhatsNew => 'Újdonságok';
 }

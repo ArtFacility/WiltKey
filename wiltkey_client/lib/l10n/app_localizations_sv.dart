@@ -229,6 +229,24 @@ class AppLocalizationsSv extends AppLocalizations {
   String get settingsProfileChipRandom => 'Slumpmässig';
 
   @override
+  String get settingsProfileChipTemplateSave => 'Lägg till i mallar';
+
+  @override
+  String get settingsProfileTemplateSaved => 'Sparad i mallar';
+
+  @override
+  String get settingsProfileTemplatesButton => 'Välj från mall';
+
+  @override
+  String get settingsProfileTemplatesTitle => 'Sparade mallar';
+
+  @override
+  String get settingsProfileNoTemplates => 'Inga sparade mallar än';
+
+  @override
+  String get settingsProfileTemplateEquipped => 'Avatarmall använd';
+
+  @override
   String get avatarEditButton => 'Redigera avatar';
 
   @override
@@ -401,6 +419,9 @@ class AppLocalizationsSv extends AppLocalizations {
 
   @override
   String get notificationNewMessageBody => 'Du har fått ett meddelande';
+
+  @override
+  String get notificationEmergencyChatBody => 'Begäran om nödchatt';
 
   @override
   String get notificationSecureLinkActive => 'Synkroniserar säkra meddelanden';
@@ -939,6 +960,18 @@ class AppLocalizationsSv extends AppLocalizations {
   String get chatVoiceReleaseCancel => 'Släpp för att avbryta';
 
   @override
+  String get chatVoiceSlideToCancel => 'Dra för att avbryta';
+
+  @override
+  String get chatVoiceSlideToLock => 'Dra uppåt för att låsa';
+
+  @override
+  String get chatVoiceCancel => 'Avbryt inspelning';
+
+  @override
+  String get chatVoiceSend => 'Skicka röstmeddelande';
+
+  @override
   String get chatVoicePermissionDenied =>
       'Mikrofonbehörighet krävs för att spela in röstmeddelanden.';
 
@@ -1056,97 +1089,114 @@ class AppLocalizationsSv extends AppLocalizations {
       'Värden laddade om gruppen — träffa dem igen för att gå med på nytt';
 
   @override
-  String get groupTimeWiltToggle => 'Time Wilt group';
+  String get groupTimeWiltToggle => 'Time Wilt-grupp';
 
   @override
   String get groupTimeWiltToggleSub =>
-      'Limited time, unlimited budget. The group wilts to read-only when your timer runs out; meet the host again to renew it.';
+      'Begränsad tid, obegränsad budget. Gruppen blir skrivskyddad när timern tar slut; träffa värden igen för att förnya den.';
 
   @override
-  String get groupTimeWiltMembersLabel => 'Max members';
+  String get groupTimeWiltMembersLabel => 'Max antal medlemmar';
 
   @override
-  String get groupTimeWiltMembersUpsell => 'Unlock up to 100 members with Plus';
+  String get groupTimeWiltMembersUpsell =>
+      'Lås upp upp till 100 medlemmar med Plus';
 
   @override
-  String get groupTimeWiltHostInfinite => 'Host · ∞';
+  String get groupTimeWiltHostInfinite => 'Värd · ∞';
 
   @override
   String get groupTimeWiltRenewComposer =>
-      'Wilted — meet the host again to renew your access';
+      'Utgången — träffa värden igen för att förnya din åtkomst';
 
   @override
   String get groupTimeWiltHostAllWilted =>
-      'All members have wilted — meet someone again to revive the group';
+      'Alla medlemmar har gått ut — träffa någon för att återuppliva gruppen';
 
   @override
-  String get groupNukeProposeButton => 'Propose destroying for everyone';
+  String get groupNukeProposeButton => 'Föreslå radering för alla';
 
   @override
-  String get groupNukeProposeTitle => 'Destroy this group for everyone?';
+  String get groupNukeProposeTitle => 'Radera denna grupp för alla?';
 
   @override
   String get groupNukeProposeBody =>
-      'Asks the other members to vote. If a majority agree, the group and its history are destroyed on every device. This can\'t be undone.';
+      'Startar en omröstning bland medlemmarna. Om majoriteten godkänner raderas gruppen och dess historik på varje enhet. Kan inte ångras.';
 
   @override
-  String get groupNukeProposeConfirm => 'Propose';
+  String get groupNukeProposeConfirm => 'Föreslå';
 
   @override
-  String get groupNukeVoteTitle => 'Destroy group?';
+  String get groupNukeVoteTitle => 'Radera grupp?';
 
   @override
   String get groupNukeVoteBody =>
-      'A member proposed destroying this group for everyone. If a majority agree, it\'s wiped on every device.';
+      'En medlem föreslog att radera denna grupp för alla. Om majoriteten godkänner rensas den på varje enhet.';
 
   @override
-  String get groupNukeVoteAllow => 'Agree';
+  String get groupNukeVoteAllow => 'Godkänn';
 
   @override
-  String get groupNukeVoteDeny => 'Keep';
+  String get groupNukeVoteDeny => 'Behåll';
 
   @override
-  String get groupNukeVotePending => 'Waiting for members to vote…';
+  String get groupNukeVotePending => 'Väntar på medlemmarnas röster…';
 
   @override
-  String get groupNukeVotePassed => 'The group was destroyed by majority vote.';
+  String get groupNukeVotePassed => 'Gruppen raderades genom majoritetsbeslut.';
 
   @override
   String get groupNukeVoteFailed =>
-      'The proposal to destroy the group did not pass.';
+      'Förslaget att radera gruppen röstades ned.';
 
   @override
-  String get groupNukeVoteSent =>
-      'Proposal sent — waiting for members to vote.';
+  String get groupNukeVoteSent => 'Förslag skickat — väntar på omröstning.';
 
   @override
-  String get activityTitle => 'Activity';
+  String get activityTitle => 'Aktivitet';
 
   @override
   String get activityEmpty =>
-      'No activity yet. Events like a chat being destroyed will show up here.';
+      'Ingen aktivitet än. Händelser som raderade chattar visas här.';
 
   @override
-  String get activityClear => 'Clear';
+  String get activityClear => 'Rensa';
 
   @override
-  String get activityClearConfirmTitle => 'Clear activity?';
+  String get activityClearConfirmTitle => 'Rensa aktivitet?';
 
   @override
   String get activityClearConfirmBody =>
-      'This removes all activity entries from this device. It can\'t be undone.';
+      'Tar bort alla aktivitetshändelser från denna enhet. Kan inte ångras.';
 
   @override
-  String get eventNukeReceivedTitle => 'Chat destroyed';
+  String get eventNukeReceivedTitle => 'Chatt raderad';
 
   @override
-  String get eventNukeReceivedBody => 'A secure chat was destroyed.';
+  String get eventNukeReceivedBody => 'En säker chatt raderades.';
 
   @override
-  String get eventGroupNukedTitle => 'Group destroyed';
+  String get eventGroupNukedTitle => 'Grupp raderad';
 
   @override
-  String get eventGroupNukedBody => 'A secure group was destroyed.';
+  String get eventGroupNukedBody => 'En säker grupp raderades.';
+
+  @override
+  String eventContactRequestTitle(String name) {
+    return '$name skickade en kontaktförfrågan till dig';
+  }
+
+  @override
+  String get eventContactRequestBody =>
+      'Tryck för att acceptera eller avböja i chatten';
+
+  @override
+  String eventContactRemovedTitle(String name) {
+    return '$name tog bort dig';
+  }
+
+  @override
+  String get eventContactRemovedBody => 'De tog bort dig från sina kontakter';
 
   @override
   String groupSyncingFromMember(String name) {
@@ -1441,6 +1491,57 @@ class AppLocalizationsSv extends AppLocalizations {
   String get themePreviewRowLost => 'Padet är slut — träffas för att ladda om';
 
   @override
+  String get themePreviewSectionProfile => 'Profilbakgrund';
+
+  @override
+  String get themePreviewFullscreenProfile =>
+      'Förhandsvisning av profil i helskärm';
+
+  @override
+  String get linkWarningTitle => 'Extern länkvarning';
+
+  @override
+  String get linkWarningBody =>
+      'Du är på väg att öppna en extern länk i webbläsaren. Detta ansluter till målservern och avslöjar din IP-adress.';
+
+  @override
+  String get linkWarningOpen => 'Öppna i webbläsare';
+
+  @override
+  String get linkWarningCopy => 'Kopiera länk';
+
+  @override
+  String get linkWarningCopied => 'Länk kopierad till urklipp';
+
+  @override
+  String get chatActionEdit => 'Redigera';
+
+  @override
+  String get chatActionDelete => 'Ta bort';
+
+  @override
+  String get chatEditingBanner => 'Redigerar meddelande';
+
+  @override
+  String get chatCancelEdit => 'Avbryt redigering';
+
+  @override
+  String get chatDeleteTitle => 'Ta bort meddelande';
+
+  @override
+  String get chatDeleteBody =>
+      'Är du säker på att du vill ta bort det här meddelandet för alla?';
+
+  @override
+  String get chatDeleteConfirm => 'Ta bort';
+
+  @override
+  String get chatMessageDeleted => '[Meddelande borttaget]';
+
+  @override
+  String get chatEditedTag => 'redigerat';
+
+  @override
   String get accessibilityWarningTitle => 'Tillgänglighetstjänst aktiv';
 
   @override
@@ -1685,7 +1786,7 @@ class AppLocalizationsSv extends AppLocalizations {
 
   @override
   String get shopPlusBenefitTimeWiltGroups =>
-      'Host bigger Time Wilt groups — up to 100 members instead of 20.';
+      'Skapa större Time Wilt-grupper — upp till 100 medlemmar istället för 20.';
 
   @override
   String get shopPlusBenefitSupport =>
@@ -1870,95 +1971,262 @@ class AppLocalizationsSv extends AppLocalizations {
   String get timeWiltLifetimeMoments => 'några ögonblick';
 
   @override
-  String get navContacts => 'Contacts';
+  String get navContacts => 'Kontakter';
 
   @override
-  String get contactsTitle => 'Contacts';
+  String get contactsTitle => 'Kontakter';
 
   @override
-  String get contactsSectionFriends => 'Friends';
+  String get contactsSectionFriends => 'Vänner';
 
   @override
-  String get contactsEmptyTitle => 'No contacts yet';
+  String get contactsEmptyTitle => 'Inga kontakter än';
 
   @override
   String get contactsEmptyBody =>
-      'Add someone from an existing chat to see them here.';
+      'Lägg till någon från en befintlig chatt för att se dem här.';
 
   @override
-  String get contactsOwnProfile => 'Your Profile';
+  String get contactsOwnProfile => 'Din profil';
 
   @override
-  String get contactsOwnProfileHint => 'Tap to set status or wilting story';
+  String get contactsOwnProfileHint =>
+      'Tryck för att ställa in status eller tidsbegränsad händelse';
 
   @override
   String contactRequestSent(String name) {
-    return 'Contact request sent to $name';
+    return 'Kontaktförfrågan skickad till $name';
   }
 
   @override
   String contactRequestReceived(String name) {
-    return '$name wants to add you as a contact';
+    return '$name vill lägga till dig som kontakt';
   }
 
   @override
-  String get contactRequestApproved => 'Contact request accepted';
+  String get contactRequestApproved => 'Kontaktförfrågan godkänd';
 
   @override
-  String get contactRequestDeclined => 'Contact request declined';
+  String get contactRequestDeclined => 'Kontaktförfrågan avvisad';
 
   @override
-  String get contactRequestApprove => 'Approve';
+  String get contactRequestApprove => 'Godkänn';
 
   @override
-  String get contactRequestDeny => 'Deny';
+  String get contactRequestDeny => 'Avvisa';
 
   @override
-  String get contactProfileOpenChat => 'Open Chat';
+  String get contactAddTitle => 'Add contact';
 
   @override
-  String get contactProfileRemove => 'Remove Contact';
+  String contactAddBody(String name) {
+    return 'Add $name to your contacts?';
+  }
 
   @override
-  String get contactProfileBlock => 'Block User';
+  String get contactAddConfirm => 'Add contact';
 
   @override
-  String get contactProfileStatusPlaceholder => 'No status yet';
+  String get contactAddAlready => 'Already in your contacts';
+
+  @override
+  String get contactAddSent => 'Contact request sent';
+
+  @override
+  String get contactProfileOpenChat => 'Öppna chatt';
+
+  @override
+  String get contactProfileRemove => 'Ta bort kontakt';
+
+  @override
+  String get contactProfileBlock => 'Blockera användare';
+
+  @override
+  String get contactProfileStatusPlaceholder => 'Ingen status än';
+
+  @override
+  String get contactProfileEmergencyChat => 'Nödchatt';
+
+  @override
+  String get contactPin => 'Fäst högst upp';
+
+  @override
+  String get contactUnpin => 'Lossa';
+
+  @override
+  String get contactUnblock => 'Avblockera';
+
+  @override
+  String get contactsSectionPinned => 'Fästa';
+
+  @override
+  String get contactStatusLabel => 'Status';
+
+  @override
+  String get contactStatusHint => 'Dela en status med dina kontakter…';
+
+  @override
+  String get contactStatusSave => 'Spara status';
+
+  @override
+  String get contactStatusUpdated => 'Status uppdaterad';
 
   @override
   String contactRemoveConfirmTitle(String name) {
-    return 'Remove $name?';
+    return 'Ta bort $name?';
   }
 
   @override
   String get contactRemoveConfirmBody =>
-      'This removes them from your contact list. You can add them again later.';
+      'Tar bort personen från din kontaktlista. Du kan lägga till dem igen senare.';
 
   @override
   String contactBlockConfirmTitle(String name) {
-    return 'Block $name?';
+    return 'Blockera $name?';
   }
 
   @override
   String get contactBlockConfirmBody =>
-      'They won\'t be able to contact you or send contact requests.';
+      'De kommer inte att kunna kontakta dig eller skicka kontaktförfrågningar.';
 
   @override
-  String get settingsBlockedContacts => 'Blocked Contacts';
+  String get settingsBlockedContacts => 'Blockerade kontakter';
 
   @override
-  String get settingsBlockedEmpty => 'No blocked contacts';
+  String get settingsBlockedEmpty => 'Inga blockerade kontakter';
 
   @override
-  String get commonRemove => 'Remove';
+  String get commonRemove => 'Ta bort';
 
   @override
-  String get commonBlock => 'Block';
+  String get commonBlock => 'Blockera';
 
   @override
   String get contactProfileChatNotFound =>
-      'No chat found for this contact — it may have been deleted';
+      'Ingen chatt hittades för denna kontakt — den kan ha raderats';
 
   @override
-  String get gestureSwipeForContacts => 'Swipe from left edge for contacts';
+  String get emergencyChatStart => 'Starta nödchatt';
+
+  @override
+  String emergencyChatConfirmTitle(String name) {
+    return 'Starta en nödchatt med $name?';
+  }
+
+  @override
+  String emergencyChatConfirmBody(String name) {
+    return 'Det finns ingen aktiv chatt med $name. Detta startar en 12-timmars Time Wilt-chatt som skapas på distans, utan ihopparning i person. Den befintliga vissnade chatten och dess meddelanden förstörs permanent och kan aldrig laddas om igen.';
+  }
+
+  @override
+  String get emergencyChatAlreadyActive =>
+      'Du har redan en aktiv chatt med den här kontakten';
+
+  @override
+  String get emergencyChatStarted => 'Nödchatt startad';
+
+  @override
+  String get chatsEmergencyPendingSubtitle => 'Ansluter nödchatt…';
+
+  @override
+  String chatsEmergencyPendingSnackBar(String name) {
+    return 'Nödchatt med $name väntar på att de ansluter.';
+  }
+
+  @override
+  String get emergencyChatPending => 'Nödchatt väntar…';
+
+  @override
+  String get gestureSwipeForContacts => 'Svep från vänster kant för kontakter';
+
+  @override
+  String get contactProfileSafetyNumber => 'Identitetsnyckelns fingeravtryck';
+
+  @override
+  String get contactProfileWiltedHint =>
+      'Starta en tillfällig 12-timmars Time Wilt-chatt';
+
+  @override
+  String get commonCopy => 'Kopiera';
+
+  @override
+  String get commonCopied => 'Kopierat till urklipp';
+
+  @override
+  String eventMentionTitle(String name) {
+    return '$name nämnde dig';
+  }
+
+  @override
+  String eventReplyTitle(String name) {
+    return '$name svarade dig';
+  }
+
+  @override
+  String get chatNotificationModeAll => 'Alla meddelanden';
+
+  @override
+  String get chatNotificationModeMentions => 'Endast omnämnanden och svar';
+
+  @override
+  String get chatNotificationModeMuted => 'Tystad (Ljudlös)';
+
+  @override
+  String get chatNotificationSettingsTitle => 'Aviseringar';
+
+  @override
+  String get chatMuteTitle => 'Tysta chatt';
+
+  @override
+  String get chatUnmuteTitle => 'Sluta tysta chatt';
+
+  @override
+  String get settingsNotifyCategories => 'Kategorier';
+
+  @override
+  String get settingsNotifyDirectMessages => 'Direktmeddelanden';
+
+  @override
+  String get settingsNotifyDirectMessagesSubtitle =>
+      'Aviseringar för 1:1-chattar';
+
+  @override
+  String get settingsNotifyGroupMessages => 'Gruppmeddelanden';
+
+  @override
+  String get settingsNotifyGroupMessagesSubtitle =>
+      'Aviseringar för gruppchattar';
+
+  @override
+  String get settingsNotifyEvents => 'Säkerhets- och aktivitetshändelser';
+
+  @override
+  String get settingsNotifyEventsSubtitle =>
+      'Kontaktförfrågningar, omröstningar om gruppradering, skärmdumpsvarningar';
+
+  @override
+  String get settingsMutedChatsTitle => 'Tystade chattar';
+
+  @override
+  String get settingsNoMutedChats => 'Inga tystade chattar';
+
+  @override
+  String get settingsUnmute => 'Sluta tysta';
+
+  @override
+  String get settingsCheckForUpdates => 'Sök efter uppdateringar';
+
+  @override
+  String get settingsCheckingUpdates => 'Söker efter uppdateringar...';
+
+  @override
+  String settingsUpdateAvailable(String version) {
+    return 'Uppdatering tillgänglig: v$version';
+  }
+
+  @override
+  String get settingsUpToDate => 'WiltKey är uppdaterad';
+
+  @override
+  String get settingsWhatsNew => 'Nyheter';
 }

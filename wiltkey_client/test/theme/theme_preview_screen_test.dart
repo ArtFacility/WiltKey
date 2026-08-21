@@ -51,4 +51,25 @@ void main() {
     }
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('fullscreen profile preview opens and renders', (tester) async {
+    await tester.pumpWidget(
+      _wrap(ThemePreviewScreen(descriptor: WiltkeyThemeRegistry.garden)),
+    );
+    await tester.pump(const Duration(milliseconds: 100));
+
+    final l10n = await AppLocalizations.delegate.load(const Locale('en'));
+    final target = find.text(l10n.themePreviewFullscreenProfile);
+    await tester.scrollUntilVisible(
+      target,
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(target, warnIfMissed: false);
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('Réka Kovács'), findsWidgets);
+    expect(tester.takeException(), isNull);
+  });
 }

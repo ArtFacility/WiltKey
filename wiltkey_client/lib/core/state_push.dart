@@ -13,7 +13,11 @@ extension AppStatePush on AppState {
   Future<void> registerPushToken() async {
     if (!kFcmEnabled) return;
     final token = await PushChannel.getToken();
-    if (token == null) return;
+    if (token == null) {
+      log('[Push] PushChannel.getToken() returned null (Google Play Services unavailable or token not yet ready)');
+      return;
+    }
+    log('[Push] Registering FCM token with relay for $userId (${token.length} chars)');
     final ts = DateTime.now().millisecondsSinceEpoch ~/ 1000;
     final sig = signMessage('$userId:$ts:$token');
     await _postPush('register', {

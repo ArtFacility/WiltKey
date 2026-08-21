@@ -11,12 +11,14 @@ import '../../../core/models.dart';
 import '../../../core/pixel_art_avatar.dart';
 import '../../../core/cosmetics/avatar_border_controller.dart';
 import '../../../core/custom_emoji.dart';
+import '../../contacts/presentation/contact_request_ui.dart';
 import 'widgets/image_source_sheet.dart';
 import '../../../core/theme/wk.dart';
 import '../../../core/theme/wiltkey_tokens.dart';
 import '../../../core/theme/wiltkey_components.dart';
 import 'widgets/compression_dialog.dart';
 import 'widgets/emoji_autocomplete_bar.dart';
+import 'widgets/mention_autocomplete_bar.dart';
 import 'widgets/emoji_picker_panel.dart';
 import 'widgets/debug_console_sheet.dart';
 import 'widgets/voice_recording_mixin.dart';
@@ -25,6 +27,8 @@ import 'widgets/download_bubble.dart';
 import 'widgets/reactions.dart';
 import 'widgets/image_viewer.dart';
 import 'widgets/chat_image_thumbnail.dart';
+import 'widgets/group_message_bubble.dart';
+import 'widgets/wilt_widgets.dart';
 import 'widgets/screenshot_ui.dart';
 import 'widgets/wilt_duration_sheet.dart';
 import 'widgets/reply_preview.dart';
@@ -91,6 +95,9 @@ class _GroupChatScreenState extends State<GroupChatScreen>
   // The message the composer is currently replying to (null = normal send).
   ChatMessage? _replyingTo;
 
+  // The message currently being edited (null = normal send).
+  ChatMessage? _editingMessage;
+
   // Wraps the message list so a consented screenshot can render it to an image.
   final GlobalKey _captureBoundaryKey = GlobalKey();
 
@@ -124,6 +131,7 @@ class _GroupChatScreenState extends State<GroupChatScreen>
       if (contact.isGroup) {
         _appState.updateGroupMembersMetadata(contact);
         _warmEmojis(contact.keyHash);
+        _appState.auditAndSyncGroupLanes(contact);
       }
     }
 
@@ -474,9 +482,98 @@ class _GroupChatScreenState extends State<GroupChatScreen>
     });
   }
 
+  void _startEditing(ChatMessage message) {
+    setState(() {
+      _editingMessage = message;
+      _replyingTo = null;
+      _messageController.text = message.decryptedText ?? message.text;
+      _messageController.selection = TextSelection.fromPosition(
+        TextPosition(offset: _messageController.text.length),
+      );
+    });
+    _inputFocus.requestFocus();
+  }
+
+  void _cancelEditing() {
+    setState(() {
+      _editingMessage = null;
+      _messageController.clear();
+    });
+  }
+
+  Future<void> _confirmDeleteMessage(ChatMessage message) async {
+    final t = context.wk;
+    final l10n = AppLocalizations.of(context)!;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: t.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(t.radiusCard),
+          side: BorderSide(color: t.border),
+        ),
+        title: Row(
+          children: [
+            Icon(Icons.delete_outline, color: t.danger, size: 22),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                l10n.chatDeleteTitle,
+                style: t.screenTitle.copyWith(fontSize: 16),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          l10n.chatDeleteBody,
+          style: t.bodySecondary.copyWith(fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(
+              l10n.commonCancel,
+              style: t.body.copyWith(color: t.textSecondary),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: t.danger,
+              foregroundColor: Colors.white,
+            ),
+            child: Text(l10n.chatDeleteConfirm),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      final contact = _appState.activeContact;
+      if (contact != null) {
+        final error = await _appState.deleteMessage(contact, message);
+        if (error != null && mounted) _errorSnack(error);
+      }
+    }
+  }
+
   void _handleSend() async {
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
+
+    if (_editingMessage != null) {
+      final editing = _editingMessage!;
+      final contact = _appState.activeContact;
+      _cancelEditing();
+      if (contact != null) {
+        final error = await _appState.editMessage(contact, editing, text);
+        if (error != null && mounted) {
+          _errorSnack(error);
+          _messageController.text = text;
+        }
+      }
+      return;
+    }
 
     _sendBloom.forward(from: 0);
 
@@ -980,299 +1077,25 @@ class _GroupChatScreenState extends State<GroupChatScreen>
                                 message.senderId) ||
                             messageList[index - 1].senderId == 'system';
 
-                        Contact? memberContact;
-                        for (final c in _appState.contacts) {
-                          if (c.keyHash == message.senderId) {
-                            memberContact = c;
-                            break;
-                          }
-                        }
-
-                        final groupProfiles =
-                            _appState.groupProfilesCache[contact.id];
-                        final memberProfile = groupProfiles?[message.senderId];
-
-                        final String senderName = isMe
-                            ? (_appState.deviceName.isNotEmpty
-                                  ? _appState.deviceName
-                                  : 'You')
-                            : (memberProfile != null
-                                  ? memberProfile['name'] ?? ''
-                                  : (memberContact != null
-                                        ? memberContact.name
-                                        : 'Member ${message.senderId.substring(0, min(6, message.senderId.length))}'));
-
-                        final String avatarHex = isMe
-                            ? (_appState.profileImageB64.isNotEmpty
-                                  ? _appState.profileImageB64
-                                  : PixelArtAvatar.generateIdenticon(
-                                      _appState.userId,
-                                    ))
-                            : (memberProfile != null &&
-                                      memberProfile['profile_image'] != null &&
-                                      memberProfile['profile_image']!.isNotEmpty
-                                  ? memberProfile['profile_image']!
-                                  : (memberContact != null &&
-                                            memberContact.profileImageB64 !=
-                                                null &&
-                                            memberContact
-                                                .profileImageB64!
-                                                .isNotEmpty
-                                        ? memberContact.profileImageB64!
-                                        : PixelArtAvatar.generateIdenticon(
-                                            message.senderId,
-                                          )));
-
-                        // Equipped avatar border: our own comes from the local
-                        // controller (solo-visible instantly); a peer's rides
-                        // their group_member_profile broadcast into the cache.
-                        final String? avatarBorderId = isMe
-                            ? AvatarBorderController.instance.borderId
-                            : (memberProfile != null
-                                  ? memberProfile['avatar_border']
-                                  : null);
-
-                        // Self uses the action accent; the host uses the identity
-                        // accent; every other member gets their own stable colour
-                        // (the same one as their flower/bar slice) so messages are
-                        // easy to tell apart.
-                        final bool isSenderHost =
-                            !isMe &&
-                            contact.hostKeyHash != null &&
-                            message.senderId == contact.hostKeyHash;
-                        final Color memberColor = isMe
-                            ? t.action
-                            : (isSenderHost
-                                  ? t.identity
-                                  : memberPaletteColor(message.senderId));
-                        final Color borderColor = isMe
-                            ? t.bubbleMeBorder
-                            : memberColor.withValues(alpha: 0.45);
-                        // Tint each member's bubble fill toward their own colour
-                        // (subtle), so senders are distinguishable at a glance.
-                        // Blending into [bubbleThem] keeps it theme-appropriate:
-                        // it darkens on dark themes, brightens on the light one.
-                        final Color bgColor = isMe
-                            ? t.bubbleMe
-                            : Color.lerp(t.bubbleThem, memberColor, 0.14)!;
-                        final Color nameColor = memberColor;
-
-                        // Spacing moved to the outer Column (trailing spacer) so
-                        // a reactions row hugs its own bubble rather than the
-                        // message below it.
-                        final Widget bubble = Container(
-                          margin: EdgeInsets.zero,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 10,
-                          ),
-                          constraints: BoxConstraints(
-                            maxWidth: MediaQuery.of(context).size.width * 0.75,
-                          ),
-                          decoration: BoxDecoration(
-                            color: bgColor,
-                            border: Border.all(
-                              color: borderColor,
-                              width: t.borderWidth,
-                            ),
-                            borderRadius: BorderRadius.only(
-                              topLeft: Radius.circular(t.radiusCard),
-                              topRight: Radius.circular(t.radiusCard),
-                              bottomLeft: isMe
-                                  ? Radius.circular(t.radiusCard)
-                                  : const Radius.circular(6),
-                              bottomRight: isMe
-                                  ? const Radius.circular(6)
-                                  : Radius.circular(t.radiusCard),
-                            ),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              buildReplyQuoteFor(
-                                    context,
-                                    _appState,
-                                    contact,
-                                    message,
-                                    onTap: message.replyToId == null
-                                        ? null
-                                        : () =>
-                                              _revealQuotedMessage(
-                                                message.replyToId,
-                                              ),
-                                    // A parent loaded but filtered out of the
-                                    // visible list (e.g. pre-join) renders as
-                                    // muted "unavailable" instead of a
-                                    // tappable-looking quote that no-ops.
-                                    isParentVisible: (parent) => messageList
-                                        .any((m) => m.id == parent.id),
-                                  ) ??
-                                  const SizedBox.shrink(),
-                              _buildGroupContent(
-                                t,
-                                message,
-                                displayText,
-                                emojiMap,
-                                isMe,
-                              ),
-                              const SizedBox(height: 4),
-                              message.isPending
-                                  ? Row(
-                                      mainAxisAlignment: MainAxisAlignment.end,
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        SizedBox(
-                                          width: 8,
-                                          height: 8,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 1.3,
-                                            valueColor:
-                                                AlwaysStoppedAnimation<Color>(
-                                                  isMe
-                                                      ? t.bubbleMeText
-                                                            .withValues(
-                                                              alpha: 0.6,
-                                                            )
-                                                      : t.textTertiary,
-                                                ),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 6),
-                                        Text(
-                                          l10n.chatEncrypting,
-                                          style: t.dataMono.copyWith(
-                                            fontSize: 9,
-                                            color: isMe
-                                                ? t.bubbleMeText.withValues(
-                                                    alpha: 0.6,
-                                                  )
-                                                : t.textTertiary,
-                                          ),
-                                        ),
-                                      ],
-                                    )
-                                  : Row(
-                                      mainAxisAlignment: MainAxisAlignment.end,
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Text(
-                                          '${message.timestamp.hour.toString().padLeft(2, '0')}:${message.timestamp.minute.toString().padLeft(2, '0')}',
-                                          style: t.dataMono.copyWith(
-                                            fontSize: 9,
-                                            color: isMe
-                                                ? t.bubbleMeText.withValues(
-                                                    alpha: 0.6,
-                                                  )
-                                                : t.textTertiary,
-                                          ),
-                                        ),
-                                        if (isMe) ...[
-                                          const SizedBox(width: 4),
-                                          Icon(
-                                            message.isDelivered
-                                                ? Icons.done_all
-                                                : Icons.check,
-                                            color: message.isDelivered
-                                                ? t.action
-                                                : t.textTertiary,
-                                            size: 10,
-                                          ),
-                                        ],
-                                      ],
-                                    ),
-                            ],
-                          ),
-                        );
-
-                        final Widget row = Row(
-                          mainAxisAlignment: isMe
-                              ? MainAxisAlignment.end
-                              : MainAxisAlignment.start,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            if (!isMe) ...[
-                              isFirstInBatch
-                                  ? PixelArtAvatar(
-                                      hexString: avatarHex,
-                                      size: 28,
-                                      borderId: avatarBorderId,
-                                    )
-                                  : const SizedBox(width: 28),
-                              const SizedBox(width: 8),
-                            ],
-                            Expanded(
-                              child: Align(
-                                alignment: isMe
-                                    ? Alignment.centerRight
-                                    : Alignment.centerLeft,
-                                heightFactor: 1,
-                                child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                crossAxisAlignment: isMe
-                                    ? CrossAxisAlignment.end
-                                    : CrossAxisAlignment.start,
-                                children: [
-                                  if (isFirstInBatch)
-                                    Padding(
-                                      padding: EdgeInsets.only(
-                                        bottom: 4.0,
-                                        left: isMe ? 0.0 : 2.0,
-                                        right: isMe ? 2.0 : 0.0,
-                                      ),
-                                      child: Text(
-                                        senderName,
-                                        style: t.dataMono.copyWith(
-                                          color: nameColor,
-                                          fontWeight: FontWeight.bold,
-                                          letterSpacing: 0.3,
-                                        ),
-                                      ),
-                                    ),
-                                  message.isPending
-                                      ? Opacity(opacity: 0.6, child: bubble)
-                                      : GestureDetector(
-                                          onLongPress: () {
-                                            // Drop composer focus first so
-                                            // dismissing the modal reaction sheet
-                                            // doesn't refocus the text field,
-                                            // reopen the keyboard, and yank the
-                                            // list to the bottom (same fix as the
-                                            // 1:1 MessageBubble).
-                                            FocusManager.instance.primaryFocus
-                                                ?.unfocus();
-                                            showReactionPicker(
-                                              context,
-                                              appState: _appState,
-                                              contact: contact,
-                                              message: message,
-                                              emojiMap: emojiMap,
-                                            );
-                                          },
-                                          child: bubble,
-                                        ),
-                                  ReactionsRow(
-                                    message: message,
-                                    contact: contact,
-                                    appState: _appState,
-                                    emojiMap: emojiMap,
-                                    isMe: isMe,
-                                  ),
-                                  SizedBox(height: isFirstInBatch ? 12 : 4),
-                                ],
-                                ),
-                              ),
-                            ),
-                            if (isMe) ...[
-                              const SizedBox(width: 8),
-                              isFirstInBatch
-                                  ? PixelArtAvatar(
-                                      hexString: avatarHex,
-                                      size: 28,
-                                      borderId: avatarBorderId,
-                                    )
-                                  : const SizedBox(width: 28),
-                            ],
-                          ],
+                        final Widget row = GroupMessageBubble(
+                          message: message,
+                          displayText: displayText,
+                          group: contact,
+                          appState: _appState,
+                          isMe: isMe,
+                          isFirstInBatch: isFirstInBatch,
+                          emojiMap: emojiMap,
+                          onQuoteTap: message.replyToId == null
+                              ? null
+                              : () =>
+                                    _revealQuotedMessage(message.replyToId),
+                          onFailedTap: null,
+                          onMemberTap: _promptAddContactFor,
+                          revealedImageIds: _revealedImageIds,
+                          onRevealImage: (msgId) =>
+                              setState(() => _revealedImageIds.add(msgId)),
+                          onEdit: _startEditing,
+                          onDelete: _confirmDeleteMessage,
                         );
                         final Widget swipeRow =
                             _wrapSwipeToReply(message, row);
@@ -1507,7 +1330,7 @@ class _GroupChatScreenState extends State<GroupChatScreen>
           ),
           if (message.openedAt != null && message.expiresAt != null) ...[
             const SizedBox(height: 7),
-            _GroupWiltCountdownBar(
+            WiltCountdownBar(
               openedAt: message.openedAt!,
               expiresAt: message.expiresAt!,
               color: t.action,
@@ -1649,7 +1472,7 @@ class _GroupChatScreenState extends State<GroupChatScreen>
           ),
           if (message.openedAt != null && message.expiresAt != null) ...[
             const SizedBox(height: 7),
-            _GroupWiltCountdownBar(
+            WiltCountdownBar(
               openedAt: message.openedAt!,
               expiresAt: message.expiresAt!,
               color: t.danger,
@@ -1885,6 +1708,54 @@ class _GroupChatScreenState extends State<GroupChatScreen>
     final int cost = _charCount > 0 ? _charCount + 73 : 0;
     return Column(
       children: [
+        if (_editingMessage != null)
+          Container(
+            margin: const EdgeInsets.only(bottom: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: t.surface,
+              borderRadius: BorderRadius.circular(t.radiusCard),
+              border: Border.all(color: t.action.withValues(alpha: 0.4)),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.edit_outlined, size: 16, color: t.action),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        l10n.chatEditingBanner,
+                        style: t.badgeLabel.copyWith(
+                          color: t.action,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 11,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        _editingMessage!.decryptedText ?? '',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: t.bodySecondary.copyWith(fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close, size: 16),
+                  color: t.textTertiary,
+                  onPressed: _cancelEditing,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  splashRadius: 16,
+                  tooltip: l10n.chatCancelEdit,
+                ),
+              ],
+            ),
+          ),
         if (_replyingTo != null)
           Padding(
             padding: const EdgeInsets.only(bottom: 6),
@@ -1894,6 +1765,10 @@ class _GroupChatScreenState extends State<GroupChatScreen>
               onClose: _cancelReply,
             ),
           ),
+        MentionAutocompleteBar(
+          controller: _messageController,
+          candidates: _getMentionCandidates(contact),
+        ),
         EmojiAutocompleteBar(
           controller: _messageController,
           emojiMap: CustomEmojiStore.cachedMap(contact.keyHash),
@@ -1969,8 +1844,8 @@ class _GroupChatScreenState extends State<GroupChatScreen>
               ),
             ],
             const SizedBox(width: 8),
-            if (_charCount == 0)
-              // Empty field → hold-to-record mic (tap it for the quality picker).
+            if (_charCount == 0 || isRecordingVoice)
+              // Empty field or recording → hold-to-record mic / locked send button.
               buildVoiceButton(t, l10n)
             else
               Padding(
@@ -2493,20 +2368,28 @@ class _GroupChatScreenState extends State<GroupChatScreen>
         ? AvatarBorderController.instance.borderId
         : _appState.groupProfilesCache[contact.id]?[keyHash]?['avatar_border'];
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: t.surface,
-        borderRadius: BorderRadius.circular(t.radiusCard),
-        border: Border.all(
-          color: isSelf
-              ? t.action.withValues(alpha: 0.3)
-              : t.identity.withValues(alpha: 0.18),
-          width: t.borderWidth,
+    // Tapping a member row offers to add them as a contact. The request is sent
+    // directly to that one member over the AES meta channel — it is NOT fanned
+    // to the rest of the group. Requires a direct 1:1 chat for the in-chat card.
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: isSelf
+          ? null
+          : () => _promptAddContactFor(keyHash, name),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: t.surface,
+          borderRadius: BorderRadius.circular(t.radiusCard),
+          border: Border.all(
+            color: isSelf
+                ? t.action.withValues(alpha: 0.3)
+                : t.identity.withValues(alpha: 0.18),
+            width: t.borderWidth,
+          ),
         ),
-      ),
-      child: Column(
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
@@ -2685,456 +2568,93 @@ class _GroupChatScreenState extends State<GroupChatScreen>
           ],
         ],
       ),
+      ),
     );
   }
 
-  Widget _buildGroupContent(
-    WiltkeyTokens t,
-    ChatMessage message,
-    String displayText,
-    Map<String, CustomEmoji> emojiMap,
-    bool isMe,
-  ) {
-    // Wilting (disappearing) messages. The group screen renders its own bubbles
-    // (it does NOT use MessageBubble), so it must reproduce the three wilt
-    // states itself to match 1-on-1: destroyed → tombstone; a received-but-
-    // unopened ephemeral → a tap-to-reveal gate (never decrypted until
-    // revealed); an opened/own ephemeral → normal content with a countdown /
-    // "wilting" footer. The engine, send and receive paths already carry these
-    // (state_wilting.dart, sendGroupMessage, _handleGroupPayload) — only this UI
-    // was missing.
-    if (message.wilted) return _buildGroupWiltedTombstone(t, isMe);
-    // Large payload still held on the relay — fetch the body before anything can
-    // decrypt or reveal it (same ordering as MessageBubble: after the tombstone,
-    // before the wilt gate).
-    final pendingChat = _appState.activeContact;
-    if (message.isPendingDownload && pendingChat != null) {
-      return DownloadBubble(
-        message: message,
-        contact: pendingChat,
-        appState: _appState,
-      );
-    }
-    if (message.ephemeral && !isMe && message.openedAt == null) {
-      return _buildGroupWiltGate(t, message);
-    }
-    return _wrapGroupWilting(
-      t,
-      message,
-      isMe,
-      _buildGroupContentInner(t, message, displayText, emojiMap, isMe),
-    );
-  }
-
-  Widget _buildGroupContentInner(
-    WiltkeyTokens t,
-    ChatMessage message,
-    String displayText,
-    Map<String, CustomEmoji> emojiMap,
-    bool isMe,
-  ) {
-    final ct = message.contentType;
-    if (ct == 'image' || ct == 'image_hidden') {
-      return _buildGroupImage(t, message);
-    }
-    if (ct == 'voice') {
-      if (message.decodedAudioBytes == null) {
-        try {
-          message.decodedAudioBytes = base64Decode(
-            message.decryptedText ?? displayText,
-          );
-        } catch (_) {}
+  /// Tapping a member row offers to add them as a contact. The request is sent
+  /// directly to that one member over the AES meta channel (never fanned to the
+  /// rest of the group). If a direct 1:1 chat with them already exists, the sent
+  /// card lands in that chat; otherwise the request still goes out but has no
+  /// in-chat card on this side.
+  void _promptAddContactFor(String keyHash, String name) {
+    Contact? direct;
+    for (final c in _appState.contacts) {
+      if (!c.isGroup && c.keyHash == keyHash) {
+        direct = c;
+        break;
       }
-      return VoiceMessagePlayer(message: message);
     }
-    final scale = _appState.chatTextScale;
-    final textColor = isMe ? t.bubbleMeText : t.textPrimary;
+    showAddContactFlow(
+      context,
+      appState: _appState,
+      keyHash: keyHash,
+      name: name,
+      chatContact: direct,
+    );
+  }
 
-    // Sticker: render the single emoji / custom token large. (Group bubbles keep
-    // their sender tint/name, so the sticker stays inside the bubble here.)
-    final sticker = stickerPayload(displayText);
-    if (sticker != null) {
-      final m = RegExp(r'^:([a-z0-9_]{2,32}):$').firstMatch(sticker);
-      if (m != null) {
-        final emoji = emojiMap[m.group(1)];
-        if (emoji != null) {
-          final side = 88.0 * scale;
-          return Image.memory(
-            emoji.bytes,
-            width: side,
-            height: side,
-            gaplessPlayback: true,
-            filterQuality: FilterQuality.medium,
-            errorBuilder: (_, _, _) => Text(
-              sticker,
-              style: TextStyle(color: textColor, fontSize: 56 * scale),
-            ),
-          );
-        }
+  List<GroupMentionCandidate> _getMentionCandidates(Contact contact) {
+    final list = <GroupMentionCandidate>[];
+    final cached = _appState.groupProfilesCache[contact.id] ?? {};
+
+    for (final entry in cached.entries) {
+      final keyHash = entry.key;
+      final p = entry.value;
+      final name = p['name'] ?? '';
+      if (name.isEmpty && keyHash == _appState.userId) continue;
+      final shortCode = p['short_nick'] ??
+          GroupMentionCandidate.deriveShortCode(name, keyHash);
+      final isSelf = keyHash == _appState.userId;
+      list.add(
+        GroupMentionCandidate(
+          keyHash: keyHash,
+          name: isSelf
+              ? '${_appState.effectiveDeviceName} (You)'
+              : (name.isNotEmpty ? name : shortCode),
+          shortCode: isSelf ? _appState.effectiveShortNick : shortCode,
+          profileImage: isSelf
+              ? _appState.profileImageB64
+              : (p['profile_image'] ?? ''),
+          avatarBorderId: isSelf
+              ? AvatarBorderController.instance.borderId
+              : p['avatar_border'],
+          isMe: isSelf,
+        ),
+      );
+    }
+
+    if (contact.isHost) {
+      if (!list.any((c) => c.keyHash == _appState.userId)) {
+        list.add(
+          GroupMentionCandidate(
+            keyHash: _appState.userId,
+            name: '${_appState.effectiveDeviceName} (Host/You)',
+            shortCode: _appState.effectiveShortNick,
+            profileImage: _appState.profileImageB64,
+            avatarBorderId: AvatarBorderController.instance.borderId,
+            isMe: true,
+          ),
+        );
       }
-      return Text(sticker, style: TextStyle(fontSize: 56 * scale, height: 1.1));
+    } else if (contact.hostKeyHash != null) {
+      if (!list.any((c) => c.keyHash == contact.hostKeyHash)) {
+        final hostName = contact.hostName ?? 'Host';
+        final hostShort = GroupMentionCandidate.deriveShortCode(
+          hostName,
+          contact.hostKeyHash!,
+        );
+        list.add(
+          GroupMentionCandidate(
+            keyHash: contact.hostKeyHash!,
+            name: '$hostName (Host)',
+            shortCode: hostShort,
+          ),
+        );
+      }
     }
-
-    final jumbo = jumboEmojiCount(displayText, emojiMap);
-    if (jumbo != null) {
-      final base = jumbo == 1 ? 40.0 : (jumbo <= 3 ? 34.0 : 26.0);
-      return EmojiText(
-        text: displayText,
-        emojiMap: emojiMap,
-        style: t.body.copyWith(
-          color: textColor,
-          fontSize: base * scale,
-          height: 1.15,
-        ),
-        emojiSize: base * 1.25 * scale,
-      );
-    }
-    return EmojiText(
-      text: displayText,
-      emojiMap: emojiMap,
-      style: t.body.copyWith(
-        color: textColor,
-        fontSize: 13 * scale,
-        height: 1.4,
-      ),
-      emojiSize: 20 * scale,
-    );
-  }
-
-  // --- Wilting message UI (group) -------------------------------------------
-  // Mirrors MessageBubble's 1-on-1 wilt widgets; kept local to the group screen
-  // so the shipped 1-on-1 path is untouched.
-
-  /// Tombstone left after a group message's content has been destroyed.
-  Widget _buildGroupWiltedTombstone(WiltkeyTokens t, bool isMe) {
-    final l10n = AppLocalizations.of(context)!;
-    final color = isMe ? t.bubbleMeText.withValues(alpha: 0.6) : t.textTertiary;
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(Icons.local_florist_outlined, size: 14, color: color),
-        const SizedBox(width: 6),
-        Text(
-          t.uppercaseLabels
-              ? l10n.wiltedMessage.toUpperCase()
-              : l10n.wiltedMessage,
-          style: t.dataMono.copyWith(
-            fontSize: 11.5,
-            color: color,
-            fontStyle: FontStyle.italic,
-          ),
-        ),
-      ],
-    );
-  }
-
-  /// Tap-to-reveal gate for a received, not-yet-opened wilting group message.
-  /// Tapping stamps the countdown via [AppStateWilting.revealEphemeral].
-  Widget _buildGroupWiltGate(WiltkeyTokens t, ChatMessage message) {
-    final l10n = AppLocalizations.of(context)!;
-    final secs = message.ttlSeconds <= 0 ? 5 : message.ttlSeconds;
-    return GestureDetector(
-      onTap: () {
-        final contact = _appState.activeContact;
-        if (contact != null) _appState.revealEphemeral(contact, message);
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-        decoration: BoxDecoration(
-          color: t.action.withValues(alpha: 0.08),
-          border: Border.all(color: t.action.withValues(alpha: 0.35), width: 1),
-          borderRadius: BorderRadius.circular(t.radiusControl),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.local_florist_outlined, color: t.action, size: 16),
-            const SizedBox(width: 8),
-            Text(
-              t.uppercaseLabels
-                  ? l10n.wiltingTapToReveal.toUpperCase()
-                  : l10n.wiltingTapToReveal,
-              style: t.dataMono.copyWith(color: t.action, fontSize: 11),
-            ),
-            const SizedBox(width: 6),
-            Text(
-              '${secs}s',
-              style: t.dataMono.copyWith(color: t.textTertiary, fontSize: 10),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// Wraps opened/own wilting content with its countdown bar (an opened received
-  /// message) or a static "wilting" tag (our own copy, which wilts on the peers'
-  /// confirmation rather than a local timer). Non-wilting content passes through.
-  Widget _wrapGroupWilting(
-    WiltkeyTokens t,
-    ChatMessage message,
-    bool isMe,
-    Widget content,
-  ) {
-    if (!message.isWilting) return content;
-    final l10n = AppLocalizations.of(context)!;
-    final accent = isMe ? t.bubbleMeText : t.action;
-    final Widget footer;
-    if (message.openedAt != null && message.expiresAt != null) {
-      footer = _GroupWiltCountdownBar(
-        openedAt: message.openedAt!,
-        expiresAt: message.expiresAt!,
-        color: accent,
-      );
-    } else {
-      footer = Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            Icons.local_florist_outlined,
-            size: 11,
-            color: accent.withValues(alpha: 0.7),
-          ),
-          const SizedBox(width: 4),
-          Text(
-            t.uppercaseLabels
-                ? l10n.wiltingMessageTag.toUpperCase()
-                : l10n.wiltingMessageTag,
-            style: t.dataMono.copyWith(
-              fontSize: 9,
-              color: accent.withValues(alpha: 0.7),
-            ),
-          ),
-        ],
-      );
-    }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [content, const SizedBox(height: 5), footer],
-    );
-  }
-
-  Widget _buildGroupImage(WiltkeyTokens t, ChatMessage message) {
-    final l10n = AppLocalizations.of(context)!;
-    // Plain images: fixed-size lazy thumbnail. It loads its own bytes when
-    // scrolled into view (a deferred image has none in memory at page load), so
-    // this precedes the "decrypting…" spinner below and the layout doesn't pop as
-    // images decode. The wilt gate (unopened ephemeral) is handled by the caller.
-    final groupContact = _appState.activeContact;
-    if (message.contentType == 'image' && groupContact != null) {
-      return ChatImageThumbnail(
-        appState: _appState,
-        contact: groupContact,
-        message: message,
-      );
-    }
-    final String? b64 = message.decryptedText;
-    if (b64 == null || b64.isEmpty) {
-      return Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SizedBox(
-            width: 10,
-            height: 10,
-            child: CircularProgressIndicator(
-              strokeWidth: 1.5,
-              valueColor: AlwaysStoppedAnimation<Color>(t.action),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            t.uppercaseLabels
-                ? l10n.groupDecryptingImage.toUpperCase()
-                : l10n.groupDecryptingImage,
-            style: t.dataMono.copyWith(color: t.action, fontSize: 11),
-          ),
-        ],
-      );
-    }
-
-    final bool isHidden = message.contentType == 'image_hidden';
-    final bool revealed = _revealedImageIds.contains(message.id);
-
-    if (isHidden && !revealed) {
-      int rawSize = 0;
-      try {
-        rawSize = base64Decode(b64).length;
-      } catch (_) {}
-      return GestureDetector(
-        onTap: () => setState(() => _revealedImageIds.add(message.id)),
-        child: Container(
-          width: 200,
-          height: 120,
-          decoration: BoxDecoration(
-            color: t.surface,
-            border: Border.all(
-              color: t.action.withValues(alpha: 0.3),
-              width: 1,
-            ),
-            borderRadius: BorderRadius.circular(t.radiusControl),
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.visibility_off_outlined, color: t.action, size: 28),
-              const SizedBox(height: 8),
-              Text(
-                t.uppercaseLabels
-                    ? l10n.groupTapToRevealImage.toUpperCase()
-                    : l10n.groupTapToRevealImage,
-                style: t.dataMono.copyWith(color: t.action, fontSize: 10),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                l10n.groupImageSize(AppState.formatBytes(rawSize)),
-                style: t.dataMono.copyWith(
-                  color: t.textTertiary,
-                  fontSize: 8.5,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    Uint8List? imageBytes = message.decodedImageBytes;
-    if (imageBytes == null) {
-      try {
-        imageBytes = base64Decode(b64);
-        message.decodedImageBytes = imageBytes;
-      } catch (_) {}
-    }
-
-    if (imageBytes == null) {
-      return _imageError(t);
-    }
-
-    final bytes = imageBytes;
-    return GestureDetector(
-      onTap: () => ImageViewerScreen.open(
-        context,
-        imageBytes: bytes,
-        allowSave: message.allowSave,
-      ),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxHeight: 300, maxWidth: 260),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(t.radiusControl),
-          child: Image.memory(
-            bytes,
-            fit: BoxFit.cover,
-            gaplessPlayback: true,
-            errorBuilder: (context, error, stackTrace) => _imageError(t),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _imageError(WiltkeyTokens t) {
-    final l10n = AppLocalizations.of(context)!;
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: t.surface,
-        borderRadius: BorderRadius.circular(t.radiusControl),
-        border: Border.all(color: t.border),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.broken_image, color: t.danger, size: 16),
-          const SizedBox(width: 6),
-          Text(
-            l10n.groupImageFailedToLoad,
-            style: t.bodySecondary.copyWith(fontSize: 10),
-          ),
-        ],
-      ),
-    );
+    return list;
   }
 }
 
-/// Self-ticking draining bar for an opened wilting group message (a local mirror
-/// of MessageBubble's 1-on-1 countdown, kept here so the group screen doesn't
-/// depend on that widget's private class). Purely visual — the AppStateWilting
-/// timer drives the actual destruction and rebuilds the bubble into a tombstone.
-class _GroupWiltCountdownBar extends StatefulWidget {
-  final int openedAt;
-  final int expiresAt;
-  final Color color;
-  const _GroupWiltCountdownBar({
-    required this.openedAt,
-    required this.expiresAt,
-    required this.color,
-  });
 
-  @override
-  State<_GroupWiltCountdownBar> createState() => _GroupWiltCountdownBarState();
-}
-
-class _GroupWiltCountdownBarState extends State<_GroupWiltCountdownBar> {
-  Timer? _ticker;
-
-  @override
-  void initState() {
-    super.initState();
-    _ticker = Timer.periodic(const Duration(milliseconds: 200), (t) {
-      if (!mounted || _fraction() <= 0) {
-        t.cancel();
-        return;
-      }
-      setState(() {});
-    });
-  }
-
-  double _fraction() {
-    final now = DateTime.now().millisecondsSinceEpoch;
-    final span = widget.expiresAt - widget.openedAt;
-    if (span <= 0) return 0;
-    return ((widget.expiresAt - now) / span).clamp(0.0, 1.0);
-  }
-
-  int _secondsLeft() {
-    final now = DateTime.now().millisecondsSinceEpoch;
-    return ((widget.expiresAt - now) / 1000).ceil().clamp(0, 999);
-  }
-
-  @override
-  void dispose() {
-    _ticker?.cancel();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final frac = _fraction();
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        SizedBox(
-          width: 90,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(3),
-            child: LinearProgressIndicator(
-              value: frac,
-              minHeight: 4,
-              backgroundColor: widget.color.withValues(alpha: 0.15),
-              valueColor: AlwaysStoppedAnimation<Color>(widget.color),
-            ),
-          ),
-        ),
-        const SizedBox(width: 6),
-        Text(
-          '${_secondsLeft()}s',
-          style: TextStyle(
-            fontSize: 9,
-            color: widget.color.withValues(alpha: 0.8),
-          ),
-        ),
-      ],
-    );
-  }
-}

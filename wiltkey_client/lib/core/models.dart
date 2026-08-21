@@ -17,6 +17,11 @@ class Contact {
   bool
   isArchived; // True once the OTP pad has been dropped to save space (read-only)
   bool isPinned; // User-pinned to the top of the chats list
+  bool isPendingEmergency; // True while waiting for peer to ack emergency chat request
+  String notificationMode; // 'all', 'mentions_only', 'muted'
+
+  bool get isMuted => notificationMode == 'muted';
+  bool get isMentionsOnly => notificationMode == 'mentions_only';
 
   // Group chat specific attributes
   final bool isGroup;
@@ -48,6 +53,7 @@ class Contact {
   // Profile metadata sync
   String? shortNick;
   String? profileImageB64; // Stored as a 100-character hex matrix for pixel art
+  String? themeId; // Peer's active theme id (e.g. cyberpunk, garden, paperink)
   // The peer's equipped avatar border id (see WkAvatarBorderRegistry), synced
   // over the 1-on-1 metadata channel like the avatar/nick. Cosmetic broadcast
   // art — always renders for everyone; null/'none' = no border.
@@ -154,6 +160,7 @@ class Contact {
     this.joinedAt,
     this.shortNick,
     this.profileImageB64,
+    this.themeId,
     this.avatarBorderId,
     this.outgoingOffset = 0,
     this.outgoingMaxOffset = 0,
@@ -169,6 +176,8 @@ class Contact {
     this.slotIndex,
     List<int> additionalSlots = const [],
     this.groupRechargePending = false,
+    this.isPendingEmergency = false,
+    this.notificationMode = 'all',
   }) : additionalSlots = List<int>.from(additionalSlots);
 
   Contact copyWith({
@@ -197,6 +206,7 @@ class Contact {
     DateTime? joinedAt,
     String? shortNick,
     String? profileImageB64,
+    String? themeId,
     String? avatarBorderId,
     int? outgoingOffset,
     int? outgoingMaxOffset,
@@ -212,6 +222,8 @@ class Contact {
     int? slotIndex,
     List<int>? additionalSlots,
     bool? groupRechargePending,
+    bool? isPendingEmergency,
+    String? notificationMode,
   }) {
     return Contact(
       id: id ?? this.id,
@@ -240,6 +252,7 @@ class Contact {
       joinedAt: joinedAt ?? this.joinedAt,
       shortNick: shortNick ?? this.shortNick,
       profileImageB64: profileImageB64 ?? this.profileImageB64,
+      themeId: themeId ?? this.themeId,
       avatarBorderId: avatarBorderId ?? this.avatarBorderId,
       outgoingOffset: outgoingOffset ?? this.outgoingOffset,
       outgoingMaxOffset: outgoingMaxOffset ?? this.outgoingMaxOffset,
@@ -256,6 +269,8 @@ class Contact {
       slotIndex: slotIndex ?? this.slotIndex,
       additionalSlots: additionalSlots ?? this.additionalSlots,
       groupRechargePending: groupRechargePending ?? this.groupRechargePending,
+      isPendingEmergency: isPendingEmergency ?? this.isPendingEmergency,
+      notificationMode: notificationMode ?? this.notificationMode,
     );
   }
 
@@ -299,6 +314,7 @@ class Contact {
     'joinedAt': joinedAt?.toIso8601String(),
     'shortNick': shortNick,
     'profileImageB64': profileImageB64,
+    'themeId': themeId,
     'avatarBorderId': avatarBorderId,
     'outgoingOffset': outgoingOffset,
     'outgoingMaxOffset': outgoingMaxOffset,
@@ -314,6 +330,8 @@ class Contact {
     'slotIndex': slotIndex,
     'additionalSlots': additionalSlots,
     'groupRechargePending': groupRechargePending,
+    'isPendingEmergency': isPendingEmergency,
+    'notificationMode': notificationMode,
   };
 
   factory Contact.fromJson(Map<String, dynamic> json) {
@@ -349,6 +367,7 @@ class Contact {
           : null,
       shortNick: json['shortNick'] as String?,
       profileImageB64: json['profileImageB64'] as String?,
+      themeId: json['themeId'] as String?,
       avatarBorderId: json['avatarBorderId'] as String?,
       outgoingOffset: json['outgoingOffset'] as int? ?? 0,
       outgoingMaxOffset: json['outgoingMaxOffset'] as int? ?? maxBuffer ~/ 2,
@@ -369,6 +388,8 @@ class Contact {
       additionalSlots:
           (json['additionalSlots'] as List<dynamic>?)?.cast<int>() ?? [],
       groupRechargePending: json['groupRechargePending'] as bool? ?? false,
+      isPendingEmergency: json['isPendingEmergency'] as bool? ?? false,
+      notificationMode: json['notificationMode'] as String? ?? 'all',
     );
   }
 }
@@ -475,6 +496,16 @@ class ChatMessage {
   // Synced over the AES meta channel, like [reactions].
   Set<String> wiltedBy;
 
+  // --- Message Editing & Deletion --------------------------------------------
+  // Edits/deletions ride as new messages advancing the keystream offset (no crypto
+  // reuse). An edit frame carries `editTargetId` pointing to the original message;
+  // once applied, the original row sets `isEdited = true` and `editedAt = timestamp`.
+  // A delete frame marks `isDeleted = true` and wipes local media/ciphertext.
+  bool isEdited;
+  String? editTargetId;
+  int? editedAt;
+  bool isDeleted;
+
   // --- Pending large-file download -------------------------------------------
   // Large payloads (>= the relay's bucket threshold) are no longer pushed down
   // the socket: the relay sends a FILE_OFFER carrying only routing metadata, and
@@ -511,6 +542,10 @@ class ChatMessage {
     this.expiresAt,
     this.wilted = false,
     Set<String>? wiltedBy,
+    this.isEdited = false,
+    this.editTargetId,
+    this.editedAt,
+    this.isDeleted = false,
     this.remoteFileId,
     this.remoteSize = 0,
   }) : reactions = reactions ?? {},
@@ -551,6 +586,39 @@ class ChatMessage {
     return (body.substring(1, end), body.substring(end + 1));
   }
 
+  // --- Edit & Delete Body Framing --------------------------------------------
+  // Delimiter `\x02` (STX) is used for edit and delete commands inside the OTP body.
+  // Format: `\x02e\x02<targetId>\x02<newText>` or `\x02d\x02<targetId>\x02`
+  static const String _editPrefix = '\x02e\x02';
+  static const String _deletePrefix = '\x02d\x02';
+  static const String _editDelim = '\x02';
+
+  static String buildEditBody(String targetId, String newText) =>
+      '$_editPrefix$targetId$_editDelim$newText';
+
+  static String buildDeleteBody(String targetId) =>
+      '$_deletePrefix$targetId$_editDelim';
+
+  static ({String? editTargetId, String? deleteTargetId, String text}) parseEditOrDelete(
+    String body,
+  ) {
+    if (body.startsWith(_editPrefix)) {
+      final rest = body.substring(_editPrefix.length);
+      final delimIdx = rest.indexOf(_editDelim);
+      if (delimIdx != -1) {
+        final targetId = rest.substring(0, delimIdx);
+        final newText = rest.substring(delimIdx + 1);
+        return (editTargetId: targetId, deleteTargetId: null, text: newText);
+      }
+    } else if (body.startsWith(_deletePrefix)) {
+      final rest = body.substring(_deletePrefix.length);
+      final delimIdx = rest.indexOf(_editDelim);
+      final targetId = delimIdx != -1 ? rest.substring(0, delimIdx) : rest;
+      return (editTargetId: null, deleteTargetId: targetId, text: '');
+    }
+    return (editTargetId: null, deleteTargetId: null, text: body);
+  }
+
   /// A live wilting message (ephemeral and not yet destroyed).
   bool get isWilting => ephemeral && !wilted;
 
@@ -573,6 +641,15 @@ class ChatMessage {
     decodedImageBytes = null;
     decodedAudioBytes = null;
     offset = -1;
+  }
+
+  /// Mark message as deleted in memory.
+  void deleteInMemory() {
+    isDeleted = true;
+    text = '';
+    decryptedText = '[Message deleted]';
+    decodedImageBytes = null;
+    decodedAudioBytes = null;
   }
 
   /// Serialise [reactions] (sets → lists) to a JSON string, or null if empty.
@@ -616,6 +693,10 @@ class ChatMessage {
     if (expiresAt != null) 'expiresAt': expiresAt,
     if (wilted) 'wilted': true,
     if (wiltedBy.isNotEmpty) 'wiltedBy': wiltedBy.toList(),
+    if (isEdited) 'isEdited': true,
+    if (editTargetId != null) 'editTargetId': editTargetId,
+    if (editedAt != null) 'editedAt': editedAt,
+    if (isDeleted) 'isDeleted': true,
   };
 
   factory ChatMessage.fromJson(Map<String, dynamic> json) {
@@ -640,6 +721,10 @@ class ChatMessage {
       allowSave: json['allowSave'] as bool? ?? false,
       replyToId: json['replyToId'] as String?,
       decryptedText: isSystem ? text : null,
+      isEdited: json['isEdited'] as bool? ?? false,
+      editTargetId: json['editTargetId'] as String?,
+      editedAt: json['editedAt'] as int?,
+      isDeleted: json['isDeleted'] as bool? ?? false,
       reactions: (json['reactions'] as Map<String, dynamic>?)?.map(
         (k, v) => MapEntry(k, {...(v as List).map((e) => e.toString())}),
       ),
@@ -657,8 +742,10 @@ class ChatMessage {
 
 /// A social contact (friend) — independent of chat contacts.
 /// Established via mutual contact request over an existing 1-on-1 chat.
-/// The [sharedSecretSeed] = sha256(sorted(myPub + peerPub)) is the single
-/// source of truth for all derived peer-to-peer content (theme, stories, etc.).
+/// The [sharedSecretSeed] = sha256(sorted(myKeyHash + peerKeyHash)) is the
+/// single source of truth for all derived peer-to-peer content (theme,
+/// stories, etc.). Derives from the two key hashes (not raw pubkeys) so both
+/// sides compute an identical seed — see `_deriveSharedSecretSeed`.
 class SocialContact {
   final int id;
   final String keyHash; // Peer's identity hash (64-char hex)
@@ -666,6 +753,7 @@ class SocialContact {
   final String? shortNick;
   final String? profileImageB64;
   final String? avatarBorderId;
+  final String? themeId; // Peer's active theme id
   final String sharedSecretSeed;
   final String myPubkey;
   final String peerPubkey;
@@ -673,6 +761,10 @@ class SocialContact {
   final bool isBlocked;
   final String? themeSeed; // Derived: sha256(sharedSecretSeed + "theme")
   final int? lastSyncedAt;
+  final bool isPinned;
+  final String? status; // Peer's synced status message
+  final String? statusEmoji; // Peer's synced status emoji
+  final int? statusExpiresAt; // Unix timestamp in ms when status expires
 
   SocialContact({
     required this.id,
@@ -681,6 +773,7 @@ class SocialContact {
     this.shortNick,
     this.profileImageB64,
     this.avatarBorderId,
+    this.themeId,
     required this.sharedSecretSeed,
     required this.myPubkey,
     required this.peerPubkey,
@@ -688,7 +781,19 @@ class SocialContact {
     this.isBlocked = false,
     this.themeSeed,
     this.lastSyncedAt,
+    this.isPinned = false,
+    this.status,
+    this.statusEmoji,
+    this.statusExpiresAt,
   });
+
+  bool get isStatusExpired =>
+      statusExpiresAt != null &&
+      statusExpiresAt! > 0 &&
+      DateTime.now().millisecondsSinceEpoch > statusExpiresAt!;
+
+  String? get activeStatus => isStatusExpired ? null : status;
+  String? get activeStatusEmoji => isStatusExpired ? null : statusEmoji;
 
   factory SocialContact.fromRow(Map<String, dynamic> row) => SocialContact(
     id: row['id'] as int,
@@ -697,6 +802,7 @@ class SocialContact {
     shortNick: row['short_nick'] as String?,
     profileImageB64: row['profile_image_b64'] as String?,
     avatarBorderId: row['avatar_border_id'] as String?,
+    themeId: row['theme_id'] as String?,
     sharedSecretSeed: row['shared_secret_seed'] as String,
     myPubkey: row['my_pubkey'] as String,
     peerPubkey: row['peer_pubkey'] as String,
@@ -704,6 +810,10 @@ class SocialContact {
     isBlocked: (row['is_blocked'] as int? ?? 0) == 1,
     themeSeed: row['theme_seed'] as String?,
     lastSyncedAt: row['last_synced_at'] as int?,
+    isPinned: (row['is_pinned'] as int? ?? 0) == 1,
+    status: row['status'] as String?,
+    statusEmoji: row['status_emoji'] as String?,
+    statusExpiresAt: row['status_expires_at'] as int?,
   );
 
   Map<String, Object?> toRow() => {
@@ -712,6 +822,7 @@ class SocialContact {
     'short_nick': shortNick,
     'profile_image_b64': profileImageB64,
     'avatar_border_id': avatarBorderId,
+    'theme_id': themeId,
     'shared_secret_seed': sharedSecretSeed,
     'my_pubkey': myPubkey,
     'peer_pubkey': peerPubkey,
@@ -719,6 +830,10 @@ class SocialContact {
     'is_blocked': isBlocked ? 1 : 0,
     'theme_seed': themeSeed,
     'last_synced_at': lastSyncedAt,
+    'is_pinned': isPinned ? 1 : 0,
+    'status': status,
+    'status_emoji': statusEmoji,
+    'status_expires_at': statusExpiresAt,
   };
 
   /// Derives the theme seed from the shared secret (lazy, cached in DB).

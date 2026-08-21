@@ -1,5 +1,6 @@
 import 'dart:ui' show Locale;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -179,26 +180,65 @@ class WiltkeyNotifications {
   /// keyHash, when known) rides as the payload so a tap can deep-link to that
   /// chat after unlock.
   static Future<void> showMessageNotification({String? chatKey}) async {
-    await initLocalNotifications();
-    final l10n = await _strings();
-    const details = NotificationDetails(
-      android: AndroidNotificationDetails(
-        kMsgChannelId,
-        kMsgChannelName,
-        channelDescription: 'New secure message alerts',
-        importance: Importance.high,
-        priority: Priority.high,
-        icon: '@drawable/ic_stat_notif',
-        // No content preview — content stays encrypted until the device unlocks.
-      ),
-    );
-    await plugin.show(
-      kMsgNotificationId,
-      'Wiltkey',
-      l10n.notificationNewMessageBody,
-      details,
-      payload: chatKey,
-    );
+    try {
+      if (chatKey != null) {
+        final prefs = await SharedPreferences.getInstance();
+        final muted = prefs.getStringList('wk_muted_chats') ?? [];
+        if (muted.contains(chatKey)) return;
+      }
+      await initLocalNotifications();
+      final l10n = await _strings();
+      const details = NotificationDetails(
+        android: AndroidNotificationDetails(
+          kMsgChannelId,
+          kMsgChannelName,
+          channelDescription: 'New secure message alerts',
+          importance: Importance.high,
+          priority: Priority.high,
+          icon: '@drawable/ic_stat_notif',
+          // No content preview — content stays encrypted until the device unlocks.
+        ),
+      );
+      await plugin.show(
+        kMsgNotificationId,
+        'Wiltkey',
+        l10n.notificationNewMessageBody,
+        details,
+        payload: chatKey,
+      );
+    } catch (e) {
+      debugPrint('[Notifications] Error showing message notification: $e');
+    }
+  }
+
+  /// Distinct alert for an emergency-chat frame — created remotely when the
+  /// sender has no in-person chat with us, so the generic "new message" copy
+  /// would undersell it. Same collapsed id/channel as normal messages.
+  static Future<void> showEmergencyChatNotification({String? chatKey}) async {
+    try {
+      await initLocalNotifications();
+      final l10n = await _strings();
+      const details = NotificationDetails(
+        android: AndroidNotificationDetails(
+          kMsgChannelId,
+          kMsgChannelName,
+          channelDescription: 'New secure message alerts',
+          importance: Importance.high,
+          priority: Priority.high,
+          icon: '@drawable/ic_stat_notif',
+          // No content preview — content stays encrypted until the device unlocks.
+        ),
+      );
+      await plugin.show(
+        kMsgNotificationId,
+        'Wiltkey',
+        l10n.notificationEmergencyChatBody,
+        details,
+        payload: chatKey,
+      );
+    } catch (e) {
+      debugPrint('[Notifications] Error showing emergency chat notification: $e');
+    }
   }
 
   /// Dismiss the "you got a message" alert(s). Called when the app returns to the

@@ -120,6 +120,7 @@
   "notificationModeInstant": "Direkt",
   "notificationModeInstantDesc": "Valfritt. Håller en totalsträckskrypterad anslutning öppen i bakgrunden för att synkronisera dina inkommande meddelanden i realtid, vilket visas med en pågående avisering. Wiltkey använder detta i stället för push-tjänster från Google eller Apple av integritetsskäl, så att det fungerar även utan Google Play-tjänster – på bekostnad av mer batteri.",
   "notificationNewMessageBody": "Du har fått ett meddelande",
+  "notificationEmergencyChatBody": "Begäran om nödchatt",
   "notificationSecureLinkActive": "Synkroniserar säkra meddelanden",
   "onboardingNotificationsTitle": "Aviseringar",
   "onboardingNotificationsExplanation": "Wiltkey använder inte push-aviseringar från Google eller Apple – ingenting om dina meddelanden når deras servrar. Välj hur du vill bli aviserad. Du kan ändra detta när som helst i Inställningar.",
@@ -272,6 +273,10 @@
   "chatVoiceComingSoon": "Röstmeddelanden kommer snart.",
   "chatVoiceHoldHint": "Håll in för att spela in ett röstmeddelande.",
   "chatVoiceReleaseCancel": "Släpp för att avbryta",
+  "chatVoiceSlideToCancel": "Dra för att avbryta",
+  "chatVoiceSlideToLock": "Dra uppåt för att låsa",
+  "chatVoiceCancel": "Avbryt inspelning",
+  "chatVoiceSend": "Skicka röstmeddelande",
   "chatVoicePermissionDenied": "Mikrofonbehörighet krävs för att spela in röstmeddelanden.",
   "chatVoiceQualityLofi": "Lo-fi",
   "chatVoiceQualityVoice": "Röst",
@@ -310,6 +315,24 @@
   "groupHost": "Värd",
   "groupMember": "Medlem",
   "groupDepleted": "Slut",
+  "eventContactRequestTitle": "{name} skickade en kontaktförfrågan till dig",
+  "@eventContactRequestTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "eventContactRequestBody": "Tryck för att acceptera eller avböja i chatten",
+  "eventContactRemovedTitle": "{name} tog bort dig",
+  "@eventContactRemovedTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "eventContactRemovedBody": "De tog bort dig från sina kontakter",
   "groupSyncingFromMember": "Synkroniserar detaljer och meddelanden från {name}...",
   "groupInviteMember": "Bjud in medlem",
   "groupLeaveGroup": "Lämna grupp",
@@ -518,5 +541,161 @@
   "timeWiltLifetimeHours": "{count, plural, =1{1 timme} other{{count} timmar}}",
   "timeWiltLifetimeMinutes": "{count} min",
   "timeWiltLifetimeMonths": "{count, plural, =1{1 månad} other{{count} månader}}",
-  "timeWiltLifetimeMoments": "några ögonblick"
+  "timeWiltLifetimeMoments": "några ögonblick",
+  "contactAddTitle": "Add contact",
+  "contactAddBody": "Add {name} to your contacts?",
+  "contactAddConfirm": "Add contact",
+  "contactAddAlready": "Already in your contacts",
+  "contactAddSent": "Contact request sent",
+  "contactPin": "Fäst högst upp",
+  "contactUnpin": "Lossa",
+  "contactUnblock": "Avblockera",
+  "contactsSectionPinned": "Fästa",
+  "contactStatusLabel": "Status",
+  "contactStatusHint": "Dela en status med dina kontakter…",
+  "contactStatusSave": "Spara status",
+  "contactStatusUpdated": "Status uppdaterad",
+  "contactProfileEmergencyChat": "Nödchatt",
+  "emergencyChatStart": "Starta nödchatt",
+  "emergencyChatConfirmTitle": "Starta en nödchatt med {name}?",
+  "@emergencyChatConfirmTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "emergencyChatConfirmBody": "Det finns ingen aktiv chatt med {name}. Detta startar en 12-timmars Time Wilt-chatt som skapas på distans, utan ihopparning i person. Den befintliga vissnade chatten och dess meddelanden förstörs permanent och kan aldrig laddas om igen.",
+  "@emergencyChatConfirmBody": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "emergencyChatAlreadyActive": "Du har redan en aktiv chatt med den här kontakten",
+  "emergencyChatStarted": "Nödchatt startad",
+  "settingsProfileChipTemplateSave": "Lägg till i mallar",
+  "settingsProfileTemplateSaved": "Sparad i mallar",
+  "settingsProfileTemplatesButton": "Välj från mall",
+  "settingsProfileTemplatesTitle": "Sparade mallar",
+  "settingsProfileNoTemplates": "Inga sparade mallar än",
+  "settingsProfileTemplateEquipped": "Avatarmall använd",
+  "groupTimeWiltToggle": "Time Wilt-grupp",
+  "groupTimeWiltToggleSub": "Begränsad tid, obegränsad budget. Gruppen blir skrivskyddad när timern tar slut; träffa värden igen för att förnya den.",
+  "groupTimeWiltMembersLabel": "Max antal medlemmar",
+  "groupTimeWiltMembersUpsell": "Lås upp upp till 100 medlemmar med Plus",
+  "groupTimeWiltHostInfinite": "Värd · ∞",
+  "groupTimeWiltRenewComposer": "Utgången — träffa värden igen för att förnya din åtkomst",
+  "groupTimeWiltHostAllWilted": "Alla medlemmar har gått ut — träffa någon för att återuppliva gruppen",
+  "groupNukeProposeButton": "Föreslå radering för alla",
+  "groupNukeProposeTitle": "Radera denna grupp för alla?",
+  "groupNukeProposeBody": "Startar en omröstning bland medlemmarna. Om majoriteten godkänner raderas gruppen och dess historik på varje enhet. Kan inte ångras.",
+  "groupNukeProposeConfirm": "Föreslå",
+  "groupNukeVoteTitle": "Radera grupp?",
+  "groupNukeVoteBody": "En medlem föreslog att radera denna grupp för alla. Om majoriteten godkänner rensas den på varje enhet.",
+  "groupNukeVoteAllow": "Godkänn",
+  "groupNukeVoteDeny": "Behåll",
+  "groupNukeVotePending": "Väntar på medlemmarnas röster…",
+  "groupNukeVotePassed": "Gruppen raderades genom majoritetsbeslut.",
+  "groupNukeVoteFailed": "Förslaget att radera gruppen röstades ned.",
+  "groupNukeVoteSent": "Förslag skickat — väntar på omröstning.",
+  "activityTitle": "Aktivitet",
+  "activityEmpty": "Ingen aktivitet än. Händelser som raderade chattar visas här.",
+  "activityClear": "Rensa",
+  "activityClearConfirmTitle": "Rensa aktivitet?",
+  "activityClearConfirmBody": "Tar bort alla aktivitetshändelser från denna enhet. Kan inte ångras.",
+  "eventNukeReceivedTitle": "Chatt raderad",
+  "eventNukeReceivedBody": "En säker chatt raderades.",
+  "eventGroupNukedTitle": "Grupp raderad",
+  "eventGroupNukedBody": "En säker grupp raderades.",
+  "themePreviewSectionProfile": "Profilbakgrund",
+  "themePreviewFullscreenProfile": "Förhandsvisning av profil i helskärm",
+  "linkWarningTitle": "Extern länkvarning",
+  "linkWarningBody": "Du är på väg att öppna en extern länk i webbläsaren. Detta ansluter till målservern och avslöjar din IP-adress.",
+  "linkWarningOpen": "Öppna i webbläsare",
+  "linkWarningCopy": "Kopiera länk",
+  "linkWarningCopied": "Länk kopierad till urklipp",
+  "chatActionEdit": "Redigera",
+  "chatActionDelete": "Ta bort",
+  "chatEditingBanner": "Redigerar meddelande",
+  "chatCancelEdit": "Avbryt redigering",
+  "chatDeleteTitle": "Ta bort meddelande",
+  "chatDeleteBody": "Är du säker på att du vill ta bort det här meddelandet för alla?",
+  "chatDeleteConfirm": "Ta bort",
+  "chatMessageDeleted": "[Meddelande borttaget]",
+  "chatEditedTag": "redigerat",
+  "shopPlusBenefitTimeWiltGroups": "Skapa större Time Wilt-grupper — upp till 100 medlemmar istället för 20.",
+  "navContacts": "Kontakter",
+  "contactsTitle": "Kontakter",
+  "contactsSectionFriends": "Vänner",
+  "contactsEmptyTitle": "Inga kontakter än",
+  "contactsEmptyBody": "Lägg till någon från en befintlig chatt för att se dem här.",
+  "contactsOwnProfile": "Din profil",
+  "contactsOwnProfileHint": "Tryck för att ställa in status eller tidsbegränsad händelse",
+  "contactRequestSent": "Kontaktförfrågan skickad till {name}",
+  "contactRequestReceived": "{name} vill lägga till dig som kontakt",
+  "contactRequestApproved": "Kontaktförfrågan godkänd",
+  "contactRequestDeclined": "Kontaktförfrågan avvisad",
+  "contactRequestApprove": "Godkänn",
+  "contactRequestDeny": "Avvisa",
+  "contactProfileOpenChat": "Öppna chatt",
+  "contactProfileRemove": "Ta bort kontakt",
+  "contactProfileBlock": "Blockera användare",
+  "contactProfileStatusPlaceholder": "Ingen status än",
+  "contactRemoveConfirmTitle": "Ta bort {name}?",
+  "contactRemoveConfirmBody": "Tar bort personen från din kontaktlista. Du kan lägga till dem igen senare.",
+  "contactBlockConfirmTitle": "Blockera {name}?",
+  "contactBlockConfirmBody": "De kommer inte att kunna kontakta dig eller skicka kontaktförfrågningar.",
+  "settingsBlockedContacts": "Blockerade kontakter",
+  "settingsBlockedEmpty": "Inga blockerade kontakter",
+  "commonRemove": "Ta bort",
+  "commonBlock": "Blockera",
+  "contactProfileChatNotFound": "Ingen chatt hittades för denna kontakt — den kan ha raderats",
+  "chatsEmergencyPendingSubtitle": "Ansluter nödchatt…",
+  "chatsEmergencyPendingSnackBar": "Nödchatt med {name} väntar på att de ansluter.",
+  "emergencyChatPending": "Nödchatt väntar…",
+  "gestureSwipeForContacts": "Svep från vänster kant för kontakter",
+  "contactProfileSafetyNumber": "Identitetsnyckelns fingeravtryck",
+  "contactProfileWiltedHint": "Starta en tillfällig 12-timmars Time Wilt-chatt",
+  "commonCopy": "Kopiera",
+  "commonCopied": "Kopierat till urklipp",
+  "eventMentionTitle": "{name} nämnde dig",
+  "@eventMentionTitle": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "eventReplyTitle": "{name} svarade dig",
+  "@eventReplyTitle": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "chatNotificationModeAll": "Alla meddelanden",
+  "chatNotificationModeMentions": "Endast omnämnanden och svar",
+  "chatNotificationModeMuted": "Tystad (Ljudlös)",
+  "chatNotificationSettingsTitle": "Aviseringar",
+  "chatMuteTitle": "Tysta chatt",
+  "chatUnmuteTitle": "Sluta tysta chatt",
+  "settingsNotifyCategories": "Kategorier",
+  "settingsNotifyDirectMessages": "Direktmeddelanden",
+  "settingsNotifyDirectMessagesSubtitle": "Aviseringar för 1:1-chattar",
+  "settingsNotifyGroupMessages": "Gruppmeddelanden",
+  "settingsNotifyGroupMessagesSubtitle": "Aviseringar för gruppchattar",
+  "settingsNotifyEvents": "Säkerhets- och aktivitetshändelser",
+  "settingsNotifyEventsSubtitle": "Kontaktförfrågningar, omröstningar om gruppradering, skärmdumpsvarningar",
+  "settingsMutedChatsTitle": "Tystade chattar",
+  "settingsNoMutedChats": "Inga tystade chattar",
+  "settingsUnmute": "Sluta tysta",
+  "settingsCheckForUpdates": "Sök efter uppdateringar",
+  "settingsCheckingUpdates": "Söker efter uppdateringar...",
+  "settingsUpdateAvailable": "Uppdatering tillgänglig: v{version}",
+  "@settingsUpdateAvailable": {
+    "placeholders": {
+      "version": { "type": "String" }
+    }
+  },
+  "settingsUpToDate": "WiltKey är uppdaterad",
+  "settingsWhatsNew": "Nyheter"
 }

@@ -120,6 +120,7 @@
   "notificationModeInstant": "Azonnali",
   "notificationModeInstantDesc": "Opcionális. A háttérben nyitva tart egy végpontok közötti titkosított kapcsolatot, hogy valós időben szinkronizálja a bejövő üzeneteket, amit egy állandó értesítés jelez. A Wiltkey adatvédelmi okokból ezt használja a Google vagy az Apple push-szolgáltatásai helyett, így Google Play-szolgáltatások nélkül is működik – nagyobb akkumulátor-fogyasztás árán.",
   "notificationNewMessageBody": "Új üzeneted érkezett",
+  "notificationEmergencyChatBody": "Vészhelyzeti chat kérés",
   "notificationSecureLinkActive": "Biztonságos üzenetek szinkronizálása",
   "onboardingNotificationsTitle": "Értesítések",
   "onboardingNotificationsExplanation": "A Wiltkey nem használ Google vagy Apple push-értesítéseket – az üzeneteidről semmi nem kerül a szervereikre. Válaszd ki, hogyan szeretnél értesítést kapni. Ezt bármikor módosíthatod a Beállításokban.",
@@ -272,6 +273,10 @@
   "chatVoiceComingSoon": "A hangüzenetek hamarosan jönnek.",
   "chatVoiceHoldHint": "Tartsd nyomva hangüzenet rögzítéséhez.",
   "chatVoiceReleaseCancel": "Engedd el a megszakításhoz",
+  "chatVoiceSlideToCancel": "Csúsztasd a megszakításhoz",
+  "chatVoiceSlideToLock": "Csúsztasd fel a zároláshoz",
+  "chatVoiceCancel": "Felvétel megszakítása",
+  "chatVoiceSend": "Hangüzenet küldése",
   "chatVoicePermissionDenied": "A hangüzenetek rögzítéséhez mikrofon-engedély szükséges.",
   "chatVoiceQualityLofi": "Lo-fi",
   "chatVoiceQualityVoice": "Hang",
@@ -310,6 +315,24 @@
   "groupHost": "Házigazda",
   "groupMember": "Tag",
   "groupDepleted": "Kimerült",
+  "eventContactRequestTitle": "{name} kapcsolatkérelmet küldött neked",
+  "@eventContactRequestTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "eventContactRequestBody": "Koppints az elfogadáshoz vagy az elutasításhoz a csevegésben",
+  "eventContactRemovedTitle": "{name} eltávolított téged",
+  "@eventContactRemovedTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "eventContactRemovedBody": "Eltávolított a kapcsolatai közül",
   "groupSyncingFromMember": "Részletek és üzenetek szinkronizálása a következő tagtól: {name}...",
   "groupInviteMember": "Tag meghívása",
   "groupLeaveGroup": "Csoport elhagyása",
@@ -518,5 +541,161 @@
   "timeWiltLifetimeHours": "{count, plural, =1{1 óra} other{{count} óra}}",
   "timeWiltLifetimeMinutes": "{count} perc",
   "timeWiltLifetimeMonths": "{count, plural, =1{1 hónap} other{{count} hónap}}",
-  "timeWiltLifetimeMoments": "pár pillanat"
+  "timeWiltLifetimeMoments": "pár pillanat",
+  "contactAddTitle": "Add contact",
+  "contactAddBody": "Add {name} to your contacts?",
+  "contactAddConfirm": "Add contact",
+  "contactAddAlready": "Already in your contacts",
+  "contactAddSent": "Contact request sent",
+  "contactPin": "Rögzítés",
+  "contactUnpin": "Rögzítés feloldása",
+  "contactUnblock": "Feloldás",
+  "contactsSectionPinned": "Rögzítve",
+  "contactStatusLabel": "Státusz",
+  "contactStatusHint": "Oszd meg a státuszodat a kapcsolataiddal…",
+  "contactStatusSave": "Státusz mentése",
+  "contactStatusUpdated": "Státusz frissítve",
+  "contactProfileEmergencyChat": "Vészhelyzeti chat",
+  "emergencyChatStart": "Vészhelyzeti chat indítása",
+  "emergencyChatConfirmTitle": "Vészhelyzeti chat indítása ezzel: {name}?",
+  "@emergencyChatConfirmTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "emergencyChatConfirmBody": "Nincs aktív chat ezzel: {name}. Ez egy 12 órás, távolról létrehozott Time Wilt chatet indít, személyes párosítás nélkül. A meglévő elhervadt chat és üzenetei véglegesen megsemmisülnek, és soha nem tölthetők újra.",
+  "@emergencyChatConfirmBody": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "emergencyChatAlreadyActive": "Már van aktív chated ezzel a kapcsolattal",
+  "emergencyChatStarted": "Vészhelyzeti chat elindítva",
+  "settingsProfileChipTemplateSave": "Mentés sablonként",
+  "settingsProfileTemplateSaved": "Sablonok közé mentve",
+  "settingsProfileTemplatesButton": "Választás sablonból",
+  "settingsProfileTemplatesTitle": "Mentett sablonok",
+  "settingsProfileNoTemplates": "Nincsenek mentett sablonok",
+  "settingsProfileTemplateEquipped": "Profilkép-sablon beállítva",
+  "groupTimeWiltToggle": "Time Wilt csoport",
+  "groupTimeWiltToggleSub": "Korlátozott idő, korlátlan keret. A csoport írásvédetté válik, ha az időzítő lejár; találkozz újra a házigazdával a megújításhoz.",
+  "groupTimeWiltMembersLabel": "Max. taglétszám",
+  "groupTimeWiltMembersUpsell": "Akár 100 tag a Plus csomaggal",
+  "groupTimeWiltHostInfinite": "Házigazda · ∞",
+  "groupTimeWiltRenewComposer": "Lejárt — találkozz a házigazdával a hozzáférés megújításához",
+  "groupTimeWiltHostAllWilted": "Minden tagnak lejárt az ideje — találkozz valakivel a csoport újraindításához",
+  "groupNukeProposeButton": "Megsemmisítés javaslata mindenkinek",
+  "groupNukeProposeTitle": "Csoport megsemmisítése mindenkinek?",
+  "groupNukeProposeBody": "Szavazást indít a tagok között. Többségi döntés esetén a csoport és előzményei minden eszközről törlődnek. Nem vonható vissza.",
+  "groupNukeProposeConfirm": "Javaslat",
+  "groupNukeVoteTitle": "Csoport megsemmisítése?",
+  "groupNukeVoteBody": "Egy tag javasolta a csoport törlését mindenki számára. Többség esetén minden eszközről törlődik.",
+  "groupNukeVoteAllow": "Egyetértek",
+  "groupNukeVoteDeny": "Megtartás",
+  "groupNukeVotePending": "Várakozás a tagok szavazataira…",
+  "groupNukeVotePassed": "A csoport többségi szavazással megsemmisült.",
+  "groupNukeVoteFailed": "A csoport törlésére tett javaslat nem kapott többséget.",
+  "groupNukeVoteSent": "Javaslat elküldve — várakozás a tagok szavazatára.",
+  "activityTitle": "Aktivitás",
+  "activityEmpty": "Nincs korábbi aktivitás. Az olyan események, mint a csevegés törlése, itt jelennek meg.",
+  "activityClear": "Törlés",
+  "activityClearConfirmTitle": "Aktivitáslista törlése?",
+  "activityClearConfirmBody": "Eltávolítja az összes bejegyzést erről az eszközről. Nem vonható vissza.",
+  "eventNukeReceivedTitle": "Csevegés megsemmisült",
+  "eventNukeReceivedBody": "Egy biztonságos csevegés megsemmisült.",
+  "eventGroupNukedTitle": "Csoport megsemmisült",
+  "eventGroupNukedBody": "Egy biztonságos csoport megsemmisült.",
+  "themePreviewSectionProfile": "Profil háttér",
+  "themePreviewFullscreenProfile": "Teljes képernyős profil előnézet",
+  "linkWarningTitle": "Külső hivatkozás",
+  "linkWarningBody": "Külső hivatkozást készülsz megnyitni a böngésződben. Ez kapcsolatot létesít a célszerverrel, és felfedi az IP-címedet.",
+  "linkWarningOpen": "Megnyitás böngészőben",
+  "linkWarningCopy": "Hivatkozás másolása",
+  "linkWarningCopied": "Hivatkozás a vágólapra másolva",
+  "chatActionEdit": "Szerkesztés",
+  "chatActionDelete": "Törlés",
+  "chatEditingBanner": "Üzenet szerkesztése",
+  "chatCancelEdit": "Szerkesztés elvetése",
+  "chatDeleteTitle": "Üzenet törlése",
+  "chatDeleteBody": "Biztosan törlöd ezt az üzenetet mindenki számára?",
+  "chatDeleteConfirm": "Törlés",
+  "chatMessageDeleted": "[Üzenet törölve]",
+  "chatEditedTag": "szerkesztve",
+  "shopPlusBenefitTimeWiltGroups": "Nagyobb Time Wilt csoportok indítása — 20 helyett akár 100 tagig.",
+  "navContacts": "Névjegyek",
+  "contactsTitle": "Névjegyek",
+  "contactsSectionFriends": "Barátok",
+  "contactsEmptyTitle": "Még nincsenek névjegyek",
+  "contactsEmptyBody": "Adj hozzá valakit egy létező csevegésből, hogy itt lásd.",
+  "contactsOwnProfile": "Saját profilod",
+  "contactsOwnProfileHint": "Érintsd meg állapot vagy történet megadásához",
+  "contactRequestSent": "Kapcsolatfelvételi kérelem elküldve neki: {name}",
+  "contactRequestReceived": "{name} szeretne felvenni a névjegyei közé",
+  "contactRequestApproved": "Kapcsolatfelvételi kérelem elfogadva",
+  "contactRequestDeclined": "Kapcsolatfelvételi kérelem elutasítva",
+  "contactRequestApprove": "Elfogadás",
+  "contactRequestDeny": "Elutasítás",
+  "contactProfileOpenChat": "Csevegés megnyitása",
+  "contactProfileRemove": "Névjegy eltávolítása",
+  "contactProfileBlock": "Felhasználó letiltása",
+  "contactProfileStatusPlaceholder": "Nincs állapot megadva",
+  "contactRemoveConfirmTitle": "{name} eltávolítása?",
+  "contactRemoveConfirmBody": "Eltávolítja őt a névjegyeid közül. Később újra hozzáadhatod.",
+  "contactBlockConfirmTitle": "{name} letiltása?",
+  "contactBlockConfirmBody": "Nem fog tudni üzenetet vagy kapcsolatfelvételi kérelmet küldeni neked.",
+  "settingsBlockedContacts": "Letiltott névjegyek",
+  "settingsBlockedEmpty": "Nincsenek letiltott névjegyek",
+  "commonRemove": "Eltávolítás",
+  "commonBlock": "Letiltás",
+  "contactProfileChatNotFound": "Nem található csevegés ehhez a névjegyhez — lehet, hogy törölték",
+  "chatsEmergencyPendingSubtitle": "Vészhelyzeti csevegés kapcsolódása…",
+  "chatsEmergencyPendingSnackBar": "A vészhelyzeti csevegés {name} felével kapcsolódásra vár.",
+  "emergencyChatPending": "Vészhelyzeti csevegés folyamatban…",
+  "gestureSwipeForContacts": "Húzd el a bal szélről a névjegyekhez",
+  "contactProfileSafetyNumber": "Azonosítókulcs ujjlenyomata",
+  "contactProfileWiltedHint": "Ideiglenes, 12 órás Time Wilt csevegés indítása",
+  "commonCopy": "Másolás",
+  "commonCopied": "Vágólapra másolva",
+  "eventMentionTitle": "{name} megemlített téged",
+  "@eventMentionTitle": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "eventReplyTitle": "{name} válaszolt neked",
+  "@eventReplyTitle": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "chatNotificationModeAll": "Minden üzenet",
+  "chatNotificationModeMentions": "Csak említések és válaszok",
+  "chatNotificationModeMuted": "Némítás (Csendes)",
+  "chatNotificationSettingsTitle": "Értesítések",
+  "chatMuteTitle": "Csevegés némítása",
+  "chatUnmuteTitle": "Csevegés némításának feloldása",
+  "settingsNotifyCategories": "Kategóriák",
+  "settingsNotifyDirectMessages": "Közvetlen üzenetek",
+  "settingsNotifyDirectMessagesSubtitle": "Értesítések 1:1 csevegésekhez",
+  "settingsNotifyGroupMessages": "Csoportos üzenetek",
+  "settingsNotifyGroupMessagesSubtitle": "Értesítések csoportos csevegésekhez",
+  "settingsNotifyEvents": "Biztonsági és aktivitási események",
+  "settingsNotifyEventsSubtitle": "Kapcsolatfelvételi kérelmek, csoportmegsemmisítési szavazások, képernyőkép-riasztások",
+  "settingsMutedChatsTitle": "Némított csevegések",
+  "settingsNoMutedChats": "Nincsenek némított csevegések",
+  "settingsUnmute": "Némítás feloldása",
+  "settingsCheckForUpdates": "Frissítések keresése",
+  "settingsCheckingUpdates": "Frissítések keresése...",
+  "settingsUpdateAvailable": "Frissítés elérhető: v{version}",
+  "@settingsUpdateAvailable": {
+    "placeholders": {
+      "version": { "type": "String" }
+    }
+  },
+  "settingsUpToDate": "A WiltKey naprakész",
+  "settingsWhatsNew": "Újdonságok"
 }

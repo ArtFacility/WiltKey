@@ -14,6 +14,9 @@ class WiltkeyPersistence {
   static const String _keyDeviceName = 'wk_device_name';
   static const String _keyShortNick = 'wk_short_nick';
   static const String _keyProfileImage = 'wk_profile_image';
+  static const String _keyStatusMessage = 'wk_status_message';
+  static const String _keyStatusEmoji = 'wk_status_emoji';
+  static const String _keyStatusExpiresAt = 'wk_status_expires_at';
   static const String _keyUseLocalDevRelay = 'wk_use_local_dev_relay';
   static const String _keyLocalDevRelayUrl = 'wk_local_dev_relay_url';
   static const String _keyShowDebugButtons = 'wk_show_debug_buttons';
@@ -66,6 +69,9 @@ class WiltkeyPersistence {
     stateData['deviceName'] = prefs.getString(_keyDeviceName) ?? '';
     stateData['shortNick'] = prefs.getString(_keyShortNick) ?? '';
     stateData['profileImageB64'] = prefs.getString(_keyProfileImage) ?? '';
+    stateData['statusMessage'] = prefs.getString(_keyStatusMessage) ?? '';
+    stateData['statusEmoji'] = prefs.getString(_keyStatusEmoji) ?? '';
+    stateData['statusExpiresAtMs'] = prefs.getInt(_keyStatusExpiresAt);
     stateData['useLocalDevRelay'] = prefs.getBool(_keyUseLocalDevRelay);
     stateData['localDevRelayUrl'] = prefs.getString(_keyLocalDevRelayUrl);
     stateData['showDebugButtons'] = prefs.getBool(_keyShowDebugButtons);
@@ -103,6 +109,13 @@ class WiltkeyPersistence {
     await prefs.setString(_keyDeviceName, state.deviceName);
     await prefs.setString(_keyShortNick, state.shortNick);
     await prefs.setString(_keyProfileImage, state.profileImageB64);
+    await prefs.setString(_keyStatusMessage, state.statusMessage);
+    await prefs.setString(_keyStatusEmoji, state.statusEmoji);
+    if (state.statusExpiresAtMs != null) {
+      await prefs.setInt(_keyStatusExpiresAt, state.statusExpiresAtMs!);
+    } else {
+      await prefs.remove(_keyStatusExpiresAt);
+    }
     await prefs.setBool(_keyUseLocalDevRelay, state.useLocalDevRelay);
     await prefs.setBool(_keyShowDebugButtons, state.showDebugButtons);
     await prefs.setDouble(_keyChatTextScale, state.chatTextScale);
@@ -238,6 +251,33 @@ class WiltkeyPersistence {
     await prefs.setStringList(_keyEntitlements, productIds);
   }
 
+  // Avatar templates — up to 10 saved user avatars.
+  static const String _keyAvatarTemplates = 'wk_avatar_templates';
+
+  Future<List<String>> loadAvatarTemplates() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getStringList(_keyAvatarTemplates) ?? const [];
+  }
+
+  Future<bool> saveAvatarTemplate(String gridStr) async {
+    final prefs = await SharedPreferences.getInstance();
+    final list = (prefs.getStringList(_keyAvatarTemplates) ?? []).toList();
+    list.remove(gridStr);
+    list.insert(0, gridStr);
+    if (list.length > 10) {
+      list.removeRange(10, list.length);
+    }
+    await prefs.setStringList(_keyAvatarTemplates, list);
+    return true;
+  }
+
+  Future<void> deleteAvatarTemplate(String gridStr) async {
+    final prefs = await SharedPreferences.getInstance();
+    final list = (prefs.getStringList(_keyAvatarTemplates) ?? []).toList();
+    list.remove(gridStr);
+    await prefs.setStringList(_keyAvatarTemplates, list);
+  }
+
   Future<void> saveLocale(String localeCode) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyLocale, localeCode);
@@ -250,6 +290,7 @@ class WiltkeyPersistence {
     await prefs.remove(_keyDeviceName);
     await prefs.remove(_keyShortNick);
     await prefs.remove(_keyProfileImage);
+    await prefs.remove(_keyAvatarTemplates);
     await prefs.remove(_keyUseLocalDevRelay);
     await prefs.remove(_keyLocalDevRelayUrl);
     await prefs.remove(_keyShowDebugButtons);

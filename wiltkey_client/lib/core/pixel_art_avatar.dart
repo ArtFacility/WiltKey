@@ -81,14 +81,10 @@ class PixelArtAvatar extends StatelessWidget {
                 width: 1,
               )
             : null,
-        borderRadius: BorderRadius.circular(4),
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(3),
-        child: CustomPaint(
-          size: Size(s, s),
-          painter: _PixelArtPainter(indices),
-        ),
+      child: CustomPaint(
+        size: Size(s, s),
+        painter: _PixelArtPainter(indices),
       ),
     );
   }

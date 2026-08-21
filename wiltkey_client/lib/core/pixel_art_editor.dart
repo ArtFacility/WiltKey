@@ -5,6 +5,7 @@ import 'theme/wk.dart';
 import 'theme/wiltkey_tokens.dart';
 import 'pixel_art_avatar.dart';
 import 'pixel_palette.dart';
+import 'persistence.dart';
 
 /// Reusable 10x10 pixel-art editor used for personal avatars (settings,
 /// onboarding) and group icons (create group). Self-contained drawing/colour
@@ -12,9 +13,9 @@ import 'pixel_palette.dart';
 /// [PixelGrid.encode] chooses (legacy hex when only classic colours are used,
 /// otherwise `v2:`). Present it as a modal with [showPixelArtEditor].
 ///
-/// Living inside a modal is deliberate: it sidesteps the gesture-arena conflict
-/// the inline editors had, where a paint drag would fight the surrounding
-/// TabBarView / PageView horizontal swipe.
+/// The drawing canvas is fixed at the top of the dialog to prevent any gesture
+/// arena conflict with outer scrolling. Palettes are organized by active set,
+/// with a dedicated palette switcher popup.
 class PixelArtEditor extends StatefulWidget {
   final String initialHex;
 
@@ -31,7 +32,7 @@ class PixelArtEditor extends StatefulWidget {
     required this.onChanged,
     this.identiconSeed,
     this.defaultColorIndex = 1,
-    this.previewSize = 220,
+    this.previewSize = 200,
   });
 
   /// True for any valid grid string (either encoding).
@@ -87,6 +88,7 @@ class PixelArtEditor extends StatefulWidget {
 class _PixelArtEditorState extends State<PixelArtEditor> {
   late List<int> _grid;
   late int _selColor;
+  late WkPaletteSet _currentSet;
 
   @override
   void initState() {
@@ -102,6 +104,12 @@ class _PixelArtEditorState extends State<PixelArtEditor> {
     _selColor = WkPalette.isAuthoringIndex(widget.defaultColorIndex)
         ? widget.defaultColorIndex
         : WkPalette.firstAuthoringIndex;
+
+    // Find the authoring set containing _selColor, or default to the first authoring set
+    _currentSet = WkPalette.authoringSets.firstWhere(
+      (s) => s.contains(_selColor),
+      orElse: () => WkPalette.authoringSets.first,
+    );
   }
 
   void _emit() => widget.onChanged(PixelGrid.encode(_grid));
@@ -121,89 +129,249 @@ class _PixelArtEditorState extends State<PixelArtEditor> {
     _emit();
   }
 
+  void _openPalettePicker(BuildContext context) {
+    final t = context.wk;
+    showDialog<void>(
+      context: context,
+      builder: (pickerCtx) {
+        return AlertDialog(
+          backgroundColor: t.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(t.radiusCard),
+            side: BorderSide(color: t.border),
+          ),
+          title: Text(
+            t.uppercaseLabels ? 'SELECT PALETTE' : 'Select Palette',
+            style: t.screenTitle.copyWith(fontSize: 16),
+          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (final set in WkPalette.authoringSets) ...[
+                  _paletteSetOption(pickerCtx, t, set),
+                  const SizedBox(height: 8),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(pickerCtx),
+              child: Text(
+                t.uppercaseLabels ? 'CLOSE' : 'Close',
+                style: t.body.copyWith(color: t.action),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _paletteSetOption(BuildContext pickerCtx, WiltkeyTokens t, WkPaletteSet set) {
+    final locked = !WkPalette.canAuthor(set);
+    final isSelected = _currentSet.id == set.id;
+
+    return InkWell(
+      onTap: locked
+          ? null
+          : () {
+              setState(() {
+                _currentSet = set;
+                if (!set.contains(_selColor)) {
+                  _selColor = set.start;
+                }
+              });
+              Navigator.pop(pickerCtx);
+            },
+      borderRadius: BorderRadius.circular(t.radiusControl),
+      child: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? t.action.withValues(alpha: 0.12)
+              : t.bgRaised,
+          borderRadius: BorderRadius.circular(t.radiusControl),
+          border: Border.all(
+            color: isSelected ? t.action : t.border,
+            width: isSelected ? 1.5 : 1.0,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                Text(
+                  t.uppercaseLabels ? set.name.toUpperCase() : set.name,
+                  style: t.dataMono.copyWith(
+                    color: isSelected ? t.action : t.textPrimary,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
+                ),
+                if (locked) ...[
+                  const SizedBox(width: 6),
+                  Icon(Icons.lock, size: 13, color: t.textSecondary),
+                ],
+                const Spacer(),
+                if (isSelected)
+                  Icon(Icons.check_circle, size: 16, color: t.action),
+              ],
+            ),
+            const SizedBox(height: 8),
+            // Mini color swatch preview strip
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              physics: const NeverScrollableScrollPhysics(),
+              child: Row(
+                children: [
+                  for (int i = set.start; i < set.end && i < WkPalette.length; i++)
+                    Container(
+                      width: 14,
+                      height: 14,
+                      margin: const EdgeInsets.only(right: 3),
+                      decoration: BoxDecoration(
+                        color: WkPalette.colorAt(i),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: t.border, width: 0.5),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = context.wk;
     final l10n = AppLocalizations.of(context)!;
+    final locked = !WkPalette.canAuthor(_currentSet);
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
+        // 1. Fixed Pixel Art Drawing Canvas (Zero Scroll/Gesture Conflict)
         Container(
           width: widget.previewSize,
           height: widget.previewSize,
           decoration: BoxDecoration(
             border: Border.all(color: t.positive, width: 2),
-            borderRadius: BorderRadius.circular(t.radiusControl),
           ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(t.radiusControl),
-            child: LayoutBuilder(
-              builder: (context, c) {
-                return Listener(
-                  behavior: HitTestBehavior.opaque,
-                  onPointerDown: (e) =>
-                      _draw(e.localPosition, c.maxWidth, c.maxHeight),
-                  onPointerMove: (e) =>
-                      _draw(e.localPosition, c.maxWidth, c.maxHeight),
-                  child: GridView.builder(
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: 100,
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 10,
-                          crossAxisSpacing: 0.5,
-                          mainAxisSpacing: 0.5,
-                        ),
-                    itemBuilder: (context, i) {
-                      return Container(color: WkPalette.colorAt(_grid[i]));
-                    },
-                  ),
-                );
-              },
-            ),
+          child: LayoutBuilder(
+            builder: (context, c) {
+              return Listener(
+                behavior: HitTestBehavior.opaque,
+                onPointerDown: (e) =>
+                    _draw(e.localPosition, c.maxWidth, c.maxHeight),
+                onPointerMove: (e) =>
+                    _draw(e.localPosition, c.maxWidth, c.maxHeight),
+                child: GridView.builder(
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: 100,
+                  gridDelegate:
+                      const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 10,
+                        crossAxisSpacing: 0.5,
+                        mainAxisSpacing: 0.5,
+                      ),
+                  itemBuilder: (context, i) {
+                    return Container(color: WkPalette.colorAt(_grid[i]));
+                  },
+                ),
+              );
+            },
           ),
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 10),
+
+        // 2. Brush Preview & Palette Selector Header
         Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              l10n.settingsProfileBrushColor,
-              style: t.dataMono.copyWith(
-                color: t.textSecondary,
-                fontWeight: FontWeight.bold,
-              ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  l10n.settingsProfileBrushColor,
+                  style: t.dataMono.copyWith(
+                    color: t.textSecondary,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 11,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Container(
+                  width: 18,
+                  height: 18,
+                  decoration: BoxDecoration(
+                    color: WkPalette.colorAt(_selColor),
+                    border: Border.all(color: t.textPrimary, width: 1.5),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(width: 8),
-            Container(
-              width: 18,
-              height: 18,
-              decoration: BoxDecoration(
-                color: WkPalette.colorAt(_selColor),
-                border: Border.all(color: t.textPrimary, width: 1.5),
-                shape: BoxShape.circle,
+            // Switch Palette Button
+            InkWell(
+              onTap: () => _openPalettePicker(context),
+              borderRadius: BorderRadius.circular(t.radiusControl),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: t.bgRaised,
+                  border: Border.all(color: t.border),
+                  borderRadius: BorderRadius.circular(t.radiusControl),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      t.uppercaseLabels
+                          ? _currentSet.name.toUpperCase()
+                          : _currentSet.name,
+                      style: t.dataMono.copyWith(
+                        color: t.action,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Icon(Icons.arrow_drop_down, size: 16, color: t.action),
+                  ],
+                ),
               ),
             ),
           ],
         ),
-        const SizedBox(height: 12),
-        // Swatches grouped by palette set. Multiple sets scroll within a
-        // bounded box so a growing registry never blows out the dialog height.
-        ConstrainedBox(
-          constraints: const BoxConstraints(maxHeight: 168),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                for (final set in WkPalette.authoringSets) _swatchSet(t, set),
-              ],
-            ),
-          ),
+        const SizedBox(height: 8),
+
+        // 3. Swatches of the Active Palette Set
+        Wrap(
+          alignment: WrapAlignment.center,
+          spacing: 6,
+          runSpacing: 6,
+          children: [
+            for (int i = _currentSet.start;
+                i < _currentSet.end && i < WkPalette.length;
+                i++)
+              _swatch(t, i, locked),
+          ],
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 10),
+
+        // 4. Action Chips (Identicon, Clear, Random, Add to templates)
         Wrap(
           alignment: WrapAlignment.center,
           spacing: 8,
+          runSpacing: 6,
           children: [
             if (widget.identiconSeed != null &&
                 widget.identiconSeed!.isNotEmpty)
@@ -224,51 +392,26 @@ class _PixelArtEditorState extends State<PixelArtEditor> {
               l10n.settingsProfileChipRandom,
               () => _setGrid(PixelArtEditor.randomSymmetricGrid()),
             ),
+            _chip(
+              t,
+              l10n.settingsProfileChipTemplateSave,
+              () async {
+                final encoded = PixelGrid.encode(_grid);
+                await WiltkeyPersistence().saveAvatarTemplate(encoded);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(l10n.settingsProfileTemplateSaved),
+                      duration: const Duration(seconds: 2),
+                    ),
+                  );
+                }
+              },
+              icon: Icons.bookmark_add_outlined,
+            ),
           ],
         ),
       ],
-    );
-  }
-
-  Widget _swatchSet(WiltkeyTokens t, WkPaletteSet set) {
-    final locked = !WkPalette.canAuthor(set);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Set label only shown once there's more than one set to disambiguate.
-          if (WkPalette.authoringSets.length > 1)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 6),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    t.uppercaseLabels ? set.name.toUpperCase() : set.name,
-                    style: t.dataMono.copyWith(
-                      color: t.textSecondary,
-                      fontSize: 10,
-                    ),
-                  ),
-                  if (locked) ...[
-                    const SizedBox(width: 4),
-                    Icon(Icons.lock, size: 11, color: t.textSecondary),
-                  ],
-                ],
-              ),
-            ),
-          Wrap(
-            alignment: WrapAlignment.center,
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (int i = set.start; i < set.end && i < WkPalette.length; i++)
-                _swatch(t, i, locked),
-            ],
-          ),
-        ],
-      ),
     );
   }
 
@@ -297,7 +440,8 @@ class _PixelArtEditorState extends State<PixelArtEditor> {
     );
   }
 
-  Widget _chip(WiltkeyTokens t, String label, VoidCallback onTap) => ActionChip(
+  Widget _chip(WiltkeyTokens t, String label, VoidCallback onTap, {IconData? icon}) => ActionChip(
+    avatar: icon != null ? Icon(icon, size: 14, color: t.action) : null,
     label: Text(
       t.uppercaseLabels ? label.toUpperCase() : label,
       style: t.dataMono.copyWith(color: t.action, fontSize: 11),
@@ -339,13 +483,11 @@ Future<String?> showPixelArtEditor(
           style: t.screenTitle.copyWith(fontSize: 16),
         ),
         contentPadding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
-        content: SingleChildScrollView(
-          child: PixelArtEditor(
-            initialHex: initialHex,
-            identiconSeed: identiconSeed,
-            defaultColorIndex: defaultColorIndex,
-            onChanged: (hex) => current = hex,
-          ),
+        content: PixelArtEditor(
+          initialHex: initialHex,
+          identiconSeed: identiconSeed,
+          defaultColorIndex: defaultColorIndex,
+          onChanged: (hex) => current = hex,
         ),
         actions: [
           TextButton(

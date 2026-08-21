@@ -489,26 +489,34 @@ class _EmojiPickerPanelState extends State<EmojiPickerPanel> {
   }
 
   Widget _emojiGrid(List<String> emojis) {
-    return GridView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-        maxCrossAxisExtent: 44,
-        mainAxisSpacing: 2,
-        crossAxisSpacing: 2,
-      ),
-      itemCount: emojis.length,
-      itemBuilder: (context, i) {
-        final e = emojis[i];
-        return _ChargeSticker(
-          tokens: context.wk,
-          onInsert: () => _insert(e),
-          onSend: widget.onSendSticker == null
-              ? null
-              : () => widget.onSendSticker!(e),
-          big: (box) => Center(
-            child: Text(e, style: TextStyle(fontSize: box * 0.82)),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const maxExtent = 44.0;
+        final cols = (constraints.maxWidth / maxExtent).floor().clamp(1, 12);
+        final cell = (constraints.maxWidth - 16 - 2 * (cols - 1)) / cols;
+        final fontSize = cell * 0.55;
+        return GridView.builder(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: cols,
+            mainAxisSpacing: 2,
+            crossAxisSpacing: 2,
           ),
-          child: Center(child: Text(e, style: const TextStyle(fontSize: 24))),
+          itemCount: emojis.length,
+          itemBuilder: (context, i) {
+            final e = emojis[i];
+            return _ChargeSticker(
+              tokens: context.wk,
+              onInsert: () => _insert(e),
+              onSend: widget.onSendSticker == null
+                  ? null
+                  : () => widget.onSendSticker!(e),
+              big: (box) => Center(
+                child: Text(e, style: TextStyle(fontSize: box * 0.82)),
+              ),
+              child: Center(child: Text(e, style: TextStyle(fontSize: fontSize))),
+            );
+          },
         );
       },
     );

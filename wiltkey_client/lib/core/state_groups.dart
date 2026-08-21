@@ -462,16 +462,127 @@ extension AppStateGroups on AppState {
     groupMetaSyncTimers.remove(groupId)?.cancel();
   }
 
-  /// Pulls any messages we missed by requesting a full resync from EVERY known
-  /// member (deduped on receipt). The offline server queue only holds messages
-  /// that were addressed to us while we were away, so peers who didn't yet know
-  /// us as a member never queued anything — this sweep catches those. Debounced.
+  /// Performs an in-depth lane audit for a group chat to detect any byte-offset
+  /// gaps / missing message ranges across all member lanes, and requests targeted
+  /// resync from the most active online candidates.
+  Future<void> auditAndSyncGroupLanes(Contact group) async {
+    if (!group.isGroup) return;
+    final laneSize = group.laneSize;
+    final maxMembers = group.maxMembers;
+    if (laneSize == null || laneSize <= 0 || maxMembers == null) {
+      if (!group.isHost) requestGroupMetadata(group);
+      return;
+    }
+
+    if (!activeGroupSyncs.add(group.keyHash)) {
+      log('[Group Smart Sync] Sync already in-flight for "${group.name}". Skipping.');
+      return;
+    }
+
+    try {
+      final int infoLaneSize = AppState.infoLaneSize;
+      final allLanes = await GroupDatabase.instance.getAllLanes(group.keyHash);
+      final laneMap = <int, Map<String, dynamic>>{
+        for (final l in allLanes) l['slot_index'] as int: l,
+      };
+
+      final allMessages = await WiltkeyDatabase.instance.getMessagesInOffsetRange(
+        group.id,
+        0,
+        group.totalGroupSize ?? (infoLaneSize + maxMembers * laneSize),
+      );
+
+      int gapCount = 0;
+      for (int slot = 1; slot <= maxMembers; slot++) {
+        // Limit max concurrent gap queries per audit sweep to prevent socket flooding
+        if (gapCount >= 3) break;
+
+        final laneStart = infoLaneSize + (slot - 1) * laneSize;
+        final laneMax = laneStart + laneSize;
+        final lane = laneMap[slot];
+        final currentWrite = lane != null
+            ? (lane['current_write_offset'] as int? ?? 0)
+            : 0;
+        final hasHeader = lane != null &&
+            (lane['header_written'] == 1 ||
+                (lane['current_write_offset'] as int? ?? 0) >=
+                    AppState.laneHeaderSize);
+
+        final slotMessages = allMessages
+            .where((m) => m.offset >= laneStart && m.offset < laneMax)
+            .toList()
+          ..sort((a, b) => a.offset.compareTo(b.offset));
+
+        // 1. Missing header check if slot is in active use
+        if (!hasHeader && (slotMessages.isNotEmpty || currentWrite > AppState.laneHeaderSize)) {
+          _requestChatResync(
+            group,
+            laneStart,
+            laneStart + AppState.laneHeaderSize,
+            slotIndex: slot,
+          );
+          gapCount++;
+        }
+
+        // 2. Scan for internal gaps between messages
+        int cursor = laneStart + AppState.laneHeaderSize;
+        for (final msg in slotMessages) {
+          if (msg.offset > cursor && gapCount < 3) {
+            // Found gap [cursor, msg.offset)
+            _requestChatResync(
+              group,
+              cursor,
+              msg.offset,
+              slotIndex: slot,
+            );
+            gapCount++;
+          }
+          int msgLen = 0;
+          try {
+            if (msg.text.isNotEmpty) {
+              msgLen = base64Decode(msg.text).length;
+            }
+          } catch (_) {}
+          if (msgLen <= 0) {
+            msgLen = max(1, msg.text.length);
+          }
+          cursor = max(cursor, msg.offset + msgLen);
+        }
+
+        // 3. Scan for tail gap if the lane recorded a higher write offset than we have stored
+        if (currentWrite > 0 && gapCount < 3) {
+          final expectedEnd = laneStart + currentWrite;
+          if (expectedEnd > cursor) {
+            _requestChatResync(
+              group,
+              cursor,
+              expectedEnd,
+              slotIndex: slot,
+            );
+            gapCount++;
+          }
+        }
+      }
+
+      if (gapCount > 0) {
+        log(
+          '[Group Smart Sync] Detected and requested $gapCount gap range(s) for "${group.name}"',
+        );
+      }
+    } finally {
+      activeGroupSyncs.remove(group.keyHash);
+    }
+  }
+
+  /// Pulls any missing group metadata, announces profile, and audits member lanes
+  /// to automatically request any missed byte ranges from active candidates.
   Future<void> autoSyncGroup(Contact group) async {
     if (!group.isGroup) return;
     final now = DateTime.now();
     final last = lastGroupAutoSync[group.keyHash];
-    if (last != null && now.difference(last) < const Duration(seconds: 8))
+    if (last != null && now.difference(last) < const Duration(seconds: 15)) {
       return;
+    }
     lastGroupAutoSync[group.keyHash] = now;
 
     await ensureWebSocketConnected();
@@ -483,25 +594,9 @@ extension AppStateGroups on AppState {
     // Spokes also (re)pull metadata so they learn the full roster / icon.
     if (!group.isHost) requestGroupMetadata(group);
 
-    final int end = group.totalGroupSize ?? (1024 * 1024 * 20);
-    int count = 0;
-    for (final memberHash in group.memberKeyHashes) {
-      if (memberHash == userId) continue;
-      WebSocketClient().sendWSMessage({
-        'type': 'SEND_MESSAGE',
-        'recipient_id': memberHash,
-        'envelope': jsonEncode({
-          'group_id': group.keyHash,
-          'start_offset': 0,
-          'end_offset': end,
-        }),
-        'content_type': 'chat_resync_request',
-      });
-      count++;
-    }
-    log(
-      '[Group Sync] Auto-sync requested from $count member(s) for "${group.name}"',
-    );
+    // Smart Lane Gap Audit: detects byte-offset gaps across all member lanes
+    // and sends targeted resync requests to the most active online members.
+    await auditAndSyncGroupLanes(group);
   }
 
   /// Sweeps every group (used on WebSocket reconnect).
@@ -638,131 +733,154 @@ extension AppStateGroups on AppState {
 
     await ensureWebSocketConnected();
 
-    final lanes = await GroupDatabase.instance.getAllLanes(groupId);
-    // Slot 0 is the shared 1MB info lane — never a writable message lane.
-    final myLanes = lanes
-        .where(
-          (l) =>
-              l['member_key_hash'] == userId && (l['slot_index'] as int) != 0,
-        )
-        .toList();
-    if (myLanes.isEmpty) {
-      abortPlaceholder();
-      return 'No lane assigned to you in this group';
-    }
-
-    Map<String, dynamic>? activeLane;
-    for (final lane in myLanes) {
-      final start = lane['start_offset'] as int;
-      final max = lane['max_offset'] as int;
-      final current = lane['current_write_offset'] as int;
-      final headerWritten = (lane['header_written'] as int) == 1;
-      final neededSpace = headerWritten ? payloadBytes : (512 + payloadBytes);
-      if (current + neededSpace <= (max - start)) {
-        activeLane = lane;
-        break;
+    final sendResult = await _getGroupLock(groupId).synchronized(() async {
+      final lanes = await GroupDatabase.instance.getAllLanes(groupId);
+      // Slot 0 is the shared 1MB info lane — never a writable message lane.
+      final myLanes = lanes
+          .where(
+            (l) =>
+                l['member_key_hash'] == userId && (l['slot_index'] as int) != 0,
+          )
+          .toList();
+      if (myLanes.isEmpty) {
+        return (
+          error: 'No lane assigned to you in this group',
+          dataB64: null,
+          writeOffset: null,
+          socketConnected: null,
+        );
       }
-    }
 
-    if (activeLane == null) {
-      abortPlaceholder();
-      return 'Lane depleted. Request refill from Host.';
-    }
+      Map<String, dynamic>? activeLane;
+      for (final lane in myLanes) {
+        final start = lane['start_offset'] as int;
+        final max = lane['max_offset'] as int;
+        final current = lane['current_write_offset'] as int;
+        final headerWritten = (lane['header_written'] as int) == 1;
+        final neededSpace = headerWritten ? payloadBytes : (512 + payloadBytes);
+        if (current + neededSpace <= (max - start)) {
+          activeLane = lane;
+          break;
+        }
+      }
 
-    final slotIndex = activeLane['slot_index'] as int;
-    final startOffset = activeLane['start_offset'] as int;
-    final maxOffset = activeLane['max_offset'] as int;
-    int currentWriteOffset = activeLane['current_write_offset'] as int;
-    bool headerWritten = (activeLane['header_written'] as int) == 1;
+      if (activeLane == null) {
+        return (
+          error: 'Lane depleted. Request refill from Host.',
+          dataB64: null,
+          writeOffset: null,
+          socketConnected: null,
+        );
+      }
 
-    if (!headerWritten) {
-      log('[Group] Writing lane header for slot $slotIndex');
-      final headerBytes = buildLaneHeader(
-        name: deviceName.isNotEmpty ? deviceName : 'Member',
-        profileImage: profileImageB64,
-        arrivalOrder: slotIndex,
-      );
-      final cipherHeader = await WiltkeyOtpService.xorWithGroupKeystream(
+      final slotIndex = activeLane['slot_index'] as int;
+      final startOffset = activeLane['start_offset'] as int;
+      final maxOffset = activeLane['max_offset'] as int;
+      int currentWriteOffset = activeLane['current_write_offset'] as int;
+      bool headerWritten = (activeLane['header_written'] as int) == 1;
+
+      if (!headerWritten) {
+        log('[Group] Writing lane header for slot $slotIndex');
+        final headerBytes = buildLaneHeader(
+          name: deviceName.isNotEmpty ? deviceName : 'Member',
+          profileImage: profileImageB64,
+          arrivalOrder: slotIndex,
+        );
+        final cipherHeader = await WiltkeyOtpService.xorWithGroupKeystream(
+          groupId,
+          headerBytes,
+          startOffset,
+        );
+        final headerEnvelope = jsonEncode({
+          'group_id': groupId,
+          'sender_id': userId,
+          'slot_index': slotIndex,
+          'offset': startOffset,
+          'd': base64Encode(cipherHeader),
+          't': 'group_lane_header',
+        });
+        _fanOutGroupFrame(
+          contact.memberKeyHashes.where((h) => h != userId).toList(),
+          headerEnvelope,
+          'group_lane_header',
+        );
+        currentWriteOffset = 512;
+        await GroupDatabase.instance.upsertLane(
+          groupId: groupId,
+          slotIndex: slotIndex,
+          memberKeyHash: userId,
+          startOffset: startOffset,
+          maxOffset: maxOffset,
+          currentWriteOffset: 512,
+          headerWritten: true,
+        );
+      }
+
+      final rawBytes = utf8.encode(wireText);
+      final writeOffset = startOffset + currentWriteOffset;
+      final cipherBytes = await WiltkeyOtpService.xorWithGroupKeystream(
         groupId,
-        headerBytes,
-        startOffset,
+        rawBytes,
+        writeOffset,
       );
-      final headerEnvelope = jsonEncode({
+
+      final newWriteOffset = currentWriteOffset + rawBytes.length;
+      await GroupDatabase.instance.updateLaneWriteOffset(
+        groupId,
+        slotIndex,
+        newWriteOffset,
+      );
+
+      int remaining = 0;
+      for (final lane in myLanes) {
+        final start = lane['start_offset'] as int;
+        final max = lane['max_offset'] as int;
+        final current = (lane['slot_index'] == slotIndex)
+            ? newWriteOffset
+            : (lane['current_write_offset'] as int);
+        remaining += (max - start) - current;
+      }
+      contact.remainingBufferBytes = remaining;
+      contact.isWilted = remaining < 74;
+
+      final base64Cipher = base64Encode(cipherBytes);
+      final envelope = jsonEncode({
         'group_id': groupId,
         'sender_id': userId,
         'slot_index': slotIndex,
-        'offset': startOffset,
-        'd': base64Encode(cipherHeader),
-        't': 'group_lane_header',
+        'offset': writeOffset,
+        'd': base64Cipher,
+        't': contentType,
+        'id': messageId,
+        // Plaintext send-time (unix millis). Costs no OTP (not XOR'd) and travels
+        // with the message through resync, so ordering is stable even when delivery
+        // is out of order.
+        'ts': sentTs,
+        if (allowSave) 'dl': true,
+        if (ephemeral) 'eph': 1,
+        if (ephemeral) 'ttl': ttlSeconds,
+        // Reply target is embedded in the encrypted body, not the envelope.
       });
+
+      final bool socketConnected = WebSocketClient().isConnected;
       _fanOutGroupFrame(
         contact.memberKeyHashes.where((h) => h != userId).toList(),
-        headerEnvelope,
-        'group_lane_header',
+        envelope,
+        'group_message',
       );
-      currentWriteOffset = 512;
-      await GroupDatabase.instance.upsertLane(
-        groupId: groupId,
-        slotIndex: slotIndex,
-        memberKeyHash: userId,
-        startOffset: startOffset,
-        maxOffset: maxOffset,
-        currentWriteOffset: 512,
-        headerWritten: true,
+
+      return (
+        error: null,
+        dataB64: base64Cipher,
+        writeOffset: writeOffset,
+        socketConnected: socketConnected,
       );
-    }
-
-    final rawBytes = utf8.encode(wireText);
-    final writeOffset = startOffset + currentWriteOffset;
-    final cipherBytes = await WiltkeyOtpService.xorWithGroupKeystream(
-      groupId,
-      rawBytes,
-      writeOffset,
-    );
-
-    final envelope = jsonEncode({
-      'group_id': groupId,
-      'sender_id': userId,
-      'slot_index': slotIndex,
-      'offset': writeOffset,
-      'd': base64Encode(cipherBytes),
-      't': contentType,
-      'id': messageId,
-      // Plaintext send-time (unix millis). Costs no OTP (not XOR'd) and travels
-      // with the message through resync, so ordering is stable even when delivery
-      // is out of order.
-      'ts': sentTs,
-      if (allowSave) 'dl': true,
-      if (ephemeral) 'eph': 1,
-      if (ephemeral) 'ttl': ttlSeconds,
-      // Reply target is embedded in the encrypted body, not the envelope.
     });
 
-    final bool socketConnected = WebSocketClient().isConnected;
-    _fanOutGroupFrame(
-      contact.memberKeyHashes.where((h) => h != userId).toList(),
-      envelope,
-      'group_message',
-    );
-
-    final newWriteOffset = currentWriteOffset + rawBytes.length;
-    await GroupDatabase.instance.updateLaneWriteOffset(
-      groupId,
-      slotIndex,
-      newWriteOffset,
-    );
-
-    int remaining = 0;
-    for (final lane in myLanes) {
-      final start = lane['start_offset'] as int;
-      final max = lane['max_offset'] as int;
-      final current = (lane['slot_index'] == slotIndex)
-          ? newWriteOffset
-          : (lane['current_write_offset'] as int);
-      remaining += (max - start) - current;
+    if (sendResult.error != null) {
+      abortPlaceholder();
+      return sendResult.error;
     }
-    contact.remainingBufferBytes = remaining;
-    contact.isWilted = remaining < 74;
 
     // Finalize the pending placeholder in place (or build the message fresh for
     // the non-visible emoji-control path).
@@ -778,10 +896,10 @@ extension AppStateGroups on AppState {
           allowSave: allowSave,
           decryptedText: text,
         );
-    newMessage.text = base64Encode(cipherBytes);
-    newMessage.offset = writeOffset;
+    newMessage.text = sendResult.dataB64!;
+    newMessage.offset = sendResult.writeOffset!;
     newMessage.isPending = false;
-    newMessage.isFailed = !socketConnected;
+    newMessage.isFailed = !sendResult.socketConnected!;
     if (placeholder == null) {
       appendLoadedMessage(contact.id, newMessage);
     }

@@ -91,6 +91,14 @@ extension AppStateInbound on AppState {
     String envelope,
     String contentType,
   ) async {
+    // Hard block: EVERYTHING from a blocked keyHash is dropped at the door —
+    // messages, contact requests, control frames, nukes. Blocking is a hard
+    // nuke in WiltKey, not a "stop contact requests" filter.
+    if (await WiltkeyDatabase.instance.isContactBlocked(senderId)) {
+      log('[WebSocket] Dropping frame from blocked peer $senderId');
+      return;
+    }
+
     if (contentType == 'nuke') {
       // Stale-nuke guard: a `nuke` queued for us sits on the relay for up to 7
       // days. If the peer nuked a chat we no longer had (or never had) and we
@@ -256,6 +264,31 @@ extension AppStateInbound on AppState {
 
     if (contentType == 'contact_response') {
       await _handleContactResponse(senderId, envelope);
+      return;
+    }
+
+    if (contentType == 'contact_block') {
+      await _handleContactBlock(senderId, envelope);
+      return;
+    }
+
+    if (contentType == AppStateContacts.kEmergencyChatContentType) {
+      await _handleEmergencyChat(senderId, envelope);
+      return;
+    }
+
+    if (contentType == AppStateContacts.kEmergencyChatAckContentType) {
+      await _handleEmergencyChatAck(senderId, envelope);
+      return;
+    }
+
+    if (contentType == 'profile_update') {
+      await _handleProfileUpdate(senderId, envelope);
+      return;
+    }
+
+    if (contentType == 'profile_update_request') {
+      await _handleProfileUpdateRequest(senderId, envelope);
       return;
     }
 
@@ -577,7 +610,7 @@ extension AppStateInbound on AppState {
         return;
       }
 
-      await _handleGroupPayload(contact, groupId, envelopeJson);
+      await _handleGroupPayload(contact, groupId, envelopeJson, senderId);
       return;
     }
 
@@ -653,6 +686,69 @@ extension AppStateInbound on AppState {
         );
       }
 
+      // Check for message edit / delete commands inside the decrypted body
+      if (decryptedPlaintext != null) {
+        final parsedCmd = ChatMessage.parseEditOrDelete(decryptedPlaintext);
+        if (parsedCmd.editTargetId != null) {
+          final targetId = parsedCmd.editTargetId!;
+          final target = messages[contact.id]
+                  ?.where((m) => m.id == targetId)
+                  .firstOrNull ??
+              await WiltkeyDatabase.instance.getMessageById(
+                targetId,
+                chatId: contact.id,
+                masterKeyHex: masterKeyHex,
+              );
+          // STRICT AUTH: Must be authored by the peer in this chat (not sent by me) and not wilted
+          if (target != null &&
+              target.senderId == contact.id &&
+              !target.isSentByMe &&
+              !target.wilted) {
+            final now = DateTime.now().millisecondsSinceEpoch;
+            target.isEdited = true;
+            target.editedAt = now;
+            target.decryptedText = parsedCmd.text;
+            await WiltkeyDatabase.instance.updateMessageContent(
+              target.id,
+              chatId: contact.id,
+              newText: parsedCmd.text,
+              isEdited: true,
+              isDeleted: false,
+              editedAt: now,
+              masterKeyHex: masterKeyHex,
+            );
+            await WiltkeyDatabase.instance.upsertContact(contact);
+            notifyMessageReceived();
+            _sendDeliveryReceipt(senderId, null, messageId, offset, null);
+            return;
+          }
+        } else if (parsedCmd.deleteTargetId != null) {
+          final targetId = parsedCmd.deleteTargetId!;
+          final target = messages[contact.id]
+                  ?.where((m) => m.id == targetId)
+                  .firstOrNull ??
+              await WiltkeyDatabase.instance.getMessageById(
+                targetId,
+                chatId: contact.id,
+                masterKeyHex: masterKeyHex,
+              );
+          // STRICT AUTH: Must be authored by the peer in this chat (not sent by me)
+          if (target != null &&
+              target.senderId == contact.id &&
+              !target.isSentByMe) {
+            target.deleteInMemory();
+            await WiltkeyDatabase.instance.deleteMessageRow(
+              target.id,
+              chatId: contact.id,
+            );
+            await WiltkeyDatabase.instance.upsertContact(contact);
+            notifyMessageReceived();
+            _sendDeliveryReceipt(senderId, null, messageId, offset, null);
+            return;
+          }
+        }
+      }
+
       final newMessage = ChatMessage(
         id: messageId,
         senderId: contact.id,
@@ -672,13 +768,39 @@ extension AppStateInbound on AppState {
             : null,
       );
 
+      bool isMentionOrReply = false;
+      if (replyToId != null) {
+        final repliedMsg = messages[contact.id]?.where((m) => m.id == replyToId).firstOrNull ??
+            await WiltkeyDatabase.instance.getMessageById(replyToId, masterKeyHex: masterKeyHex);
+        if (repliedMsg != null && (repliedMsg.isSentByMe || repliedMsg.senderId == 'me')) {
+          isMentionOrReply = true;
+          final String bodyText;
+          if (newMessage.ephemeral) {
+            bodyText = 'Replied with a wilting message';
+          } else if (resolvedContentType != 'text') {
+            bodyText = 'Replied with an attachment';
+          } else {
+            bodyText = (decryptedPlaintext != null && decryptedPlaintext.isNotEmpty)
+                ? (decryptedPlaintext.length > 80 ? '${decryptedPlaintext.substring(0, 80)}...' : decryptedPlaintext)
+                : 'Replied to your message';
+          }
+          logEvent(
+            type: 'reply',
+            title: contact.name,
+            body: bodyText,
+            chatKey: contact.keyHash,
+            id: 'reply_${newMessage.id}',
+          );
+        }
+      }
+
       appendLoadedMessage(contact.id, newMessage);
       bumpUnread(
         contact,
         newMessage,
       ); // live arrival → unread badge if not open
       if (_isNotifiableMessage(newMessage)) {
-        emitMessageAlert(contact);
+        emitMessageAlert(contact, isMentionOrReply: isMentionOrReply);
         // Peer is online → auto-heal any stuck ticks / inbound gap on this chat
         // so the user never has to spam the Sync button (runs only when needed).
         maybeAutoReconcileOnPeerMessage(contact);
@@ -725,6 +847,7 @@ extension AppStateInbound on AppState {
     Contact contact,
     String groupId,
     Map<String, dynamic>? envelopeJson,
+    String authenticatedSenderId,
   ) async {
     try {
       final innerSenderId = envelopeJson?['sender_id'] as String?;
@@ -750,6 +873,15 @@ extension AppStateInbound on AppState {
           offset == null ||
           dataB64 == null) {
         log('[Group State] Ignoring malformed group payload (missing fields).');
+        return;
+      }
+
+      // STRICT SENDER AUTH: Prevent group sender ID spoofing (authenticated sender must match inner sender)
+      if (authenticatedSenderId.isNotEmpty &&
+          innerSenderId != authenticatedSenderId) {
+        log(
+          '[Group Security] Dropping spoofed group frame: inner sender $innerSenderId != authenticated sender $authenticatedSenderId',
+        );
         return;
       }
 
@@ -839,12 +971,14 @@ extension AppStateInbound on AppState {
       final lane = await GroupDatabase.instance.getLane(groupId, slotIndex);
       final int cursor = lane?['current_write_offset'] as int? ?? 0;
       final int incomingRelative = offset - laneStart;
-
       // Gap detection: we received bytes beyond where we expected this lane to be.
-      if (incomingRelative > cursor) {
+      // A lane header occupies [laneStart, laneStart + laneHeaderSize). If cursor is 0,
+      // the first normal message arrives at laneStart + laneHeaderSize.
+      final int expectedCursor = cursor == 0 ? AppState.laneHeaderSize : cursor;
+      if (incomingRelative > expectedCursor) {
         _requestChatResync(
           contact,
-          laneStart + cursor,
+          laneStart + expectedCursor,
           offset,
           slotIndex: slotIndex,
         );
@@ -879,6 +1013,78 @@ extension AppStateInbound on AppState {
         if (!contact.isHost) requestGroupMetadata(contact);
       }
 
+      // Check for message edit / delete commands inside decryptedText
+      final parsedCmd = ChatMessage.parseEditOrDelete(decryptedText);
+      if (parsedCmd.editTargetId != null) {
+        final targetId = parsedCmd.editTargetId!;
+        final target = messages[contact.id]
+                ?.where((m) => m.id == targetId)
+                .firstOrNull ??
+            await WiltkeyDatabase.instance.getMessageById(
+              targetId,
+              chatId: contact.id,
+              masterKeyHex: masterKeyHex,
+            );
+        // STRICT AUTH: Author must match innerSenderId and not wilted
+        if (target != null &&
+            target.senderId == innerSenderId &&
+            !target.wilted) {
+          final now = DateTime.now().millisecondsSinceEpoch;
+          target.isEdited = true;
+          target.editedAt = now;
+          target.decryptedText = parsedCmd.text;
+          await WiltkeyDatabase.instance.updateMessageContent(
+            target.id,
+            chatId: contact.id,
+            newText: parsedCmd.text,
+            isEdited: true,
+            isDeleted: false,
+            editedAt: now,
+            masterKeyHex: masterKeyHex,
+          );
+          notifyMessageReceived();
+          if (innerSenderId != userId) {
+            _sendDeliveryReceipt(
+              innerSenderId,
+              groupId,
+              messageId,
+              offset,
+              slotIndex,
+            );
+          }
+          return;
+        }
+      } else if (parsedCmd.deleteTargetId != null) {
+        final targetId = parsedCmd.deleteTargetId!;
+        final target = messages[contact.id]
+                ?.where((m) => m.id == targetId)
+                .firstOrNull ??
+            await WiltkeyDatabase.instance.getMessageById(
+              targetId,
+              chatId: contact.id,
+              masterKeyHex: masterKeyHex,
+            );
+        // STRICT AUTH: Author must match innerSenderId
+        if (target != null && target.senderId == innerSenderId) {
+          target.deleteInMemory();
+          await WiltkeyDatabase.instance.deleteMessageRow(
+            target.id,
+            chatId: contact.id,
+          );
+          notifyMessageReceived();
+          if (innerSenderId != userId) {
+            _sendDeliveryReceipt(
+              innerSenderId,
+              groupId,
+              messageId,
+              offset,
+              slotIndex,
+            );
+          }
+          return;
+        }
+      }
+
       final newMessage = ChatMessage(
         id: messageId,
         senderId: innerSenderId,
@@ -897,6 +1103,63 @@ extension AppStateInbound on AppState {
             : null,
       );
 
+      bool isMentionOrReply = false;
+      if (innerSenderId != userId && decryptedText.isNotEmpty) {
+        // 1. Check if user is @mentioned
+        if (effectiveShortNick.isNotEmpty &&
+            RegExp(r'@' + RegExp.escape(effectiveShortNick) + r'\b', caseSensitive: false)
+                .hasMatch(decryptedText)) {
+          isMentionOrReply = true;
+          final senderProfile = groupProfilesCache[contact.id]?[innerSenderId];
+          final senderName = senderProfile?['name'] ?? 'Someone';
+          final String bodyText;
+          if (newMessage.ephemeral) {
+            bodyText = 'Mentioned you in a wilting message';
+          } else if (innerType != 'text') {
+            bodyText = 'Mentioned you in an attachment';
+          } else {
+            bodyText = decryptedText.length > 80
+                ? '${decryptedText.substring(0, 80)}...'
+                : decryptedText;
+          }
+          logEvent(
+            type: 'mention',
+            title: '${contact.name}: $senderName',
+            body: bodyText,
+            chatKey: contact.keyHash,
+            id: 'mention_${newMessage.id}',
+          );
+        }
+
+        // 2. Check if this is a quote reply to our message
+        if (replyToId != null) {
+          final repliedMsg = messages[contact.id]?.where((m) => m.id == replyToId).firstOrNull ??
+              await WiltkeyDatabase.instance.getMessageById(replyToId, masterKeyHex: masterKeyHex);
+          if (repliedMsg != null && (repliedMsg.isSentByMe || repliedMsg.senderId == 'me' || repliedMsg.senderId == userId)) {
+            isMentionOrReply = true;
+            final senderProfile = groupProfilesCache[contact.id]?[innerSenderId];
+            final senderName = senderProfile?['name'] ?? 'Someone';
+            final String bodyText;
+            if (newMessage.ephemeral) {
+              bodyText = 'Replied with a wilting message';
+            } else if (innerType != 'text') {
+              bodyText = 'Replied with an attachment';
+            } else {
+              bodyText = decryptedText.length > 80
+                  ? '${decryptedText.substring(0, 80)}...'
+                  : decryptedText;
+            }
+            logEvent(
+              type: 'reply',
+              title: '${contact.name}: $senderName',
+              body: bodyText,
+              chatKey: contact.keyHash,
+              id: 'reply_${newMessage.id}',
+            );
+          }
+        }
+      }
+
       if (loadedChats.contains(contact.id)) {
         final updatedList = <ChatMessage>[
           ...(messages[contact.id] ?? []),
@@ -909,7 +1172,7 @@ extension AppStateInbound on AppState {
         newMessage,
       ); // live arrival → unread badge if not open
       if (innerSenderId != userId && _isNotifiableMessage(newMessage)) {
-        emitMessageAlert(contact);
+        emitMessageAlert(contact, isMentionOrReply: isMentionOrReply);
       }
       await WiltkeyDatabase.instance.saveMessage(
         newMessage,
@@ -1119,20 +1382,68 @@ extension AppStateInbound on AppState {
     }
   }
 
-  Future<List<String>> _getSyncCandidates(Contact contact) async {
+  Future<List<String>> _getSyncCandidates(
+    Contact contact, {
+    int? slotIndex,
+  }) async {
     final candidates = <String>[];
-    if (contact.hostKeyHash != null && contact.hostKeyHash != userId) {
+
+    // 1. Most recent active non-system chatter in this group (excluding self)
+    try {
+      final lastActiveSender = await WiltkeyDatabase.instance.getMostRecentSender(
+        contact.id,
+        excludeUserId: userId,
+      );
+      if (lastActiveSender != null &&
+          lastActiveSender.isNotEmpty &&
+          lastActiveSender != userId) {
+        candidates.add(lastActiveSender);
+      }
+    } catch (_) {}
+
+    // 2. Group host (if not self and not already added)
+    if (contact.hostKeyHash != null &&
+        contact.hostKeyHash != userId &&
+        !candidates.contains(contact.hostKeyHash)) {
       candidates.add(contact.hostKeyHash!);
     }
-    final profiles = await GroupDatabase.instance.getAllProfiles(
-      contact.keyHash,
-    );
-    for (final p in profiles) {
-      final keyHash = p['member_key_hash'] as String;
-      if (keyHash != userId && !candidates.contains(keyHash)) {
-        candidates.add(keyHash);
+
+    // 3. Slot owner for this lane (if known and not self)
+    if (slotIndex != null) {
+      try {
+        final lane = await GroupDatabase.instance.getLane(
+          contact.keyHash,
+          slotIndex,
+        );
+        final memberHash = lane?['member_key_hash'] as String?;
+        if (memberHash != null &&
+            memberHash != userId &&
+            !candidates.contains(memberHash)) {
+          candidates.add(memberHash);
+        }
+      } catch (_) {}
+    }
+
+    // 4. All remaining active member profiles
+    try {
+      final profiles = await GroupDatabase.instance.getAllProfiles(
+        contact.keyHash,
+      );
+      for (final p in profiles) {
+        final keyHash = p['member_key_hash'] as String;
+        if (keyHash != userId && !candidates.contains(keyHash)) {
+          candidates.add(keyHash);
+        }
+      }
+    } catch (_) {}
+
+    // 5. All member key hashes from contact metadata
+    for (final m in contact.memberKeyHashes) {
+      if (m != userId && !candidates.contains(m)) {
+        candidates.add(m);
       }
     }
+
     return candidates;
   }
 
@@ -1167,12 +1478,22 @@ extension AppStateInbound on AppState {
     List<String> candidates,
     int candidateIndex,
   ) async {
-    if (candidateIndex >= candidates.length) {
-      log('[Resync] All sync candidates exhausted for ${contact.name}');
+    // Bound candidate retries to at most 2 active peers per gap to prevent fan-out storms
+    final maxCandidates = min(candidates.length, 2);
+    if (candidateIndex >= maxCandidates) {
+      log('[Resync] Candidate attempts completed for ${contact.name} ($startOffset-$endOffset)');
       return;
     }
 
-    // Check if the gap has already been filled before sending
+    // Check if the gap has already been filled or verified clean before sending
+    final cacheKey = '${contact.keyHash}:${slotIndex ?? 0}:$startOffset:$endOffset';
+    final lastAudit = cleanGapAuditCache[cacheKey];
+    if (lastAudit != null &&
+        DateTime.now().millisecondsSinceEpoch - lastAudit < 1000 * 60 * 15) {
+      log('[Resync] Gap $startOffset-$endOffset recently verified clean. Skipping.');
+      return;
+    }
+
     bool gapFilled = false;
     if (slotIndex != null) {
       final lane = await GroupDatabase.instance.getLane(
@@ -1183,7 +1504,14 @@ extension AppStateInbound on AppState {
         final currentWrite = lane['current_write_offset'] as int;
         final start = lane['start_offset'] as int;
         if (start + currentWrite >= endOffset) {
-          gapFilled = true;
+          final msgs = await WiltkeyDatabase.instance.getMessagesInOffsetRange(
+            contact.id,
+            startOffset,
+            endOffset,
+          );
+          if (msgs.isNotEmpty) {
+            gapFilled = true;
+          }
         }
       }
     } else {
@@ -1196,12 +1524,13 @@ extension AppStateInbound on AppState {
       log(
         '[Resync] Gap $startOffset-$endOffset already filled. Aborting candidate sync.',
       );
+      cleanGapAuditCache[cacheKey] = DateTime.now().millisecondsSinceEpoch;
       return;
     }
 
     final target = candidates[candidateIndex];
     log(
-      '[Resync] Attempting sync from candidate $target (index $candidateIndex) for range $startOffset-$endOffset',
+      '[Resync] Attempting smart sync from candidate $target (priority $candidateIndex of $maxCandidates) for range $startOffset-$endOffset',
     );
     _sendResyncRequestFrame(
       target,
@@ -1211,8 +1540,11 @@ extension AppStateInbound on AppState {
       slotIndex,
     );
 
-    // Schedule fallback to next candidate after 6 seconds
-    Timer(const Duration(seconds: 6), () {
+    // Cancel any previous fallback timer for this specific gap range
+    syncCandidateTimers[cacheKey]?.cancel();
+
+    // Schedule fallback to next candidate after 15 seconds if no response arrives
+    syncCandidateTimers[cacheKey] = Timer(const Duration(seconds: 15), () {
       _performSyncWithCandidates(
         contact,
         startOffset,
@@ -1230,6 +1562,24 @@ extension AppStateInbound on AppState {
     int endOffset, {
     int? slotIndex,
   }) async {
+    if (startOffset >= endOffset) return;
+
+    final cacheKey =
+        '${contact.keyHash}:${slotIndex ?? 0}:$startOffset:$endOffset';
+    final lastAudit = cleanGapAuditCache[cacheKey];
+    if (lastAudit != null &&
+        DateTime.now().millisecondsSinceEpoch - lastAudit < 1000 * 60 * 15) {
+      log(
+        '[Resync] Gap $startOffset-$endOffset recently verified clean. Skipping.',
+      );
+      return;
+    }
+
+    if (syncCandidateTimers[cacheKey]?.isActive ?? false) {
+      log('[Resync] Query for $cacheKey already active. Skipping duplicate.');
+      return;
+    }
+
     if (!contact.isGroup) {
       final recipientId = contact.keyHash;
       if (recipientId != userId) {
@@ -1244,28 +1594,7 @@ extension AppStateInbound on AppState {
       return;
     }
 
-    if (contact.isHost) {
-      if (slotIndex != null) {
-        final lane = await GroupDatabase.instance.getLane(
-          contact.keyHash,
-          slotIndex,
-        );
-        final recipientId = lane?['member_key_hash'] as String?;
-        if (recipientId != null && recipientId != userId) {
-          _sendResyncRequestFrame(
-            recipientId,
-            contact.keyHash,
-            startOffset,
-            endOffset,
-            slotIndex,
-          );
-        }
-      }
-      return;
-    }
-
-    // Spoke path in group
-    final candidates = await _getSyncCandidates(contact);
+    final candidates = await _getSyncCandidates(contact, slotIndex: slotIndex);
     if (candidates.isEmpty) return;
 
     _performSyncWithCandidates(
@@ -1288,10 +1617,27 @@ extension AppStateInbound on AppState {
       final int startOffset = data['start_offset'] as int;
       final int endOffset = data['end_offset'] as int;
 
+      final int? slotIndex = data['slot_index'] as int?;
+
       final chatKey = groupId ?? senderId;
       final contactIndex = contacts.indexWhere((c) => c.keyHash == chatKey);
       if (contactIndex == -1) return;
       final contact = contacts[contactIndex];
+
+      if (contact.isGroup) {
+        final knownProfile =
+            await GroupDatabase.instance.getProfile(chatKey, senderId);
+        final isMember =
+            contact.isHost ||
+            contact.memberKeyHashes.contains(senderId) ||
+            knownProfile != null;
+        if (!isMember) {
+          log(
+            '[Resync Warning] $senderId requested group resync but is not a member of $chatKey',
+          );
+          return;
+        }
+      }
 
       final List<Map<String, dynamic>> missingMessages = [];
 
@@ -1391,6 +1737,9 @@ extension AppStateInbound on AppState {
         'recipient_id': senderId,
         'envelope': jsonEncode({
           'group_id': groupId,
+          'start_offset': startOffset,
+          'end_offset': endOffset,
+          'slot_index': slotIndex,
           'messages': missingMessages,
         }),
         'content_type': 'chat_resync_response',
@@ -1407,12 +1756,21 @@ extension AppStateInbound on AppState {
     try {
       final data = jsonDecode(envelope) as Map<String, dynamic>;
       final String? groupId = data['group_id'];
-      final List<dynamic> serializedMsgs = data['messages'] as List<dynamic>;
+      final List<dynamic> serializedMsgs = (data['messages'] as List<dynamic>?) ?? [];
+      final int? startOffset = data['start_offset'] as int?;
+      final int? endOffset = data['end_offset'] as int?;
+      final int? slotIndex = data['slot_index'] as int?;
 
       final chatKey = groupId ?? senderId;
       final contactIndex = contacts.indexWhere((c) => c.keyHash == chatKey);
       if (contactIndex == -1) return;
       final contact = contacts[contactIndex];
+
+      if (startOffset != null && endOffset != null) {
+        final cacheKey = '${contact.keyHash}:${slotIndex ?? 0}:$startOffset:$endOffset';
+        syncCandidateTimers[cacheKey]?.cancel();
+        cleanGapAuditCache[cacheKey] = DateTime.now().millisecondsSinceEpoch;
+      }
       final recovered =
           <ChatMessage>[]; // chat messages newly persisted this pass
 
@@ -1575,8 +1933,18 @@ extension AppStateInbound on AppState {
               }
             }
           } else {
-            if (offset + cipherBytes.length > contact.incomingOffset) {
-              contact.incomingOffset = offset + cipherBytes.length;
+            // Gap detection + incoming bookkeeping apply ONLY to the peer's primary
+            // lane for peer-authored messages.
+            final int incomingLaneStart =
+                contact.incomingMaxOffset >= contact.maxBufferBytes
+                ? contact.maxBufferBytes ~/ 2
+                : 0;
+            if (!msgIsSentByMe &&
+                offset >= incomingLaneStart &&
+                offset <= contact.incomingMaxOffset) {
+              if (offset + cipherBytes.length > contact.incomingOffset) {
+                contact.incomingOffset = offset + cipherBytes.length;
+              }
             }
           }
         }
