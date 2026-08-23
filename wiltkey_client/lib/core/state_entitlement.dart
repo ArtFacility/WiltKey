@@ -70,4 +70,28 @@ extension AppStateEntitlement on AppState {
       log('[Entitlement] Plus sync failed: $e');
     }
   }
+
+  /// Request / refresh our Play Integrity attestation cert with the relay.
+  Future<void> syncClientAttestation({bool force = false}) async {
+    if (!kPlayStore) return;
+    if (publicKeyHex.isEmpty || userId.isEmpty) return;
+    try {
+      final priorCert = IntegrityAttestationManager.instance.cachedCert;
+      final cert = await IntegrityAttestationManager.instance.syncAttestation(
+        relayUrl: activeRelayUrl,
+        userId: userId,
+        publicKeyHex: publicKeyHex,
+        signMessage: signMessage,
+        force: force,
+      );
+      if (cert != null && cert['client_type'] != priorCert?['client_type']) {
+        // Broaden our verified badge to 1:1 contacts and group peers
+        broadcastChatInfoToPeers();
+        broadcastMyProfileToGroups();
+        notifyListeners();
+      }
+    } catch (e) {
+      log('[Integrity] Attestation sync error: $e');
+    }
+  }
 }

@@ -59,6 +59,10 @@ class Contact {
   // art — always renders for everyone; null/'none' = no border.
   String? avatarBorderId;
 
+  // Google Play Integrity client attestation ('play_official', 'play_plus', or null/tinkerer)
+  String? clientAttestation;
+  int? attestationExpiresAt;
+
   // OTP partition offsets
   int outgoingOffset;
   int outgoingMaxOffset;
@@ -165,6 +169,8 @@ class Contact {
     this.profileImageB64,
     this.themeId,
     this.avatarBorderId,
+    this.clientAttestation,
+    this.attestationExpiresAt,
     this.outgoingOffset = 0,
     this.outgoingMaxOffset = 0,
     this.incomingOffset = 0,
@@ -211,6 +217,8 @@ class Contact {
     String? profileImageB64,
     String? themeId,
     String? avatarBorderId,
+    String? clientAttestation,
+    int? attestationExpiresAt,
     int? outgoingOffset,
     int? outgoingMaxOffset,
     int? incomingOffset,
@@ -257,6 +265,8 @@ class Contact {
       profileImageB64: profileImageB64 ?? this.profileImageB64,
       themeId: themeId ?? this.themeId,
       avatarBorderId: avatarBorderId ?? this.avatarBorderId,
+      clientAttestation: clientAttestation ?? this.clientAttestation,
+      attestationExpiresAt: attestationExpiresAt ?? this.attestationExpiresAt,
       outgoingOffset: outgoingOffset ?? this.outgoingOffset,
       outgoingMaxOffset: outgoingMaxOffset ?? this.outgoingMaxOffset,
       incomingOffset: incomingOffset ?? this.incomingOffset,
@@ -319,6 +329,8 @@ class Contact {
     'profileImageB64': profileImageB64,
     'themeId': themeId,
     'avatarBorderId': avatarBorderId,
+    'clientAttestation': clientAttestation,
+    'attestationExpiresAt': attestationExpiresAt,
     'outgoingOffset': outgoingOffset,
     'outgoingMaxOffset': outgoingMaxOffset,
     'incomingOffset': incomingOffset,
@@ -372,6 +384,8 @@ class Contact {
       profileImageB64: json['profileImageB64'] as String?,
       themeId: json['themeId'] as String?,
       avatarBorderId: json['avatarBorderId'] as String?,
+      clientAttestation: json['clientAttestation'] as String?,
+      attestationExpiresAt: json['attestationExpiresAt'] as int?,
       outgoingOffset: json['outgoingOffset'] as int? ?? 0,
       outgoingMaxOffset: json['outgoingMaxOffset'] as int? ?? maxBuffer ~/ 2,
       incomingOffset: json['incomingOffset'] as int? ?? maxBuffer ~/ 2,
@@ -768,6 +782,8 @@ class SocialContact {
   final String? status; // Peer's synced status message
   final String? statusEmoji; // Peer's synced status emoji
   final int? statusExpiresAt; // Unix timestamp in ms when status expires
+  final String? clientAttestation; // 'play_official', 'play_plus', or null/tinkerer
+  final int? attestationExpiresAt; // Unix timestamp in seconds
 
   SocialContact({
     required this.id,
@@ -788,6 +804,8 @@ class SocialContact {
     this.status,
     this.statusEmoji,
     this.statusExpiresAt,
+    this.clientAttestation,
+    this.attestationExpiresAt,
   });
 
   bool get isStatusExpired =>
@@ -817,6 +835,8 @@ class SocialContact {
     status: row['status'] as String?,
     statusEmoji: row['status_emoji'] as String?,
     statusExpiresAt: row['status_expires_at'] as int?,
+    clientAttestation: row['client_attestation'] as String?,
+    attestationExpiresAt: row['attestation_expires_at'] as int?,
   );
 
   Map<String, Object?> toRow() => {
@@ -837,6 +857,8 @@ class SocialContact {
     'status': status,
     'status_emoji': statusEmoji,
     'status_expires_at': statusExpiresAt,
+    'client_attestation': clientAttestation,
+    'attestation_expires_at': attestationExpiresAt,
   };
 
   /// Derives the theme seed from the shared secret (lazy, cached in DB).
@@ -874,4 +896,62 @@ class ContactBlock {
     'blocked_at': blockedAt,
     'reason': reason,
   };
+}
+
+/// Verification badge status derived from Google Play Integrity attestation.
+enum ClientBadgeType {
+  /// Verified official Google Play Store build + active Plus subscription (Golden Shield 🛡️✨)
+  playPlus,
+  /// Verified official Google Play Store build (Teal / Primary Shield 🛡️)
+  playOfficial,
+  /// Open source / community / self-compiled / unverified build (Wrench / Cog 🔧)
+  tinkerer,
+}
+
+extension ContactBadgeExtension on Contact {
+  bool get isAttestationValid {
+    if (clientAttestation != 'play_plus' && clientAttestation != 'play_official') return false;
+    final nowSec = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    return attestationExpiresAt == null || attestationExpiresAt! > nowSec;
+  }
+
+  ClientBadgeType get badgeType {
+    if (clientAttestation == 'play_plus') {
+      if (attestationExpiresAt == null ||
+          attestationExpiresAt! > DateTime.now().millisecondsSinceEpoch ~/ 1000) {
+        return ClientBadgeType.playPlus;
+      }
+    }
+    if (clientAttestation == 'play_official') {
+      if (attestationExpiresAt == null ||
+          attestationExpiresAt! > DateTime.now().millisecondsSinceEpoch ~/ 1000) {
+        return ClientBadgeType.playOfficial;
+      }
+    }
+    return ClientBadgeType.tinkerer;
+  }
+}
+
+extension SocialContactBadgeExtension on SocialContact {
+  bool get isAttestationValid {
+    if (clientAttestation != 'play_plus' && clientAttestation != 'play_official') return false;
+    final nowSec = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    return attestationExpiresAt == null || attestationExpiresAt! > nowSec;
+  }
+
+  ClientBadgeType get badgeType {
+    if (clientAttestation == 'play_plus') {
+      if (attestationExpiresAt == null ||
+          attestationExpiresAt! > DateTime.now().millisecondsSinceEpoch ~/ 1000) {
+        return ClientBadgeType.playPlus;
+      }
+    }
+    if (clientAttestation == 'play_official') {
+      if (attestationExpiresAt == null ||
+          attestationExpiresAt! > DateTime.now().millisecondsSinceEpoch ~/ 1000) {
+        return ClientBadgeType.playOfficial;
+      }
+    }
+    return ClientBadgeType.tinkerer;
+  }
 }

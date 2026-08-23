@@ -1093,6 +1093,240 @@ func handlePostEntitlement(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(fmt.Sprintf(`{"status":"success","expires_at":%d}`, expiry.Unix())))
 }
 
+type IntegrityChallengeRequest struct {
+	UserID    string `json:"user_id"`
+	Pubkey    string `json:"pubkey"`
+	Signature string `json:"signature"`
+	Timestamp int64  `json:"timestamp"`
+}
+
+type IntegrityAttestRequest struct {
+	UserID         string `json:"user_id"`
+	Pubkey         string `json:"pubkey"`
+	IntegrityToken string `json:"integrity_token"`
+	Signature      string `json:"signature"`
+	Timestamp      int64  `json:"timestamp"`
+}
+
+func handleIntegrityChallenge(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ip := clientIP(r)
+
+	var req IntegrityChallengeRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	// 1. Verify timestamp drift (max 60 seconds)
+	drift := math.Abs(float64(time.Now().Unix() - req.Timestamp))
+	if drift > 60 {
+		handleValidationFailure(w, ip, "timestamp drift too high")
+		return
+	}
+
+	// 2. Validate id matches SHA-256(pubkey)
+	pubBytes, err := hex.DecodeString(req.Pubkey)
+	if err != nil {
+		http.Error(w, "Invalid pubkey hex format", http.StatusBadRequest)
+		return
+	}
+	hash := sha256.Sum256(pubBytes)
+	computedID := hex.EncodeToString(hash[:])
+	if computedID != req.UserID {
+		handleValidationFailure(w, ip, "user_id does not match sha256(pubkey)")
+		return
+	}
+
+	// 3. Verify signature over INTEGRITY_CHALLENGE:<user_id>:<timestamp>
+	message := fmt.Sprintf("INTEGRITY_CHALLENGE:%s:%d", req.UserID, req.Timestamp)
+	ok, err := VerifySignature(req.Pubkey, req.Signature, []byte(message))
+	if err != nil || !ok {
+		handleValidationFailure(w, ip, "invalid authentication signature")
+		return
+	}
+
+	// 4. Generate random 32-byte server nonce
+	nonceBytes := make([]byte, 32)
+	if _, err := crypto_rand.Read(nonceBytes); err != nil {
+		http.Error(w, "Failed to generate nonce", http.StatusInternalServerError)
+		return
+	}
+	serverNonce := hex.EncodeToString(nonceBytes)
+
+	// 5. Store nonce in Redis (5 min TTL)
+	if err := rdb.StoreIntegrityNonce(req.UserID, serverNonce, kChallengeTTL); err != nil {
+		log.Printf("Failed to store integrity nonce in Redis: %v", err)
+		http.Error(w, "Database error storing nonce", http.StatusInternalServerError)
+		return
+	}
+
+	expectedNonce := ComputeIntegrityNonce(serverNonce, req.UserID)
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"server_nonce":   serverNonce,
+		"expected_nonce": expectedNonce,
+		"timestamp":      time.Now().Unix(),
+		"relay_pubkey":   playIntegrityVerifier.PublicKeyHex(),
+	})
+}
+
+func handleIntegrityAttest(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ip := clientIP(r)
+
+	var req IntegrityAttestRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.IntegrityToken == "" {
+		http.Error(w, "Missing integrity token", http.StatusBadRequest)
+		return
+	}
+
+	// 1. Verify timestamp drift (max 60 seconds)
+	drift := math.Abs(float64(time.Now().Unix() - req.Timestamp))
+	if drift > 60 {
+		handleValidationFailure(w, ip, "timestamp drift too high")
+		return
+	}
+
+	// 2. Validate id matches SHA-256(pubkey)
+	pubBytes, err := hex.DecodeString(req.Pubkey)
+	if err != nil {
+		http.Error(w, "Invalid pubkey hex format", http.StatusBadRequest)
+		return
+	}
+	hash := sha256.Sum256(pubBytes)
+	computedID := hex.EncodeToString(hash[:])
+	if computedID != req.UserID {
+		handleValidationFailure(w, ip, "user_id does not match sha256(pubkey)")
+		return
+	}
+
+	// 3. Verify signature over INTEGRITY_ATTEST:<user_id>:<tokenHash>:<timestamp>
+	tokenH := sha256.Sum256([]byte(req.IntegrityToken))
+	tokenHash := hex.EncodeToString(tokenH[:])
+	message := fmt.Sprintf("INTEGRITY_ATTEST:%s:%s:%d", req.UserID, tokenHash, req.Timestamp)
+	ok, err := VerifySignature(req.Pubkey, req.Signature, []byte(message))
+	if err != nil || !ok {
+		handleValidationFailure(w, ip, "invalid authentication signature")
+		return
+	}
+
+	// 4. Retrieve and consume server nonce from Redis
+	serverNonce, err := rdb.GetIntegrityNonce(req.UserID)
+	if err != nil || serverNonce == "" {
+		http.Error(w, `{"error":"Invalid or expired integrity challenge"}`, http.StatusBadRequest)
+		return
+	}
+	rdb.DeleteIntegrityNonce(req.UserID)
+
+	expectedNonce := ComputeIntegrityNonce(serverNonce, req.UserID)
+
+	// 5. Verify token with Google Play Integrity
+	var clientType = "play_official"
+
+	if playIntegrityVerifier.enabled {
+		valid, err := playIntegrityVerifier.VerifyIntegrityToken(req.IntegrityToken, expectedNonce)
+		if err != nil || !valid {
+			log.Printf("[Integrity] Attestation failed for %s: %v", req.UserID, err)
+			http.Error(w, fmt.Sprintf(`{"error":"Integrity verification failed: %v"}`, err), http.StatusForbidden)
+			return
+		}
+	} else {
+		// In self-hosted / test mode without credentials, accept if token is provided
+		log.Printf("[Integrity] Self-hosted / test mode: Attestation accepted without Google Cloud for %s", req.UserID)
+	}
+
+	// 6. Check Plus entitlement in DB / Redis
+	if pg != nil {
+		ent, _ := pg.GetEntitlement(req.UserID)
+		if ent != nil && ent.ExpiresAt.After(time.Now()) {
+			clientType = "play_plus"
+		}
+	} else {
+		entHash, _ := rdb.GetEntitlementHash(req.UserID)
+		if entHash != "" {
+			clientType = "play_plus"
+		}
+	}
+
+	issuedAt := time.Now().Unix()
+	expiresAt := time.Now().Add(kAttestationTTL).Unix()
+	certSig := playIntegrityVerifier.SignAttestation(req.UserID, clientType, issuedAt, expiresAt)
+
+	// 7. Store in PostgreSQL if available
+	if pg != nil {
+		if err := pg.StoreClientAttestation(req.UserID, clientType, time.Unix(issuedAt, 0), time.Unix(expiresAt, 0), certSig, playIntegrityVerifier.PublicKeyHex()); err != nil {
+			log.Printf("Failed to store client attestation in Postgres: %v", err)
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"user_id":          req.UserID,
+		"client_type":      clientType,
+		"issued_at":        issuedAt,
+		"expires_at":       expiresAt,
+		"relay_signature":  certSig,
+		"relay_public_key": playIntegrityVerifier.PublicKeyHex(),
+	})
+}
+
+func handleIntegrityQuery(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	userID := r.URL.Query().Get("user_id")
+	if userID == "" {
+		http.Error(w, "Missing user_id", http.StatusBadRequest)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	if pg != nil {
+		att, err := pg.GetClientAttestation(userID)
+		if err == nil && att != nil && att.ExpiresAt.After(time.Now()) {
+			pubkey := att.RelayPubkey
+			if pubkey == "" {
+				pubkey = playIntegrityVerifier.PublicKeyHex()
+			}
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"user_id":          att.UserID,
+				"client_type":      att.ClientType,
+				"issued_at":        att.IssuedAt.Unix(),
+				"expires_at":       att.ExpiresAt.Unix(),
+				"relay_signature":  att.CertSig,
+				"relay_public_key": pubkey,
+			})
+			return
+		}
+	}
+
+	// Default fallback: Tinkerer
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"user_id":     userID,
+		"client_type": "tinkerer",
+	})
+}
+
 func main() {
 	// Best-effort load of a `.env` in the working directory. Never overrides vars
 	// already set in the environment (so pm2/ecosystem values win), and a missing
@@ -1186,6 +1420,9 @@ func main() {
 	// PLAY_CREDENTIALS_FILE points at a Play Developer API service-account JSON.
 	playVerifier = NewPlayVerifier()
 
+	// Google Play Integrity attestation verification.
+	playIntegrityVerifier = NewPlayIntegrityVerifier()
+
 	hub := NewHub(rdb, push)
 	go hub.Run()
 
@@ -1200,6 +1437,9 @@ func main() {
 	http.HandleFunc("/api/v1/pair/poll", rateLimitMiddleware(handlePairPoll))
 	http.HandleFunc("/api/v1/pair/invite", rateLimitMiddleware(handlePairInvite))
 	http.HandleFunc("/api/v1/entitlement", rateLimitMiddleware(handlePostEntitlement))
+	http.HandleFunc("/api/v1/integrity/challenge", rateLimitMiddleware(handleIntegrityChallenge))
+	http.HandleFunc("/api/v1/integrity/attest", rateLimitMiddleware(handleIntegrityAttest))
+	http.HandleFunc("/api/v1/integrity/query", rateLimitMiddleware(handleIntegrityQuery))
 	http.HandleFunc("/api/v1/file", rateLimitMiddleware(handleFileDownload))
 	http.HandleFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

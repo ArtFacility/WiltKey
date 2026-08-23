@@ -55,6 +55,23 @@ class RemotePairingController extends ChangeNotifier {
   /// Our own identity hash — the string the host reads out alongside the PIN.
   String get myHash => appState.userId;
 
+  /// Formats the QR pairing URI payload.
+  String get qrPayload {
+    if (pin == null) return '';
+    final uri = Uri(
+      scheme: 'wiltkey',
+      host: 'pair',
+      queryParameters: {
+        'pin': pin!,
+        'host': appState.userId,
+        'relay': _relay,
+        if (groupToInvite != null) 'group': groupToInvite!.keyHash,
+        'type': 'timewilt',
+      },
+    );
+    return uri.toString();
+  }
+
   bool get busy =>
       phase == RemotePairPhase.hosting ||
       phase == RemotePairPhase.joining ||
@@ -85,11 +102,11 @@ class RemotePairingController extends ChangeNotifier {
         _relay,
         initiatorId: appState.userId,
         pubkey: appState.publicKeyHex,
-        bufferBytes: kDebugRemotePadBytes,
+        bufferBytes: 0, // 0 = 7-day Time Wilt stream cipher
       );
       if (_disposed) return;
       pin = init.pin;
-      status = 'Share your hash + PIN, then keep this screen open…';
+      status = 'Share your QR code or PIN, then keep this screen open…';
       notifyListeners();
       _startPolling();
     } catch (e) {
@@ -127,7 +144,6 @@ class RemotePairingController extends ChangeNotifier {
             await _pairWith(
               peerId: poll.receiverId!,
               peerPub: poll.receiverPub!,
-              bufferBytes: kDebugRemotePadBytes,
             );
           }
         } else if (poll.status == 'expired') {
@@ -143,10 +159,28 @@ class RemotePairingController extends ChangeNotifier {
 
   // ---- Joiner side ---------------------------------------------------------
 
+  /// Join via parsed QR Code Uri
+  Future<void> joinUri(Uri uri) async {
+    final p = uri.queryParameters['pin'];
+    final h = uri.queryParameters['host'];
+    final g = uri.queryParameters['group'];
+    if (p == null || h == null) {
+      _fail('Invalid WiltKey QR code.');
+      return;
+    }
+    if (g != null && g.isNotEmpty) {
+      await joinGroup(p, h);
+    } else {
+      await join(p, h);
+    }
+  }
+
   /// Submit against [enteredPin], verify the host's identity against
   /// [expectedHostHash] (pasted by the user), then build the contact.
   Future<void> join(String enteredPin, String expectedHostHash) async {
-    if (busy) return;
+    if (phase == RemotePairPhase.joining || phase == RemotePairPhase.generating) return;
+    _pollTimer?.cancel();
+    pin = null;
     final p = enteredPin.trim();
     final h = expectedHostHash.trim().toLowerCase();
     if (p.length != 6 || int.tryParse(p) == null) {
@@ -174,18 +208,14 @@ class RemotePairingController extends ChangeNotifier {
       // the user pasted out-of-band. If not, a relay swapped keys — abort.
       if (_hashOfPub(joinRes.initiatorPub) != h) {
         _fail(
-          'Host identity did not match the pasted hash — pairing aborted '
+          'Host identity did not match the expected hash — pairing aborted '
           '(possible relay tampering).',
         );
         return;
       }
-      final bufferBytes = joinRes.bufferBytes > 0
-          ? joinRes.bufferBytes
-          : kDebugRemotePadBytes;
       await _pairWith(
         peerId: joinRes.initiatorId,
         peerPub: joinRes.initiatorPub,
-        bufferBytes: bufferBytes,
       );
     } catch (e) {
       _fail('Join failed: $e');
@@ -197,12 +227,21 @@ class RemotePairingController extends ChangeNotifier {
   Future<void> _pairWith({
     required String peerId,
     required String peerPub,
-    required int bufferBytes,
   }) async {
     phase = RemotePairPhase.generating;
     padProgress = 0;
-    status = 'Generating ${AppState.formatBytes(bufferBytes)} pad…';
+    status = 'Setting up 7-day Time Wilt chat…';
     notifyListeners();
+
+    // Security Invariant: Remote connection CANNOT recharge existing OTP pad chats.
+    final existingIndex = appState.contacts.indexWhere((c) => c.keyHash == peerId);
+    if (existingIndex != -1) {
+      final existing = appState.contacts[existingIndex];
+      if (existing.maxBufferBytes > 0) {
+        _fail('This contact already exists with an in-person pad. Pad recharging requires in-person BLE pairing.');
+        return;
+      }
+    }
 
     // Same seed derivation as the BLE handshake (sorted concat of both pubkeys).
     final pair = [appState.publicKeyHex, peerPub]..sort();
@@ -215,17 +254,15 @@ class RemotePairingController extends ChangeNotifier {
     final placeholder = 'Contact ${peerId.substring(0, 6)}';
 
     try {
-      await appState.addOrRechargeContact(
+      // 7-day Time Wilt default for casual remote QR connect
+      final wiltExpiresAt = DateTime.now().toUtc().add(const Duration(days: 7));
+
+      await appState.addOrRechargeTimeWiltContact(
         placeholder,
         _relay,
-        bufferBytes,
         peerId,
         derivedSeed,
-        onPadProgress: (written, total) {
-          if (_disposed || total <= 0) return;
-          padProgress = written / total;
-          notifyListeners();
-        },
+        wiltExpiresAt,
       );
       if (_disposed) return;
 
@@ -240,11 +277,11 @@ class RemotePairingController extends ChangeNotifier {
 
       result = contact;
       phase = RemotePairPhase.success;
-      status = 'Paired. You can now chat.';
+      status = 'Connected! 7-day Time Wilt chat ready.';
       pin = null;
       notifyListeners();
     } catch (e) {
-      _fail('Pad generation failed: $e');
+      _fail('Connection failed: $e');
     }
   }
 

@@ -211,6 +211,8 @@ extension AppStateGroups on AppState {
     int? arrivalOrder,
     String? avatarBorder,
     String? wiltExpiresAt,
+    String? clientAttestation,
+    int? attestationExpiresAt,
   }) async {
     final existing = await GroupDatabase.instance.getProfile(
       groupId,
@@ -231,13 +233,10 @@ extension AppStateGroups on AppState {
       name: mergedName,
       profileImage: mergedImage,
       arrivalOrder: mergedOrder,
-      // Null preserves the stored value (see upsertProfile); a concrete id
-      // (including 'none' to unequip) overwrites it.
       avatarBorder: avatarBorder,
-      // Time Wilt per-member clock — only the host stamps it (at register/
-      // re-meet). Null preserves any host-broadcast value on member-profile
-      // writes so a nick/avatar change doesn't blank the countdown.
       wiltExpiresAt: wiltExpiresAt,
+      clientAttestation: clientAttestation,
+      attestationExpiresAt: attestationExpiresAt,
     );
   }
 
@@ -337,10 +336,12 @@ extension AppStateGroups on AppState {
     final seed = group.groupSeed ?? '';
     if (seed.isEmpty) return;
     final keyHex = sha256.convert(utf8.encode(seed)).toString();
+    final attestation = IntegrityAttestationManager.instance.cachedCert;
     final payload = jsonEncode({
       'name': effectiveDeviceName,
       'profile_image': profileImageB64,
       'avatar_border': AvatarBorderController.instance.borderId,
+      'attestation': attestation,
       'v': 1,
     });
     final enc = WiltkeyPersistence().encryptString(payload, keyHex);

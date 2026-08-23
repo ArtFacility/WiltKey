@@ -9,6 +9,9 @@ import '../../../core/theme/wiltkey_tokens.dart';
 import '../../../core/theme/theme_registry.dart';
 import '../../chat/presentation/chat_screen.dart';
 import 'status_emoji_picker_sheet.dart';
+import '../../../core/theme/widgets/client_integrity_badge.dart';
+import '../../../core/build_flavor.dart';
+import '../../../core/entitlements/entitlement_service.dart';
 
 /// Full-screen profile for a social contact (or self).
 /// Renders with the peer's theme (derived from shared secret seed) when viewing
@@ -525,10 +528,29 @@ class _ContactProfileScreenState extends State<ContactProfileScreen> {
                           ],
                         ),
                         const SizedBox(height: 16),
-                        Text(
-                          _name(),
-                          style: t.screenTitle.copyWith(fontSize: 24),
-                          textAlign: TextAlign.center,
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Flexible(
+                              child: Text(
+                                _name(),
+                                style: t.screenTitle.copyWith(fontSize: 24),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            ClientIntegrityBadge(
+                              badgeType: widget.isSelf
+                                  ? (kPlayStore
+                                      ? (EntitlementService.instance.plusActive
+                                          ? ClientBadgeType.playPlus
+                                          : ClientBadgeType.playOfficial)
+                                      : ClientBadgeType.tinkerer)
+                                  : (widget.contact?.badgeType ?? ClientBadgeType.tinkerer),
+                              size: 18,
+                            ),
+                          ],
                         ),
                         if (_shortNick().isNotEmpty) ...[
                           const SizedBox(height: 6),

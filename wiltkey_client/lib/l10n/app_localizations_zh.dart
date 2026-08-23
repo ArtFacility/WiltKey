@@ -2104,4 +2104,120 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsWhatsNew => '更新内容';
+
+  @override
+  String get settingsStorageSection => '存储与历史记录';
+
+  @override
+  String get settingsHistoryLimitTitle => '消息历史保留';
+
+  @override
+  String get settingsHistoryLimitDescription =>
+      '自动清理较早的本地消息与媒体文件以节省存储空间。加密密钥与联系人将始终保留。';
+
+  @override
+  String get settingsHistoryLimitAll => '保留所有消息（无限制）';
+
+  @override
+  String settingsHistoryLimitCount(int count) {
+    return '保留最近 $count 条消息';
+  }
+
+  @override
+  String get chatDetailsClearHistory => '清除消息历史';
+
+  @override
+  String get chatDetailsClearHistoryConfirm => '清除历史';
+
+  @override
+  String get chatDetailsClearHistoryDialogBody =>
+      '永久删除此聊天中的所有本地消息历史？加密密钥与联系人状态将予以保留。';
+
+  @override
+  String get chatDetailsClearHistoryPrune100 => '仅保留最近 100 条消息';
+
+  @override
+  String get chatDetailsClearHistorySuccess => '聊天记录已清除';
+
+  @override
+  String get chatDetailsSectionMedia => '媒体、语音与链接';
+
+  @override
+  String get chatDetailsMediaPhotos => '照片';
+
+  @override
+  String get chatDetailsMediaVoice => '语音消息';
+
+  @override
+  String get chatDetailsMediaLinks => '链接';
+
+  @override
+  String get chatDetailsNoMedia => '暂无共享照片';
+
+  @override
+  String get chatDetailsNoVoice => '暂无语音消息';
+
+  @override
+  String get chatDetailsNoLinks => '暂无共享链接';
+
+  @override
+  String get qrConnectTitle => '二维码连接';
+
+  @override
+  String get qrConnectScanTab => '扫描二维码';
+
+  @override
+  String get qrConnectMyCodeTab => '我的二维码';
+
+  @override
+  String get qrConnectScanPrompt => '将摄像头对准 WiltKey 二维码即可立即连接';
+
+  @override
+  String get qrConnect7DayNotice =>
+      '远程连接将自动开启为期 7 天的 Time Wilt 聊天。如需为一次性密码本充能，需要面对面 BLE 配对。';
+
+  @override
+  String get qrConnectRechargeBlocked => '该联系人已存在。密码本充能需要面对面 BLE 配对，无法远程进行。';
+
+  @override
+  String get qrConnectManualPin => '手动输入 PIN';
+
+  @override
+  String get badgePlayPlus => 'Play 商店 · Plus';
+
+  @override
+  String get badgePlayPlusSubtitle => '已验证的 Google Play 版本 + Plus 支持者';
+
+  @override
+  String get badgePlayPlusExplainer =>
+      '此用户正在运行经 Google Play Integrity 验证的官方未修改版本，并通过有效的 Plus 会员资格积极支持 WiltKey。';
+
+  @override
+  String get badgePlayVerified => 'Play 商店';
+
+  @override
+  String get badgePlayVerifiedSubtitle => '已验证的 Google Play 版本';
+
+  @override
+  String get badgePlayVerifiedExplainer =>
+      '此用户正在运行经 Google Play Integrity 密码学验证的官方未修改版本。';
+
+  @override
+  String get badgeFoss => '开源';
+
+  @override
+  String get badgeFossSubtitle => '社区 / FOSS 版本';
+
+  @override
+  String get badgeFossExplainer =>
+      '此客户端正在运行开源或自定义版本。由于它不运行 Google 专有服务，因此被视为社区版本。所有消息和加密仍保持 100% 安全和私密。';
+
+  @override
+  String get groupAnonymousMember => '成员';
+
+  @override
+  String get groupMemberRoleHost => '房主';
+
+  @override
+  String get contactSelfBadge => '你';
 }

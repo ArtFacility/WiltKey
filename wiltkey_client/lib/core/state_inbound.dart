@@ -327,12 +327,21 @@ extension AppStateInbound on AppState {
             keyHex,
           );
           final p = jsonDecode(dec) as Map<String, dynamic>;
+          String? clientAttestation;
+          int? attestationExpiresAt;
+          final attMap = p['attestation'] as Map<String, dynamic>?;
+          if (attMap != null && IntegrityAttestationManager.verifyAttestation(attMap, expectedUserId: senderId)) {
+            clientAttestation = attMap['client_type'] as String?;
+            attestationExpiresAt = attMap['expires_at'] as int?;
+          }
           await upsertGroupProfileMerged(
             groupId: groupId,
             memberKeyHash: senderId,
             name: (p['name'] as String?)?.trim(),
             profileImage: (p['profile_image'] as String?)?.trim(),
             avatarBorder: (p['avatar_border'] as String?)?.trim(),
+            clientAttestation: clientAttestation,
+            attestationExpiresAt: attestationExpiresAt,
           );
           // Refresh the in-memory cache the chat UI reads from (+ notify).
           updateGroupMembersMetadata(contact);

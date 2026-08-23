@@ -697,5 +697,46 @@
     }
   },
   "settingsUpToDate": "WiltKey est à jour",
-  "settingsWhatsNew": "Nouveautés"
+  "settingsWhatsNew": "Nouveautés",
+  "settingsStorageSection": "Stockage et historique",
+  "settingsHistoryLimitTitle": "Conservation de l'historique des messages",
+  "settingsHistoryLimitDescription": "Purger automatiquement les anciens messages locaux et fichiers multimédias pour économiser de l'espace de stockage. Les clés de chiffrement et les contacts sont toujours conservés.",
+  "settingsHistoryLimitAll": "Conserver tous les messages (Illimité)",
+  "settingsHistoryLimitCount": "Conserver les {count} derniers messages",
+  "@settingsHistoryLimitCount": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "chatDetailsClearHistory": "Effacer l'historique des messages",
+  "chatDetailsClearHistoryConfirm": "Effacer l'historique",
+  "chatDetailsClearHistoryDialogBody": "Supprimer définitivement tout l'historique local des messages de cette discussion ? Les clés de chiffrement et le statut du contact seront conservés.",
+  "chatDetailsClearHistoryPrune100": "Ne conserver que les 100 derniers messages",
+  "chatDetailsClearHistorySuccess": "Historique de discussion effacé",
+  "chatDetailsSectionMedia": "Médias, messages vocaux et liens",
+  "chatDetailsMediaPhotos": "Photos",
+  "chatDetailsMediaVoice": "Messages vocaux",
+  "chatDetailsMediaLinks": "Liens",
+  "chatDetailsNoMedia": "Aucune photo partagée pour l'instant",
+  "chatDetailsNoVoice": "Aucun message vocal pour l'instant",
+  "chatDetailsNoLinks": "Aucun lien partagé pour l'instant",
+  "qrConnectTitle": "Connexion QR",
+  "qrConnectScanTab": "Scanner le QR",
+  "qrConnectMyCodeTab": "Mon code QR",
+  "qrConnectScanPrompt": "Pointe l'appareil photo vers un code QR WiltKey pour te connecter instantanément",
+  "qrConnect7DayNotice": "Les connexions à distance démarrent automatiquement sous forme de chat Time Wilt de 7 jours. Un appairage BLE en personne est requis pour recharger le masque jetable.",
+  "qrConnectRechargeBlocked": "Ce contact existe déjà. La recharge du pad nécessite un appairage BLE en personne et ne peut pas être effectuée à distance.",
+  "qrConnectManualPin": "Saisir le PIN manuellement",
+  "badgePlayPlus": "Play Store · Plus",
+  "badgePlayPlusSubtitle": "Version Google Play vérifiée + Supporter Plus",
+  "badgePlayPlusExplainer": "Cet utilisateur utilise une version officielle et non modifiée, vérifiée via Google Play Integrity, et soutient activement WiltKey avec un abonnement Plus.",
+  "badgePlayVerified": "Play Store",
+  "badgePlayVerifiedSubtitle": "Version Google Play vérifiée",
+  "badgePlayVerifiedExplainer": "Cet utilisateur utilise une version officielle et non modifiée, vérifiée cryptographiquement via Google Play Integrity.",
+  "badgeFoss": "Open Source",
+  "badgeFossSubtitle": "Version Communauté / FOSS",
+  "badgeFossExplainer": "Ce client utilise une version open source ou personnalisée. Comme il n'exécute pas les services propriétaires de Google, il est considéré comme une version communautaire. Tous les messages et le chiffrement restent 100 % sécurisés et privés.",
+  "groupAnonymousMember": "Membre",
+  "groupMemberRoleHost": "Hôte",
+  "contactSelfBadge": "Vous"
 }

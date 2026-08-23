@@ -7,6 +7,12 @@ import '../../../core/custom_emoji.dart';
 import '../../../core/theme/wk.dart';
 import '../../../core/theme/wiltkey_tokens.dart';
 import 'emoji_creator_screen.dart';
+import '../../chat/presentation/chat_media_gallery_screen.dart';
+import '../../../core/db/wiltkey_db.dart';
+import '../../../core/theme/widgets/client_integrity_badge.dart';
+import '../../../core/build_flavor.dart';
+import '../../../core/entitlements/entitlement_service.dart';
+import '../../../core/cosmetics/avatar_border_controller.dart';
 
 /// Group Details screen — opened by tapping the group name/avatar in the chat.
 /// Hosts host policies, the custom-emoji manager, the reserved metadata-space
@@ -275,6 +281,62 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
     );
   }
 
+  void _confirmClearHistory(Contact group) {
+    final t = context.wk;
+    final l10n = AppLocalizations.of(context)!;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: t.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(t.radiusCard),
+          side: BorderSide(color: t.border),
+        ),
+        title: Text(
+          t.uppercaseLabels
+              ? l10n.chatDetailsClearHistoryConfirm.toUpperCase()
+              : l10n.chatDetailsClearHistoryConfirm,
+          style: t.screenTitle.copyWith(fontSize: 16),
+        ),
+        content: Text(
+          l10n.chatDetailsClearHistoryDialogBody,
+          style: t.bodySecondary,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(
+              l10n.commonCancel,
+              style: TextStyle(color: t.textSecondary),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await WiltkeyDatabase.instance.deleteMessagesForChat(group.id);
+              await _appState.loadMessagesForContact(group);
+              if (!mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  backgroundColor: t.surface,
+                  content: Text(
+                    l10n.chatDetailsClearHistorySuccess,
+                    style: TextStyle(color: t.action),
+                  ),
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: t.danger,
+              foregroundColor: Colors.white,
+            ),
+            child: Text(l10n.chatDetailsClearHistoryConfirm),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// Send a "destroy for everyone" proposal to the other members and return to
   /// the chat, where the outcome (a member's card / the tally) plays out. The
   /// group is NOT destroyed here — only a passing majority vote wipes it.
@@ -373,6 +435,10 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
               ),
             ),
             Divider(color: t.border, height: 24),
+
+            // Group Members with Client Attestation Badges
+            _buildMembersSection(t),
+            Divider(color: t.border, height: 32),
 
             // Notification Preference
             _sectionTitle(t, l10n.chatNotificationSettingsTitle, t.action),
@@ -569,6 +635,59 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
               const SizedBox(height: 24),
             ],
 
+            // Media, Voice & Links Gallery
+            _sectionTitle(t, l10n.chatDetailsSectionMedia, t.action),
+            const SizedBox(height: 10),
+            Container(
+              decoration: _panelDeco(t),
+              child: ListTile(
+                leading: Icon(Icons.perm_media_outlined, color: t.action),
+                title: Text(
+                  l10n.chatDetailsSectionMedia,
+                  style: t.body.copyWith(fontWeight: FontWeight.w600, fontSize: 14),
+                ),
+                trailing: Icon(Icons.chevron_right, color: t.textTertiary),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ChatMediaGalleryScreen(contact: group),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // History cleanup
+            _sectionTitle(t, l10n.chatDetailsClearHistory, t.textSecondary),
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: _panelDeco(t),
+              child: Row(
+                children: [
+                  Icon(Icons.cleaning_services_outlined, color: t.textSecondary, size: 20),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      l10n.chatDetailsClearHistory,
+                      style: t.body.copyWith(fontWeight: FontWeight.w500, fontSize: 13),
+                    ),
+                  ),
+                  OutlinedButton(
+                    onPressed: () => _confirmClearHistory(group),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: t.textSecondary,
+                      side: BorderSide(color: t.border),
+                    ),
+                    child: Text(l10n.chatDetailsClearHistoryConfirm),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+
             // Destructive
             _sectionTitle(t, l10n.chatDetailsSectionDestructive, t.danger),
             const SizedBox(height: 10),
@@ -610,6 +729,154 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildMembersSection(WiltkeyTokens t) {
+    final l10n = AppLocalizations.of(context)!;
+    final group = widget.group;
+    final myUserId = _appState.userId;
+
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: GroupDatabase.instance.getAllProfiles(group.keyHash),
+      builder: (context, snapshot) {
+        final profiles = snapshot.data ?? [];
+        final profileMap = <String, Map<String, dynamic>>{
+          for (final p in profiles)
+            if (p['member_key_hash'] != null)
+              p['member_key_hash'] as String: p,
+        };
+
+        // All members in memberKeyHashes
+        final allHashes = group.memberKeyHashes.isNotEmpty
+            ? group.memberKeyHashes
+            : [myUserId];
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _sectionTitle(
+              t,
+              '${l10n.groupMembersTitle} (${allHashes.length})',
+              t.action,
+            ),
+            const SizedBox(height: 10),
+            Container(
+              decoration: _panelDeco(t),
+              child: ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                itemCount: allHashes.length,
+                separatorBuilder: (_, _) => Divider(color: t.border, height: 1),
+                itemBuilder: (context, idx) {
+                  final hash = allHashes[idx];
+                  final isMe = hash == myUserId;
+                  final isHost = hash == group.hostKeyHash;
+                  final p = profileMap[hash];
+
+                  final name = isMe
+                      ? '${_appState.effectiveDeviceName} (${l10n.contactSelfBadge})'
+                      : ((p?['name'] as String?)?.isNotEmpty == true
+                          ? p!['name'] as String
+                          : l10n.groupAnonymousMember);
+
+                  final avatarHex = isMe
+                      ? _appState.profileImageB64
+                      : (p?['profile_image'] as String?) ??
+                          PixelArtAvatar.generateIdenticon(hash);
+
+                  final borderId = isMe
+                      ? AvatarBorderController.instance.borderId
+                      : p?['avatar_border'] as String?;
+
+                  final ClientBadgeType badgeType;
+                  if (isMe) {
+                    badgeType = kPlayStore
+                        ? (EntitlementService.instance.plusActive
+                            ? ClientBadgeType.playPlus
+                            : ClientBadgeType.playOfficial)
+                        : ClientBadgeType.tinkerer;
+                  } else {
+                    final att = p?['client_attestation'] as String?;
+                    final exp = p?['attestation_expires_at'] as int?;
+                    final nowSec = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+                    if (exp != null && exp < nowSec) {
+                      badgeType = ClientBadgeType.tinkerer;
+                    } else if (att == 'play_plus') {
+                      badgeType = ClientBadgeType.playPlus;
+                    } else if (att == 'play_official') {
+                      badgeType = ClientBadgeType.playOfficial;
+                    } else {
+                      badgeType = ClientBadgeType.tinkerer;
+                    }
+                  }
+
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    child: Row(
+                      children: [
+                        PixelArtAvatar(
+                          hexString: avatarHex.isNotEmpty
+                              ? avatarHex
+                              : PixelArtAvatar.generateIdenticon(hash),
+                          size: 36,
+                          borderId: borderId,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  name,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: t.body.copyWith(
+                                    fontWeight: isMe || isHost
+                                        ? FontWeight.w600
+                                        : FontWeight.normal,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              ClientIntegrityBadge(
+                                badgeType: badgeType,
+                                size: 14,
+                              ),
+                              if (isHost) ...[
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: t.action.withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(t.radiusPill),
+                                  ),
+                                  child: Text(
+                                    l10n.groupMemberRoleHost,
+                                    style: t.badgeLabel.copyWith(
+                                      color: t.action,
+                                      fontSize: 10,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 

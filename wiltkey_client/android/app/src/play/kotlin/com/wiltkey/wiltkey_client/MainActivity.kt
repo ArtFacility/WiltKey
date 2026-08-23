@@ -3,6 +3,8 @@ package com.wiltkey.wiltkey_client
 import android.content.Intent
 import android.os.Bundle
 import androidx.annotation.NonNull
+import com.google.android.play.core.integrity.IntegrityManagerFactory
+import com.google.android.play.core.integrity.IntegrityTokenRequest
 import com.google.firebase.messaging.FirebaseMessaging
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -69,6 +71,38 @@ class MainActivity : SecureFlutterActivity() {
                         val key = pendingChat
                         pendingChat = null
                         result.success(key)
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "wiltkey/integrity")
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "requestIntegrityToken" -> {
+                        val nonce = call.argument<String>("nonce")
+                        if (nonce.isNullOrEmpty()) {
+                            result.error("INVALID_ARGUMENT", "Nonce cannot be empty", null)
+                            return@setMethodCallHandler
+                        }
+                        try {
+                            val integrityManager = IntegrityManagerFactory.create(applicationContext)
+                            val request = IntegrityTokenRequest.builder()
+                                .setNonce(nonce)
+                                .build()
+                            integrityManager.requestIntegrityToken(request)
+                                .addOnSuccessListener { response ->
+                                    result.success(response.token())
+                                }
+                                .addOnFailureListener { exception ->
+                                    result.error("INTEGRITY_FAILED", exception.message, null)
+                                }
+                        } catch (e: Exception) {
+                            result.error("INTEGRITY_EXCEPTION", e.message, null)
+                        }
+                    }
+                    "isSupported" -> {
+                        result.success(true)
                     }
                     else -> result.notImplemented()
                 }

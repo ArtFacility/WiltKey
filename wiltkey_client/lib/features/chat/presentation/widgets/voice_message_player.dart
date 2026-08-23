@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -60,6 +61,13 @@ class _VoiceMessagePlayerState extends State<VoiceMessagePlayer> {
   }
 
   void _parseHeader() {
+    if (widget.message.decodedAudioBytes == null &&
+        widget.message.decryptedText != null &&
+        widget.message.decryptedText!.isNotEmpty) {
+      try {
+        widget.message.decodedAudioBytes = base64Decode(widget.message.decryptedText!);
+      } catch (_) {}
+    }
     final bytes = widget.message.decodedAudioBytes;
     if (bytes == null) return; // not decrypted yet; didUpdateWidget retries
     final parsed = VoiceHeader.unwrap(bytes);
@@ -78,6 +86,13 @@ class _VoiceMessagePlayerState extends State<VoiceMessagePlayer> {
   Future<bool> _ensureLoaded() async {
     if (_loaded) return true;
     if (_loading) return false;
+    if (widget.message.decodedAudioBytes == null &&
+        widget.message.decryptedText != null &&
+        widget.message.decryptedText!.isNotEmpty) {
+      try {
+        widget.message.decodedAudioBytes = base64Decode(widget.message.decryptedText!);
+      } catch (_) {}
+    }
     final bytes = widget.message.decodedAudioBytes;
     if (bytes == null) return false;
     final parsed = VoiceHeader.unwrap(bytes);

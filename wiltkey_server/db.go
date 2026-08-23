@@ -31,6 +31,15 @@ type PGEntitlement struct {
 	ExpiresAt           time.Time
 }
 
+type PGClientAttestation struct {
+	UserID      string
+	ClientType  string
+	IssuedAt    time.Time
+	ExpiresAt   time.Time
+	CertSig     string
+	RelayPubkey string
+}
+
 type PostgresClient struct {
 	db *sql.DB
 }
@@ -105,6 +114,23 @@ func (p *PostgresClient) runMigrations() error {
 	`)
 	if err != nil {
 		return fmt.Errorf("error creating entitlements table: %v", err)
+	}
+
+	// Create client_attestations table (Play Integrity verification cache)
+	_, err = p.db.Exec(`
+		CREATE TABLE IF NOT EXISTS client_attestations (
+			user_id VARCHAR(64) PRIMARY KEY,
+			client_type VARCHAR(32) NOT NULL,
+			issued_at TIMESTAMP NOT NULL,
+			expires_at TIMESTAMP NOT NULL,
+			cert_sig VARCHAR(128) NOT NULL,
+			relay_pubkey VARCHAR(64) NOT NULL DEFAULT ''
+		);
+		ALTER TABLE client_attestations ADD COLUMN IF NOT EXISTS relay_pubkey VARCHAR(64) NOT NULL DEFAULT '';
+		CREATE INDEX IF NOT EXISTS idx_attestations_expires ON client_attestations(expires_at);
+	`)
+	if err != nil {
+		return fmt.Errorf("error creating client_attestations table: %v", err)
 	}
 
 	return nil
@@ -278,4 +304,38 @@ func (p *PostgresClient) GetEntitlement(userID string) (*PGEntitlement, error) {
 	}
 
 	return &ent, nil
+}
+
+// StoreClientAttestation creates or updates user's client integrity attestation.
+func (p *PostgresClient) StoreClientAttestation(userID, clientType string, issuedAt, expiresAt time.Time, certSig, relayPubkey string) error {
+	_, err := p.db.Exec(`
+		INSERT INTO client_attestations (user_id, client_type, issued_at, expires_at, cert_sig, relay_pubkey)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		ON CONFLICT (user_id) DO UPDATE 
+		SET client_type = EXCLUDED.client_type,
+		    issued_at = EXCLUDED.issued_at,
+		    expires_at = EXCLUDED.expires_at,
+		    cert_sig = EXCLUDED.cert_sig,
+		    relay_pubkey = EXCLUDED.relay_pubkey
+	`, userID, clientType, issuedAt, expiresAt, certSig, relayPubkey)
+	return err
+}
+
+// GetClientAttestation retrieves a user's client attestation if it exists and is not expired.
+func (p *PostgresClient) GetClientAttestation(userID string) (*PGClientAttestation, error) {
+	row := p.db.QueryRow(`
+		SELECT user_id, client_type, issued_at, expires_at, cert_sig, relay_pubkey
+		FROM client_attestations
+		WHERE user_id = $1 AND expires_at > NOW()
+	`, userID)
+
+	var att PGClientAttestation
+	err := row.Scan(&att.UserID, &att.ClientType, &att.IssuedAt, &att.ExpiresAt, &att.CertSig, &att.RelayPubkey)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	} else if err != nil {
+		return nil, err
+	}
+
+	return &att, nil
 }

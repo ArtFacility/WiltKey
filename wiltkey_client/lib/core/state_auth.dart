@@ -158,9 +158,16 @@ extension AppStateAuth on AppState {
       } catch (_) {}
     }
 
+    if (fullData['historyRetentionLimit'] != null) {
+      historyRetentionLimit = fullData['historyRetentionLimit'] as int;
+    }
+
     // Initialize WiltkeyDatabase
     await WiltkeyDatabase.instance.init();
     contacts = await WiltkeyDatabase.instance.getAllContacts();
+    if (historyRetentionLimit > 0) {
+      await runHistoryRetentionSweep();
+    }
     await loadEvents(); // hydrate the activity feed + its unread badge
     await loadSocialContacts(); // hydrate the friends list (persisted between launches)
     await loadNotificationPreferences(); // hydrate notification category preferences & muted list

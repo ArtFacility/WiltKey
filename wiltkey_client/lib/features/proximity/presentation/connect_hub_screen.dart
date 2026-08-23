@@ -7,9 +7,8 @@ import '../../shell/presentation/app_shell.dart';
 import '../../groups/presentation/create_group_screen.dart';
 import '../../groups/presentation/group_search_screen.dart';
 import 'pairing_screen.dart';
-// TEMPORARY (see kRemotePairingTesting): debug-only remote entries.
-import 'package:wiltkey_client/core/build_flavor.dart';
-import 'remote_pair_tab.dart';
+import '../../../core/build_flavor.dart';
+import 'qr_pairing_screen.dart';
 import 'remote_group_pair_view.dart';
 
 /// The Pair-tab landing: a menu of every way to start (or join) a chat, grouped
@@ -89,17 +88,15 @@ class _ConnectHubScreenState extends State<ConnectHubScreen> {
             subtitle: l10n.connectTimeWiltDesc,
             onTap: () => _pushPairThenChats(context, timeWilt: true),
           ),
-          if (showRemote)
-            _HubCard(
-              icon: Icons.cloud_sync_outlined,
-              title: l10n.connectRemotePairTitle,
-              subtitle: l10n.connectRemotePairDesc,
-              accent: t.warning,
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const RemotePairScreen()),
-              ),
+          _HubCard(
+            icon: Icons.qr_code_scanner,
+            title: l10n.qrConnectTitle,
+            subtitle: l10n.qrConnect7DayNotice,
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const QrPairingScreen()),
             ),
+          ),
           const SizedBox(height: 22),
           _sectionLabel(t, l10n.connectSectionGroups),
           const SizedBox(height: 8),

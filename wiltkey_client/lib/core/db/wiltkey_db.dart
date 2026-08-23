@@ -43,7 +43,7 @@ class WiltkeyDatabase {
     } catch (_) {}
     _db = await openDatabase(
       path,
-      version: 25,
+      version: 26,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -201,6 +201,16 @@ class WiltkeyDatabase {
     if (oldVersion < 25) {
       await _safeAddColumn(db, 'contacts', 'notification_mode', "TEXT DEFAULT 'all'");
     }
+
+    // v26: Google Play Integrity client attestation and attestation_expires_at.
+    if (oldVersion < 26) {
+      await _safeAddColumn(db, 'contacts', 'client_attestation', 'TEXT');
+      await _safeAddColumn(db, 'contacts', 'attestation_expires_at', 'INTEGER');
+      await _safeAddColumn(db, 'social_contacts', 'client_attestation', 'TEXT');
+      await _safeAddColumn(db, 'social_contacts', 'attestation_expires_at', 'INTEGER');
+      await _safeAddColumn(db, 'group_profiles', 'client_attestation', 'TEXT');
+      await _safeAddColumn(db, 'group_profiles', 'attestation_expires_at', 'INTEGER');
+    }
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -248,6 +258,8 @@ class WiltkeyDatabase {
         permissions TEXT DEFAULT '',
         avatar_border TEXT,
         wilt_expires_at TEXT,
+        client_attestation TEXT,
+        attestation_expires_at INTEGER,
         UNIQUE(group_id, member_key_hash),
         FOREIGN KEY (group_id) REFERENCES group_info(group_id) ON DELETE CASCADE
       )
@@ -283,6 +295,8 @@ class WiltkeyDatabase {
         profile_image_b64 TEXT,
         theme_id TEXT,
         avatar_border TEXT,
+        client_attestation TEXT,
+        attestation_expires_at INTEGER,
         outgoing_offset INTEGER,
         outgoing_max_offset INTEGER,
         incoming_offset INTEGER,
@@ -386,7 +400,9 @@ class WiltkeyDatabase {
         is_pinned INTEGER DEFAULT 0,
         status TEXT,
         status_emoji TEXT,
-        status_expires_at INTEGER
+        status_expires_at INTEGER,
+        client_attestation TEXT,
+        attestation_expires_at INTEGER
       )
     ''';
 
@@ -436,6 +452,8 @@ class WiltkeyDatabase {
       'profile_image_b64': contact.profileImageB64,
       'theme_id': contact.themeId,
       'avatar_border': contact.avatarBorderId,
+      'client_attestation': contact.clientAttestation,
+      'attestation_expires_at': contact.attestationExpiresAt,
       'outgoing_offset': contact.outgoingOffset,
       'outgoing_max_offset': contact.outgoingMaxOffset,
       'incoming_offset': contact.incomingOffset,
@@ -493,6 +511,8 @@ class WiltkeyDatabase {
         profileImageB64: row['profile_image_b64'] as String?,
         themeId: row['theme_id'] as String?,
         avatarBorderId: row['avatar_border'] as String?,
+        clientAttestation: row['client_attestation'] as String?,
+        attestationExpiresAt: row['attestation_expires_at'] as int?,
         outgoingOffset: row['outgoing_offset'] as int? ?? 0,
         outgoingMaxOffset: row['outgoing_max_offset'] as int? ?? 0,
         incomingOffset: row['incoming_offset'] as int? ?? 0,
@@ -1009,6 +1029,7 @@ class WiltkeyDatabase {
     Map<String, Object?> row, {
     String? masterKeyHex,
     bool eagerOtp = false,
+    bool? deferImage,
   }) {
     final senderId = row['sender_id'] as String;
     final contentType = row['content_type'] as String;
@@ -1022,16 +1043,17 @@ class WiltkeyDatabase {
     // master copy, and base64-decoding here for EVERY row at page load is what
     // froze chats full of large images. Wilting/hidden images keep the eager path
     // (special lifecycle / need a pre-reveal size).
-    final bool deferImage =
-        !eagerOtp &&
-        !wilted &&
-        contentType == 'image' &&
-        (row['ephemeral'] as int? ?? 0) == 0;
+    final bool shouldDefer = deferImage ?? (
+      !eagerOtp &&
+      !wilted &&
+      contentType == 'image' &&
+      (row['ephemeral'] as int? ?? 0) == 0
+    );
 
     String textOtp = (row['text_otp'] as String?) ?? '';
     String? textEncryptedMaster = row['text_encrypted_master'] as String?;
     final mediaPath = row['media_path'] as String?;
-    if (!deferImage && !wilted && mediaPath != null && mediaPath.isNotEmpty) {
+    if (!shouldDefer && !wilted && mediaPath != null && mediaPath.isNotEmpty) {
       final loaded = _readMediaFilesSync(mediaPath);
       if (loaded != null) {
         textOtp = loaded.$1;
@@ -1047,7 +1069,7 @@ class WiltkeyDatabase {
     final editedAt = row['edited_at'] as int?;
 
     String? decryptedText;
-    if (wilted || deferImage) {
+    if (wilted || shouldDefer) {
       // wilted: destroyed content. deferImage: body fetched on demand when the
       // thumbnail scrolls into view — nothing to decrypt here.
     } else if (isDeleted) {
@@ -1077,10 +1099,16 @@ class WiltkeyDatabase {
       isFailed: (row['is_failed'] as int? ?? 0) == 1,
       allowSave: (row['allow_save'] as int? ?? 0) == 1,
       decryptedText: decryptedText,
-      decodedImageBytes: (!deferImage &&
+      decodedImageBytes: (!shouldDefer &&
               !isDeleted &&
               contentType == 'image' &&
               decryptedText != null)
+          ? base64Decode(decryptedText)
+          : null,
+      decodedAudioBytes: (!isDeleted &&
+              contentType == 'voice' &&
+              decryptedText != null &&
+              decryptedText.isNotEmpty)
           ? base64Decode(decryptedText)
           : null,
       reactions: ChatMessage.decodeReactions(row['reactions'] as String?),
@@ -1517,6 +1545,116 @@ class WiltkeyDatabase {
     await _deleteMediaForChat(chatId); // drop any offloaded body files too
   }
 
+  /// Prunes message history for [chatId], retaining only the [keepLastCount] most recent messages.
+  /// Deletes older messages and any offloaded media sidecar files (.o, .m) associated with pruned rows.
+  /// Returns the number of pruned messages.
+  Future<int> pruneChatMessages(String chatId, int keepLastCount) async {
+    if (keepLastCount <= 0) return 0;
+    final db = await _database;
+
+    final cutoffRows = await db.query(
+      'messages',
+      columns: ['timestamp'],
+      where: 'chat_id = ?',
+      whereArgs: [chatId],
+      orderBy: 'timestamp DESC',
+      limit: 1,
+      offset: keepLastCount - 1,
+    );
+    if (cutoffRows.isEmpty) return 0;
+
+    final cutoffTimestamp = cutoffRows.first['timestamp'] as String;
+
+    // Collect media paths of messages older than cutoff to delete sidecars
+    final toDeleteRows = await db.query(
+      'messages',
+      columns: ['id', 'media_path'],
+      where: 'chat_id = ? AND timestamp < ?',
+      whereArgs: [chatId, cutoffTimestamp],
+    );
+
+    for (final row in toDeleteRows) {
+      final base = row['media_path'] as String?;
+      if (base != null && base.isNotEmpty) {
+        await _deleteMediaFiles(base);
+      }
+    }
+
+    final deletedCount = await db.delete(
+      'messages',
+      where: 'chat_id = ? AND timestamp < ?',
+      whereArgs: [chatId, cutoffTimestamp],
+    );
+
+    return deletedCount;
+  }
+
+  /// Fetches media messages (photos / images) for [chatId] for the media gallery.
+  Future<List<ChatMessage>> getChatMediaMessages(
+    String chatId, {
+    String? masterKeyHex,
+    int limit = 300,
+  }) async {
+    final db = await _database;
+    final rows = await db.query(
+      'messages',
+      where:
+          "chat_id = ? AND (content_type = 'image' OR content_type = 'image_hidden') AND wilted = 0 AND is_deleted = 0",
+      whereArgs: [chatId],
+      orderBy: 'timestamp DESC',
+      limit: limit,
+    );
+    return [
+      for (final r in rows)
+        _rowToMessage(r, masterKeyHex: masterKeyHex, deferImage: true),
+    ];
+  }
+
+  /// Fetches voice messages for [chatId] for the audio gallery.
+  Future<List<ChatMessage>> getChatVoiceMessages(
+    String chatId, {
+    String? masterKeyHex,
+    int limit = 300,
+  }) async {
+    final db = await _database;
+    final rows = await db.query(
+      'messages',
+      where:
+          "chat_id = ? AND content_type = 'voice' AND wilted = 0 AND is_deleted = 0",
+      whereArgs: [chatId],
+      orderBy: 'timestamp DESC',
+      limit: limit,
+    );
+    return [for (final r in rows) _rowToMessage(r, masterKeyHex: masterKeyHex)];
+  }
+
+  /// Fetches messages containing links for [chatId] for the links gallery.
+  Future<List<ChatMessage>> getChatLinkMessages(
+    String chatId, {
+    String? masterKeyHex,
+    int limit = 300,
+  }) async {
+    final db = await _database;
+    final rows = await db.query(
+      'messages',
+      where:
+          "chat_id = ? AND content_type = 'text' AND wilted = 0 AND is_deleted = 0",
+      whereArgs: [chatId],
+      orderBy: 'timestamp DESC',
+      limit: limit,
+    );
+    final linkRegex = RegExp(r'https?://[^\s]+', caseSensitive: false);
+    final List<ChatMessage> result = [];
+    for (final r in rows) {
+      final msg = _rowToMessage(r, masterKeyHex: masterKeyHex);
+      final text = msg.decryptedText ?? msg.text;
+      if (linkRegex.hasMatch(text)) {
+        result.add(msg);
+      }
+    }
+    return result;
+  }
+
   Future<void> deleteMessage(String id) async {
     final db = await _database;
     final existing = await db.query(
@@ -1745,21 +1883,20 @@ class WiltkeyDatabase {
     required int arrivalOrder,
     String? avatarBorder,
     String? wiltExpiresAt,
+    String? clientAttestation,
+    int? attestationExpiresAt,
   }) async {
     final db = await _database;
-    // avatar_border is known only to the member themselves (it rides the
-    // group_member_profile channel), so authoritative writers — lane-header
-    // parses and the host's group_info_update — pass null. This is a full-row
-    // ConflictAlgorithm.replace, so preserve any already-known border instead
-    // of letting those writers blank it. wilt_expires_at is the mirror case:
-    // ONLY the host's group_info_update sets it, so a member-profile write
-    // (null) must not blank the host-stamped clock — same null-preserve trick.
     String? border = avatarBorder;
     String? wiltExpiry = wiltExpiresAt;
-    if (border == null || wiltExpiry == null) {
+    String? attestation = clientAttestation;
+    int? attExpires = attestationExpiresAt;
+    if (border == null || wiltExpiry == null || attestation == null || attExpires == null) {
       final existing = await getProfile(groupId, memberKeyHash);
       border ??= existing?['avatar_border'] as String?;
       wiltExpiry ??= existing?['wilt_expires_at'] as String?;
+      attestation ??= existing?['client_attestation'] as String?;
+      attExpires ??= existing?['attestation_expires_at'] as int?;
     }
     await db.insert('group_profiles', {
       'group_id': groupId,
@@ -1769,6 +1906,8 @@ class WiltkeyDatabase {
       'arrival_order': arrivalOrder,
       'avatar_border': border,
       'wilt_expires_at': wiltExpiry,
+      'client_attestation': attestation,
+      'attestation_expires_at': attExpires,
     }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
@@ -1946,6 +2085,8 @@ class WiltkeyDatabase {
     String? statusEmoji,
     int? statusExpiresAt,
     int? lastSyncedAt,
+    String? clientAttestation,
+    int? attestationExpiresAt,
   }) async {
     final db = await _database;
     await db.update(
@@ -1960,6 +2101,8 @@ class WiltkeyDatabase {
         'status_emoji': ?statusEmoji,
         'status_expires_at': ?statusExpiresAt,
         'last_synced_at': ?lastSyncedAt,
+        'client_attestation': ?clientAttestation,
+        'attestation_expires_at': ?attestationExpiresAt,
       },
       where: 'key_hash = ?',
       whereArgs: [keyHash],

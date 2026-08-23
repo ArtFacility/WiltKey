@@ -9,7 +9,12 @@ import '../../../core/theme/wk.dart';
 import '../../../core/theme/wiltkey_tokens.dart';
 import '../../../core/theme/wiltkey_components.dart';
 import '../../groups/presentation/emoji_creator_screen.dart';
+import '../../contacts/presentation/contact_request_ui.dart';
+import '../../contacts/presentation/contact_profile_screen.dart';
+import 'chat_media_gallery_screen.dart';
+import '../../../core/db/wiltkey_db.dart';
 import 'widgets/nuke_confirm_dialog.dart';
+import '../../../core/theme/widgets/client_integrity_badge.dart';
 
 /// 1-on-1 Chat Details — opened by tapping the peer's name/avatar in the chat.
 /// Mirrors the group Details screen: peer profile, the (synced) image
@@ -133,6 +138,62 @@ class _ChatDetailsScreenState extends State<ChatDetailsScreen> {
     );
   }
 
+  void _confirmClearHistory(Contact contact) {
+    final t = context.wk;
+    final l10n = AppLocalizations.of(context)!;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: t.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(t.radiusCard),
+          side: BorderSide(color: t.border),
+        ),
+        title: Text(
+          t.uppercaseLabels
+              ? l10n.chatDetailsClearHistoryConfirm.toUpperCase()
+              : l10n.chatDetailsClearHistoryConfirm,
+          style: t.screenTitle.copyWith(fontSize: 16),
+        ),
+        content: Text(
+          l10n.chatDetailsClearHistoryDialogBody,
+          style: t.bodySecondary,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(
+              l10n.commonCancel,
+              style: TextStyle(color: t.textSecondary),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await WiltkeyDatabase.instance.deleteMessagesForChat(contact.id);
+              await _appState.loadMessagesForContact(contact);
+              if (!mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  backgroundColor: t.surface,
+                  content: Text(
+                    l10n.chatDetailsClearHistorySuccess,
+                    style: TextStyle(color: t.action),
+                  ),
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: t.danger,
+              foregroundColor: Colors.white,
+            ),
+            child: Text(l10n.chatDetailsClearHistoryConfirm),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _nukeChat() {
     final contact = widget.contact;
 
@@ -219,12 +280,25 @@ class _ChatDetailsScreenState extends State<ChatDetailsScreen> {
                     borderId: contact.avatarBorderId,
                   ),
                   const SizedBox(height: 12),
-                  Text(
-                    contact.name,
-                    style: t.body.copyWith(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          contact.name,
+                          style: t.body.copyWith(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      ClientIntegrityBadge(
+                        badgeType: contact.badgeType,
+                        size: 16,
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 4),
                   Text(
@@ -284,6 +358,115 @@ class _ChatDetailsScreenState extends State<ChatDetailsScreen> {
               ),
             ),
             Divider(color: t.border, height: 32),
+
+            // Social contact relationship
+            () {
+              final bool isSocialContact = _appState.socialContacts.any(
+                (sc) => sc.keyHash == contact.keyHash,
+              );
+              if (!isSocialContact) {
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 20),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: t.surface,
+                    border: Border.all(
+                      color: t.action.withOpacity(0.35),
+                      width: t.borderWidth,
+                    ),
+                    borderRadius: BorderRadius.circular(t.radiusCard),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.person_add_outlined, color: t.action, size: 22),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              l10n.contactAddTitle,
+                              style: t.body.copyWith(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
+                              ),
+                            ),
+                            Text(
+                              l10n.contactAddBody(contact.name),
+                              style: t.bodySecondary.copyWith(fontSize: 11),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      ElevatedButton(
+                        onPressed: () => showAddContactFlow(
+                          context,
+                          appState: _appState,
+                          contact: contact,
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: t.action,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                        ),
+                        child: Text(
+                          l10n.contactAddConfirm,
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              } else {
+                final sc = _appState.socialContacts.firstWhere(
+                  (c) => c.keyHash == contact.keyHash,
+                );
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 20),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  decoration: _panel(t),
+                  child: Row(
+                    children: [
+                      Icon(Icons.badge_outlined, color: t.positive, size: 18),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          t.uppercaseLabels
+                              ? 'SAVED CONTACT'
+                              : 'Saved contact',
+                          style: t.dataMono.copyWith(
+                            fontSize: 11,
+                            color: t.positive,
+                          ),
+                        ),
+                      ),
+                      TextButton.icon(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => ContactProfileScreen(contact: sc),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.arrow_forward, size: 13),
+                        label: Text(
+                          t.uppercaseLabels ? 'VIEW PROFILE' : 'View profile',
+                          style: const TextStyle(fontSize: 11),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }
+            }(),
 
             // Profile sync
             _title(t, l10n.chatDetailsSectionProfile, t.action),
@@ -402,6 +585,59 @@ class _ChatDetailsScreenState extends State<ChatDetailsScreen> {
 
             // Custom emojis
             _buildEmojiSection(t, emojisOk, budget),
+            const SizedBox(height: 24),
+
+            // Media, Voice & Links Gallery
+            _title(t, l10n.chatDetailsSectionMedia, t.action),
+            const SizedBox(height: 8),
+            Container(
+              decoration: _panel(t),
+              child: ListTile(
+                leading: Icon(Icons.perm_media_outlined, color: t.action),
+                title: Text(
+                  l10n.chatDetailsSectionMedia,
+                  style: t.body.copyWith(fontWeight: FontWeight.w600, fontSize: 14),
+                ),
+                trailing: Icon(Icons.chevron_right, color: t.textTertiary),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ChatMediaGalleryScreen(contact: contact),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // History cleanup
+            _title(t, l10n.chatDetailsClearHistory, t.textSecondary),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: _panel(t),
+              child: Row(
+                children: [
+                  Icon(Icons.cleaning_services_outlined, color: t.textSecondary, size: 20),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      l10n.chatDetailsClearHistory,
+                      style: t.body.copyWith(fontWeight: FontWeight.w500, fontSize: 13),
+                    ),
+                  ),
+                  OutlinedButton(
+                    onPressed: () => _confirmClearHistory(contact),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: t.textSecondary,
+                      side: BorderSide(color: t.border),
+                    ),
+                    child: Text(l10n.chatDetailsClearHistoryConfirm),
+                  ),
+                ],
+              ),
+            ),
             const SizedBox(height: 24),
 
             // Destructive

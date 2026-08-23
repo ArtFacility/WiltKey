@@ -2229,4 +2229,124 @@ class AppLocalizationsSv extends AppLocalizations {
 
   @override
   String get settingsWhatsNew => 'Nyheter';
+
+  @override
+  String get settingsStorageSection => 'Lagring och historik';
+
+  @override
+  String get settingsHistoryLimitTitle => 'Spara meddelandehistorik';
+
+  @override
+  String get settingsHistoryLimitDescription =>
+      'Rensa automatiskt äldre lokala meddelanden och mediefiler för att spara lagringsutrymme. Krypteringsnycklar och kontakter bevaras alltid.';
+
+  @override
+  String get settingsHistoryLimitAll => 'Behåll alla meddelanden (Obegränsat)';
+
+  @override
+  String settingsHistoryLimitCount(int count) {
+    return 'Behåll de senaste $count meddelandena';
+  }
+
+  @override
+  String get chatDetailsClearHistory => 'Rensa meddelandehistorik';
+
+  @override
+  String get chatDetailsClearHistoryConfirm => 'Rensa historik';
+
+  @override
+  String get chatDetailsClearHistoryDialogBody =>
+      'Radera all lokal meddelandehistorik i den här chatten permanent? Krypteringsnycklar och kontaktstatus kommer att bevaras.';
+
+  @override
+  String get chatDetailsClearHistoryPrune100 =>
+      'Behåll endast de senaste 100 meddelandena';
+
+  @override
+  String get chatDetailsClearHistorySuccess => 'Chatthistorik rensad';
+
+  @override
+  String get chatDetailsSectionMedia => 'Media, röst & länkar';
+
+  @override
+  String get chatDetailsMediaPhotos => 'Foton';
+
+  @override
+  String get chatDetailsMediaVoice => 'Röstmeddelanden';
+
+  @override
+  String get chatDetailsMediaLinks => 'Länkar';
+
+  @override
+  String get chatDetailsNoMedia => 'Inga delade foton ännu';
+
+  @override
+  String get chatDetailsNoVoice => 'Inga röstmeddelanden ännu';
+
+  @override
+  String get chatDetailsNoLinks => 'Inga delade länkar ännu';
+
+  @override
+  String get qrConnectTitle => 'QR-anslutning';
+
+  @override
+  String get qrConnectScanTab => 'Skanna QR';
+
+  @override
+  String get qrConnectMyCodeTab => 'Min QR-kod';
+
+  @override
+  String get qrConnectScanPrompt =>
+      'Rikta kameran mot en WiltKey QR-kod för att ansluta direkt';
+
+  @override
+  String get qrConnect7DayNotice =>
+      'Fjärranslutningar startar automatiskt som en 7-dagars Time Wilt-chatt. Personlig BLE-ihopparning krävs för att ladda om engångskryptering.';
+
+  @override
+  String get qrConnectRechargeBlocked =>
+      'Den här kontakten finns redan. Omladdning av pad kräver personlig BLE-ihopparning och kan inte göras på distans.';
+
+  @override
+  String get qrConnectManualPin => 'Ange PIN manuellt';
+
+  @override
+  String get badgePlayPlus => 'Play Butik · Plus';
+
+  @override
+  String get badgePlayPlusSubtitle =>
+      'Verifierad Google Play-version + Plus-supporter';
+
+  @override
+  String get badgePlayPlusExplainer =>
+      'Den här användaren kör en officiell, omodifierad version som verifierats via Google Play Integrity och stöder aktivt WiltKey med ett aktivt Plus-medlemskap.';
+
+  @override
+  String get badgePlayVerified => 'Play Butik';
+
+  @override
+  String get badgePlayVerifiedSubtitle => 'Verifierad Google Play-version';
+
+  @override
+  String get badgePlayVerifiedExplainer =>
+      'Den här användaren kör en officiell, omodifierad version som verifierats kryptografiskt via Google Play Integrity.';
+
+  @override
+  String get badgeFoss => 'Öppen källkod';
+
+  @override
+  String get badgeFossSubtitle => 'Community- / FOSS-version';
+
+  @override
+  String get badgeFossExplainer =>
+      'Den här klienten kör en version med öppen källkod eller en anpassad version. Eftersom den inte kör Googles proprietära tjänster behandlas den som en community-version. Alla meddelanden och kryptering förblir 100 % säkra och privata.';
+
+  @override
+  String get groupAnonymousMember => 'Medlem';
+
+  @override
+  String get groupMemberRoleHost => 'Värd';
+
+  @override
+  String get contactSelfBadge => 'Du';
 }

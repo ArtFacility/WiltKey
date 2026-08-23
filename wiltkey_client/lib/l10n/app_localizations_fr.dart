@@ -2240,4 +2240,127 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get settingsWhatsNew => 'Nouveautés';
+
+  @override
+  String get settingsStorageSection => 'Stockage et historique';
+
+  @override
+  String get settingsHistoryLimitTitle =>
+      'Conservation de l\'historique des messages';
+
+  @override
+  String get settingsHistoryLimitDescription =>
+      'Purger automatiquement les anciens messages locaux et fichiers multimédias pour économiser de l\'espace de stockage. Les clés de chiffrement et les contacts sont toujours conservés.';
+
+  @override
+  String get settingsHistoryLimitAll =>
+      'Conserver tous les messages (Illimité)';
+
+  @override
+  String settingsHistoryLimitCount(int count) {
+    return 'Conserver les $count derniers messages';
+  }
+
+  @override
+  String get chatDetailsClearHistory => 'Effacer l\'historique des messages';
+
+  @override
+  String get chatDetailsClearHistoryConfirm => 'Effacer l\'historique';
+
+  @override
+  String get chatDetailsClearHistoryDialogBody =>
+      'Supprimer définitivement tout l\'historique local des messages de cette discussion ? Les clés de chiffrement et le statut du contact seront conservés.';
+
+  @override
+  String get chatDetailsClearHistoryPrune100 =>
+      'Ne conserver que les 100 derniers messages';
+
+  @override
+  String get chatDetailsClearHistorySuccess =>
+      'Historique de discussion effacé';
+
+  @override
+  String get chatDetailsSectionMedia => 'Médias, messages vocaux et liens';
+
+  @override
+  String get chatDetailsMediaPhotos => 'Photos';
+
+  @override
+  String get chatDetailsMediaVoice => 'Messages vocaux';
+
+  @override
+  String get chatDetailsMediaLinks => 'Liens';
+
+  @override
+  String get chatDetailsNoMedia => 'Aucune photo partagée pour l\'instant';
+
+  @override
+  String get chatDetailsNoVoice => 'Aucun message vocal pour l\'instant';
+
+  @override
+  String get chatDetailsNoLinks => 'Aucun lien partagé pour l\'instant';
+
+  @override
+  String get qrConnectTitle => 'Connexion QR';
+
+  @override
+  String get qrConnectScanTab => 'Scanner le QR';
+
+  @override
+  String get qrConnectMyCodeTab => 'Mon code QR';
+
+  @override
+  String get qrConnectScanPrompt =>
+      'Pointe l\'appareil photo vers un code QR WiltKey pour te connecter instantanément';
+
+  @override
+  String get qrConnect7DayNotice =>
+      'Les connexions à distance démarrent automatiquement sous forme de chat Time Wilt de 7 jours. Un appairage BLE en personne est requis pour recharger le masque jetable.';
+
+  @override
+  String get qrConnectRechargeBlocked =>
+      'Ce contact existe déjà. La recharge du pad nécessite un appairage BLE en personne et ne peut pas être effectuée à distance.';
+
+  @override
+  String get qrConnectManualPin => 'Saisir le PIN manuellement';
+
+  @override
+  String get badgePlayPlus => 'Play Store · Plus';
+
+  @override
+  String get badgePlayPlusSubtitle =>
+      'Version Google Play vérifiée + Supporter Plus';
+
+  @override
+  String get badgePlayPlusExplainer =>
+      'Cet utilisateur utilise une version officielle et non modifiée, vérifiée via Google Play Integrity, et soutient activement WiltKey avec un abonnement Plus.';
+
+  @override
+  String get badgePlayVerified => 'Play Store';
+
+  @override
+  String get badgePlayVerifiedSubtitle => 'Version Google Play vérifiée';
+
+  @override
+  String get badgePlayVerifiedExplainer =>
+      'Cet utilisateur utilise une version officielle et non modifiée, vérifiée cryptographiquement via Google Play Integrity.';
+
+  @override
+  String get badgeFoss => 'Open Source';
+
+  @override
+  String get badgeFossSubtitle => 'Version Communauté / FOSS';
+
+  @override
+  String get badgeFossExplainer =>
+      'Ce client utilise une version open source ou personnalisée. Comme il n\'exécute pas les services propriétaires de Google, il est considéré comme une version communautaire. Tous les messages et le chiffrement restent 100 % sécurisés et privés.';
+
+  @override
+  String get groupAnonymousMember => 'Membre';
+
+  @override
+  String get groupMemberRoleHost => 'Hôte';
+
+  @override
+  String get contactSelfBadge => 'Vous';
 }

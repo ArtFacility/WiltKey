@@ -1120,6 +1120,18 @@ class _PairingScreenState extends State<PairingScreen>
                 ),
               ],
             ),
+          ] else ...[
+            const SizedBox(height: 16),
+            Center(
+              child: TextButton.icon(
+                onPressed: () => _manager.abortHandshake(),
+                icon: Icon(Icons.close, size: 16, color: t.textSecondary),
+                label: Text(
+                  l10n.commonCancel,
+                  style: TextStyle(color: t.textSecondary),
+                ),
+              ),
+            ),
           ],
         ],
       ),

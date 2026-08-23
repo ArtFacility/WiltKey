@@ -26,6 +26,7 @@ class WiltkeyPersistence {
   static const String _keyThemeId = 'wk_theme_id';
   static const String _keyNotificationMode = kPrefNotificationMode;
   static const String _keyLocale = 'wk_locale';
+  static const String _keyHistoryRetentionLimit = 'wk_history_retention_limit';
 
   // PIN security keys
   static const String keyPinSalt = 'wk_pin_salt';
@@ -85,6 +86,7 @@ class WiltkeyPersistence {
         prefs.getBool(_keyBiometricEnabled) ?? false;
     stateData['lastUnlockMs'] = prefs.getInt(_keyLastUnlockMs);
     stateData['biometricIdleHours'] = prefs.getInt(_keyBiometricIdleHours);
+    stateData['historyRetentionLimit'] = prefs.getInt(_keyHistoryRetentionLimit) ?? 0;
 
     final privateKeyRaw = prefs.getString(_keyPrivateKey);
     if (privateKeyRaw != null) {
@@ -129,6 +131,7 @@ class WiltkeyPersistence {
       _keyNotificationMode,
       state.notificationMode.storageValue,
     );
+    await prefs.setInt(_keyHistoryRetentionLimit, state.historyRetentionLimit);
 
     // Save encrypted private key if masterKeyHex is provided
     final mKey = masterKeyHex ?? state.masterKeyHex;

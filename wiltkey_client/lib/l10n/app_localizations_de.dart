@@ -2238,4 +2238,126 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsWhatsNew => 'Was gibt\'s Neues';
+
+  @override
+  String get settingsStorageSection => 'Speicher & Verlauf';
+
+  @override
+  String get settingsHistoryLimitTitle =>
+      'Aufbewahrung des Nachrichtenverlaufs';
+
+  @override
+  String get settingsHistoryLimitDescription =>
+      'Ältere lokale Nachrichten und Mediendateien automatisch bereinigen, um Speicherplatz zu sparen. Verschlüsselungsschlüssel und Kontakte bleiben immer erhalten.';
+
+  @override
+  String get settingsHistoryLimitAll =>
+      'Alle Nachrichten behalten (Unbegrenzt)';
+
+  @override
+  String settingsHistoryLimitCount(int count) {
+    return 'Letzte $count Nachrichten behalten';
+  }
+
+  @override
+  String get chatDetailsClearHistory => 'Nachrichtenverlauf leeren';
+
+  @override
+  String get chatDetailsClearHistoryConfirm => 'Verlauf leeren';
+
+  @override
+  String get chatDetailsClearHistoryDialogBody =>
+      'Den gesamten lokalen Nachrichtenverlauf in diesem Chat dauerhaft löschen? Verschlüsselungsschlüssel und Kontaktstatus bleiben erhalten.';
+
+  @override
+  String get chatDetailsClearHistoryPrune100 =>
+      'Nur die letzten 100 Nachrichten behalten';
+
+  @override
+  String get chatDetailsClearHistorySuccess => 'Chat-Verlauf geleert';
+
+  @override
+  String get chatDetailsSectionMedia => 'Medien, Sprachnachrichten & Links';
+
+  @override
+  String get chatDetailsMediaPhotos => 'Fotos';
+
+  @override
+  String get chatDetailsMediaVoice => 'Sprachnachrichten';
+
+  @override
+  String get chatDetailsMediaLinks => 'Links';
+
+  @override
+  String get chatDetailsNoMedia => 'Noch keine geteilten Fotos';
+
+  @override
+  String get chatDetailsNoVoice => 'Noch keine Sprachnachrichten';
+
+  @override
+  String get chatDetailsNoLinks => 'Noch keine geteilten Links';
+
+  @override
+  String get qrConnectTitle => 'QR-Verbindung';
+
+  @override
+  String get qrConnectScanTab => 'QR scannen';
+
+  @override
+  String get qrConnectMyCodeTab => 'Mein QR-Code';
+
+  @override
+  String get qrConnectScanPrompt =>
+      'Kamera auf einen WiltKey-QR-Code richten, um sich sofort zu verbinden';
+
+  @override
+  String get qrConnect7DayNotice =>
+      'Fernverbindungen starten automatisch als 7-Tage-Time-Wilt-Chat. Für das Wiederaufladen des One-Time-Pads ist ein persönliches BLE-Pairing erforderlich.';
+
+  @override
+  String get qrConnectRechargeBlocked =>
+      'Dieser Kontakt existiert bereits. Das Aufladen des Pads erfordert ein persönliches BLE-Pairing und kann nicht aus der Ferne durchgeführt werden.';
+
+  @override
+  String get qrConnectManualPin => 'PIN manuell eingeben';
+
+  @override
+  String get badgePlayPlus => 'Play Store · Plus';
+
+  @override
+  String get badgePlayPlusSubtitle =>
+      'Verifizierter Google Play-Build + Plus-Unterstützer';
+
+  @override
+  String get badgePlayPlusExplainer =>
+      'Dieser Benutzer nutzt einen offiziellen, unveränderten Build, der über Google Play Integrity verifiziert wurde, und unterstützt WiltKey aktiv mit einer Plus-Mitgliedschaft.';
+
+  @override
+  String get badgePlayVerified => 'Play Store';
+
+  @override
+  String get badgePlayVerifiedSubtitle => 'Verifizierter Google Play-Build';
+
+  @override
+  String get badgePlayVerifiedExplainer =>
+      'Dieser Benutzer nutzt einen offiziellen, unveränderten Build, der kryptografisch über Google Play Integrity verifiziert wurde.';
+
+  @override
+  String get badgeFoss => 'Open Source';
+
+  @override
+  String get badgeFossSubtitle => 'Community- / FOSS-Build';
+
+  @override
+  String get badgeFossExplainer =>
+      'Dieser Client nutzt einen quelloffenen oder benutzerdefinierten Build. Da er keine proprietären Google-Dienste ausführt, wird er als Community-Build behandelt. Alle Nachrichten und die Verschlüsselung bleiben zu 100 % sicher und privat.';
+
+  @override
+  String get groupAnonymousMember => 'Mitglied';
+
+  @override
+  String get groupMemberRoleHost => 'Host';
+
+  @override
+  String get contactSelfBadge => 'Du';
 }

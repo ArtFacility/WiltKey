@@ -59,6 +59,8 @@ dependencies:
   just_audio: ^0.10.6
   url_launcher: ^6.3.0 # Open the "Support the project" link on the FOSS build (Android intent; no Google Play Services)
   flutter_svg: ^2.0.10 # Render SVG avatar borders (vector, scales to every avatar size)
+  qr_flutter: ^4.1.0
+  mobile_scanner: ^7.4.0
 
 dev_dependencies:
   flutter_test:

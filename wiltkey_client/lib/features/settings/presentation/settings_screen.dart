@@ -942,6 +942,74 @@ class _SettingsScreenState extends State<SettingsScreen>
           ),
           const SizedBox(height: 28),
 
+          _section(t, l10n.settingsStorageSection),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: _panel(t),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        l10n.settingsHistoryLimitTitle,
+                        style: t.body.copyWith(fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                    DropdownButton<int>(
+                      value: _appState.historyRetentionLimit,
+                      dropdownColor: t.surface,
+                      underline: const SizedBox(),
+                      style: t.dataMono.copyWith(
+                        color: t.action,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                      icon: Icon(Icons.arrow_drop_down, color: t.action),
+                      items: [
+                        DropdownMenuItem(
+                          value: 0,
+                          child: Text(l10n.settingsHistoryLimitAll),
+                        ),
+                        DropdownMenuItem(
+                          value: 1000,
+                          child: Text(l10n.settingsHistoryLimitCount(1000)),
+                        ),
+                        DropdownMenuItem(
+                          value: 500,
+                          child: Text(l10n.settingsHistoryLimitCount(500)),
+                        ),
+                        DropdownMenuItem(
+                          value: 250,
+                          child: Text(l10n.settingsHistoryLimitCount(250)),
+                        ),
+                        DropdownMenuItem(
+                          value: 100,
+                          child: Text(l10n.settingsHistoryLimitCount(100)),
+                        ),
+                      ],
+                      onChanged: (val) {
+                        if (val != null) {
+                          HapticFeedback.lightImpact();
+                          _appState.setHistoryRetentionLimit(val);
+                        }
+                      },
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  l10n.settingsHistoryLimitDescription,
+                  style: t.bodySecondary.copyWith(fontSize: 12, height: 1.4),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 28),
+
           _section(t, l10n.settingsSecuritySectionDanger),
           const SizedBox(height: 12),
           Container(

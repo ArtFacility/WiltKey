@@ -26,6 +26,7 @@ import 'entitlements/entitlement_service.dart';
 import 'cosmetics/avatar_border_controller.dart';
 import 'theme/theme_controller.dart';
 import 'update/update_service.dart';
+import 'network/integrity_attestation_manager.dart';
 
 part 'state_auth.dart';
 part 'state_chats.dart';
@@ -202,6 +203,34 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   bool notifyGroupMessages = true;
   bool notifyEvents = true;
   bool notifyMentionsAndReplies = true;
+
+  /// Max message history limit per chat (0 = Keep All / Unlimited, 100, 250, 500, 1000).
+  int historyRetentionLimit = 0;
+
+  Future<void> setHistoryRetentionLimit(int limit) async {
+    historyRetentionLimit = limit;
+    await _persistence.saveState(this);
+    if (limit > 0) {
+      await runHistoryRetentionSweep();
+    }
+    notifyListeners();
+  }
+
+  Future<void> runHistoryRetentionSweep() async {
+    if (historyRetentionLimit <= 0) return;
+    for (final c in contacts) {
+      final pruned = await WiltkeyDatabase.instance.pruneChatMessages(
+        c.id,
+        historyRetentionLimit,
+      );
+      if (pruned > 0) {
+        log('[History Prune] Pruned $pruned messages from chat ${c.id}');
+        if (activeContact?.id == c.id) {
+          await loadMessagesForContact(c);
+        }
+      }
+    }
+  }
 
   // Lock map to serialize group outbound lane allocation and encryption per group
   final Map<String, Lock> _groupSendLocks = {};
@@ -445,12 +474,15 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
         // Play flavor: tell the relay we're a Plus subscriber (grants the 72h hold
         // + large-file transfers). Cheap no-op when not subscribed / on FOSS.
         syncPlusEntitlement();
+        // Play flavor: request/refresh our Play Integrity attestation certificate.
+        syncClientAttestation();
       }
       notifyListeners();
     };
   }
 
   Future<void> _initAndLoad() async {
+    await IntegrityAttestationManager.instance.init();
     final data = await _persistence.loadState();
 
     notificationMode = NotificationMode.fromStorage(
@@ -586,7 +618,10 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
       // happened while backgrounded, e.g. via the Play Store app). No-op on FOSS.
       // Re-sync to the relay afterwards in case Plus was just acquired while the
       // socket stayed live (the on-connect sync wouldn't have re-fired).
-      EntitlementService.instance.refresh().then((_) => syncPlusEntitlement());
+      EntitlementService.instance.refresh().then((_) {
+        syncPlusEntitlement();
+        syncClientAttestation();
+      });
       // If we're back in the foreground and still unlocked, make sure the socket
       // is live again immediately (don't wait for the next watchdog tick).
       if (!isLocked && masterKeyHex != null) {

@@ -12,12 +12,13 @@ extension AppStateChatMeta on AppState {
   // the BLE handshake.
 
   /// Push our current profile + the chat's image permission to a 1-on-1 peer.
-  Future<void> sendChatInfoUpdate(Contact contact) async {
+  Future<void> sendChatInfoUpdate(Contact contact, {bool isResponse = false}) async {
     if (contact.isGroup) return;
     final metaKeyHex = await ChatMetaStore.keyFor(contact.keyHash);
     if (metaKeyHex == null)
       return; // contact predates the feature; re-pair to enable
     await ensureWebSocketConnected();
+    final attestation = IntegrityAttestationManager.instance.cachedCert;
     final payload = jsonEncode({
       'name': effectiveDeviceName,
       'short_nick': effectiveShortNick,
@@ -26,6 +27,8 @@ extension AppStateChatMeta on AppState {
       'theme_id': ThemeController().themeId,
       'images_allowed': contact.imagesAllowed ?? true,
       'relay_url': activeRelayUrl, // advertise our relay for peer fallback
+      'attestation': attestation,
+      'is_response': isResponse,
       'v': 1,
     });
     final enc = WiltkeyPersistence().encryptString(payload, metaKeyHex);
@@ -136,6 +139,14 @@ extension AppStateChatMeta on AppState {
       final themeId = (p['theme_id'] as String?)?.trim();
       final imagesAllowed = p['images_allowed'] as bool?;
 
+      String? clientAttestation;
+      int? attestationExpiresAt;
+      final attMap = p['attestation'] as Map<String, dynamic>?;
+      if (attMap != null && IntegrityAttestationManager.verifyAttestation(attMap, expectedUserId: senderId)) {
+        clientAttestation = attMap['client_type'] as String?;
+        attestationExpiresAt = attMap['expires_at'] as int?;
+      }
+
       // Remember the peer's relay as a connection fallback (filtered + persisted).
       addKnownPeerRelay(p['relay_url'] as String?);
 
@@ -147,6 +158,8 @@ extension AppStateChatMeta on AppState {
         // 'none' (a real value) unequips; absent/empty (old peer) keeps current.
         avatarBorderId: (border != null && border.isNotEmpty) ? border : null,
         imagesAllowed: imagesAllowed,
+        clientAttestation: clientAttestation,
+        attestationExpiresAt: attestationExpiresAt,
       );
       contacts[idx] = updated;
       if (activeContact?.keyHash == senderId) activeContact = updated;
@@ -172,6 +185,10 @@ extension AppStateChatMeta on AppState {
           lastSyncedAt: sc.lastSyncedAt,
           isPinned: sc.isPinned,
           status: sc.status,
+          statusEmoji: sc.statusEmoji,
+          statusExpiresAt: sc.statusExpiresAt,
+          clientAttestation: clientAttestation ?? sc.clientAttestation,
+          attestationExpiresAt: attestationExpiresAt ?? sc.attestationExpiresAt,
         );
         socialContacts[scIdx] = updatedSc;
         await WiltkeyDatabase.instance.upsertSocialContact(updatedSc);
@@ -180,6 +197,13 @@ extension AppStateChatMeta on AppState {
       notifyListeners();
       _persistence.saveState(this);
       log('[ChatInfo] Applied profile/permission update from ${updated.name}');
+
+      // If this was an initial update from peer (not already a response), reply back with our info
+      // so the peer is guaranteed to receive our profile even if they joined after or dropped the first one.
+      final isResponse = p['is_response'] as bool? ?? false;
+      if (!isResponse) {
+        sendChatInfoUpdate(updated, isResponse: true);
+      }
     } catch (e) {
       log('[ChatInfo Error] $e');
     }

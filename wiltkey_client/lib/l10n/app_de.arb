@@ -697,5 +697,46 @@
     }
   },
   "settingsUpToDate": "WiltKey ist auf dem neuesten Stand",
-  "settingsWhatsNew": "Was gibt's Neues"
+  "settingsWhatsNew": "Was gibt's Neues",
+  "settingsStorageSection": "Speicher & Verlauf",
+  "settingsHistoryLimitTitle": "Aufbewahrung des Nachrichtenverlaufs",
+  "settingsHistoryLimitDescription": "Ältere lokale Nachrichten und Mediendateien automatisch bereinigen, um Speicherplatz zu sparen. Verschlüsselungsschlüssel und Kontakte bleiben immer erhalten.",
+  "settingsHistoryLimitAll": "Alle Nachrichten behalten (Unbegrenzt)",
+  "settingsHistoryLimitCount": "Letzte {count} Nachrichten behalten",
+  "@settingsHistoryLimitCount": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "chatDetailsClearHistory": "Nachrichtenverlauf leeren",
+  "chatDetailsClearHistoryConfirm": "Verlauf leeren",
+  "chatDetailsClearHistoryDialogBody": "Den gesamten lokalen Nachrichtenverlauf in diesem Chat dauerhaft löschen? Verschlüsselungsschlüssel und Kontaktstatus bleiben erhalten.",
+  "chatDetailsClearHistoryPrune100": "Nur die letzten 100 Nachrichten behalten",
+  "chatDetailsClearHistorySuccess": "Chat-Verlauf geleert",
+  "chatDetailsSectionMedia": "Medien, Sprachnachrichten & Links",
+  "chatDetailsMediaPhotos": "Fotos",
+  "chatDetailsMediaVoice": "Sprachnachrichten",
+  "chatDetailsMediaLinks": "Links",
+  "chatDetailsNoMedia": "Noch keine geteilten Fotos",
+  "chatDetailsNoVoice": "Noch keine Sprachnachrichten",
+  "chatDetailsNoLinks": "Noch keine geteilten Links",
+  "qrConnectTitle": "QR-Verbindung",
+  "qrConnectScanTab": "QR scannen",
+  "qrConnectMyCodeTab": "Mein QR-Code",
+  "qrConnectScanPrompt": "Kamera auf einen WiltKey-QR-Code richten, um sich sofort zu verbinden",
+  "qrConnect7DayNotice": "Fernverbindungen starten automatisch als 7-Tage-Time-Wilt-Chat. Für das Wiederaufladen des One-Time-Pads ist ein persönliches BLE-Pairing erforderlich.",
+  "qrConnectRechargeBlocked": "Dieser Kontakt existiert bereits. Das Aufladen des Pads erfordert ein persönliches BLE-Pairing und kann nicht aus der Ferne durchgeführt werden.",
+  "qrConnectManualPin": "PIN manuell eingeben",
+  "badgePlayPlus": "Play Store · Plus",
+  "badgePlayPlusSubtitle": "Verifizierter Google Play-Build + Plus-Unterstützer",
+  "badgePlayPlusExplainer": "Dieser Benutzer nutzt einen offiziellen, unveränderten Build, der über Google Play Integrity verifiziert wurde, und unterstützt WiltKey aktiv mit einer Plus-Mitgliedschaft.",
+  "badgePlayVerified": "Play Store",
+  "badgePlayVerifiedSubtitle": "Verifizierter Google Play-Build",
+  "badgePlayVerifiedExplainer": "Dieser Benutzer nutzt einen offiziellen, unveränderten Build, der kryptografisch über Google Play Integrity verifiziert wurde.",
+  "badgeFoss": "Open Source",
+  "badgeFossSubtitle": "Community- / FOSS-Build",
+  "badgeFossExplainer": "Dieser Client nutzt einen quelloffenen oder benutzerdefinierten Build. Da er keine proprietären Google-Dienste ausführt, wird er als Community-Build behandelt. Alle Nachrichten und die Verschlüsselung bleiben zu 100 % sicher und privat.",
+  "groupAnonymousMember": "Mitglied",
+  "groupMemberRoleHost": "Host",
+  "contactSelfBadge": "Du"
 }

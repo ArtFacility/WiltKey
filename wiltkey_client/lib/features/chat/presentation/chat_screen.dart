@@ -137,6 +137,9 @@ class _ChatScreenState extends State<ChatScreen>
         if (!contact.isGroup && _needsReconcile(contact)) {
           _appState.syncOneOnOneChat(contact);
         }
+        if (!contact.isGroup) {
+          _appState.sendChatInfoUpdate(contact);
+        }
       });
       CustomEmojiStore.load(contact.keyHash).then((_) {
         if (mounted) setState(() {});
@@ -769,12 +772,6 @@ class _ChatScreenState extends State<ChatScreen>
     );
   }
 
-  /// Tapping the peer's avatar offers to add them as a contact (the name block
-  /// beside it still opens the chat details).
-  void _promptAddContact(Contact contact) {
-    showAddContactFlow(context, appState: _appState, contact: contact);
-  }
-
   @override
   Widget build(BuildContext context) {
     final t = context.wk;
@@ -802,32 +799,24 @@ class _ChatScreenState extends State<ChatScreen>
               backgroundColor: t.bg,
               elevation: 0,
               titleSpacing: 8,
-              title: Row(
-                children: [
-                  GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: () => _promptAddContact(contact),
-                    child: Row(
-                      children: [
-                        PixelArtAvatar(
-                          hexString:
-                              (contact.profileImageB64 != null &&
-                                  contact.profileImageB64!.isNotEmpty)
-                              ? contact.profileImageB64!
-                              : PixelArtAvatar.generateIdenticon(
-                                  contact.keyHash,
-                                ),
-                          size: 34,
-                          borderId: contact.avatarBorderId,
-                        ),
-                        const SizedBox(width: 10),
-                      ],
+              title: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => _openChatDetails(contact),
+                child: Row(
+                  children: [
+                    PixelArtAvatar(
+                      hexString:
+                          (contact.profileImageB64 != null &&
+                              contact.profileImageB64!.isNotEmpty)
+                          ? contact.profileImageB64!
+                          : PixelArtAvatar.generateIdenticon(
+                              contact.keyHash,
+                            ),
+                      size: 34,
+                      borderId: contact.avatarBorderId,
                     ),
-                  ),
-                  Expanded(
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: () => _openChatDetails(contact),
+                    const SizedBox(width: 10),
+                    Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
@@ -855,42 +844,37 @@ class _ChatScreenState extends State<ChatScreen>
                         ],
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  // Budget glyph in the header (flower in garden, compact bar in
-                  // cyberpunk). Tap → diagnostics.
-                  GestureDetector(
-                    onTap: () => DiagnosticsDialog.show(
-                      context,
-                      contact,
-                      _appState.userId,
-                    ),
-                    // Time Wilt reuses the single gauge for time-remaining (the
-                    // countdown lives in the subtitle above, so the gauge stays
-                    // unstacked — no overflow on tall vertical gauges).
-                    child: context.wkc.budgetIndicator(
-                      ourFraction: contact.isTimeWilt
-                          ? contact.timeWiltRemainingFraction
-                          : currentPercent,
-                      theirFraction: contact.isTimeWilt
-                          ? 0
-                          : contact.getTheirChargePercentage(_appState.userId),
-                      isWilted:
-                          contact.isTimeWilt ? contact.isArchived : isWilted,
-                      split: !contact.isTimeWilt,
-                      variant: BudgetIndicatorVariant.chatHeader,
-                      semanticLabel: contact.isTimeWilt
-                          ? contact.timeWiltCountdownLabel
-                          : l10n.chatRemainingLabel(
-                              AppState.formatBytes(
-                                contact.remainingBufferBytes,
-                              ),
-                            ),
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
               actions: [
+                GestureDetector(
+                  onTap: () => DiagnosticsDialog.show(
+                    context,
+                    contact,
+                    _appState.userId,
+                  ),
+                  child: context.wkc.budgetIndicator(
+                    ourFraction: contact.isTimeWilt
+                        ? contact.timeWiltRemainingFraction
+                        : currentPercent,
+                    theirFraction: contact.isTimeWilt
+                        ? 0
+                        : contact.getTheirChargePercentage(_appState.userId),
+                    isWilted:
+                        contact.isTimeWilt ? contact.isArchived : isWilted,
+                    split: !contact.isTimeWilt,
+                    variant: BudgetIndicatorVariant.chatHeader,
+                    semanticLabel: contact.isTimeWilt
+                        ? contact.timeWiltCountdownLabel
+                        : l10n.chatRemainingLabel(
+                            AppState.formatBytes(
+                              contact.remainingBufferBytes,
+                            ),
+                          ),
+                  ),
+                ),
+                const SizedBox(width: 8),
                 // Overflow menu keeps the header uncluttered: only the budget
                 // glyph stays inline; sync / screenshot / debug live in here. The
                 // sync glyph still reflects the "sync problem" state on the button.

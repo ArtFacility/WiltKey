@@ -697,5 +697,46 @@
     }
   },
   "settingsUpToDate": "A WiltKey naprakész",
-  "settingsWhatsNew": "Újdonságok"
+  "settingsWhatsNew": "Újdonságok",
+  "settingsStorageSection": "Tárhely és előzmények",
+  "settingsHistoryLimitTitle": "Üzenetelőzmények megőrzése",
+  "settingsHistoryLimitDescription": "A régebbi helyi üzenetek és médiafájlok automatikus törlése a tárhely megtakarítása érdekében. A titkosítási kulcsok és a kapcsolatok mindig megmaradnak.",
+  "settingsHistoryLimitAll": "Minden üzenet megtartása (Korlátlan)",
+  "settingsHistoryLimitCount": "Utolsó {count} üzenet megtartása",
+  "@settingsHistoryLimitCount": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "chatDetailsClearHistory": "Üzenetelőzmények törlése",
+  "chatDetailsClearHistoryConfirm": "Előzmények törlése",
+  "chatDetailsClearHistoryDialogBody": "Véglegesen törli az összes helyi üzenetelőzményt ebben a csevegésben? A titkosítási kulcsok és a kapcsolat állapota megmarad.",
+  "chatDetailsClearHistoryPrune100": "Csak az utolsó 100 üzenet megtartása",
+  "chatDetailsClearHistorySuccess": "Csevegési előzmények törölve",
+  "chatDetailsSectionMedia": "Média, hang és hivatkozások",
+  "chatDetailsMediaPhotos": "Fotók",
+  "chatDetailsMediaVoice": "Hangüzenetek",
+  "chatDetailsMediaLinks": "Hivatkozások",
+  "chatDetailsNoMedia": "Még nincsenek megosztott fotók",
+  "chatDetailsNoVoice": "Még nincsenek hangüzenetek",
+  "chatDetailsNoLinks": "Még nincsenek megosztott hivatkozások",
+  "qrConnectTitle": "QR-csatlakozás",
+  "qrConnectScanTab": "QR beolvasása",
+  "qrConnectMyCodeTab": "Saját QR-kódom",
+  "qrConnectScanPrompt": "Irányítsd a kamerát egy WiltKey QR-kódra az azonnali csatlakozáshoz",
+  "qrConnect7DayNotice": "A távoli kapcsolatok automatikusan 7 napos Time Wilt csevegésként indulnak. Az egyszeri kulcs újratöltéséhez személyes BLE-párosítás szükséges.",
+  "qrConnectRechargeBlocked": "Ez a kapcsolat már létezik. A kulcstár újratöltése személyes BLE-párosítást igényel, és nem végezhető el távolról.",
+  "qrConnectManualPin": "PIN megadása manuálisan",
+  "badgePlayPlus": "Play Áruház · Plus",
+  "badgePlayPlusSubtitle": "Ellenőrzött Google Play build + Plus támogató",
+  "badgePlayPlusExplainer": "Ez a felhasználó hivatalos, módosítatlan buildet használ, amelyet a Google Play Integrity ellenőrzött, és aktív Plus tagsággal támogatja a WiltKeyt.",
+  "badgePlayVerified": "Play Áruház",
+  "badgePlayVerifiedSubtitle": "Ellenőrzött Google Play build",
+  "badgePlayVerifiedExplainer": "Ez a felhasználó hivatalos, módosítatlan buildet használ, amelyet a Google Play Integrity kriptográfiailag ellenőrzött.",
+  "badgeFoss": "Nyílt forráskód",
+  "badgeFossSubtitle": "Közösségi / FOSS build",
+  "badgeFossExplainer": "Ez a kliens nyílt forráskódú vagy egyéni buildet futtat. Mivel nem futtat zárt forrású Google-szolgáltatásokat, közösségi buildként van kezelve. Minden üzenet és titkosítás 100%-ban biztonságos és privát marad.",
+  "groupAnonymousMember": "Tag",
+  "groupMemberRoleHost": "Házigazda",
+  "contactSelfBadge": "Te"
 }

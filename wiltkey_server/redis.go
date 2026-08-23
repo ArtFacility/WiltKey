@@ -923,3 +923,48 @@ func (r *RedisClient) GetEntitlementHash(userID string) (string, error) {
 	}
 	return val, err
 }
+
+// StoreIntegrityNonce saves a challenge nonce for Play Integrity verification.
+func (r *RedisClient) StoreIntegrityNonce(keyHash, nonce string, ttl time.Duration) error {
+	if r.isMemory {
+		r.mu.Lock()
+		defer r.mu.Unlock()
+		r.memoryEntitlements["integrity_nonce:"+keyHash] = nonce
+		r.memoryBlocks["integrity_nonce:"+keyHash] = time.Now().Add(ttl)
+		return nil
+	}
+	key := fmt.Sprintf("integrity:nonce:%s", keyHash)
+	return r.rdb.Set(ctx, key, nonce, ttl).Err()
+}
+
+// GetIntegrityNonce retrieves the challenge nonce for Play Integrity verification.
+func (r *RedisClient) GetIntegrityNonce(keyHash string) (string, error) {
+	if r.isMemory {
+		r.mu.RLock()
+		defer r.mu.RUnlock()
+		expiry, exists := r.memoryBlocks["integrity_nonce:"+keyHash]
+		if !exists || expiry.Before(time.Now()) {
+			return "", nil
+		}
+		return r.memoryEntitlements["integrity_nonce:"+keyHash], nil
+	}
+	key := fmt.Sprintf("integrity:nonce:%s", keyHash)
+	val, err := r.rdb.Get(ctx, key).Result()
+	if err == redis.Nil {
+		return "", nil
+	}
+	return val, err
+}
+
+// DeleteIntegrityNonce removes a consumed challenge nonce.
+func (r *RedisClient) DeleteIntegrityNonce(keyHash string) error {
+	if r.isMemory {
+		r.mu.Lock()
+		defer r.mu.Unlock()
+		delete(r.memoryEntitlements, "integrity_nonce:"+keyHash)
+		delete(r.memoryBlocks, "integrity_nonce:"+keyHash)
+		return nil
+	}
+	key := fmt.Sprintf("integrity:nonce:%s", keyHash)
+	return r.rdb.Del(ctx, key).Err()
+}

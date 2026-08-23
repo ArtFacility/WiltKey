@@ -16,6 +16,7 @@ import 'events_screen.dart';
 import '../../chat/presentation/widgets/nuke_confirm_dialog.dart';
 import '../../proximity/presentation/pairing_screen.dart';
 import '../../shell/presentation/app_shell.dart';
+import '../../../core/theme/widgets/client_integrity_badge.dart';
 
 /// The Chats tab: a single list of every conversation — 1:1 contacts and groups
 /// merged, groups badged. Header carries the title, search, debug console and a
@@ -735,6 +736,10 @@ class _ContactRow extends StatelessWidget {
                           style: t.body.copyWith(fontWeight: FontWeight.w600),
                         ),
                       ),
+                      if (!c.isGroup) ...[
+                        const SizedBox(width: 4),
+                        ClientIntegrityBadge(badgeType: c.badgeType, size: 13),
+                      ],
                       if (c.isPendingEmergency) ...[
                         const SizedBox(width: 8),
                         Container(

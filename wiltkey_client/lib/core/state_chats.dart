@@ -50,6 +50,15 @@ extension AppStateChats on AppState {
     notifyListeners();
   }
 
+  /// Reloads a chat's in-memory messages from the database after a prune or clear operation.
+  Future<void> loadMessagesForContact(Contact contact) async {
+    loadedChats.remove(contact.id);
+    messages[contact.id] = [];
+    hasMoreOlder.remove(contact.id);
+    await loadInitialMessages(contact);
+    notifyListeners();
+  }
+
   /// Prepends the next older page for a chat (scroll-back). Returns how many new
   /// messages were prepended (0 when nothing older remains).
   Future<int> loadOlderMessages(Contact contact) async {

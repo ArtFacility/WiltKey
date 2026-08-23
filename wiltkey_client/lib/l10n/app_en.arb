@@ -1328,5 +1328,46 @@
     }
   },
   "settingsUpToDate": "WiltKey is up to date",
-  "settingsWhatsNew": "What's new"
+  "settingsWhatsNew": "What's new",
+  "settingsStorageSection": "Storage & History",
+  "settingsHistoryLimitTitle": "Message History Retention",
+  "settingsHistoryLimitDescription": "Automatically prune older local messages and media files to conserve storage space. Encryption keys and contacts are always preserved.",
+  "settingsHistoryLimitAll": "Keep all messages (Unlimited)",
+  "settingsHistoryLimitCount": "Keep last {count} messages",
+  "@settingsHistoryLimitCount": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "chatDetailsClearHistory": "Clear Message History",
+  "chatDetailsClearHistoryConfirm": "Clear History",
+  "chatDetailsClearHistoryDialogBody": "Permanently delete all local message history in this chat? Encryption keys and contact status will be preserved.",
+  "chatDetailsClearHistoryPrune100": "Keep only last 100 messages",
+  "chatDetailsClearHistorySuccess": "Chat history cleared",
+  "chatDetailsSectionMedia": "Media, Voice & Links",
+  "chatDetailsMediaPhotos": "Photos",
+  "chatDetailsMediaVoice": "Voice Notes",
+  "chatDetailsMediaLinks": "Links",
+  "chatDetailsNoMedia": "No shared photos yet",
+  "chatDetailsNoVoice": "No voice notes yet",
+  "chatDetailsNoLinks": "No links shared yet",
+  "qrConnectTitle": "QR Connect",
+  "qrConnectScanTab": "Scan QR",
+  "qrConnectMyCodeTab": "My QR Code",
+  "qrConnectScanPrompt": "Point camera at a WiltKey QR code to connect instantly",
+  "qrConnect7DayNotice": "Remote connections automatically start as a 7-day Time Wilt chat. In-person BLE pairing is required for one-time pad recharging.",
+  "qrConnectRechargeBlocked": "This contact already exists. Pad recharging requires in-person BLE pairing and cannot be performed remotely.",
+  "qrConnectManualPin": "Enter PIN manually",
+  "badgePlayPlus": "Play Store · Plus",
+  "badgePlayPlusSubtitle": "Verified Google Play Build + Plus Supporter",
+  "badgePlayPlusExplainer": "This user is running an official, unmodified build verified through Google Play Integrity, and is actively supporting WiltKey with an active Plus membership.",
+  "badgePlayVerified": "Play Store",
+  "badgePlayVerifiedSubtitle": "Verified Google Play Build",
+  "badgePlayVerifiedExplainer": "This user is running an official, unmodified build cryptographically verified through Google Play Integrity.",
+  "badgeFoss": "Open Source",
+  "badgeFossSubtitle": "Community / FOSS Build",
+  "badgeFossExplainer": "This client is running an open-source or custom build. Because it does not run Google proprietary services, it is treated as a community build. All messages and encryption remain 100% secure and private.",
+  "groupAnonymousMember": "Member",
+  "groupMemberRoleHost": "Host",
+  "contactSelfBadge": "You"
 }

@@ -2214,4 +2214,123 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsWhatsNew => 'What\'s new';
+
+  @override
+  String get settingsStorageSection => 'Storage & History';
+
+  @override
+  String get settingsHistoryLimitTitle => 'Message History Retention';
+
+  @override
+  String get settingsHistoryLimitDescription =>
+      'Automatically prune older local messages and media files to conserve storage space. Encryption keys and contacts are always preserved.';
+
+  @override
+  String get settingsHistoryLimitAll => 'Keep all messages (Unlimited)';
+
+  @override
+  String settingsHistoryLimitCount(int count) {
+    return 'Keep last $count messages';
+  }
+
+  @override
+  String get chatDetailsClearHistory => 'Clear Message History';
+
+  @override
+  String get chatDetailsClearHistoryConfirm => 'Clear History';
+
+  @override
+  String get chatDetailsClearHistoryDialogBody =>
+      'Permanently delete all local message history in this chat? Encryption keys and contact status will be preserved.';
+
+  @override
+  String get chatDetailsClearHistoryPrune100 => 'Keep only last 100 messages';
+
+  @override
+  String get chatDetailsClearHistorySuccess => 'Chat history cleared';
+
+  @override
+  String get chatDetailsSectionMedia => 'Media, Voice & Links';
+
+  @override
+  String get chatDetailsMediaPhotos => 'Photos';
+
+  @override
+  String get chatDetailsMediaVoice => 'Voice Notes';
+
+  @override
+  String get chatDetailsMediaLinks => 'Links';
+
+  @override
+  String get chatDetailsNoMedia => 'No shared photos yet';
+
+  @override
+  String get chatDetailsNoVoice => 'No voice notes yet';
+
+  @override
+  String get chatDetailsNoLinks => 'No links shared yet';
+
+  @override
+  String get qrConnectTitle => 'QR Connect';
+
+  @override
+  String get qrConnectScanTab => 'Scan QR';
+
+  @override
+  String get qrConnectMyCodeTab => 'My QR Code';
+
+  @override
+  String get qrConnectScanPrompt =>
+      'Point camera at a WiltKey QR code to connect instantly';
+
+  @override
+  String get qrConnect7DayNotice =>
+      'Remote connections automatically start as a 7-day Time Wilt chat. In-person BLE pairing is required for one-time pad recharging.';
+
+  @override
+  String get qrConnectRechargeBlocked =>
+      'This contact already exists. Pad recharging requires in-person BLE pairing and cannot be performed remotely.';
+
+  @override
+  String get qrConnectManualPin => 'Enter PIN manually';
+
+  @override
+  String get badgePlayPlus => 'Play Store · Plus';
+
+  @override
+  String get badgePlayPlusSubtitle =>
+      'Verified Google Play Build + Plus Supporter';
+
+  @override
+  String get badgePlayPlusExplainer =>
+      'This user is running an official, unmodified build verified through Google Play Integrity, and is actively supporting WiltKey with an active Plus membership.';
+
+  @override
+  String get badgePlayVerified => 'Play Store';
+
+  @override
+  String get badgePlayVerifiedSubtitle => 'Verified Google Play Build';
+
+  @override
+  String get badgePlayVerifiedExplainer =>
+      'This user is running an official, unmodified build cryptographically verified through Google Play Integrity.';
+
+  @override
+  String get badgeFoss => 'Open Source';
+
+  @override
+  String get badgeFossSubtitle => 'Community / FOSS Build';
+
+  @override
+  String get badgeFossExplainer =>
+      'This client is running an open-source or custom build. Because it does not run Google proprietary services, it is treated as a community build. All messages and encryption remain 100% secure and private.';
+
+  @override
+  String get groupAnonymousMember => 'Member';
+
+  @override
+  String get groupMemberRoleHost => 'Host';
+
+  @override
+  String get contactSelfBadge => 'You';
 }

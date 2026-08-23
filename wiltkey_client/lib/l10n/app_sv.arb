@@ -697,5 +697,46 @@
     }
   },
   "settingsUpToDate": "WiltKey är uppdaterad",
-  "settingsWhatsNew": "Nyheter"
+  "settingsWhatsNew": "Nyheter",
+  "settingsStorageSection": "Lagring och historik",
+  "settingsHistoryLimitTitle": "Spara meddelandehistorik",
+  "settingsHistoryLimitDescription": "Rensa automatiskt äldre lokala meddelanden och mediefiler för att spara lagringsutrymme. Krypteringsnycklar och kontakter bevaras alltid.",
+  "settingsHistoryLimitAll": "Behåll alla meddelanden (Obegränsat)",
+  "settingsHistoryLimitCount": "Behåll de senaste {count} meddelandena",
+  "@settingsHistoryLimitCount": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "chatDetailsClearHistory": "Rensa meddelandehistorik",
+  "chatDetailsClearHistoryConfirm": "Rensa historik",
+  "chatDetailsClearHistoryDialogBody": "Radera all lokal meddelandehistorik i den här chatten permanent? Krypteringsnycklar och kontaktstatus kommer att bevaras.",
+  "chatDetailsClearHistoryPrune100": "Behåll endast de senaste 100 meddelandena",
+  "chatDetailsClearHistorySuccess": "Chatthistorik rensad",
+  "chatDetailsSectionMedia": "Media, röst & länkar",
+  "chatDetailsMediaPhotos": "Foton",
+  "chatDetailsMediaVoice": "Röstmeddelanden",
+  "chatDetailsMediaLinks": "Länkar",
+  "chatDetailsNoMedia": "Inga delade foton ännu",
+  "chatDetailsNoVoice": "Inga röstmeddelanden ännu",
+  "chatDetailsNoLinks": "Inga delade länkar ännu",
+  "qrConnectTitle": "QR-anslutning",
+  "qrConnectScanTab": "Skanna QR",
+  "qrConnectMyCodeTab": "Min QR-kod",
+  "qrConnectScanPrompt": "Rikta kameran mot en WiltKey QR-kod för att ansluta direkt",
+  "qrConnect7DayNotice": "Fjärranslutningar startar automatiskt som en 7-dagars Time Wilt-chatt. Personlig BLE-ihopparning krävs för att ladda om engångskryptering.",
+  "qrConnectRechargeBlocked": "Den här kontakten finns redan. Omladdning av pad kräver personlig BLE-ihopparning och kan inte göras på distans.",
+  "qrConnectManualPin": "Ange PIN manuellt",
+  "badgePlayPlus": "Play Butik · Plus",
+  "badgePlayPlusSubtitle": "Verifierad Google Play-version + Plus-supporter",
+  "badgePlayPlusExplainer": "Den här användaren kör en officiell, omodifierad version som verifierats via Google Play Integrity och stöder aktivt WiltKey med ett aktivt Plus-medlemskap.",
+  "badgePlayVerified": "Play Butik",
+  "badgePlayVerifiedSubtitle": "Verifierad Google Play-version",
+  "badgePlayVerifiedExplainer": "Den här användaren kör en officiell, omodifierad version som verifierats kryptografiskt via Google Play Integrity.",
+  "badgeFoss": "Öppen källkod",
+  "badgeFossSubtitle": "Community- / FOSS-version",
+  "badgeFossExplainer": "Den här klienten kör en version med öppen källkod eller en anpassad version. Eftersom den inte kör Googles proprietära tjänster behandlas den som en community-version. Alla meddelanden och kryptering förblir 100 % säkra och privata.",
+  "groupAnonymousMember": "Medlem",
+  "groupMemberRoleHost": "Värd",
+  "contactSelfBadge": "Du"
 }

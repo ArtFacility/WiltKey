@@ -73,14 +73,33 @@ class UpdateService {
     client.connectionTimeout = const Duration(seconds: 6);
 
     try {
-      final uri = Uri.parse(kPatchnotesUrl);
-      final request = await client.getUrl(uri);
-      final response = await request.close();
+      UpdateInfo? updateInfo;
 
-      if (response.statusCode == 200) {
-        final body = await response.transform(utf8.decoder).join();
-        final json = jsonDecode(body) as Map<String, dynamic>;
-        final updateInfo = UpdateInfo.fromJson(json);
+      // 1. Primary: check wiltkey.org/patchnotes.json
+      try {
+        final uri = Uri.parse(kPatchnotesUrl);
+        final request = await client.getUrl(uri);
+        final response = await request.close();
+
+        if (response.statusCode == 200) {
+          final body = await response.transform(utf8.decoder).join();
+          final json = jsonDecode(body) as Map<String, dynamic>;
+          updateInfo = UpdateInfo.fromJson(json);
+        }
+      } catch (_) {
+        // Fall through to GitHub releases
+      }
+
+      // 2. Secondary / FOSS fallback: check GitHub Releases API (ignoring server tags)
+      if (updateInfo == null || !updateInfo.isUpdateAvailable(_currentBuildNumber)) {
+        final ghInfo = await _checkGitHubReleases(client);
+        if (ghInfo != null &&
+            (updateInfo == null || ghInfo.latestBuild > updateInfo.latestBuild)) {
+          updateInfo = ghInfo;
+        }
+      }
+
+      if (updateInfo != null) {
         _cachedInfo = updateInfo;
         await prefs.setInt(_kPrefLastCheckTime, now);
 
@@ -101,6 +120,93 @@ class UpdateService {
       _isChecking = false;
     }
     return _cachedInfo;
+  }
+
+  /// Parses GitHub releases, filtering out `-server` tags and extracting build numbers.
+  Future<UpdateInfo?> _checkGitHubReleases(HttpClient client) async {
+    try {
+      final uri = Uri.parse('https://api.github.com/repos/ArtFacility/WiltKey/releases?per_page=10');
+      final request = await client.getUrl(uri);
+      request.headers.set('User-Agent', 'WiltKey-Android-Client');
+      request.headers.set('Accept', 'application/vnd.github.v3+json');
+      final response = await request.close();
+
+      if (response.statusCode == 200) {
+        final body = await response.transform(utf8.decoder).join();
+        final list = jsonDecode(body) as List<dynamic>;
+        return parseGitHubReleases(list);
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  /// Extracted pure parser for GitHub releases (public for testing).
+  static UpdateInfo? parseGitHubReleases(List<dynamic> releases) {
+    // Regex matches e.g. "v1.0.1-10", "v1.3.5-12", "v1.3.5+12", or "v1.3.5"
+    final tagRegex = RegExp(r'^v?(\d+\.\d+\.\d+)(?:[-+](\d+))?$');
+
+    for (final item in releases) {
+      if (item is! Map<String, dynamic>) continue;
+      final tagName = (item['tag_name'] as String? ?? '').trim();
+      final isDraft = item['draft'] as bool? ?? false;
+      final isPrerelease = item['prerelease'] as bool? ?? false;
+
+      // Filter out server releases (e.g. "v1.3.5-server") and drafts
+      if (isDraft || tagName.endsWith('-server') || tagName.contains('server')) {
+        continue;
+      }
+
+      final match = tagRegex.firstMatch(tagName);
+      if (match != null) {
+        final versionStr = match.group(1)!;
+        final buildStr = match.group(2);
+        final buildNum = buildStr != null ? (int.tryParse(buildStr) ?? 0) : 0;
+
+        String? downloadUrl;
+        final assets = item['assets'] as List<dynamic>?;
+        if (assets != null) {
+          for (final asset in assets) {
+            if (asset is Map<String, dynamic>) {
+              final name = asset['name'] as String? ?? '';
+              if (name.endsWith('.apk')) {
+                downloadUrl = asset['browser_download_url'] as String?;
+                break;
+              }
+            }
+          }
+        }
+        downloadUrl ??= item['html_url'] as String? ?? 'https://github.com/ArtFacility/WiltKey/releases/latest';
+
+        final releaseTitle = (item['name'] as String?)?.isNotEmpty == true
+            ? item['name'] as String
+            : 'WiltKey v$versionStr';
+        final releaseBody = item['body'] as String? ?? '';
+        final highlights = releaseBody
+            .split('\n')
+            .map((l) => l.trim().replaceAll(RegExp(r'^[-*]\s*'), ''))
+            .where((l) => l.isNotEmpty && !l.startsWith('#'))
+            .take(6)
+            .toList();
+
+        return UpdateInfo(
+          latestVersion: versionStr,
+          latestBuild: buildNum,
+          minSupportedBuild: 1,
+          downloadUrlFoss: downloadUrl,
+          downloadUrlPlay: 'https://play.google.com/store/apps/details?id=xyz.artfacility.wiltkey',
+          releases: [
+            AppRelease(
+              version: versionStr,
+              build: buildNum,
+              date: item['published_at'] as String?,
+              title: releaseTitle,
+              highlights: highlights,
+            ),
+          ],
+        );
+      }
+    }
+    return null;
   }
 
   void _logUpdateEvent(UpdateInfo info) {

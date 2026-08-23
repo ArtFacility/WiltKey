@@ -3983,6 +3983,222 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'What\'s new'**
   String get settingsWhatsNew;
+
+  /// No description provided for @settingsStorageSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Storage & History'**
+  String get settingsStorageSection;
+
+  /// No description provided for @settingsHistoryLimitTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Message History Retention'**
+  String get settingsHistoryLimitTitle;
+
+  /// No description provided for @settingsHistoryLimitDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatically prune older local messages and media files to conserve storage space. Encryption keys and contacts are always preserved.'**
+  String get settingsHistoryLimitDescription;
+
+  /// No description provided for @settingsHistoryLimitAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep all messages (Unlimited)'**
+  String get settingsHistoryLimitAll;
+
+  /// No description provided for @settingsHistoryLimitCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep last {count} messages'**
+  String settingsHistoryLimitCount(int count);
+
+  /// No description provided for @chatDetailsClearHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear Message History'**
+  String get chatDetailsClearHistory;
+
+  /// No description provided for @chatDetailsClearHistoryConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear History'**
+  String get chatDetailsClearHistoryConfirm;
+
+  /// No description provided for @chatDetailsClearHistoryDialogBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Permanently delete all local message history in this chat? Encryption keys and contact status will be preserved.'**
+  String get chatDetailsClearHistoryDialogBody;
+
+  /// No description provided for @chatDetailsClearHistoryPrune100.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep only last 100 messages'**
+  String get chatDetailsClearHistoryPrune100;
+
+  /// No description provided for @chatDetailsClearHistorySuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat history cleared'**
+  String get chatDetailsClearHistorySuccess;
+
+  /// No description provided for @chatDetailsSectionMedia.
+  ///
+  /// In en, this message translates to:
+  /// **'Media, Voice & Links'**
+  String get chatDetailsSectionMedia;
+
+  /// No description provided for @chatDetailsMediaPhotos.
+  ///
+  /// In en, this message translates to:
+  /// **'Photos'**
+  String get chatDetailsMediaPhotos;
+
+  /// No description provided for @chatDetailsMediaVoice.
+  ///
+  /// In en, this message translates to:
+  /// **'Voice Notes'**
+  String get chatDetailsMediaVoice;
+
+  /// No description provided for @chatDetailsMediaLinks.
+  ///
+  /// In en, this message translates to:
+  /// **'Links'**
+  String get chatDetailsMediaLinks;
+
+  /// No description provided for @chatDetailsNoMedia.
+  ///
+  /// In en, this message translates to:
+  /// **'No shared photos yet'**
+  String get chatDetailsNoMedia;
+
+  /// No description provided for @chatDetailsNoVoice.
+  ///
+  /// In en, this message translates to:
+  /// **'No voice notes yet'**
+  String get chatDetailsNoVoice;
+
+  /// No description provided for @chatDetailsNoLinks.
+  ///
+  /// In en, this message translates to:
+  /// **'No links shared yet'**
+  String get chatDetailsNoLinks;
+
+  /// No description provided for @qrConnectTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'QR Connect'**
+  String get qrConnectTitle;
+
+  /// No description provided for @qrConnectScanTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan QR'**
+  String get qrConnectScanTab;
+
+  /// No description provided for @qrConnectMyCodeTab.
+  ///
+  /// In en, this message translates to:
+  /// **'My QR Code'**
+  String get qrConnectMyCodeTab;
+
+  /// No description provided for @qrConnectScanPrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Point camera at a WiltKey QR code to connect instantly'**
+  String get qrConnectScanPrompt;
+
+  /// No description provided for @qrConnect7DayNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'Remote connections automatically start as a 7-day Time Wilt chat. In-person BLE pairing is required for one-time pad recharging.'**
+  String get qrConnect7DayNotice;
+
+  /// No description provided for @qrConnectRechargeBlocked.
+  ///
+  /// In en, this message translates to:
+  /// **'This contact already exists. Pad recharging requires in-person BLE pairing and cannot be performed remotely.'**
+  String get qrConnectRechargeBlocked;
+
+  /// No description provided for @qrConnectManualPin.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter PIN manually'**
+  String get qrConnectManualPin;
+
+  /// No description provided for @badgePlayPlus.
+  ///
+  /// In en, this message translates to:
+  /// **'Play Store · Plus'**
+  String get badgePlayPlus;
+
+  /// No description provided for @badgePlayPlusSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Verified Google Play Build + Plus Supporter'**
+  String get badgePlayPlusSubtitle;
+
+  /// No description provided for @badgePlayPlusExplainer.
+  ///
+  /// In en, this message translates to:
+  /// **'This user is running an official, unmodified build verified through Google Play Integrity, and is actively supporting WiltKey with an active Plus membership.'**
+  String get badgePlayPlusExplainer;
+
+  /// No description provided for @badgePlayVerified.
+  ///
+  /// In en, this message translates to:
+  /// **'Play Store'**
+  String get badgePlayVerified;
+
+  /// No description provided for @badgePlayVerifiedSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Verified Google Play Build'**
+  String get badgePlayVerifiedSubtitle;
+
+  /// No description provided for @badgePlayVerifiedExplainer.
+  ///
+  /// In en, this message translates to:
+  /// **'This user is running an official, unmodified build cryptographically verified through Google Play Integrity.'**
+  String get badgePlayVerifiedExplainer;
+
+  /// No description provided for @badgeFoss.
+  ///
+  /// In en, this message translates to:
+  /// **'Open Source'**
+  String get badgeFoss;
+
+  /// No description provided for @badgeFossSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Community / FOSS Build'**
+  String get badgeFossSubtitle;
+
+  /// No description provided for @badgeFossExplainer.
+  ///
+  /// In en, this message translates to:
+  /// **'This client is running an open-source or custom build. Because it does not run Google proprietary services, it is treated as a community build. All messages and encryption remain 100% secure and private.'**
+  String get badgeFossExplainer;
+
+  /// No description provided for @groupAnonymousMember.
+  ///
+  /// In en, this message translates to:
+  /// **'Member'**
+  String get groupAnonymousMember;
+
+  /// No description provided for @groupMemberRoleHost.
+  ///
+  /// In en, this message translates to:
+  /// **'Host'**
+  String get groupMemberRoleHost;
+
+  /// No description provided for @contactSelfBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'You'**
+  String get contactSelfBadge;
 }
 
 class _AppLocalizationsDelegate

@@ -125,6 +125,10 @@ dependencies {
     // The native billing bridge + the `wiltkey/billing` MethodChannel live under
     // src/play/ to match (see BillingBridge.kt); the FOSS Dart side no-ops.
     "playImplementation"("com.android.billingclient:billing-ktx:8.0.0")
+
+    // Google Play Integrity — PLAY flavor ONLY (flavor-scoped `playImplementation`),
+    // so the FOSS build contains zero Play Integrity code.
+    "playImplementation"("com.google.android.play:integrity:1.4.0")
 }
 
 // Apply the Google Services plugin ONLY when building the Play flavor. It requires

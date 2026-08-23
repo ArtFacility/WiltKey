@@ -2244,4 +2244,124 @@ class AppLocalizationsHu extends AppLocalizations {
 
   @override
   String get settingsWhatsNew => 'Újdonságok';
+
+  @override
+  String get settingsStorageSection => 'Tárhely és előzmények';
+
+  @override
+  String get settingsHistoryLimitTitle => 'Üzenetelőzmények megőrzése';
+
+  @override
+  String get settingsHistoryLimitDescription =>
+      'A régebbi helyi üzenetek és médiafájlok automatikus törlése a tárhely megtakarítása érdekében. A titkosítási kulcsok és a kapcsolatok mindig megmaradnak.';
+
+  @override
+  String get settingsHistoryLimitAll => 'Minden üzenet megtartása (Korlátlan)';
+
+  @override
+  String settingsHistoryLimitCount(int count) {
+    return 'Utolsó $count üzenet megtartása';
+  }
+
+  @override
+  String get chatDetailsClearHistory => 'Üzenetelőzmények törlése';
+
+  @override
+  String get chatDetailsClearHistoryConfirm => 'Előzmények törlése';
+
+  @override
+  String get chatDetailsClearHistoryDialogBody =>
+      'Véglegesen törli az összes helyi üzenetelőzményt ebben a csevegésben? A titkosítási kulcsok és a kapcsolat állapota megmarad.';
+
+  @override
+  String get chatDetailsClearHistoryPrune100 =>
+      'Csak az utolsó 100 üzenet megtartása';
+
+  @override
+  String get chatDetailsClearHistorySuccess => 'Csevegési előzmények törölve';
+
+  @override
+  String get chatDetailsSectionMedia => 'Média, hang és hivatkozások';
+
+  @override
+  String get chatDetailsMediaPhotos => 'Fotók';
+
+  @override
+  String get chatDetailsMediaVoice => 'Hangüzenetek';
+
+  @override
+  String get chatDetailsMediaLinks => 'Hivatkozások';
+
+  @override
+  String get chatDetailsNoMedia => 'Még nincsenek megosztott fotók';
+
+  @override
+  String get chatDetailsNoVoice => 'Még nincsenek hangüzenetek';
+
+  @override
+  String get chatDetailsNoLinks => 'Még nincsenek megosztott hivatkozások';
+
+  @override
+  String get qrConnectTitle => 'QR-csatlakozás';
+
+  @override
+  String get qrConnectScanTab => 'QR beolvasása';
+
+  @override
+  String get qrConnectMyCodeTab => 'Saját QR-kódom';
+
+  @override
+  String get qrConnectScanPrompt =>
+      'Irányítsd a kamerát egy WiltKey QR-kódra az azonnali csatlakozáshoz';
+
+  @override
+  String get qrConnect7DayNotice =>
+      'A távoli kapcsolatok automatikusan 7 napos Time Wilt csevegésként indulnak. Az egyszeri kulcs újratöltéséhez személyes BLE-párosítás szükséges.';
+
+  @override
+  String get qrConnectRechargeBlocked =>
+      'Ez a kapcsolat már létezik. A kulcstár újratöltése személyes BLE-párosítást igényel, és nem végezhető el távolról.';
+
+  @override
+  String get qrConnectManualPin => 'PIN megadása manuálisan';
+
+  @override
+  String get badgePlayPlus => 'Play Áruház · Plus';
+
+  @override
+  String get badgePlayPlusSubtitle =>
+      'Ellenőrzött Google Play build + Plus támogató';
+
+  @override
+  String get badgePlayPlusExplainer =>
+      'Ez a felhasználó hivatalos, módosítatlan buildet használ, amelyet a Google Play Integrity ellenőrzött, és aktív Plus tagsággal támogatja a WiltKeyt.';
+
+  @override
+  String get badgePlayVerified => 'Play Áruház';
+
+  @override
+  String get badgePlayVerifiedSubtitle => 'Ellenőrzött Google Play build';
+
+  @override
+  String get badgePlayVerifiedExplainer =>
+      'Ez a felhasználó hivatalos, módosítatlan buildet használ, amelyet a Google Play Integrity kriptográfiailag ellenőrzött.';
+
+  @override
+  String get badgeFoss => 'Nyílt forráskód';
+
+  @override
+  String get badgeFossSubtitle => 'Közösségi / FOSS build';
+
+  @override
+  String get badgeFossExplainer =>
+      'Ez a kliens nyílt forráskódú vagy egyéni buildet futtat. Mivel nem futtat zárt forrású Google-szolgáltatásokat, közösségi buildként van kezelve. Minden üzenet és titkosítás 100%-ban biztonságos és privát marad.';
+
+  @override
+  String get groupAnonymousMember => 'Tag';
+
+  @override
+  String get groupMemberRoleHost => 'Házigazda';
+
+  @override
+  String get contactSelfBadge => 'Te';
 }

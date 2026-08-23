@@ -11,10 +11,8 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:ble_peripheral/ble_peripheral.dart';
 import '../../../core/state.dart';
 import '../../../core/models.dart';
-import '../../../core/crypto/otp_service.dart';
 import '../../../core/db/wiltkey_db.dart';
 import '../../../core/pad_tiers.dart';
-import '../../../core/pixel_art_avatar.dart';
 import '../../../core/theme/wiltkey_components.dart';
 
 /// RSSI within pairing reach (matches the screens' proximity gate).
@@ -136,6 +134,8 @@ class BlePairingManager extends ChangeNotifier {
   Timer? _syncTimer;
   Timer? _hexAnimationTimer;
   Timer? _pairingReadTimer;
+  Timer? _handshakeTimeoutTimer;
+  StreamSubscription<BluetoothConnectionState>? _connectionStateSubscription;
   Uint8List? _gattResponseBytes;
 
   // Callback to the UI to handle confirmation dialog
@@ -738,6 +738,8 @@ class BlePairingManager extends ChangeNotifier {
       if (json['status'] == 'accepted') {
         notifySub?.cancel();
         _pairingReadTimer?.cancel();
+        _handshakeTimeoutTimer?.cancel();
+        _handshakeTimeoutTimer = null;
 
         final peerPubKey = json['pubkey'] as String;
         final peerShortNick = json['short_nick'] as String? ?? '';
@@ -802,19 +804,47 @@ class BlePairingManager extends ChangeNotifier {
         );
       } else if (json['status'] == 'rejected') {
         notifySub?.cancel();
-        _pairingReadTimer?.cancel();
-        device.disconnect();
-        isSyncing = false;
-        notifyListeners();
-        if (onAlert != null) {
-          onAlert!('Connection request rejected by peer.');
-        }
-        startScanningFlow();
-        startAdvertising();
+        abortHandshake('Connection request rejected by peer.');
       }
     } catch (e) {
       log('[BLE Client Error] Process response failed: $e');
     }
+  }
+
+  /// Aborts an in-progress pairing attempt and returns to the scanner/radar view.
+  void abortHandshake([String? reason]) {
+    log('[BLE Client] Aborting handshake. Reason: ${reason ?? 'User cancelled'}');
+    _handshakeTimeoutTimer?.cancel();
+    _handshakeTimeoutTimer = null;
+    _pairingReadTimer?.cancel();
+    _pairingReadTimer = null;
+    _hexAnimationTimer?.cancel();
+    _hexAnimationTimer = null;
+    _syncTimer?.cancel();
+    _syncTimer = null;
+    _connectionStateSubscription?.cancel();
+    _connectionStateSubscription = null;
+
+    final dev = activeConnection;
+    activeConnection = null;
+    if (dev != null) {
+      try {
+        dev.disconnect();
+      } catch (_) {}
+    }
+
+    isSyncing = false;
+    isGeneratingPad = false;
+    syncProgress = 0.0;
+    syncStepText = 'Idle';
+    notifyListeners();
+
+    if (reason != null && onAlert != null) {
+      onAlert!(reason);
+    }
+
+    startScanningFlow();
+    startAdvertising();
   }
 
   Future<void> startSyncProcess(String relayUrl) async {
@@ -845,6 +875,13 @@ class BlePairingManager extends ChangeNotifier {
     syncStepText = 'Establishing secure Bluetooth link...';
     notifyListeners();
 
+    _handshakeTimeoutTimer?.cancel();
+    _handshakeTimeoutTimer = Timer(const Duration(seconds: 35), () {
+      if (isSyncing && !isSuccess && !isGeneratingPad) {
+        abortHandshake('Pairing request timed out. Please verify the peer accepted the prompt.');
+      }
+    });
+
     _hexAnimationTimer = Timer.periodic(const Duration(milliseconds: 100), (
       timer,
     ) {
@@ -858,6 +895,16 @@ class BlePairingManager extends ChangeNotifier {
     try {
       final device = BluetoothDevice.fromId(selectedDevice!.id);
       activeConnection = device;
+
+      _connectionStateSubscription?.cancel();
+      _connectionStateSubscription = device.connectionState.listen((state) {
+        if (state == BluetoothConnectionState.disconnected &&
+            isSyncing &&
+            !isSuccess &&
+            !isGeneratingPad) {
+          abortHandshake('Bluetooth connection lost.');
+        }
+      });
 
       await device.connect(timeout: const Duration(seconds: 8));
       log('[BLE Client] Connected to peer.');
@@ -1230,6 +1277,8 @@ class BlePairingManager extends ChangeNotifier {
     _syncTimer?.cancel();
     _hexAnimationTimer?.cancel();
     _pairingReadTimer?.cancel();
+    _handshakeTimeoutTimer?.cancel();
+    _connectionStateSubscription?.cancel();
     _evictionTimer?.cancel();
     stopAdvertising();
     activeConnection?.disconnect();

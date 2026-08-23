@@ -7,6 +7,9 @@ import '../../../core/theme/wk.dart';
 import '../../../features/shell/presentation/app_shell.dart';
 import 'blocked_contacts_screen.dart';
 import 'contact_profile_screen.dart';
+import '../../../core/theme/widgets/client_integrity_badge.dart';
+import '../../../core/build_flavor.dart';
+import '../../../core/entitlements/entitlement_service.dart';
 
 /// The Contacts tab: a panel showing the user's own profile row at the top,
 /// followed by their social contacts (friends list). Accessible via the bottom
@@ -413,6 +416,15 @@ class _OwnProfileRow extends StatelessWidget {
                           ),
                         ),
                       ),
+                      const SizedBox(width: 6),
+                      ClientIntegrityBadge(
+                        badgeType: kPlayStore
+                            ? (EntitlementService.instance.plusActive
+                                ? ClientBadgeType.playPlus
+                                : ClientBadgeType.playOfficial)
+                            : ClientBadgeType.tinkerer,
+                        size: 14,
+                      ),
                       const SizedBox(width: 8),
                       Container(
                         padding: const EdgeInsets.symmetric(
@@ -557,6 +569,8 @@ class _ContactRow extends StatelessWidget {
                           style: t.body.copyWith(fontWeight: FontWeight.w600),
                         ),
                       ),
+                      const SizedBox(width: 4),
+                      ClientIntegrityBadge(badgeType: contact.badgeType, size: 13),
                     ],
                   ),
                   const SizedBox(height: 2),

@@ -2242,4 +2242,128 @@ class AppLocalizationsPl extends AppLocalizations {
 
   @override
   String get settingsWhatsNew => 'Co nowego';
+
+  @override
+  String get settingsStorageSection => 'Pamięć i historia';
+
+  @override
+  String get settingsHistoryLimitTitle => 'Przechowywanie historii wiadomości';
+
+  @override
+  String get settingsHistoryLimitDescription =>
+      'Automatycznie usuwaj starsze lokalne wiadomości i pliki multimedialne, aby zaoszczędzić miejsce. Klucze szyfrowania i kontakty są zawsze zachowywane.';
+
+  @override
+  String get settingsHistoryLimitAll =>
+      'Zachowaj wszystkie wiadomości (Bez limitu)';
+
+  @override
+  String settingsHistoryLimitCount(int count) {
+    return 'Zachowaj ostatnie $count wiadomości';
+  }
+
+  @override
+  String get chatDetailsClearHistory => 'Wyczyść historię wiadomości';
+
+  @override
+  String get chatDetailsClearHistoryConfirm => 'Wyczyść historię';
+
+  @override
+  String get chatDetailsClearHistoryDialogBody =>
+      'Trwale usunąć całą lokalną historię wiadomości w tym czacie? Klucze szyfrowania i status kontaktu zostaną zachowane.';
+
+  @override
+  String get chatDetailsClearHistoryPrune100 =>
+      'Zachowaj tylko ostatnie 100 wiadomości';
+
+  @override
+  String get chatDetailsClearHistorySuccess =>
+      'Historia czatu została wyczyszczona';
+
+  @override
+  String get chatDetailsSectionMedia =>
+      'Multimedia, wiadomości głosowe i linki';
+
+  @override
+  String get chatDetailsMediaPhotos => 'Zdjęcia';
+
+  @override
+  String get chatDetailsMediaVoice => 'Wiadomości głosowe';
+
+  @override
+  String get chatDetailsMediaLinks => 'Linki';
+
+  @override
+  String get chatDetailsNoMedia => 'Brak udostępnionych zdjęć';
+
+  @override
+  String get chatDetailsNoVoice => 'Brak wiadomości głosowych';
+
+  @override
+  String get chatDetailsNoLinks => 'Brak udostępnionych linków';
+
+  @override
+  String get qrConnectTitle => 'Połączenie QR';
+
+  @override
+  String get qrConnectScanTab => 'Skanuj QR';
+
+  @override
+  String get qrConnectMyCodeTab => 'Mój kod QR';
+
+  @override
+  String get qrConnectScanPrompt =>
+      'Skieruj aparat na kod QR WiltKey, aby połączyć się natychmiast';
+
+  @override
+  String get qrConnect7DayNotice =>
+      'Połączenia zdalne rozpoczynają się automatycznie jako 7-dniowy czat Time Wilt. Do doładowania szyfru jednorazowego wymagane jest osobiste parowanie BLE.';
+
+  @override
+  String get qrConnectRechargeBlocked =>
+      'Ten kontakt już istnieje. Doładowanie notesu wymaga osobistego parowania BLE i nie może być wykonane zdalnie.';
+
+  @override
+  String get qrConnectManualPin => 'Wpisz PIN ręcznie';
+
+  @override
+  String get badgePlayPlus => 'Sklep Play · Plus';
+
+  @override
+  String get badgePlayPlusSubtitle =>
+      'Zweryfikowana kompilacja Google Play + Wspierający Plus';
+
+  @override
+  String get badgePlayPlusExplainer =>
+      'Ten użytkownik korzysta z oficjalnej, niezmodyfikowanej kompilacji zweryfikowanej przez Google Play Integrity i aktywnie wspiera WiltKey z aktywnym członkostwem Plus.';
+
+  @override
+  String get badgePlayVerified => 'Sklep Play';
+
+  @override
+  String get badgePlayVerifiedSubtitle =>
+      'Zweryfikowana kompilacja Google Play';
+
+  @override
+  String get badgePlayVerifiedExplainer =>
+      'Ten użytkownik korzysta z oficjalnej, niezmodyfikowanej kompilacji zweryfikowanej kryptograficznie przez Google Play Integrity.';
+
+  @override
+  String get badgeFoss => 'Open Source';
+
+  @override
+  String get badgeFossSubtitle => 'Kompilacja społecznościowa / FOSS';
+
+  @override
+  String get badgeFossExplainer =>
+      'Ten klient działa na kompilacji otwartoźródłowej lub niestandardowej. Ponieważ nie uruchamia własnościowych usług Google, jest traktowany jako kompilacja społecznościowa. Wszystkie wiadomości i szyfrowanie pozostają w 100% bezpieczne i prywatne.';
+
+  @override
+  String get groupAnonymousMember => 'Członek';
+
+  @override
+  String get groupMemberRoleHost => 'Host';
+
+  @override
+  String get contactSelfBadge => 'Ty';
 }

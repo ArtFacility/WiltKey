@@ -697,5 +697,46 @@
     }
   },
   "settingsUpToDate": "WiltKey jest aktualny",
-  "settingsWhatsNew": "Co nowego"
+  "settingsWhatsNew": "Co nowego",
+  "settingsStorageSection": "Pamięć i historia",
+  "settingsHistoryLimitTitle": "Przechowywanie historii wiadomości",
+  "settingsHistoryLimitDescription": "Automatycznie usuwaj starsze lokalne wiadomości i pliki multimedialne, aby zaoszczędzić miejsce. Klucze szyfrowania i kontakty są zawsze zachowywane.",
+  "settingsHistoryLimitAll": "Zachowaj wszystkie wiadomości (Bez limitu)",
+  "settingsHistoryLimitCount": "Zachowaj ostatnie {count} wiadomości",
+  "@settingsHistoryLimitCount": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "chatDetailsClearHistory": "Wyczyść historię wiadomości",
+  "chatDetailsClearHistoryConfirm": "Wyczyść historię",
+  "chatDetailsClearHistoryDialogBody": "Trwale usunąć całą lokalną historię wiadomości w tym czacie? Klucze szyfrowania i status kontaktu zostaną zachowane.",
+  "chatDetailsClearHistoryPrune100": "Zachowaj tylko ostatnie 100 wiadomości",
+  "chatDetailsClearHistorySuccess": "Historia czatu została wyczyszczona",
+  "chatDetailsSectionMedia": "Multimedia, wiadomości głosowe i linki",
+  "chatDetailsMediaPhotos": "Zdjęcia",
+  "chatDetailsMediaVoice": "Wiadomości głosowe",
+  "chatDetailsMediaLinks": "Linki",
+  "chatDetailsNoMedia": "Brak udostępnionych zdjęć",
+  "chatDetailsNoVoice": "Brak wiadomości głosowych",
+  "chatDetailsNoLinks": "Brak udostępnionych linków",
+  "qrConnectTitle": "Połączenie QR",
+  "qrConnectScanTab": "Skanuj QR",
+  "qrConnectMyCodeTab": "Mój kod QR",
+  "qrConnectScanPrompt": "Skieruj aparat na kod QR WiltKey, aby połączyć się natychmiast",
+  "qrConnect7DayNotice": "Połączenia zdalne rozpoczynają się automatycznie jako 7-dniowy czat Time Wilt. Do doładowania szyfru jednorazowego wymagane jest osobiste parowanie BLE.",
+  "qrConnectRechargeBlocked": "Ten kontakt już istnieje. Doładowanie notesu wymaga osobistego parowania BLE i nie może być wykonane zdalnie.",
+  "qrConnectManualPin": "Wpisz PIN ręcznie",
+  "badgePlayPlus": "Sklep Play · Plus",
+  "badgePlayPlusSubtitle": "Zweryfikowana kompilacja Google Play + Wspierający Plus",
+  "badgePlayPlusExplainer": "Ten użytkownik korzysta z oficjalnej, niezmodyfikowanej kompilacji zweryfikowanej przez Google Play Integrity i aktywnie wspiera WiltKey z aktywnym członkostwem Plus.",
+  "badgePlayVerified": "Sklep Play",
+  "badgePlayVerifiedSubtitle": "Zweryfikowana kompilacja Google Play",
+  "badgePlayVerifiedExplainer": "Ten użytkownik korzysta z oficjalnej, niezmodyfikowanej kompilacji zweryfikowanej kryptograficznie przez Google Play Integrity.",
+  "badgeFoss": "Open Source",
+  "badgeFossSubtitle": "Kompilacja społecznościowa / FOSS",
+  "badgeFossExplainer": "Ten klient działa na kompilacji otwartoźródłowej lub niestandardowej. Ponieważ nie uruchamia własnościowych usług Google, jest traktowany jako kompilacja społecznościowa. Wszystkie wiadomości i szyfrowanie pozostają w 100% bezpieczne i prywatne.",
+  "groupAnonymousMember": "Członek",
+  "groupMemberRoleHost": "Host",
+  "contactSelfBadge": "Ty"
 }
