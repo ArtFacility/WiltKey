@@ -2,21 +2,29 @@
 
 # WiltKey
 
-**A private messenger for people who'd rather be off their phone. Make friends you actually see IRL**
+**A private messenger for people who'd rather be off their phone. Make friends you actually see IRL.**
 
-`v1.0.1` · Android · MPL-2.0 · made by [ArtFacility](https://github.com/ArtFacility)
+`v1.3.5` · Android · MPL-2.0 · made by [ArtFacility](https://github.com/ArtFacility)
+
+<br>
+
+[![Download Latest APK](https://img.shields.io/badge/📥_DOWNLOAD_APK-Latest_Release-06b6d4?style=for-the-badge&logo=android&logoColor=white)](https://github.com/ArtFacility/WiltKey/releases/latest)
+
+<br>
 
 </div>
 
-> ⚠️ **Heads up:** this is the first semi-stable release. It works and I daily-drive it, but it's still very much a work in progress — expect rough edges, weird messaging behavior, and the occasional bugs. Issues and suggestions welcome.
+> ⚠️ **Heads up:** WiltKey is a solo project and actively evolving. It's stable, fast, and daily-driven, but expect continuous improvements and new features. Bug reports and feature suggestions are always welcome.
 
 ---
 
-WiltKey is an encrypted chat app built on simple idea: Only people you actually know in real life are in your contacts and the people worth talking to are the ones you actually meet. So instead of accounts, phone numbers, or "add me by username," you add a contact **in person over Bluetooth**. No sign-up, no data in the cloud, nothing tying your identity to a server somewhere.
+WiltKey is an encrypted chat app built on a simple idea: the people worth talking to are the ones you actually know and meet in real life. 
 
-The encryption is a one-time pad, that thing that's mathematically unbreakable (when used properly) and the relay server in the middle is deliberately blind. It shoves encrypted blobs from A to B and keeps **zero** chat history. If someone's offline, their message waits in a queue for 24 hours and then it's gone, delivered or not.
+Instead of phone numbers, email accounts, or searching random usernames, you connect with someone **in person over Bluetooth** (or via a quick **QR code** for temporary 7-day chats). There are no user accounts, no cloud databases holding your messages, and nothing tying your real-world identity to a server.
 
-And the whole thing is designed to *not* hold your attention. No infinite feed, no streaks, no "someone is typing…" dopamine loops. It's a tool to catch up with friends before seeing them IRL, and the less time you spend on your phone texting people and the more in real life with your bros, the better.
+The encryption is a **one-time pad and stream cipher** — mathematically unbreakable when used properly. The relay server in the middle is completely blind: it blindly routes encrypted blobs between devices and keeps **zero** chat history. If someone is offline, their message waits temporarily in a self-expiring queue and is permanently wiped on delivery.
+
+No infinite feeds. No streaks. No "someone is typing…" dopamine traps. It's built to help you catch up with friends before meeting up in real life.
 
 <div align="center">
 <table>
@@ -33,15 +41,20 @@ And the whole thing is designed to *not* hold your attention. No infinite feed, 
 </table>
 </div>
 
-## The gist
+---
 
-- **Keys are swapped in person.** Two phones, Bluetooth, a few seconds. That physical step *is* the trust — there's no "verify this safety number later," because you were literally standing next to each other.
-- **One-time pad encryption.** Each message is XOR'd against shared keystream that's never reused. The server can't read it, and neither can anyone who grabs it off the wire.
-- **The server knows nothing.** It's a blind relay. No chat logs, no accounts, no metadata pile. Offline messages sit in a 24-hour Redis queue and vanish on delivery.
-- **You have a messaging budget.** You and your contact share a finite stash of keystream, and every message spends a little. Run low? You can borrow unused space from the person you're chatting with — and it can happen automatically, so you just keep chatting.
-- **It's yours.** Multiple themes (a cozy Garden one, a neon Cyberpunk one, a clean Paper-ink one), pixel-art avatars you draw yourself, and per-chat custom emojis.
+## What Makes It Different
 
-## A few things it does
+- 🤝 **In-Person Bluetooth Pairing:** Two phones, Bluetooth, a few seconds. The physical meetup *is* the trust. No centralized directory, no "verify safety numbers" after the fact.
+- ⚡ **Instant QR Connect:** Need to connect quickly on the go? Scan a QR code or enter a 6-digit PIN to start a 7-day Time Wilt chat. (Pad recharging stays strictly in-person over Bluetooth to protect physical security).
+- 🔒 **One-Time Pad & Stream Cipher Encryption:** Messages are encrypted using fresh, non-reused keystream material. The server can never read your messages, and neither can anyone intercepting network traffic.
+- 🙈 **Zero-Knowledge Blind Relay:** The relay server only sees opaque hashes and encrypted ciphertext. It maintains zero message logs, zero account databases, and zero relationship graphs.
+- ⏳ **Wilting (Self-Destructing) Messages & Photos:** Hold the send button to attach a self-destruct timer (1–60s). Messages quietly dissolve after being read.
+- 🎨 **Pixel-Art Avatar & Custom Emoji Creator:** Draw your own 16x16 pixel art avatar with custom color palettes and create custom `:emoji:` definitions usable inline.
+- 🛡️ **Democratic Vote-to-Nuke:** Nuke a 1:1 chat to wipe all messages and keys from both devices simultaneously. In group chats, destroying a group requires a majority vote from members.
+- 🎙️ **Hands-Free Voice Notes:** Slide up to lock recording hands-free with real-time waveform preview and automatic byte-budget protection.
+- 🏷️ **Client Integrity Badges:** Cryptographically verifiable build authenticity tags—Official Google Play builds show a Shield (Golden Shield for Plus supporters), while community/custom builds display an Open Source tinkerer badge.
+- 💬 **All the Essentials You Expect:** Photo sharing with live compression & hidden tap-to-reveal mode, shared Media/Voice/Links gallery, configurable message history retention (keep last 100–1000 messages or clear history), markdown formatting, quote swipe-to-reply, emoji reactions (`🗿`), `@mention` autocomplete, muted chats, PIN/fingerprint lock, screenshot protection, and multiple themes (Garden, Cyberpunk, Paper-ink).
 
 <div align="center">
 <table>
@@ -58,74 +71,94 @@ And the whole thing is designed to *not* hold your attention. No infinite feed, 
 </table>
 </div>
 
-- **Group chats** that work over the same in-person trust model.
-- **Image sending** with a compression slider so you can see exactly what a picture will "cost" before it goes, plus a *send hidden* option for spoiler/tap-to-reveal pics. Tap a received image to zoom and pan it full-screen, and the sender can optionally let you **save it to your gallery** (in JPEG, PNG or WebP).
-- **Message reactions** — react to any message with an emoji, your custom ones included.
-- **Custom emojis per chat** — make a `:pepesad:` or a `:mogged:`, use it inline with `:name:`.
-- **Voice messages** — hold to record and pick the quality before you send, from crisp down to charmingly lo-fi. They ride the same one-time pad as everything else, and each theme plays them back its own way.
-- **Nuke a chat** from both sides — wipes the messages and the keys, on your device and theirs.
-- **PIN + fingerprint lock**, and the app blocks screenshots/screen-recording on release builds.
-- **Notifications on your terms** — a fully Google-free mode (a light on-device background connection or periodic checks), or, on the Play Store build, an optional real-time push that sends only a *content-free* wake-up through Google — never your messages. (Only the Play build registers a wake-up token with the relay; the self-built/FOSS build stays completely Google-free.)
-- **Localized** into several languages (Mostly AI for now, and this is the easiest place to help out — see below).
+---
 
-A couple of short demos (click to watch):
+<div align="center">
 
-📹 [Pairing two phones over Bluetooth](showcase/device_pairing.mp4) · 🔒 [PIN unlock](showcase/pin_unlock.mp4)
+## 📥 Get WiltKey
 
-## Under the hood
+Looking for the APK? You can download the latest standalone release directly:
 
-If you want the real, animated explanation of how the pad, the lanes, the borrowing, and the blind relay all fit together, the website does a much better job than a wall of text here:
+[![Download Latest APK](https://img.shields.io/badge/DOWNLOAD_LATEST_RELEASE-APK-06b6d4?style=for-the-badge&logo=android&logoColor=white)](https://github.com/ArtFacility/WiltKey/releases/latest)
 
-- 🌐 **Architecture, explained with animations:** [wiltkey.org/architecture.html](https://wiltkey.org/architecture.html)
-- 📚 **Developer docs portal** (searchable, per-feature): [wiltkey.org/docs/](https://wiltkey.org/docs/)
+*(No Google Play Services required for the FOSS build — runs 100% on-device).*
 
-The short version: a Flutter client (`wiltkey_client/`) talks to a small Go relay (`wiltkey_server/`). Identity is a local Ed25519 keypair. Messages *and* custom emojis ride the one-time pad (XOR keystream, spending pad budget). A small, separate AES-encrypted metadata channel — keyed per-contact — handles profile/permission sync (name, avatar, image permission) and archive signals, so that stuff keeps working even while a pad is being torn down. Nothing sensitive is ever written to disk in plaintext.
+</div>
 
-### Building it yourself
+---
 
-You'll need the [Flutter SDK](https://docs.flutter.dev/get-started/install) (Android side only for now — I don't have a Mac to build iOS).
+## Roadmap & What's Next
+
+Here is what's on the radar:
+
+- **More profile features:** including wilting stories (ephemeral 24h photo/status drops for mutual contacts).
+- **More groupchat/social stuff:** votekick, location sharings, permission related features, profile pic sharing, etc.
+- **True OTP generator:** exploring hardware/entropy-backed random pad generation.
+- **Meshtastic support:** I am contemplating off-grid/Meshtastic support, but don't count on it, I'm still  looking into it.
+- **Community-driven features:** whatever people request enough that makes sense and doesn't compromise on privacy and the wilting "meet up to chat" philosophy of the app.
+
+No promises — this is an project developed next to my job+raising my kid.
+
+---
+
+## Under the Hood & Documentation
+
+For interactive diagrams, specs, and technical documentation:
+
+- 🌐 **Interactive Architecture & Protocol Animations:** [wiltkey.org/architecture.html](https://wiltkey.org/architecture.html)
+- 📚 **Full Developer Documentation Portal:** [wiltkey.org/docs/](https://wiltkey.org/docs/)
+- 📜 **Complete Version History & Patch Notes:** [wiltkey.org/patchnotes.html](https://wiltkey.org/patchnotes.html)
+
+### How It Fits Together
+
+- **Client (`wiltkey_client/`):** Built with Flutter (Android). Cryptographic identities are local Ed25519 keypairs. All private chat data is stored encrypted-at-rest with an AES-256 master key derived from the user's PIN using iterative SHA-256 KDF.
+- **Blind Relay (`wiltkey_server/`):** Written in Go. Handles WebSocket routing and temporary Redis/PostgreSQL queueing. Employs Ed25519 challenge-response authentication (`/ws`), anti-replay nonces, and Google Play Integrity verification.
+- **Channel Isolation:** Privacy-critical chat content rides the OTP/keystream channel. Lightweight profile metadata and reactions ride a separate AES-encrypted metadata channel that never consumes one-time pad bytes.
+
+---
+
+## Building from Source
+
+You'll need the [Flutter SDK](https://docs.flutter.dev/get-started/install).
 
 ```bash
-cd wiltkey_client
+# Clone the repository
+git clone https://github.com/ArtFacility/WiltKey
+cd WiltKey/wiltkey_client
+
+# Fetch dependencies & generate localizations
+flutter clean
 flutter pub get
-flutter run --flavor foss --dart-define=WK_FCM=false   # Google-free build
+flutter gen-l10n
+
+# Run / Build FOSS flavor (100% Google-free)
+flutter run --flavor foss --dart-define=WK_FCM=false
+flutter build apk --release --flavor foss --dart-define=WK_FCM=false
 ```
 
-The app builds in **two flavors**, and a `--flavor` is required:
+### Build Flavors
 
-- **`foss`** — zero Google services. This is the one you want for a self-built or sideloaded install; notifications run entirely on-device (a background connection or light polling).
-- **`play`** — the Google Play build. Adds Firebase Cloud Messaging as an *optional*, content-free push wake-up (needs your own `google-services.json`). Build it with `--flavor play --dart-define=WK_FCM=true`.
+- **`foss`:** Zero proprietary Google dependencies or libraries. Notifications run completely on-device using a lightweight background connection.
+- **`play`:** The Google Play Store build. Integrates optional Firebase Cloud Messaging for content-free push wakeups and Google Play Billing/Integrity. Requires `--flavor play --dart-define=WK_FCM=true --dart-define=WK_PLAY=true`.
 
-> Debug builds intentionally **don't** block screenshots, so you can capture stuff like the shots above. Release builds always do.
+To run your own relay server, check the [Self-Hosting Guide](https://wiltkey.org/docs/relay-server.html#self-hosting) in `wiltkey_server/`.
 
-The Go relay lives in `wiltkey_server/` if you want to run your own instead of the default one. (The FCM push is opt-in there too — it stays disabled unless you point it at Firebase credentials, so a self-hosted relay needs no Google account.)
+---
 
-## Status & roadmap
+## Contributing & Localization
 
-I'd say it's a rough **1.0.0** — the first version I'm comfortable letting other people poke at. Core messaging, groups, theming, and the security basics are in and working. Plenty is still planned:
+The easiest and most impactful way to contribute is **translations**:
 
-- 💥 **Self-destruct messages & images** — set something to vanish after it's read.
-- 📍 **Meetup discovery** — create/join small local events near you so people with shared interests can actually meet up in person.
-- …and a steady stream of smaller stuff: more themes, polish, and the special-action animations that are still stubbed out.
-
-No promises tho — it's a solo project I work on next to work and raising a baby.
-
-## Contributing
-
-The single most useful thing you can help with right now is **translations**.
-
-The app is already wired for localization, and the language files are easy to find:
-
-```
+```text
 wiltkey_client/lib/l10n/
   app_en.arb                  # English source strings
-  app_localizations_*.dart    # the per-language files
+  app_localizations_*.dart    # Generated per-language files
 ```
 
-If you speak a language WiltKey already supports and something reads awkwardly — fix it. If you speak one it *doesn't* support yet — adding it is very welcome. Open a PR or just an issue with suggestions; I'd rather have a slightly rough translation from a native speaker than one from an AI that sounds like someone larping as a native speaker.
+WiltKey currently supports 8 languages: English (`en`), German (`de`), French (`fr`), Hungarian (`hu`), Polish (`pl`), Swedish (`sv`), and Chinese (`zh`). If you notice awkward phrasing or want to add a new language, PRs are warmly welcomed!
 
-Beyond that, bug reports and feature thoughts are great. Just keep in mind the project has a few non-negotiables (no plaintext at rest, the server stays blind, one-time pads never get reused, themes stay token-driven, and nothing should be designed to keep you glued to the screen). The [docs](https://wiltkey.org/docs/) spell those out if you're curious. If you find any sort of security concerns, hit me up.
+---
 
 ## License
 
-WiltKey is licensed under the **Mozilla Public License 2.0**. See [LICENSE.md](LICENSE.md). In short: use it, modify it, ship it — just keep changes to the MPL-covered files open under the same license.
+WiltKey is licensed under the **Mozilla Public License 2.0**. See [LICENSE.md](LICENSE.md).
