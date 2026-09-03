@@ -2364,4 +2364,157 @@ class AppLocalizationsHu extends AppLocalizations {
 
   @override
   String get contactSelfBadge => 'Te';
+
+  @override
+  String get chatAttachContentTitle => 'Csatolás a csevegéshez';
+
+  @override
+  String get chatAttachPhotos => 'Fotók és kamera';
+
+  @override
+  String get chatAttachPhotosSubtitle =>
+      'Fotó készítése vagy választás a galériából';
+
+  @override
+  String get chatAttachPixelArt => 'Pixel art és avatarok';
+
+  @override
+  String get chatAttachPixelArtSubtitle =>
+      'Rajzolj pixelrajzot vagy küldj mentett sablonokból';
+
+  @override
+  String get chatAttachVideo => 'Videó';
+
+  @override
+  String get chatAttachVideoSubtitle =>
+      'Titkosított rövid videoklipek egy jövőbeli frissítésben';
+
+  @override
+  String get chatAttachComingSoon => 'HAMAROSAN';
+
+  @override
+  String get chatPixelArtDrawNew => 'Új pixelrajz készítése';
+
+  @override
+  String get chatPixelArtTemplates => 'Mentett avatarsablonok';
+
+  @override
+  String get chatPixelArtSend => 'Küldés a csevegésbe';
+
+  @override
+  String get chatPixelArtNoTemplates => 'Még nincsenek mentett avatarsablonok';
+
+  @override
+  String get chatPixelArtActionTitle => 'Pixel art beállítások';
+
+  @override
+  String get chatPixelArtActionApplyAvatar =>
+      'Beállítás saját profilavatarként';
+
+  @override
+  String get chatPixelArtActionSaveTemplate => 'Mentés az avatarsablonok közé';
+
+  @override
+  String get chatPixelArtActionSaveEmoji => 'Mentés egyedi emojiként';
+
+  @override
+  String get chatPixelArtActionExportPng => 'PNG exportálása a fotók közé';
+
+  @override
+  String get chatPixelArtActionAppliedAvatarSuccess =>
+      'Profilavatar frissítve és szinkronizálva';
+
+  @override
+  String get chatPixelArtActionSavedTemplateSuccess =>
+      'Elmentve az avatarsablonok könyvtárába';
+
+  @override
+  String get chatPixelArtActionExportedPngSuccess =>
+      'PNG-kép elmentve a fotók közé';
+
+  @override
+  String get chatSearchHint => 'Keresés a csevegésben...';
+
+  @override
+  String get chatSearchNoMatches => '0 találat';
+
+  @override
+  String get contactPrivateNoteTitle => 'Privát jegyzetek és becenév';
+
+  @override
+  String get contactPrivateNoteHint =>
+      'Privát jegyzetek hozzáadása erről a kapcsolatról (csak helyileg tárolva)...';
+
+  @override
+  String get contactCustomNicknameTitle => 'Egyéni becenév';
+
+  @override
+  String get contactCustomNicknameHint =>
+      'Megjelenített név felülírása helyileg...';
+
+  @override
+  String get contactNotesSaved => 'Kapcsolat adatai elmentve';
+
+  @override
+  String get onboardingSocialTitle => 'WiltKey közösségi fiók';
+
+  @override
+  String get onboardingSocialExplanation =>
+      'Engedélyezi a WiltKey közösségi profilodat és a szerver által támogatott felderítést. A nyilvános azonosító kulcsod regisztrálva lesz a relayen (és bármikor véglegesen visszavonható/törölhető általad) a 24 órás elhervadó történetek és a broadcast bejegyzések szerzőségének ellenőrzéséhez. Minden tartalom zero-knowledge végpontok közötti titkosítással védett marad.';
+
+  @override
+  String get onboardingSocialEnable =>
+      'WiltKey közösségi fiók engedélyezése (Ajánlott)';
+
+  @override
+  String get onboardingSocialEnableDesc =>
+      'Ossz meg 24 órás elhervadó történeteket közös kapcsolataiddal, küldj egyedi pixelrajzokat és vegyél részt a közösségi broadcastokban.';
+
+  @override
+  String get onboardingSocialZeroServer =>
+      'Zéró szerveradat mód (Abszolút adatvédelem)';
+
+  @override
+  String get onboardingSocialZeroServerDesc =>
+      'Maximális anonimitás. Szigorúan közvetlen peer-to-peer és 1:1/csoportos üzenetküldés szerveroldali identitásregisztráció nélkül. A távoli közösségi funkciók és történetek le vannak tiltva.';
+
+  @override
+  String get settingsSocialAccountTitle => 'WiltKey közösségi fiók';
+
+  @override
+  String get settingsSocialAccountSubtitle =>
+      'Szerver által támogatott 24 órás történetek és felderítés engedélyezése';
+
+  @override
+  String get settingsStoriesReelTitle => 'Vezérlőpult történetek sáv';
+
+  @override
+  String get settingsStoriesReelSubtitle =>
+      '24 órás történetek megjelenítése a csevegések fül tetején';
+
+  @override
+  String get connectTabConnect => 'Kapcsolódás';
+
+  @override
+  String get connectTabSocial => 'Közösség';
+
+  @override
+  String get forcedUpdateTitle => 'Frissítés szükséges';
+
+  @override
+  String get forcedUpdateSubtitle =>
+      'A WiltKey biztonságos használatának folytatásához kötelező frissítés szükséges.';
+
+  @override
+  String get forcedUpdateAction => 'Frissítés most';
+
+  @override
+  String get forcedUpdateCheckAgain => 'Újraellenőrzés';
+
+  @override
+  String get forcedUpdateSecurityNotice =>
+      'Ez a verzió kritikus protokoll- vagy biztonsági frissítéseket tartalmaz. A régebbi verziók már nem tudnak kommunikálni a hálózattal.';
+
+  @override
+  String get forcedUpdateWhatsNew => 'Újdonságok ebben a frissítésben';
 }

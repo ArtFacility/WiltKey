@@ -2220,4 +2220,142 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get contactSelfBadge => '你';
+
+  @override
+  String get chatAttachContentTitle => '附加到聊天';
+
+  @override
+  String get chatAttachPhotos => '照片与相机';
+
+  @override
+  String get chatAttachPhotosSubtitle => '拍照或从相册中选择';
+
+  @override
+  String get chatAttachPixelArt => '像素画与头像';
+
+  @override
+  String get chatAttachPixelArtSubtitle => '绘制像素画或从已保存模板发送';
+
+  @override
+  String get chatAttachVideo => '视频';
+
+  @override
+  String get chatAttachVideoSubtitle => '加密短视频剪辑将在未来更新中推出';
+
+  @override
+  String get chatAttachComingSoon => '即将推出';
+
+  @override
+  String get chatPixelArtDrawNew => '绘制新像素画';
+
+  @override
+  String get chatPixelArtTemplates => '已保存的头像模板';
+
+  @override
+  String get chatPixelArtSend => '发送到聊天';
+
+  @override
+  String get chatPixelArtNoTemplates => '暂无保存的头像模板';
+
+  @override
+  String get chatPixelArtActionTitle => '像素画选项';
+
+  @override
+  String get chatPixelArtActionApplyAvatar => '应用为我的个人头像';
+
+  @override
+  String get chatPixelArtActionSaveTemplate => '保存到头像模板';
+
+  @override
+  String get chatPixelArtActionSaveEmoji => '保存为自定义表情';
+
+  @override
+  String get chatPixelArtActionExportPng => '导出 PNG 到相册';
+
+  @override
+  String get chatPixelArtActionAppliedAvatarSuccess => '个人头像已更新并同步';
+
+  @override
+  String get chatPixelArtActionSavedTemplateSuccess => '已保存到头像模板库';
+
+  @override
+  String get chatPixelArtActionExportedPngSuccess => '已将 PNG 图片保存到相册';
+
+  @override
+  String get chatSearchHint => '在聊天中搜索...';
+
+  @override
+  String get chatSearchNoMatches => '0 个匹配项';
+
+  @override
+  String get contactPrivateNoteTitle => '私密备注与昵称';
+
+  @override
+  String get contactPrivateNoteHint => '添加关于此联系人的私密备注（仅本地存储）...';
+
+  @override
+  String get contactCustomNicknameTitle => '自定义昵称';
+
+  @override
+  String get contactCustomNicknameHint => '在本地覆盖显示名称...';
+
+  @override
+  String get contactNotesSaved => '联系人详情已保存';
+
+  @override
+  String get onboardingSocialTitle => 'WiltKey 社交账号';
+
+  @override
+  String get onboardingSocialExplanation =>
+      '启用你的 WiltKey 社交个人资料及服务器辅助发现。你的公钥身份会注册到中继服务器（可由你随时永久撤销/清除），以验证 24 小时限时动态与广播帖子的发布者身份。所有内容均保持零知识端到端加密。';
+
+  @override
+  String get onboardingSocialEnable => '启用 WiltKey 社交功能（推荐）';
+
+  @override
+  String get onboardingSocialEnableDesc =>
+      '与共同联系人分享 24 小时限时动态、发送自定义像素画并参与社交广播。';
+
+  @override
+  String get onboardingSocialZeroServer => '零服务器数据模式（绝对隐私）';
+
+  @override
+  String get onboardingSocialZeroServerDesc =>
+      '最高匿名度。严格点对点直接 1:1/群聊消息，不在服务器上注册任何身份。远程社交功能和限时动态将被禁用。';
+
+  @override
+  String get settingsSocialAccountTitle => 'WiltKey 社交账号';
+
+  @override
+  String get settingsSocialAccountSubtitle => '允许服务器辅助的 24 小时动态和发现';
+
+  @override
+  String get settingsStoriesReelTitle => '主面板动态栏';
+
+  @override
+  String get settingsStoriesReelSubtitle => '在聊天列表顶部显示 24 小时动态';
+
+  @override
+  String get connectTabConnect => '连接';
+
+  @override
+  String get connectTabSocial => '社交';
+
+  @override
+  String get forcedUpdateTitle => '需要更新';
+
+  @override
+  String get forcedUpdateSubtitle => '需要进行强制更新以继续安全使用 WiltKey。';
+
+  @override
+  String get forcedUpdateAction => '立即更新';
+
+  @override
+  String get forcedUpdateCheckAgain => '再次检查';
+
+  @override
+  String get forcedUpdateSecurityNotice => '此版本包含关键的协议或安全更新。旧版本将无法再与网络通信。';
+
+  @override
+  String get forcedUpdateWhatsNew => '本次更新内容';
 }

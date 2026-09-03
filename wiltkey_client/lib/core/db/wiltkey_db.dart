@@ -43,7 +43,7 @@ class WiltkeyDatabase {
     } catch (_) {}
     _db = await openDatabase(
       path,
-      version: 26,
+      version: 27,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -211,6 +211,34 @@ class WiltkeyDatabase {
       await _safeAddColumn(db, 'group_profiles', 'client_attestation', 'TEXT');
       await _safeAddColumn(db, 'group_profiles', 'attestation_expires_at', 'INTEGER');
     }
+
+    // v27: Stories table + private contact notes & custom nickname
+    if (oldVersion < 27) {
+      await _safeAddColumn(db, 'social_contacts', 'custom_nickname', 'TEXT');
+      await _safeAddColumn(db, 'social_contacts', 'private_notes', 'TEXT');
+      await _safeAddColumn(db, 'contacts', 'custom_nickname', 'TEXT');
+      await _safeAddColumn(db, 'contacts', 'private_notes', 'TEXT');
+      try {
+        await db.execute('''
+          CREATE TABLE IF NOT EXISTS stories (
+            id TEXT PRIMARY KEY,
+            sender_id TEXT NOT NULL,
+            sender_name TEXT,
+            sender_avatar TEXT,
+            sender_border TEXT,
+            story_type TEXT NOT NULL,
+            content TEXT NOT NULL,
+            caption TEXT,
+            created_at INTEGER NOT NULL,
+            expires_at INTEGER NOT NULL,
+            viewed_at INTEGER,
+            media_path TEXT
+          )
+        ''');
+        await db.execute('CREATE INDEX IF NOT EXISTS idx_stories_sender ON stories(sender_id)');
+        await db.execute('CREATE INDEX IF NOT EXISTS idx_stories_expiry ON stories(expires_at)');
+      } catch (_) {}
+    }
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -312,7 +340,9 @@ class WiltkeyDatabase {
         additional_slots TEXT,
         group_recharge_pending INTEGER DEFAULT 0,
         is_pending_emergency INTEGER DEFAULT 0,
-        notification_mode TEXT DEFAULT 'all'
+        notification_mode TEXT DEFAULT 'all',
+        custom_nickname TEXT,
+        private_notes TEXT
       )
     ''');
 
@@ -361,7 +391,28 @@ class WiltkeyDatabase {
 
     // 8. Local block list for contact requests.
     await db.execute(_createContactBlocksTableSql);
+
+    // 9. Wilting stories
+    await db.execute(_createStoriesTableSql);
   }
+
+  // Wilting stories (24h ephemeral posts).
+  static const String _createStoriesTableSql = '''
+      CREATE TABLE IF NOT EXISTS stories (
+        id TEXT PRIMARY KEY,
+        sender_id TEXT NOT NULL,
+        sender_name TEXT,
+        sender_avatar TEXT,
+        sender_border TEXT,
+        story_type TEXT NOT NULL,
+        content TEXT NOT NULL,
+        caption TEXT,
+        created_at INTEGER NOT NULL,
+        expires_at INTEGER NOT NULL,
+        viewed_at INTEGER,
+        media_path TEXT
+      )
+    ''';
 
   // Activity-feed event log. `chat_key` (nullable) deep-links to a chat when it
   // still exists; `read` drives the bell badge. Kept as its own table (not
@@ -402,7 +453,9 @@ class WiltkeyDatabase {
         status_emoji TEXT,
         status_expires_at INTEGER,
         client_attestation TEXT,
-        attestation_expires_at INTEGER
+        attestation_expires_at INTEGER,
+        custom_nickname TEXT,
+        private_notes TEXT
       )
     ''';
 
@@ -454,6 +507,8 @@ class WiltkeyDatabase {
       'avatar_border': contact.avatarBorderId,
       'client_attestation': contact.clientAttestation,
       'attestation_expires_at': contact.attestationExpiresAt,
+      'custom_nickname': contact.customNickname,
+      'private_notes': contact.privateNotes,
       'outgoing_offset': contact.outgoingOffset,
       'outgoing_max_offset': contact.outgoingMaxOffset,
       'incoming_offset': contact.incomingOffset,
@@ -471,6 +526,31 @@ class WiltkeyDatabase {
       'is_pending_emergency': contact.isPendingEmergency ? 1 : 0,
       'notification_mode': contact.notificationMode,
     }, conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<void> updateContactNotes(
+    String keyHash, {
+    String? customNickname,
+    String? privateNotes,
+  }) async {
+    final db = await _database;
+    final Map<String, Object?> values = {};
+    if (customNickname != null) values['custom_nickname'] = customNickname;
+    if (privateNotes != null) values['private_notes'] = privateNotes;
+    if (values.isNotEmpty) {
+      await db.update(
+        'contacts',
+        values,
+        where: 'key_hash = ?',
+        whereArgs: [keyHash],
+      );
+      await db.update(
+        'social_contacts',
+        values,
+        where: 'key_hash = ?',
+        whereArgs: [keyHash],
+      );
+    }
   }
 
   Future<List<Contact>> getAllContacts() async {
@@ -513,6 +593,8 @@ class WiltkeyDatabase {
         avatarBorderId: row['avatar_border'] as String?,
         clientAttestation: row['client_attestation'] as String?,
         attestationExpiresAt: row['attestation_expires_at'] as int?,
+        customNickname: row['custom_nickname'] as String?,
+        privateNotes: row['private_notes'] as String?,
         outgoingOffset: row['outgoing_offset'] as int? ?? 0,
         outgoingMaxOffset: row['outgoing_max_offset'] as int? ?? 0,
         incomingOffset: row['incoming_offset'] as int? ?? 0,
@@ -1174,6 +1256,23 @@ class WiltkeyDatabase {
     await db.update(
       'messages',
       updateMap,
+      where: where,
+      whereArgs: whereArgs,
+    );
+  }
+
+  /// Updates message timestamp to preserve original position after asynchronous download.
+  Future<void> updateMessageTimestamp(
+    String messageId, {
+    String? chatId,
+    required DateTime timestamp,
+  }) async {
+    final db = await _database;
+    final where = chatId != null ? 'id = ? AND chat_id = ?' : 'id = ?';
+    final whereArgs = chatId != null ? [messageId, chatId] : [messageId];
+    await db.update(
+      'messages',
+      {'timestamp': timestamp.toIso8601String()},
       where: where,
       whereArgs: whereArgs,
     );

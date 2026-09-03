@@ -16,6 +16,7 @@ import 'chat_image_thumbnail.dart';
 import 'chat_markdown.dart';
 import 'reply_preview.dart';
 import 'wilt_widgets.dart';
+import 'pixel_art_message_bubble.dart';
 
 class MessageBubble extends StatelessWidget {
   final ChatMessage message;
@@ -399,6 +400,18 @@ class MessageBubble extends StatelessWidget {
     }
 
     final decryptedText = message.decryptedText ?? displayText;
+
+    if (message.contentType == 'pixel_art') {
+      return wrapWiltingContent(
+        context: context,
+        message: message,
+        isMe: isMe,
+        content: PixelArtMessageCard(
+          hexString: decryptedText,
+          isSentByMe: isMe,
+        ),
+      );
+    }
 
     if (message.contentType == 'voice') {
       if (message.decodedAudioBytes == null) {

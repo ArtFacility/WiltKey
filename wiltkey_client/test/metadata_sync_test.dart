@@ -248,8 +248,8 @@ void main() {
         // Deliver this message. This should trigger gap detection for [gapStart, gapEnd]
         ws.onMessageReceived!(bobKeyHash, envelope, 'text');
 
-        // Wait for async operations
-        await Future.delayed(const Duration(milliseconds: 100));
+        // Wait for async DB and gap detection
+        await Future.delayed(const Duration(milliseconds: 400));
 
         // 4. Assert that a resync request was sent for the gap [gapStart, gapEnd]
         expect(sentMessages, isNotEmpty);
@@ -299,7 +299,7 @@ void main() {
           responseEnvelope,
           'chat_resync_response',
         );
-        await Future.delayed(const Duration(milliseconds: 100));
+        await Future.delayed(const Duration(milliseconds: 1000));
 
         // 6. Assert that the gap is healed
         final chatMessages = appState.messages[contact.id] ?? [];

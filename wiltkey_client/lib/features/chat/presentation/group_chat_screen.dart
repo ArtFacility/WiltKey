@@ -13,6 +13,8 @@ import '../../../core/cosmetics/avatar_border_controller.dart';
 import '../../../core/custom_emoji.dart';
 import '../../contacts/presentation/contact_request_ui.dart';
 import 'widgets/image_source_sheet.dart';
+import 'widgets/content_attachment_sheet.dart';
+import 'widgets/chat_search_bar.dart';
 import '../../../core/theme/wk.dart';
 import '../../../core/theme/wiltkey_tokens.dart';
 import '../../../core/theme/wiltkey_components.dart';
@@ -100,6 +102,13 @@ class _GroupChatScreenState extends State<GroupChatScreen>
 
   // Wraps the message list so a consented screenshot can render it to an image.
   final GlobalKey _captureBoundaryKey = GlobalKey();
+
+  // Local keyword search
+  bool _isSearching = false;
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+  List<String> _matchingMessageIds = [];
+  int _currentMatchIndex = 0;
 
   late final AnimationController _sendBloom = AnimationController(
     vsync: this,
@@ -482,6 +491,68 @@ class _GroupChatScreenState extends State<GroupChatScreen>
     });
   }
 
+  void _onSearchChanged(String q) {
+    final query = q.trim().toLowerCase();
+    setState(() {
+      _searchQuery = query;
+      if (query.isEmpty) {
+        _matchingMessageIds.clear();
+        _currentMatchIndex = 0;
+        return;
+      }
+      final contact = _appState.activeContact;
+      final msgs = contact != null ? _visibleMessages(contact) : <ChatMessage>[];
+      _matchingMessageIds = msgs
+          .where((m) =>
+              (m.decryptedText ?? m.text).toLowerCase().contains(query))
+          .map((m) => m.id)
+          .toList();
+      _currentMatchIndex = 0;
+    });
+    if (_matchingMessageIds.isNotEmpty) {
+      _jumpToCurrentMatch();
+    }
+  }
+
+  void _nextSearchMatch() {
+    if (_matchingMessageIds.isEmpty) return;
+    setState(() {
+      _currentMatchIndex = (_currentMatchIndex + 1) % _matchingMessageIds.length;
+    });
+    _jumpToCurrentMatch();
+  }
+
+  void _prevSearchMatch() {
+    if (_matchingMessageIds.isEmpty) return;
+    setState(() {
+      _currentMatchIndex =
+          (_currentMatchIndex - 1 + _matchingMessageIds.length) %
+              _matchingMessageIds.length;
+    });
+    _jumpToCurrentMatch();
+  }
+
+  void _jumpToCurrentMatch() {
+    if (_matchingMessageIds.isEmpty) return;
+    final contact = _appState.activeContact;
+    if (contact == null) return;
+    final targetId = _matchingMessageIds[_currentMatchIndex];
+    scrollToMessageInList(
+      controller: _scrollController,
+      messages: _visibleMessages(contact),
+      targetId: targetId,
+      rowKeys: _messageRowKeys,
+    );
+    _flashTimer?.cancel();
+    setState(() {
+      _flashMessageId = targetId;
+      _flashTick++;
+    });
+    _flashTimer = Timer(const Duration(milliseconds: 1300), () {
+      if (mounted) setState(() => _flashMessageId = null);
+    });
+  }
+
   void _startEditing(ChatMessage message) {
     setState(() {
       _editingMessage = message;
@@ -634,11 +705,18 @@ class _GroupChatScreenState extends State<GroupChatScreen>
     }
   }
 
-  /// Tapping the group image button: choose camera vs gallery, then send.
+  /// Tapping the group attachment button: choose Photos, Pixel Art / Avatars, or Video.
   Future<void> _onGroupImageButton(Contact contact) async {
-    final src = await showImageSourceSheet(context);
-    if (src == null || !mounted) return;
-    await _pickAndSendGroupImage(contact, src);
+    final res = await showContentAttachmentSheet(context);
+    if (res == null || !mounted) return;
+    if (res is PhotoAttachmentResult) {
+      await _pickAndSendGroupImage(contact, res.source);
+    } else if (res is PixelArtAttachmentResult) {
+      await _appState.sendGroupMessage(
+        res.hexString,
+        contentType: 'pixel_art',
+      );
+    }
   }
 
   Future<void> _pickAndSendGroupImage(
@@ -866,6 +944,10 @@ class _GroupChatScreenState extends State<GroupChatScreen>
                   ),
                   onSelected: (value) {
                     switch (value) {
+                      case 'search':
+                        setState(() {
+                          _isSearching = true;
+                        });
                       case 'screenshot':
                         _requestScreenshot(contact);
                       case 'debug':
@@ -873,6 +955,14 @@ class _GroupChatScreenState extends State<GroupChatScreen>
                     }
                   },
                   itemBuilder: (context) => [
+                    PopupMenuItem(
+                      value: 'search',
+                      child: _menuRow(
+                        t,
+                        Icons.search,
+                        'Search in chat',
+                      ),
+                    ),
                     PopupMenuItem(
                       value: 'screenshot',
                       child: _menuRow(
@@ -893,13 +983,31 @@ class _GroupChatScreenState extends State<GroupChatScreen>
                   ],
                 ),
               ],
-              bottom: PreferredSize(
-                preferredSize: const Size.fromHeight(22),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16.0,
-                    vertical: 2.0,
-                  ),
+              bottom: _isSearching
+                  ? ChatSearchBar(
+                      controller: _searchController,
+                      matchCount: _matchingMessageIds.length,
+                      currentMatchIndex: _currentMatchIndex,
+                      onChanged: _onSearchChanged,
+                      onNext: _nextSearchMatch,
+                      onPrevious: _prevSearchMatch,
+                      onClose: () {
+                        setState(() {
+                          _isSearching = false;
+                          _searchController.clear();
+                          _searchQuery = '';
+                          _matchingMessageIds.clear();
+                          _currentMatchIndex = 0;
+                        });
+                      },
+                    )
+                  : PreferredSize(
+                      preferredSize: const Size.fromHeight(22),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16.0,
+                          vertical: 2.0,
+                        ),
                   child: GestureDetector(
                     onTap: () => _showMembersSheet(contact),
                     behavior: HitTestBehavior.opaque,

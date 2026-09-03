@@ -176,6 +176,13 @@ extension AppStateInbound on AppState {
       return;
     }
 
+    if (contentType == 'story_update' || contentType == 'story_reaction') {
+      if (socialAccountEnabled && storiesEnabled) {
+        refreshStoriesFeed();
+      }
+      return;
+    }
+
     if (contentType == 'archive_signal') {
       await _handleArchiveSignal(senderId, envelope);
       return;
@@ -636,6 +643,7 @@ extension AppStateInbound on AppState {
       int ttlSeconds = 0;
       String? replyToId;
 
+      DateTime? envelopeTimestamp;
       try {
         if (envelopeJson != null) {
           resolvedContentType = envelopeJson['t'] as String? ?? contentType;
@@ -645,6 +653,10 @@ extension AppStateInbound on AppState {
           allowSave = envelopeJson['dl'] == true;
           ephemeral = envelopeJson['eph'] == 1;
           ttlSeconds = envelopeJson['ttl'] as int? ?? 0;
+          final int? tsMillis = envelopeJson['ts'] as int?;
+          if (tsMillis != null && tsMillis > 0) {
+            envelopeTimestamp = DateTime.fromMillisecondsSinceEpoch(tsMillis);
+          }
         }
 
         final cipherBytes = base64Decode(rawContent);
@@ -766,7 +778,7 @@ extension AppStateInbound on AppState {
         senderId: contact.id,
         text: rawContent,
         contentType: resolvedContentType,
-        timestamp: DateTime.now(),
+        timestamp: envelopeTimestamp ?? DateTime.now(),
         isSentByMe: false,
         offset: offset,
         allowSave: allowSave,

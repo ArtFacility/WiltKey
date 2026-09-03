@@ -18,6 +18,7 @@ import 'reactions.dart';
 import 'reply_preview.dart';
 import 'voice_message_player.dart';
 import 'wilt_widgets.dart';
+import 'pixel_art_message_bubble.dart';
 
 /// A complete message bubble for group chats.
 ///
@@ -343,6 +344,12 @@ class GroupMessageBubble extends StatelessWidget {
     AppLocalizations l10n,
   ) {
     final ct = message.contentType;
+    if (ct == 'pixel_art') {
+      return PixelArtMessageCard(
+        hexString: message.decryptedText ?? displayText,
+        isSentByMe: isMe,
+      );
+    }
     if (ct == 'image' || ct == 'image_hidden') {
       return _buildImageContent(context, t, l10n);
     }

@@ -20,6 +20,7 @@ enum OnboardingPageType {
   profile,
   avatar,
   notifications,
+  socialConsent,
   pin,
 }
 
@@ -59,6 +60,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   // and any background work is opt-in. Applied after the enclave is created.
   NotificationMode _selectedNotificationMode = NotificationMode.off;
 
+  // Social account preference chosen during onboarding. Defaults to True (Recommended).
+  bool _selectedSocialAccount = true;
+
   @override
   void initState() {
     super.initState();
@@ -77,6 +81,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       OnboardingPageType.profile,
       OnboardingPageType.avatar,
       OnboardingPageType.notifications,
+      OnboardingPageType.socialConsent,
       OnboardingPageType.pin,
     ]);
 
@@ -95,6 +100,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   static const _kOnbCode = 'wk_onb_code';
   static const _kOnbGrid = 'wk_onb_grid';
   static const _kOnbNotif = 'wk_onb_notif';
+  static const _kOnbSocial = 'wk_onb_social';
 
   bool _restoring = false; // suppress checkpoint writes while applying a restore
 
@@ -111,6 +117,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       await prefs.setString(_kOnbCode, _codenameController.text);
       await prefs.setString(_kOnbGrid, _pixelGrid.join());
       await prefs.setInt(_kOnbNotif, _selectedNotificationMode.index);
+      await prefs.setBool(_kOnbSocial, _selectedSocialAccount);
     } catch (_) {}
   }
 
@@ -127,6 +134,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       final code = prefs.getString(_kOnbCode);
       final grid = prefs.getString(_kOnbGrid);
       final notif = prefs.getInt(_kOnbNotif);
+      final social = prefs.getBool(_kOnbSocial);
       _restoring = true;
       setState(() {
         if (user != null) _usernameController.text = user;
@@ -136,6 +144,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             notif >= 0 &&
             notif < NotificationMode.values.length) {
           _selectedNotificationMode = NotificationMode.values[notif];
+        }
+        if (social != null) {
+          _selectedSocialAccount = social;
         }
         _currentPage = idx;
       });
@@ -159,6 +170,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         _kOnbCode,
         _kOnbGrid,
         _kOnbNotif,
+        _kOnbSocial,
       ]) {
         await prefs.remove(k);
       }
@@ -309,6 +321,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         profileImage: _pixelGrid.join(),
       );
       await _clearCheckpoint(); // onboarding done — drop the resume checkpoint.
+      // Apply the social account setting chosen during onboarding.
+      await _appState.setSocialAccountEnabled(_selectedSocialAccount);
+      await _appState.setStoriesEnabled(_selectedSocialAccount);
       // Apply the notification choice now that the enclave exists. Off is the
       // default state already, so only act when the user opted into a background
       // mode — this also triggers the OS notification-permission prompt.
@@ -342,6 +357,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           return _buildAvatarCustomizerPage(t, l10n);
         case OnboardingPageType.notifications:
           return _buildNotificationsPage(t, l10n);
+        case OnboardingPageType.socialConsent:
+          return _buildSocialConsentPage(t, l10n);
         case OnboardingPageType.pin:
           return _buildPinSetupPage(t, l10n);
       }
@@ -491,6 +508,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         fact = kFcmEnabled
             ? l10n.onboardingFactPushBodyFcm
             : l10n.onboardingFactPushBody;
+        break;
+      case OnboardingPageType.socialConsent:
+        title = 'EPHEMERAL SOCIAL PRIVACY';
+        fact = 'WiltKey Social encrypts stories with zero-knowledge keys wrapped only for mutual contacts. You can revoke and wipe your server registration at any time in Settings.';
         break;
       case OnboardingPageType.pin:
         title = l10n.onboardingFactKdfTitle;
@@ -877,6 +898,109 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   Text(
                     description,
                     style: t.bodySecondary.copyWith(height: 1.4),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSocialConsentPage(WiltkeyTokens t, AppLocalizations l10n) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 8),
+          _stepTitle(t, l10n.onboardingSocialTitle),
+          const SizedBox(height: 12),
+          Text(
+            l10n.onboardingSocialExplanation,
+            style: t.bodySecondary.copyWith(height: 1.5),
+          ),
+          const SizedBox(height: 20),
+          _socialOptionCard(
+            t,
+            enabled: true,
+            label: l10n.onboardingSocialEnable,
+            description: l10n.onboardingSocialEnableDesc,
+            icon: Icons.public,
+          ),
+          const SizedBox(height: 12),
+          _socialOptionCard(
+            t,
+            enabled: false,
+            label: l10n.onboardingSocialZeroServer,
+            description: l10n.onboardingSocialZeroServerDesc,
+            icon: Icons.shield_outlined,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _socialOptionCard(
+    WiltkeyTokens t, {
+    required bool enabled,
+    required String label,
+    required String description,
+    required IconData icon,
+  }) {
+    final selected = _selectedSocialAccount == enabled;
+    return GestureDetector(
+      onTap: () {
+        setState(() => _selectedSocialAccount = enabled);
+        _saveCheckpoint();
+      },
+      child: AnimatedContainer(
+        duration: t.motionShort,
+        curve: Curves.easeOut,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: t.surface,
+          borderRadius: BorderRadius.circular(t.radiusCard),
+          border: Border.all(
+            color: selected ? t.action : t.border,
+            width: selected ? 2 : t.borderWidth,
+          ),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              selected
+                  ? Icons.radio_button_checked
+                  : Icons.radio_button_unchecked,
+              color: selected ? t.action : t.textTertiary,
+              size: 20,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(icon, size: 16, color: selected ? t.action : t.textSecondary),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          label,
+                          style: t.body.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: selected ? t.textPrimary : t.textSecondary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    description,
+                    style: t.bodySecondary.copyWith(height: 1.4, fontSize: 12),
                   ),
                 ],
               ),

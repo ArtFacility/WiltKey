@@ -6,6 +6,7 @@ import '../../../core/pixel_art_avatar.dart';
 import '../../../core/custom_emoji.dart';
 import '../../../core/theme/wk.dart';
 import '../../../core/theme/wiltkey_tokens.dart';
+import '../../../core/theme/nuke_capture.dart';
 import 'emoji_creator_screen.dart';
 import '../../chat/presentation/chat_media_gallery_screen.dart';
 import '../../../core/db/wiltkey_db.dart';
@@ -28,6 +29,10 @@ class GroupSettingsScreen extends StatefulWidget {
 
 class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
   final AppState _appState = AppState();
+
+  /// Captures this screen as the themed nuke overlay's base (see
+  /// `captureNukeScreen` / `nukeOverlay(screen: …)`).
+  final GlobalKey _nukeCaptureKey = GlobalKey();
 
   // Host-editable policy state.
   late bool _imagesAllowed;
@@ -352,8 +357,14 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
 
   /// Plays the theme's nuke animation over the screen, then full-mesh nukes the
   /// group (every member is wiped — see AppState.nukeGroup) and exits to root.
-  void _playNukeAndDestroy() {
+  void _playNukeAndDestroy() async {
     final group = widget.group;
+
+    // Capture the screen before covering it, for themes that use the real
+    // screen as their destruction base.
+    final screen = await captureNukeScreen(_nukeCaptureKey);
+    if (!mounted) return;
+
     final overlay = Overlay.of(context, rootOverlay: true);
     final wkc = context.wkc;
     final themeData = Theme.of(context);
@@ -365,6 +376,7 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
         child: Theme(
           data: themeData,
           child: wkc.nukeOverlay(
+            screen: screen,
             onDone: () async {
               entry.remove();
               await CustomEmojiStore.clear(group.keyHash);
@@ -387,7 +399,9 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
     final group = widget.group;
     final isHost = group.isHost;
 
-    return Scaffold(
+    return RepaintBoundary(
+      key: _nukeCaptureKey,
+      child: Scaffold(
       backgroundColor: t.bg,
       appBar: AppBar(
         title: Text(
@@ -728,6 +742,7 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
             ),
           ],
         ),
+      ),
       ),
     );
   }

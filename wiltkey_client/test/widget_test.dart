@@ -33,7 +33,7 @@ void main() {
     SharedPreferences.setMockInitialValues({});
   });
 
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
+  testWidgets('App boots to onboarding or dashboard smoke test', (WidgetTester tester) async {
     await tester.runAsync(() async {
       // Build our app and trigger a frame.
       await tester.pumpWidget(const WiltkeyApp());

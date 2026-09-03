@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	_ "github.com/lib/pq"
+	"github.com/lib/pq"
 )
 
 type PGMessage struct {
@@ -38,6 +38,33 @@ type PGClientAttestation struct {
 	ExpiresAt   time.Time
 	CertSig     string
 	RelayPubkey string
+}
+
+type PGStory struct {
+	ID            string    `json:"id"`
+	SenderID      string    `json:"sender_id"`
+	StoryType     string    `json:"story_type"`
+	CiphertextB64 string    `json:"ciphertext_b64"`
+	BucketURL     *string   `json:"bucket_url,omitempty"`
+	MediaMeta     string    `json:"media_meta,omitempty"`
+	CreatedAt     time.Time `json:"created_at"`
+	ExpiresAt     time.Time `json:"expires_at"`
+	BytesUsed     int64     `json:"bytes_used"`
+}
+
+type PGStoryReaction struct {
+	ID        string    `json:"id"`
+	StoryID   string    `json:"story_id"`
+	ReactorID string    `json:"reactor_id"`
+	Emoji     string    `json:"emoji"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+type PGSocialBudget struct {
+	UserID    string    `json:"user_id"`
+	BytesUsed int64     `json:"bytes_used"`
+	WeekStart time.Time `json:"week_start"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 type PostgresClient struct {
@@ -131,6 +158,43 @@ func (p *PostgresClient) runMigrations() error {
 	`)
 	if err != nil {
 		return fmt.Errorf("error creating client_attestations table: %v", err)
+	}
+
+	// Create stories, reactions, and social budgets tables
+	_, err = p.db.Exec(`
+		CREATE TABLE IF NOT EXISTS stories (
+			id UUID PRIMARY KEY,
+			sender_id VARCHAR(64) NOT NULL,
+			story_type VARCHAR(32) NOT NULL,
+			ciphertext_b64 TEXT NOT NULL,
+			bucket_url VARCHAR(255),
+			media_meta TEXT NOT NULL DEFAULT '',
+			created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+			expires_at TIMESTAMP NOT NULL,
+			bytes_used BIGINT NOT NULL DEFAULT 0
+		);
+		CREATE INDEX IF NOT EXISTS idx_stories_sender ON stories(sender_id);
+		CREATE INDEX IF NOT EXISTS idx_stories_expires ON stories(expires_at);
+
+		CREATE TABLE IF NOT EXISTS story_reactions (
+			id UUID PRIMARY KEY,
+			story_id UUID NOT NULL REFERENCES stories(id) ON DELETE CASCADE,
+			reactor_id VARCHAR(64) NOT NULL,
+			emoji VARCHAR(32) NOT NULL,
+			created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+			UNIQUE(story_id, reactor_id)
+		);
+		CREATE INDEX IF NOT EXISTS idx_reactions_story ON story_reactions(story_id);
+
+		CREATE TABLE IF NOT EXISTS social_budgets (
+			user_id VARCHAR(64) PRIMARY KEY,
+			bytes_used BIGINT NOT NULL DEFAULT 0,
+			week_start TIMESTAMP NOT NULL,
+			updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+		);
+	`)
+	if err != nil {
+		return fmt.Errorf("error creating stories and social tables: %v", err)
 	}
 
 	return nil
@@ -338,4 +402,240 @@ func (p *PostgresClient) GetClientAttestation(userID string) (*PGClientAttestati
 	}
 
 	return &att, nil
+}
+
+// GetOrCreateSocialBudget retrieves or initializes the weekly social budget for a user.
+// Resets budget automatically if 7 days have passed.
+func (p *PostgresClient) GetOrCreateSocialBudget(userID string) (*PGSocialBudget, error) {
+	now := time.Now()
+	var b PGSocialBudget
+	err := p.db.QueryRow(`
+		SELECT user_id, bytes_used, week_start, updated_at
+		FROM social_budgets
+		WHERE user_id = $1
+	`, userID).Scan(&b.UserID, &b.BytesUsed, &b.WeekStart, &b.UpdatedAt)
+
+	if err == sql.ErrNoRows {
+		b = PGSocialBudget{
+			UserID:    userID,
+			BytesUsed: 0,
+			WeekStart: now,
+			UpdatedAt: now,
+		}
+		_, err := p.db.Exec(`
+			INSERT INTO social_budgets (user_id, bytes_used, week_start, updated_at)
+			VALUES ($1, $2, $3, $4)
+			ON CONFLICT (user_id) DO NOTHING
+		`, b.UserID, b.BytesUsed, b.WeekStart, b.UpdatedAt)
+		if err != nil {
+			return nil, err
+		}
+		return &b, nil
+	} else if err != nil {
+		return nil, err
+	}
+
+	if now.Sub(b.WeekStart) >= 7*24*time.Hour {
+		b.BytesUsed = 0
+		b.WeekStart = now
+		b.UpdatedAt = now
+		_, err := p.db.Exec(`
+			UPDATE social_budgets
+			SET bytes_used = 0, week_start = $2, updated_at = $3
+			WHERE user_id = $1
+		`, b.UserID, b.WeekStart, b.UpdatedAt)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return &b, nil
+}
+
+// ConsumeSocialBudget checks if the user has enough budget to spend [bytes], and if so, atomically increments usage.
+// Returns (allowed, newBytesUsed, maxBytes, error).
+func (p *PostgresClient) ConsumeSocialBudget(userID string, bytes int64, isPlus bool) (bool, int64, int64, error) {
+	_, err := p.GetOrCreateSocialBudget(userID)
+	if err != nil {
+		return false, 0, 0, err
+	}
+
+	var maxBudget int64 = 10 * 1024 * 1024 // 10 MB for free
+	if isPlus {
+		maxBudget = 100 * 1024 * 1024 // 100 MB for plus
+	}
+
+	var newBytesUsed int64
+	err = p.db.QueryRow(`
+		UPDATE social_budgets
+		SET bytes_used = bytes_used + $2, updated_at = NOW()
+		WHERE user_id = $1 AND bytes_used + $2 <= $3
+		RETURNING bytes_used
+	`, userID, bytes, maxBudget).Scan(&newBytesUsed)
+
+	if err == sql.ErrNoRows {
+		var currentUsed int64
+		_ = p.db.QueryRow(`SELECT bytes_used FROM social_budgets WHERE user_id = $1`, userID).Scan(&currentUsed)
+		return false, currentUsed, maxBudget, nil
+	}
+	if err != nil {
+		return false, 0, 0, err
+	}
+
+	return true, newBytesUsed, maxBudget, nil
+}
+
+// PostStory stores a new story.
+func (p *PostgresClient) PostStory(senderID, storyType, ciphertextB64 string, bucketURL *string, mediaMeta string, bytesUsed int64, ttl time.Duration) (string, error) {
+	id := uuid.New().String()
+	expiresAt := time.Now().Add(ttl)
+
+	_, err := p.db.Exec(`
+		INSERT INTO stories (id, sender_id, story_type, ciphertext_b64, bucket_url, media_meta, bytes_used, created_at, expires_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), $8)
+	`, id, senderID, storyType, ciphertextB64, bucketURL, mediaMeta, bytesUsed, expiresAt)
+	if err != nil {
+		return "", err
+	}
+	return id, nil
+}
+
+// GetStoriesFeed returns unexpired stories for given senders.
+func (p *PostgresClient) GetStoriesFeed(senders []string) ([]PGStory, error) {
+	if len(senders) == 0 {
+		return []PGStory{}, nil
+	}
+
+	query := `
+		SELECT id, sender_id, story_type, ciphertext_b64, bucket_url, media_meta, bytes_used, created_at, expires_at
+		FROM stories
+		WHERE sender_id = ANY($1) AND expires_at > NOW()
+		ORDER BY created_at ASC
+	`
+	rows, err := p.db.Query(query, pq.Array(senders))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var stories []PGStory
+	for rows.Next() {
+		var s PGStory
+		var bucketURL sql.NullString
+		if err := rows.Scan(&s.ID, &s.SenderID, &s.StoryType, &s.CiphertextB64, &bucketURL, &s.MediaMeta, &s.BytesUsed, &s.CreatedAt, &s.ExpiresAt); err != nil {
+			return nil, err
+		}
+		if bucketURL.Valid {
+			s.BucketURL = &bucketURL.String
+		}
+		stories = append(stories, s)
+	}
+	return stories, nil
+}
+
+// GetStory loads a single story by ID.
+func (p *PostgresClient) GetStory(id string) (*PGStory, error) {
+	var s PGStory
+	var bucketURL sql.NullString
+	err := p.db.QueryRow(`
+		SELECT id, sender_id, story_type, ciphertext_b64, bucket_url, media_meta, bytes_used, created_at, expires_at
+		FROM stories
+		WHERE id = $1 AND expires_at > NOW()
+	`, id).Scan(&s.ID, &s.SenderID, &s.StoryType, &s.CiphertextB64, &bucketURL, &s.MediaMeta, &s.BytesUsed, &s.CreatedAt, &s.ExpiresAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if bucketURL.Valid {
+		s.BucketURL = &bucketURL.String
+	}
+	return &s, nil
+}
+
+// DeleteStory deletes a story owned by userID.
+func (p *PostgresClient) DeleteStory(id, userID string) error {
+	_, err := p.db.Exec(`DELETE FROM stories WHERE id = $1 AND sender_id = $2`, id, userID)
+	return err
+}
+
+// AddOrUpdateStoryReaction adds or updates an emoji reaction.
+func (p *PostgresClient) AddOrUpdateStoryReaction(storyID, reactorID, emoji string) error {
+	id := uuid.New().String()
+	_, err := p.db.Exec(`
+		INSERT INTO story_reactions (id, story_id, reactor_id, emoji, created_at)
+		VALUES ($1, $2, $3, $4, NOW())
+		ON CONFLICT (story_id, reactor_id)
+		DO UPDATE SET emoji = EXCLUDED.emoji, created_at = NOW()
+	`, id, storyID, reactorID, emoji)
+	return err
+}
+
+// GetStoryReactions returns all reactions for a story.
+func (p *PostgresClient) GetStoryReactions(storyID string) ([]PGStoryReaction, error) {
+	rows, err := p.db.Query(`
+		SELECT id, story_id, reactor_id, emoji, created_at
+		FROM story_reactions
+		WHERE story_id = $1
+		ORDER BY created_at ASC
+	`, storyID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var reactions []PGStoryReaction
+	for rows.Next() {
+		var r PGStoryReaction
+		if err := rows.Scan(&r.ID, &r.StoryID, &r.ReactorID, &r.Emoji, &r.CreatedAt); err != nil {
+			return nil, err
+		}
+		reactions = append(reactions, r)
+	}
+	return reactions, nil
+}
+
+// WipeUserSocialData deletes all stories and reactions for a user and returns any bucket URLs.
+func (p *PostgresClient) WipeUserSocialData(userID string) ([]string, error) {
+	rows, err := p.db.Query(`
+		DELETE FROM stories
+		WHERE sender_id = $1
+		RETURNING bucket_url
+	`, userID)
+	var deletedURLs []string
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var bucketURL sql.NullString
+			if err := rows.Scan(&bucketURL); err == nil && bucketURL.Valid && bucketURL.String != "" {
+				deletedURLs = append(deletedURLs, bucketURL.String)
+			}
+		}
+	}
+	_, _ = p.db.Exec(`DELETE FROM story_reactions WHERE reactor_id = $1`, userID)
+	_, _ = p.db.Exec(`DELETE FROM social_budgets WHERE user_id = $1`, userID)
+	return deletedURLs, nil
+}
+
+// PruneExpiredStories deletes stories older than their expires_at and returns their bucket URLs.
+func (p *PostgresClient) PruneExpiredStories() ([]string, error) {
+	rows, err := p.db.Query(`
+		DELETE FROM stories
+		WHERE expires_at <= NOW()
+		RETURNING bucket_url
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var deletedURLs []string
+	for rows.Next() {
+		var bucketURL sql.NullString
+		if err := rows.Scan(&bucketURL); err == nil && bucketURL.Valid && bucketURL.String != "" {
+			deletedURLs = append(deletedURLs, bucketURL.String)
+		}
+	}
+	return deletedURLs, nil
 }

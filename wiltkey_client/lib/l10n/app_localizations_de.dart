@@ -2360,4 +2360,156 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get contactSelfBadge => 'Du';
+
+  @override
+  String get chatAttachContentTitle => 'An Chat anhängen';
+
+  @override
+  String get chatAttachPhotos => 'Fotos & Kamera';
+
+  @override
+  String get chatAttachPhotosSubtitle =>
+      'Foto aufnehmen oder aus Galerie wählen';
+
+  @override
+  String get chatAttachPixelArt => 'Pixel-Art & Avatare';
+
+  @override
+  String get chatAttachPixelArtSubtitle =>
+      'Pixel-Art zeichnen oder aus Vorlagen senden';
+
+  @override
+  String get chatAttachVideo => 'Video';
+
+  @override
+  String get chatAttachVideoSubtitle =>
+      'Verschlüsselte kurze Videoclips in einem zukünftigen Update';
+
+  @override
+  String get chatAttachComingSoon => 'DEMNÄCHST';
+
+  @override
+  String get chatPixelArtDrawNew => 'Neues Pixel-Art zeichnen';
+
+  @override
+  String get chatPixelArtTemplates => 'Gespeicherte Avatar-Vorlagen';
+
+  @override
+  String get chatPixelArtSend => 'An Chat senden';
+
+  @override
+  String get chatPixelArtNoTemplates =>
+      'Noch keine Avatar-Vorlagen gespeichert';
+
+  @override
+  String get chatPixelArtActionTitle => 'Pixel-Art-Optionen';
+
+  @override
+  String get chatPixelArtActionApplyAvatar =>
+      'Als mein Profil-Avatar verwenden';
+
+  @override
+  String get chatPixelArtActionSaveTemplate => 'Als Avatar-Vorlage speichern';
+
+  @override
+  String get chatPixelArtActionSaveEmoji => 'Als eigenes Emoji speichern';
+
+  @override
+  String get chatPixelArtActionExportPng => 'PNG in Fotos exportieren';
+
+  @override
+  String get chatPixelArtActionAppliedAvatarSuccess =>
+      'Profil-Avatar aktualisiert und synchronisiert';
+
+  @override
+  String get chatPixelArtActionSavedTemplateSuccess =>
+      'In Avatar-Vorlagenbibliothek gespeichert';
+
+  @override
+  String get chatPixelArtActionExportedPngSuccess =>
+      'PNG-Bild in Fotos gespeichert';
+
+  @override
+  String get chatSearchHint => 'Im Chat suchen...';
+
+  @override
+  String get chatSearchNoMatches => '0 Treffer';
+
+  @override
+  String get contactPrivateNoteTitle => 'Private Notizen & Spitzname';
+
+  @override
+  String get contactPrivateNoteHint =>
+      'Private Notizen zu diesem Kontakt hinzufügen (nur lokal gespeichert)...';
+
+  @override
+  String get contactCustomNicknameTitle => 'Eigener Spitzname';
+
+  @override
+  String get contactCustomNicknameHint => 'Anzeigename lokal überschreiben...';
+
+  @override
+  String get contactNotesSaved => 'Kontaktdetails gespeichert';
+
+  @override
+  String get onboardingSocialTitle => 'WiltKey Social-Konto';
+
+  @override
+  String get onboardingSocialExplanation =>
+      'Aktiviert dein WiltKey Social-Profil und servergestützte Erkennung. Dein öffentlicher Identitätsschlüssel wird beim Relay registriert (und kann von dir jederzeit dauerhaft widerrufen/gelöscht werden), um die Urheberschaft von 24h-welkenden Stories und Broadcast-Beiträgen zu verifizieren. Alle Inhalte bleiben Zero-Knowledge Ende-zu-Ende-verschlüsselt.';
+
+  @override
+  String get onboardingSocialEnable => 'WiltKey Social aktivieren (Empfohlen)';
+
+  @override
+  String get onboardingSocialEnableDesc =>
+      'Teile 24h-welkende Stories mit gemeinsamen Kontakten, sende eigene Pixel-Art und nimm an Social-Broadcasts teil.';
+
+  @override
+  String get onboardingSocialZeroServer =>
+      'Null-Serverdaten-Modus (Absolute Privatsphäre)';
+
+  @override
+  String get onboardingSocialZeroServerDesc =>
+      'Maximale Anonymität. Ausschließlich Peer-to-Peer und direkte 1:1-/Gruppennachrichten ohne jegliche Identitätsregistrierung auf dem Server. Externe Social-Funktionen und Stories sind deaktiviert.';
+
+  @override
+  String get settingsSocialAccountTitle => 'WiltKey Social-Konto';
+
+  @override
+  String get settingsSocialAccountSubtitle =>
+      'Servergestützte 24h-Stories und Erkennung zulassen';
+
+  @override
+  String get settingsStoriesReelTitle => 'Dashboard Stories-Leiste';
+
+  @override
+  String get settingsStoriesReelSubtitle =>
+      '24-Stunden-Stories oben im Chats-Tab anzeigen';
+
+  @override
+  String get connectTabConnect => 'Verbinden';
+
+  @override
+  String get connectTabSocial => 'Social';
+
+  @override
+  String get forcedUpdateTitle => 'Update erforderlich';
+
+  @override
+  String get forcedUpdateSubtitle =>
+      'Ein obligatorisches Update ist erforderlich, um WiltKey weiterhin sicher zu nutzen.';
+
+  @override
+  String get forcedUpdateAction => 'Jetzt aktualisieren';
+
+  @override
+  String get forcedUpdateCheckAgain => 'Erneut prüfen';
+
+  @override
+  String get forcedUpdateSecurityNotice =>
+      'Diese Version enthält kritische Protokoll- oder Sicherheitsupdates. Ältere Versionen können nicht mehr mit dem Netzwerk kommunizieren.';
+
+  @override
+  String get forcedUpdateWhatsNew => 'Was ist neu in diesem Update';
 }

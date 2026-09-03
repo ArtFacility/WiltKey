@@ -12,6 +12,7 @@ import 'status_emoji_picker_sheet.dart';
 import '../../../core/theme/widgets/client_integrity_badge.dart';
 import '../../../core/build_flavor.dart';
 import '../../../core/entitlements/entitlement_service.dart';
+import '../../../core/db/wiltkey_db.dart';
 
 /// Full-screen profile for a social contact (or self).
 /// Renders with the peer's theme (derived from shared secret seed) when viewing
@@ -33,6 +34,8 @@ class ContactProfileScreen extends StatefulWidget {
 class _ContactProfileScreenState extends State<ContactProfileScreen> {
   final AppState _appState = AppState();
   late final TextEditingController _statusController;
+  late final TextEditingController _nicknameController;
+  late final TextEditingController _notesController;
   String _selectedEmoji = '';
   int? _selectedDurationHours;
 
@@ -42,6 +45,10 @@ class _ContactProfileScreenState extends State<ContactProfileScreen> {
     _statusController = TextEditingController(
       text: widget.isSelf ? _appState.effectiveStatusMessage : '',
     );
+    final c = _currentContact();
+    _nicknameController = TextEditingController(text: c?.customNickname ?? '');
+    _notesController = TextEditingController(text: c?.privateNotes ?? '');
+
     if (widget.isSelf) {
       _selectedEmoji = _appState.effectiveStatusEmoji;
       if (_appState.statusExpiresAtMs != null && !_appState.isOwnStatusExpired) {
@@ -65,6 +72,8 @@ class _ContactProfileScreenState extends State<ContactProfileScreen> {
   @override
   void dispose() {
     _statusController.dispose();
+    _nicknameController.dispose();
+    _notesController.dispose();
     super.dispose();
   }
 
@@ -588,6 +597,10 @@ class _ContactProfileScreenState extends State<ContactProfileScreen> {
                         ? _buildSelfStatus(t, l10n)
                         : _buildContactStatus(t, l10n),
                   ),
+                  if (!isSelf && widget.contact != null) ...[
+                    const SizedBox(height: 16),
+                    _buildPrivateNotesSection(t, l10n),
+                  ],
                   const SizedBox(height: 16),
                   // Keyhash / Safety fingerprint card
                   _buildKeyhashCard(
@@ -605,6 +618,116 @@ class _ContactProfileScreenState extends State<ContactProfileScreen> {
             ),
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildPrivateNotesSection(WiltkeyTokens t, AppLocalizations l10n) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: t.surface,
+        borderRadius: BorderRadius.circular(t.radiusCard),
+        border: Border.all(color: t.border, width: t.borderWidth),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.lock_outline, size: 16, color: t.action),
+              const SizedBox(width: 8),
+              Text(
+                t.uppercaseLabels
+                    ? (l10n.contactPrivateNoteTitle ?? 'Private Notes & Nickname').toUpperCase()
+                    : (l10n.contactPrivateNoteTitle ?? 'Private Notes & Nickname'),
+                style: t.body.copyWith(fontWeight: FontWeight.w600, fontSize: 13),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: t.action.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(t.radiusPill),
+                ),
+                child: Text(
+                  'LOCAL ONLY',
+                  style: t.badgeLabel.copyWith(color: t.action, fontSize: 9),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _nicknameController,
+            style: t.body,
+            decoration: InputDecoration(
+              labelText: l10n.contactCustomNicknameTitle ?? 'Custom Nickname',
+              labelStyle: t.bodySecondary.copyWith(fontSize: 12),
+              hintText: l10n.contactCustomNicknameHint ?? 'Override display name locally...',
+              hintStyle: t.bodySecondary.copyWith(fontSize: 12),
+              isDense: true,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(t.radiusControl),
+                borderSide: BorderSide(color: t.border),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _notesController,
+            maxLines: 3,
+            style: t.body,
+            decoration: InputDecoration(
+              labelText: l10n.contactPrivateNoteTitle ?? 'Private Note',
+              labelStyle: t.bodySecondary.copyWith(fontSize: 12),
+              hintText: l10n.contactPrivateNoteHint ?? 'Add private notes about this contact...',
+              hintStyle: t.bodySecondary.copyWith(fontSize: 12),
+              alignLabelWithHint: true,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(t.radiusControl),
+                borderSide: BorderSide(color: t.border),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerRight,
+            child: ElevatedButton.icon(
+              icon: const Icon(Icons.check, size: 16),
+              label: const Text('Save Details'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: t.action,
+                foregroundColor: t.onAction,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(t.radiusControl),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              ),
+              onPressed: () async {
+                HapticFeedback.lightImpact();
+                final keyHash = widget.contact!.keyHash;
+                await WiltkeyDatabase.instance.updateContactNotes(
+                  keyHash,
+                  customNickname: _nicknameController.text.trim(),
+                  privateNotes: _notesController.text.trim(),
+                );
+                await _appState.reloadAllContacts();
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      backgroundColor: t.surface,
+                      content: Text(
+                        l10n.contactNotesSaved ?? 'Contact details saved',
+                        style: t.body.copyWith(color: t.positive),
+                      ),
+                    ),
+                  );
+                }
+              },
+            ),
+          ),
+        ],
       ),
     );
   }

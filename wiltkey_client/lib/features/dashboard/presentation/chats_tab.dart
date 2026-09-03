@@ -17,6 +17,7 @@ import '../../chat/presentation/widgets/nuke_confirm_dialog.dart';
 import '../../proximity/presentation/pairing_screen.dart';
 import '../../shell/presentation/app_shell.dart';
 import '../../../core/theme/widgets/client_integrity_badge.dart';
+import '../../stories/presentation/stories_bar.dart';
 
 /// The Chats tab: a single list of every conversation — 1:1 contacts and groups
 /// merged, groups badged. Header carries the title, search, debug console and a
@@ -74,6 +75,7 @@ class _ChatsTabState extends State<ChatsTab> {
   void initState() {
     super.initState();
     _appState.addListener(_onState);
+    _appState.refreshStoriesFeed();
     _wiltTicker = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted) return;
       final now = DateTime.now();
@@ -540,6 +542,10 @@ class _ChatsTabState extends State<ChatsTab> {
             ),
           ),
         ),
+
+        // 24-hour Wilting Stories Reel (gated by social account and stories settings)
+        if (_appState.socialAccountEnabled && _appState.storiesEnabled)
+          const StoriesBar(),
 
         // Type filter
         Padding(

@@ -2333,4 +2333,154 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get contactSelfBadge => 'You';
+
+  @override
+  String get chatAttachContentTitle => 'Attach to chat';
+
+  @override
+  String get chatAttachPhotos => 'Photos & Camera';
+
+  @override
+  String get chatAttachPhotosSubtitle =>
+      'Take a picture or choose from gallery';
+
+  @override
+  String get chatAttachPixelArt => 'Pixel Art & Avatars';
+
+  @override
+  String get chatAttachPixelArtSubtitle =>
+      'Draw a pixel drawing or send from saved templates';
+
+  @override
+  String get chatAttachVideo => 'Video';
+
+  @override
+  String get chatAttachVideoSubtitle =>
+      'Encrypted short video clips in a future update';
+
+  @override
+  String get chatAttachComingSoon => 'COMING SOON';
+
+  @override
+  String get chatPixelArtDrawNew => 'Draw New Pixel Art';
+
+  @override
+  String get chatPixelArtTemplates => 'Saved Avatar Templates';
+
+  @override
+  String get chatPixelArtSend => 'Send to Chat';
+
+  @override
+  String get chatPixelArtNoTemplates => 'No saved avatar templates yet';
+
+  @override
+  String get chatPixelArtActionTitle => 'Pixel Art Options';
+
+  @override
+  String get chatPixelArtActionApplyAvatar => 'Apply as My Profile Avatar';
+
+  @override
+  String get chatPixelArtActionSaveTemplate => 'Save to Avatar Templates';
+
+  @override
+  String get chatPixelArtActionSaveEmoji => 'Save as Custom Emoji';
+
+  @override
+  String get chatPixelArtActionExportPng => 'Export PNG to Photos';
+
+  @override
+  String get chatPixelArtActionAppliedAvatarSuccess =>
+      'Profile avatar updated and synced';
+
+  @override
+  String get chatPixelArtActionSavedTemplateSuccess =>
+      'Saved to Avatar Templates library';
+
+  @override
+  String get chatPixelArtActionExportedPngSuccess =>
+      'Saved PNG image to photos';
+
+  @override
+  String get chatSearchHint => 'Search in chat...';
+
+  @override
+  String get chatSearchNoMatches => '0 matches';
+
+  @override
+  String get contactPrivateNoteTitle => 'Private Notes & Nickname';
+
+  @override
+  String get contactPrivateNoteHint =>
+      'Add private notes about this contact (stored locally only)...';
+
+  @override
+  String get contactCustomNicknameTitle => 'Custom Nickname';
+
+  @override
+  String get contactCustomNicknameHint => 'Override display name locally...';
+
+  @override
+  String get contactNotesSaved => 'Contact details saved';
+
+  @override
+  String get onboardingSocialTitle => 'WiltKey Social Account';
+
+  @override
+  String get onboardingSocialExplanation =>
+      'Enables your WiltKey Social profile and server-assisted discovery. Your public identity key is registered with the relay (and can be permanently revoked/wiped anytime by you) to verify authorship of 24h Wilting Stories and broadcast posts. All content remains zero-knowledge end-to-end encrypted.';
+
+  @override
+  String get onboardingSocialEnable => 'Enable WiltKey Social (Recommended)';
+
+  @override
+  String get onboardingSocialEnableDesc =>
+      'Share 24h Wilting Stories with mutual contacts, send custom pixel art, and participate in social broadcasts.';
+
+  @override
+  String get onboardingSocialZeroServer =>
+      'Zero Server Data Mode (Absolute Privacy)';
+
+  @override
+  String get onboardingSocialZeroServerDesc =>
+      'Maximum anonymity. Strictly peer-to-peer and direct 1:1/group messaging without any server identity registration. Remote social features and stories are disabled.';
+
+  @override
+  String get settingsSocialAccountTitle => 'WiltKey Social Account';
+
+  @override
+  String get settingsSocialAccountSubtitle =>
+      'Allow server-assisted 24h stories and discovery';
+
+  @override
+  String get settingsStoriesReelTitle => 'Dashboard Stories Reel';
+
+  @override
+  String get settingsStoriesReelSubtitle =>
+      'Show 24-hour stories on top of the chats tab';
+
+  @override
+  String get connectTabConnect => 'Connect';
+
+  @override
+  String get connectTabSocial => 'Social';
+
+  @override
+  String get forcedUpdateTitle => 'Update Required';
+
+  @override
+  String get forcedUpdateSubtitle =>
+      'A mandatory update is required to continue using WiltKey safely.';
+
+  @override
+  String get forcedUpdateAction => 'Update Now';
+
+  @override
+  String get forcedUpdateCheckAgain => 'Check Again';
+
+  @override
+  String get forcedUpdateSecurityNotice =>
+      'This version includes critical protocol or security updates. Older versions can no longer communicate with the network.';
+
+  @override
+  String get forcedUpdateWhatsNew => 'What\'s in this update';
 }

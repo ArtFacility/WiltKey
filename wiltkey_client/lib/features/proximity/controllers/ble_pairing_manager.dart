@@ -135,7 +135,6 @@ class BlePairingManager extends ChangeNotifier {
   Timer? _hexAnimationTimer;
   Timer? _pairingReadTimer;
   Timer? _handshakeTimeoutTimer;
-  StreamSubscription<BluetoothConnectionState>? _connectionStateSubscription;
   Uint8List? _gattResponseBytes;
 
   // Callback to the UI to handle confirmation dialog
@@ -738,6 +737,7 @@ class BlePairingManager extends ChangeNotifier {
       if (json['status'] == 'accepted') {
         notifySub?.cancel();
         _pairingReadTimer?.cancel();
+        _pairingReadTimer = null;
         _handshakeTimeoutTimer?.cancel();
         _handshakeTimeoutTimer = null;
 
@@ -822,8 +822,6 @@ class BlePairingManager extends ChangeNotifier {
     _hexAnimationTimer = null;
     _syncTimer?.cancel();
     _syncTimer = null;
-    _connectionStateSubscription?.cancel();
-    _connectionStateSubscription = null;
 
     final dev = activeConnection;
     activeConnection = null;
@@ -895,16 +893,6 @@ class BlePairingManager extends ChangeNotifier {
     try {
       final device = BluetoothDevice.fromId(selectedDevice!.id);
       activeConnection = device;
-
-      _connectionStateSubscription?.cancel();
-      _connectionStateSubscription = device.connectionState.listen((state) {
-        if (state == BluetoothConnectionState.disconnected &&
-            isSyncing &&
-            !isSuccess &&
-            !isGeneratingPad) {
-          abortHandshake('Bluetooth connection lost.');
-        }
-      });
 
       await device.connect(timeout: const Duration(seconds: 8));
       log('[BLE Client] Connected to peer.');
@@ -1019,14 +1007,7 @@ class BlePairingManager extends ChangeNotifier {
       notifyListeners();
     } catch (e) {
       log('[BLE Client Error] Handshake start failed: $e');
-      _pairingReadTimer?.cancel();
-      isSyncing = false;
-      notifyListeners();
-      if (onAlert != null) {
-        onAlert!('BLE connection failed. Verify devices are side-by-side.');
-      }
-      startScanningFlow();
-      startAdvertising();
+      abortHandshake('BLE connection failed. Verify devices are side-by-side.');
     }
   }
 
@@ -1278,7 +1259,6 @@ class BlePairingManager extends ChangeNotifier {
     _hexAnimationTimer?.cancel();
     _pairingReadTimer?.cancel();
     _handshakeTimeoutTimer?.cancel();
-    _connectionStateSubscription?.cancel();
     _evictionTimer?.cancel();
     stopAdvertising();
     activeConnection?.disconnect();

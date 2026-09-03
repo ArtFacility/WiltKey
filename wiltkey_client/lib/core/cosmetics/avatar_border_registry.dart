@@ -4,6 +4,18 @@ import '../entitlements/product_ids.dart';
 import 'avatar_border_ticker.dart';
 import 'premium/premium_borders.dart';
 
+/// Shape to crop the underlying pixel-art avatar when this border is equipped.
+enum AvatarCropShape {
+  /// Classic sharp 90-degree square (unclipped).
+  square,
+
+  /// Rounded rectangle with corner radius derived from [WkAvatarBorder.cornerRadiusFactor] (or default ~15%).
+  rounded,
+
+  /// Full circular crop (ClipOval).
+  circle,
+}
+
 /// A decorative overlay drawn on top of an avatar — a frame, a hat, an accessory.
 ///
 /// Borders are usually **SVG assets** rendered over the pixel-art avatar (which
@@ -39,12 +51,22 @@ class WkAvatarBorder {
   /// Paid border (Play only). Free borders ([none], [tinfoil]) are false.
   final bool premium;
 
+  /// How the underlying pixel art avatar should be cropped/shaped when this
+  /// border is equipped (e.g. rounded square, circle, or default square).
+  final AvatarCropShape cropShape;
+
+  /// Optional fractional corner radius (0.0 to 0.5) when [cropShape] is [AvatarCropShape.rounded].
+  /// Defaults to 0.15 (~15% corner radius).
+  final double? cornerRadiusFactor;
+
   const WkAvatarBorder({
     required this.id,
     required this.name,
     required this.assetPath,
     this.animatedPaint,
     this.premium = false,
+    this.cropShape = AvatarCropShape.square,
+    this.cornerRadiusFactor,
   });
 
   /// True when this border renders via a live painter rather than an SVG.

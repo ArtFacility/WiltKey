@@ -4199,6 +4199,276 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'You'**
   String get contactSelfBadge;
+
+  /// No description provided for @chatAttachContentTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Attach to chat'**
+  String get chatAttachContentTitle;
+
+  /// No description provided for @chatAttachPhotos.
+  ///
+  /// In en, this message translates to:
+  /// **'Photos & Camera'**
+  String get chatAttachPhotos;
+
+  /// No description provided for @chatAttachPhotosSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Take a picture or choose from gallery'**
+  String get chatAttachPhotosSubtitle;
+
+  /// No description provided for @chatAttachPixelArt.
+  ///
+  /// In en, this message translates to:
+  /// **'Pixel Art & Avatars'**
+  String get chatAttachPixelArt;
+
+  /// No description provided for @chatAttachPixelArtSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Draw a pixel drawing or send from saved templates'**
+  String get chatAttachPixelArtSubtitle;
+
+  /// No description provided for @chatAttachVideo.
+  ///
+  /// In en, this message translates to:
+  /// **'Video'**
+  String get chatAttachVideo;
+
+  /// No description provided for @chatAttachVideoSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Encrypted short video clips in a future update'**
+  String get chatAttachVideoSubtitle;
+
+  /// No description provided for @chatAttachComingSoon.
+  ///
+  /// In en, this message translates to:
+  /// **'COMING SOON'**
+  String get chatAttachComingSoon;
+
+  /// No description provided for @chatPixelArtDrawNew.
+  ///
+  /// In en, this message translates to:
+  /// **'Draw New Pixel Art'**
+  String get chatPixelArtDrawNew;
+
+  /// No description provided for @chatPixelArtTemplates.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved Avatar Templates'**
+  String get chatPixelArtTemplates;
+
+  /// No description provided for @chatPixelArtSend.
+  ///
+  /// In en, this message translates to:
+  /// **'Send to Chat'**
+  String get chatPixelArtSend;
+
+  /// No description provided for @chatPixelArtNoTemplates.
+  ///
+  /// In en, this message translates to:
+  /// **'No saved avatar templates yet'**
+  String get chatPixelArtNoTemplates;
+
+  /// No description provided for @chatPixelArtActionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Pixel Art Options'**
+  String get chatPixelArtActionTitle;
+
+  /// No description provided for @chatPixelArtActionApplyAvatar.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply as My Profile Avatar'**
+  String get chatPixelArtActionApplyAvatar;
+
+  /// No description provided for @chatPixelArtActionSaveTemplate.
+  ///
+  /// In en, this message translates to:
+  /// **'Save to Avatar Templates'**
+  String get chatPixelArtActionSaveTemplate;
+
+  /// No description provided for @chatPixelArtActionSaveEmoji.
+  ///
+  /// In en, this message translates to:
+  /// **'Save as Custom Emoji'**
+  String get chatPixelArtActionSaveEmoji;
+
+  /// No description provided for @chatPixelArtActionExportPng.
+  ///
+  /// In en, this message translates to:
+  /// **'Export PNG to Photos'**
+  String get chatPixelArtActionExportPng;
+
+  /// No description provided for @chatPixelArtActionAppliedAvatarSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Profile avatar updated and synced'**
+  String get chatPixelArtActionAppliedAvatarSuccess;
+
+  /// No description provided for @chatPixelArtActionSavedTemplateSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved to Avatar Templates library'**
+  String get chatPixelArtActionSavedTemplateSuccess;
+
+  /// No description provided for @chatPixelArtActionExportedPngSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved PNG image to photos'**
+  String get chatPixelArtActionExportedPngSuccess;
+
+  /// No description provided for @chatSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search in chat...'**
+  String get chatSearchHint;
+
+  /// No description provided for @chatSearchNoMatches.
+  ///
+  /// In en, this message translates to:
+  /// **'0 matches'**
+  String get chatSearchNoMatches;
+
+  /// No description provided for @contactPrivateNoteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Private Notes & Nickname'**
+  String get contactPrivateNoteTitle;
+
+  /// No description provided for @contactPrivateNoteHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Add private notes about this contact (stored locally only)...'**
+  String get contactPrivateNoteHint;
+
+  /// No description provided for @contactCustomNicknameTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom Nickname'**
+  String get contactCustomNicknameTitle;
+
+  /// No description provided for @contactCustomNicknameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Override display name locally...'**
+  String get contactCustomNicknameHint;
+
+  /// No description provided for @contactNotesSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Contact details saved'**
+  String get contactNotesSaved;
+
+  /// No description provided for @onboardingSocialTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'WiltKey Social Account'**
+  String get onboardingSocialTitle;
+
+  /// No description provided for @onboardingSocialExplanation.
+  ///
+  /// In en, this message translates to:
+  /// **'Enables your WiltKey Social profile and server-assisted discovery. Your public identity key is registered with the relay (and can be permanently revoked/wiped anytime by you) to verify authorship of 24h Wilting Stories and broadcast posts. All content remains zero-knowledge end-to-end encrypted.'**
+  String get onboardingSocialExplanation;
+
+  /// No description provided for @onboardingSocialEnable.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable WiltKey Social (Recommended)'**
+  String get onboardingSocialEnable;
+
+  /// No description provided for @onboardingSocialEnableDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Share 24h Wilting Stories with mutual contacts, send custom pixel art, and participate in social broadcasts.'**
+  String get onboardingSocialEnableDesc;
+
+  /// No description provided for @onboardingSocialZeroServer.
+  ///
+  /// In en, this message translates to:
+  /// **'Zero Server Data Mode (Absolute Privacy)'**
+  String get onboardingSocialZeroServer;
+
+  /// No description provided for @onboardingSocialZeroServerDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Maximum anonymity. Strictly peer-to-peer and direct 1:1/group messaging without any server identity registration. Remote social features and stories are disabled.'**
+  String get onboardingSocialZeroServerDesc;
+
+  /// No description provided for @settingsSocialAccountTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'WiltKey Social Account'**
+  String get settingsSocialAccountTitle;
+
+  /// No description provided for @settingsSocialAccountSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow server-assisted 24h stories and discovery'**
+  String get settingsSocialAccountSubtitle;
+
+  /// No description provided for @settingsStoriesReelTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Dashboard Stories Reel'**
+  String get settingsStoriesReelTitle;
+
+  /// No description provided for @settingsStoriesReelSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Show 24-hour stories on top of the chats tab'**
+  String get settingsStoriesReelSubtitle;
+
+  /// No description provided for @connectTabConnect.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect'**
+  String get connectTabConnect;
+
+  /// No description provided for @connectTabSocial.
+  ///
+  /// In en, this message translates to:
+  /// **'Social'**
+  String get connectTabSocial;
+
+  /// No description provided for @forcedUpdateTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Update Required'**
+  String get forcedUpdateTitle;
+
+  /// No description provided for @forcedUpdateSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'A mandatory update is required to continue using WiltKey safely.'**
+  String get forcedUpdateSubtitle;
+
+  /// No description provided for @forcedUpdateAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Update Now'**
+  String get forcedUpdateAction;
+
+  /// No description provided for @forcedUpdateCheckAgain.
+  ///
+  /// In en, this message translates to:
+  /// **'Check Again'**
+  String get forcedUpdateCheckAgain;
+
+  /// No description provided for @forcedUpdateSecurityNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'This version includes critical protocol or security updates. Older versions can no longer communicate with the network.'**
+  String get forcedUpdateSecurityNotice;
+
+  /// No description provided for @forcedUpdateWhatsNew.
+  ///
+  /// In en, this message translates to:
+  /// **'What\'s in this update'**
+  String get forcedUpdateWhatsNew;
 }
 
 class _AppLocalizationsDelegate

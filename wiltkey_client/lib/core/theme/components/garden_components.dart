@@ -1,3 +1,5 @@
+﻿import 'dart:ui' as ui;
+
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../wiltkey_components.dart';
@@ -128,7 +130,7 @@ class GardenComponents with VoiceScrubberDefaults implements WiltkeyComponents {
       GardenUnlockBloom(onDone: onDone);
 
   @override
-  Widget nukeOverlay({required VoidCallback onDone}) =>
+  Widget nukeOverlay({required VoidCallback onDone, ui.Image? screen}) =>
       GardenNukeWilt(onDone: onDone);
 
   @override

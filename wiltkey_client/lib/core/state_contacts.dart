@@ -132,6 +132,17 @@ extension AppStateContacts on AppState {
     }
   }
 
+  /// Reload all active chats and social contacts from the SQLite database.
+  Future<void> reloadAllContacts() async {
+    try {
+      contacts = await WiltkeyDatabase.instance.getAllContacts();
+      await loadSocialContacts();
+      notifyListeners();
+    } catch (e) {
+      log('[Contacts] reloadAllContacts failed: $e');
+    }
+  }
+
   /// Request a fresh profile_update from peers whose stored snapshot is older
   /// than [kProfileFreshness]. Silent when nothing is stale.
   Future<void> _maybeRefreshStaleProfiles() async {

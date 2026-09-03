@@ -1,3 +1,5 @@
+﻿import 'dart:ui' as ui;
+
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../wiltkey_components.dart';
@@ -176,7 +178,7 @@ class CyberpunkComponents
       CyberpunkUnlockSequence(onDone: onDone);
 
   @override
-  Widget nukeOverlay({required VoidCallback onDone}) =>
+  Widget nukeOverlay({required VoidCallback onDone, ui.Image? screen}) =>
       CyberpunkNukePurge(onDone: onDone);
 
   @override

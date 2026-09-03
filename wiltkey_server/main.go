@@ -963,6 +963,20 @@ func startCleanupWorker(pg *PostgresClient, storage ObjectStorage) {
 					}
 				}
 			}
+
+			// Prune expired stories
+			storyDeletedURLs, err := pg.PruneExpiredStories()
+			if err != nil {
+				log.Printf("[Cleanup Error] Failed to prune expired stories: %v", err)
+			} else if len(storyDeletedURLs) > 0 {
+				log.Printf("[Cleanup] Pruned %d expired wilting stories with associated storage objects.", len(storyDeletedURLs))
+				for _, rawURL := range storyDeletedURLs {
+					key := storageKeyFromURL(rawURL)
+					if key != "" {
+						_ = storage.Delete(context.Background(), key)
+					}
+				}
+			}
 		}
 	}()
 }
@@ -1441,6 +1455,18 @@ func main() {
 	http.HandleFunc("/api/v1/integrity/attest", rateLimitMiddleware(handleIntegrityAttest))
 	http.HandleFunc("/api/v1/integrity/query", rateLimitMiddleware(handleIntegrityQuery))
 	http.HandleFunc("/api/v1/file", rateLimitMiddleware(handleFileDownload))
+	http.HandleFunc("/api/v1/stories/post", rateLimitMiddleware(handlePostStory))
+	http.HandleFunc("/api/v1/stories/feed", rateLimitMiddleware(handleGetStoriesFeed))
+	http.HandleFunc("/api/v1/stories/react", rateLimitMiddleware(handleReactStory))
+	http.HandleFunc("/api/v1/stories/", rateLimitMiddleware(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/reactions") {
+			handleStoryReactions(w, r)
+		} else {
+			handleDeleteStory(w, r)
+		}
+	}))
+	http.HandleFunc("/api/v1/social/budget", rateLimitMiddleware(handleGetSocialBudget))
+	http.HandleFunc("/api/v1/social/wipe", rateLimitMiddleware(handleSocialWipe))
 	http.HandleFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(`{"status":"ok"}`))

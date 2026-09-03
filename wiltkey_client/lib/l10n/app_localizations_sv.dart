@@ -2349,4 +2349,154 @@ class AppLocalizationsSv extends AppLocalizations {
 
   @override
   String get contactSelfBadge => 'Du';
+
+  @override
+  String get chatAttachContentTitle => 'Bifoga till chatt';
+
+  @override
+  String get chatAttachPhotos => 'Foton & kamera';
+
+  @override
+  String get chatAttachPhotosSubtitle =>
+      'Ta ett foto eller välj från galleriet';
+
+  @override
+  String get chatAttachPixelArt => 'Pixel art & avatarer';
+
+  @override
+  String get chatAttachPixelArtSubtitle =>
+      'Rita en pixelteckning eller skicka från sparade mallar';
+
+  @override
+  String get chatAttachVideo => 'Video';
+
+  @override
+  String get chatAttachVideoSubtitle =>
+      'Krypterade korta videoklipp i en framtida uppdatering';
+
+  @override
+  String get chatAttachComingSoon => 'KOMMER SNART';
+
+  @override
+  String get chatPixelArtDrawNew => 'Rita ny pixel art';
+
+  @override
+  String get chatPixelArtTemplates => 'Sparade avatarmallar';
+
+  @override
+  String get chatPixelArtSend => 'Skicka till chatt';
+
+  @override
+  String get chatPixelArtNoTemplates => 'Inga sparade avatarmallar än';
+
+  @override
+  String get chatPixelArtActionTitle => 'Pixel art-alternativ';
+
+  @override
+  String get chatPixelArtActionApplyAvatar => 'Använd som min profilavatar';
+
+  @override
+  String get chatPixelArtActionSaveTemplate => 'Spara till avatarmallar';
+
+  @override
+  String get chatPixelArtActionSaveEmoji => 'Spara som egen emoji';
+
+  @override
+  String get chatPixelArtActionExportPng => 'Exportera PNG till foton';
+
+  @override
+  String get chatPixelArtActionAppliedAvatarSuccess =>
+      'Profilavatar uppdaterad och synkroniserad';
+
+  @override
+  String get chatPixelArtActionSavedTemplateSuccess =>
+      'Sparad i avatarmallsbiblioteket';
+
+  @override
+  String get chatPixelArtActionExportedPngSuccess => 'Sparade PNG-bild i foton';
+
+  @override
+  String get chatSearchHint => 'Sök i chatten...';
+
+  @override
+  String get chatSearchNoMatches => '0 träffar';
+
+  @override
+  String get contactPrivateNoteTitle => 'Privata anteckningar & smeknamn';
+
+  @override
+  String get contactPrivateNoteHint =>
+      'Lägg till privata anteckningar om denna kontakt (lagras endast lokalt)...';
+
+  @override
+  String get contactCustomNicknameTitle => 'Anpassat smeknamn';
+
+  @override
+  String get contactCustomNicknameHint => 'Åsidosätt visningsnamn lokalt...';
+
+  @override
+  String get contactNotesSaved => 'Kontaktuppgifter sparade';
+
+  @override
+  String get onboardingSocialTitle => 'WiltKey Socialt konto';
+
+  @override
+  String get onboardingSocialExplanation =>
+      'Aktiverar din WiltKey Social-profil och serverstödd upptäckt. Din offentliga identitetsnyckel registreras hos reläet (och kan när som helst återkallas/raderas permanent av dig) för att verifiera upphovsrätten för 24-timmars vissnande händelser och sändningsinlägg. Allt innehåll förblir totalsträckskrypterat med nollkunskap (zero-knowledge).';
+
+  @override
+  String get onboardingSocialEnable =>
+      'Aktivera WiltKey Social (Rekommenderas)';
+
+  @override
+  String get onboardingSocialEnableDesc =>
+      'Dela 24-timmars vissnande händelser med gemensamma kontakter, skicka anpassad pixel art och delta i sociala sändningar.';
+
+  @override
+  String get onboardingSocialZeroServer =>
+      'Noll serverdataläge (Absolut integritet)';
+
+  @override
+  String get onboardingSocialZeroServerDesc =>
+      'Maximal anonymitet. Strikt peer-to-peer och direkt 1:1/gruppmeddelanden utan någon identitetsregistrering på servern. Fjärrstyrda sociala funktioner och händelser är inaktiverade.';
+
+  @override
+  String get settingsSocialAccountTitle => 'WiltKey Socialt konto';
+
+  @override
+  String get settingsSocialAccountSubtitle =>
+      'Tillåt serverstödda 24-timmars händelser och upptäckt';
+
+  @override
+  String get settingsStoriesReelTitle => 'Översiktens händelsefält';
+
+  @override
+  String get settingsStoriesReelSubtitle =>
+      'Visa 24-timmars händelser högst upp på chattfliken';
+
+  @override
+  String get connectTabConnect => 'Anslut';
+
+  @override
+  String get connectTabSocial => 'Socialt';
+
+  @override
+  String get forcedUpdateTitle => 'Uppdatering krävs';
+
+  @override
+  String get forcedUpdateSubtitle =>
+      'En obligatorisk uppdatering krävs för att fortsätta använda WiltKey säkert.';
+
+  @override
+  String get forcedUpdateAction => 'Uppdatera nu';
+
+  @override
+  String get forcedUpdateCheckAgain => 'Kontrollera igen';
+
+  @override
+  String get forcedUpdateSecurityNotice =>
+      'Denna version innehåller kritiska protokoll- eller säkerhetsuppdateringar. Äldre versioner kan inte längre kommunicera med nätverket.';
+
+  @override
+  String get forcedUpdateWhatsNew => 'Nyheter i denna uppdatering';
 }

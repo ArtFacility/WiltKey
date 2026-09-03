@@ -14,7 +14,15 @@ import '../../l10n/app_localizations.dart';
 import 'update_models.dart';
 
 /// Service managing remote version checks, patchnotes loading, and in-app update prompts.
-class UpdateService {
+///
+/// On Google Play builds (`kPlayStore == true`), update availability is determined
+/// strictly by `https://wiltkey.org/patchnotes.json` (and `latest_build_play` if specified),
+/// never querying GitHub Releases API to prevent premature update alerts while Google Play
+/// review is in progress.
+///
+/// On FOSS builds (`kPlayStore == false`), `patchnotes.json` is used as primary and
+/// GitHub Releases API is checked as fallback for direct APK updates.
+class UpdateService extends ChangeNotifier {
   UpdateService._();
   static final UpdateService instance = UpdateService._();
 
@@ -41,16 +49,18 @@ class UpdateService {
     } catch (_) {}
   }
 
-  /// Checks whether an update is available based on cached or freshly fetched info.
+  /// Checks whether an update is available based on cached info and current flavor.
   bool get isUpdateAvailable {
     if (_cachedInfo == null || _currentBuildNumber <= 0) return false;
-    return _cachedInfo!.isUpdateAvailable(_currentBuildNumber);
+    return _cachedInfo!.isUpdateAvailable(_currentBuildNumber, isPlay: kPlayStore);
   }
 
-  /// Checks whether an update is mandatory / immediate.
+  /// Checks whether an update is mandatory / forced / immediate.
   bool get isImmediateUpdate {
     if (_cachedInfo == null || _currentBuildNumber <= 0) return false;
-    return _cachedInfo!.isImmediateUpdate(_currentBuildNumber);
+    // An update can only be immediate if a newer build actually exists for this flavor
+    if (!isUpdateAvailable) return false;
+    return _cachedInfo!.isImmediateUpdate(_currentBuildNumber, isPlay: kPlayStore);
   }
 
   /// Fetches update info from https://wiltkey.org/patchnotes.json.
@@ -87,15 +97,19 @@ class UpdateService {
           updateInfo = UpdateInfo.fromJson(json);
         }
       } catch (_) {
-        // Fall through to GitHub releases
+        // Fall through to GitHub releases for FOSS only
       }
 
-      // 2. Secondary / FOSS fallback: check GitHub Releases API (ignoring server tags)
-      if (updateInfo == null || !updateInfo.isUpdateAvailable(_currentBuildNumber)) {
-        final ghInfo = await _checkGitHubReleases(client);
-        if (ghInfo != null &&
-            (updateInfo == null || ghInfo.latestBuild > updateInfo.latestBuild)) {
-          updateInfo = ghInfo;
+      // 2. Secondary / FOSS ONLY fallback: check GitHub Releases API (ignoring server tags)
+      // Strictly disabled on Play builds so GitHub releases do not trigger premature update
+      // alerts before Google Play Store review approval.
+      if (!kPlayStore) {
+        if (updateInfo == null || !updateInfo.isUpdateAvailable(_currentBuildNumber, isPlay: false)) {
+          final ghInfo = await _checkGitHubReleases(client);
+          if (ghInfo != null &&
+              (updateInfo == null || ghInfo.latestBuild > updateInfo.latestBuild)) {
+            updateInfo = ghInfo;
+          }
         }
       }
 
@@ -104,13 +118,15 @@ class UpdateService {
         await prefs.setInt(_kPrefLastCheckTime, now);
 
         // Check if an update event should be logged to Dashboard Events
-        if (updateInfo.isUpdateAvailable(_currentBuildNumber)) {
+        if (updateInfo.isUpdateAvailable(_currentBuildNumber, isPlay: kPlayStore)) {
           final lastLogged = prefs.getInt(_kPrefLastLoggedBuild) ?? 0;
-          if (lastLogged < updateInfo.latestBuild) {
+          final targetBuild = updateInfo.effectiveLatestBuild(isPlay: kPlayStore);
+          if (lastLogged < targetBuild) {
             _logUpdateEvent(updateInfo);
-            await prefs.setInt(_kPrefLastLoggedBuild, updateInfo.latestBuild);
+            await prefs.setInt(_kPrefLastLoggedBuild, targetBuild);
           }
         }
+        notifyListeners();
         return updateInfo;
       }
     } catch (_) {
@@ -142,14 +158,12 @@ class UpdateService {
 
   /// Extracted pure parser for GitHub releases (public for testing).
   static UpdateInfo? parseGitHubReleases(List<dynamic> releases) {
-    // Regex matches e.g. "v1.0.1-10", "v1.3.5-12", "v1.3.5+12", or "v1.3.5"
     final tagRegex = RegExp(r'^v?(\d+\.\d+\.\d+)(?:[-+](\d+))?$');
 
     for (final item in releases) {
       if (item is! Map<String, dynamic>) continue;
       final tagName = (item['tag_name'] as String? ?? '').trim();
       final isDraft = item['draft'] as bool? ?? false;
-      final isPrerelease = item['prerelease'] as bool? ?? false;
 
       // Filter out server releases (e.g. "v1.3.5-server") and drafts
       if (isDraft || tagName.endsWith('-server') || tagName.contains('server')) {
@@ -211,7 +225,8 @@ class UpdateService {
 
   void _logUpdateEvent(UpdateInfo info) {
     final appState = AppState();
-    final eventId = 'update_v${info.latestBuild}';
+    final targetBuild = info.effectiveLatestBuild(isPlay: kPlayStore);
+    final eventId = 'update_v$targetBuild';
 
     appState.logEvent(
       id: eventId,

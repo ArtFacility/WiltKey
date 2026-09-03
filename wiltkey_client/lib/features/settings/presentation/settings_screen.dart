@@ -23,6 +23,7 @@ import 'widgets/border_picker.dart';
 import 'theme_selector_screen.dart';
 import 'change_pin_screen.dart';
 import '../../../core/update/update_service.dart';
+import 'wiltkey_social_tab.dart';
 
 /// Publisher shown in the Settings "About" footer. The version string itself is
 /// read from the build at runtime (package_info_plus), so pubspec.yaml's
@@ -71,7 +72,7 @@ class _SettingsScreenState extends State<SettingsScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 5, vsync: this);
     _appState.addListener(_updateStateFromModel);
     // Equipping/removing an avatar border is a profile change → announce it to
     // peers (like editing the avatar or nick), so their copy of us updates.
@@ -409,38 +410,80 @@ class _SettingsScreenState extends State<SettingsScreen>
               : l10n.settingsTitle,
           style: t.screenTitle.copyWith(fontSize: 18),
         ),
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: t.action,
-          labelColor: t.action,
-          unselectedLabelColor: t.textTertiary,
-          labelStyle: t.sectionLabel.copyWith(fontSize: 11),
-          tabs: [
-            Tab(
-              icon: const Icon(Icons.person, size: 20),
-              text: t.uppercaseLabels
-                  ? l10n.settingsTabProfile.toUpperCase()
-                  : l10n.settingsTabProfile,
-            ),
-            Tab(
-              icon: const Icon(Icons.shield_outlined, size: 20),
-              text: t.uppercaseLabels
-                  ? l10n.settingsTabSecurity.toUpperCase()
-                  : l10n.settingsTabSecurity,
-            ),
-            Tab(
-              icon: const Icon(Icons.wifi, size: 20),
-              text: t.uppercaseLabels
-                  ? l10n.settingsTabNetwork.toUpperCase()
-                  : l10n.settingsTabNetwork,
-            ),
-            Tab(
-              icon: const Icon(Icons.notifications, size: 20),
-              text: t.uppercaseLabels
-                  ? l10n.settingsTabAlerts.toUpperCase()
-                  : l10n.settingsTabAlerts,
-            ),
-          ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(80),
+          child: Column(
+            children: [
+              TabBar(
+                controller: _tabController,
+                indicatorColor: t.action,
+                indicatorWeight: 3.0,
+                labelColor: t.action,
+                unselectedLabelColor: t.textTertiary,
+                tabs: const [
+                  Tab(icon: Icon(Icons.person, size: 22)),
+                  Tab(icon: Icon(Icons.shield_outlined, size: 22)),
+                  Tab(icon: Icon(Icons.wifi, size: 22)),
+                  Tab(icon: Icon(Icons.notifications_outlined, size: 22)),
+                  Tab(icon: Icon(Icons.public, size: 22)),
+                ],
+              ),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
+                decoration: BoxDecoration(
+                  color: t.surface.withValues(alpha: 0.5),
+                  border: Border(bottom: BorderSide(color: t.border, width: 0.5)),
+                ),
+                child: AnimatedBuilder(
+                  animation: _tabController,
+                  builder: (context, _) {
+                    final activeIndex = _tabController.index;
+                    String title = '';
+                    switch (activeIndex) {
+                      case 0:
+                        title = '${l10n.settingsTabProfile.toUpperCase()} // IDENTITY';
+                        break;
+                      case 1:
+                        title = '${l10n.settingsTabSecurity.toUpperCase()} // ENCLAVE';
+                        break;
+                      case 2:
+                        title = '${l10n.settingsTabNetwork.toUpperCase()} // RELAY';
+                        break;
+                      case 3:
+                        title = '${l10n.settingsTabAlerts.toUpperCase()} // ALERTS';
+                        break;
+                      case 4:
+                        title = 'WILTKEY SOCIAL // EPHEMERAL HUB';
+                        break;
+                    }
+                    return Row(
+                      children: [
+                        Container(
+                          width: 4,
+                          height: 12,
+                          decoration: BoxDecoration(
+                            color: t.action,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          title,
+                          style: t.dataMono.copyWith(
+                            color: t.action,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1.0,
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
         ),
       ),
       body: Stack(
@@ -452,6 +495,7 @@ class _SettingsScreenState extends State<SettingsScreen>
               _buildSecurityTab(t, l10n),
               _buildNetworkTab(t, l10n),
               _buildNotificationsTab(t, l10n),
+              const WiltkeySocialSettingsTab(),
             ],
           ),
           Positioned(

@@ -2,10 +2,13 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import '../core/cosmetics/avatar_border_registry.dart';
 import '../core/pixel_art_avatar.dart';
+import '../core/models.dart';
 import '../core/theme/theme_registry.dart';
+import '../core/theme/widgets/client_integrity_badge.dart';
 import '../core/theme/wk.dart';
 import '../core/theme/wiltkey_components.dart';
 import '../features/auth/presentation/pin_lock_screen.dart';
+import '../features/stories/presentation/widgets/themed_story_text_tag.dart';
 
 /// DEV-ONLY. A gallery of the theme's widgets + animations with live controls,
 /// for tuning visuals on desktop. Self-contained — touches no AppState/DB/models.
@@ -94,7 +97,13 @@ class _ShowcaseScreenState extends State<ShowcaseScreen> {
                 const SizedBox(height: 16),
                 _badgesSection(context),
                 const SizedBox(height: 16),
+                _clientBadgesSection(context),
+                const SizedBox(height: 16),
                 _bordersSection(context),
+                const SizedBox(height: 16),
+                _storyTextPlacersSection(context),
+                const SizedBox(height: 16),
+                _profileBackdropSection(context),
                 const SizedBox(height: 16),
                 _pinSection(context),
                 const SizedBox(height: 16),
@@ -238,6 +247,7 @@ class _ShowcaseScreenState extends State<ShowcaseScreen> {
             ourFraction: _ours,
             theirFraction: _theirs,
             isWilted: _wilted,
+            split: true,
             variant: BudgetIndicatorVariant.detail,
           ),
         ),
@@ -277,10 +287,10 @@ class _ShowcaseScreenState extends State<ShowcaseScreen> {
         Center(
           child: context.wkc.groupBudgetIndicator(
             members: const [
-              MemberBudget(fraction: 0.85, isSelf: true),
-              MemberBudget(fraction: 0.5, isHost: true),
-              MemberBudget(fraction: 0.3),
-              MemberBudget(fraction: 0.0, isWilted: true),
+              MemberBudget(fraction: 0.85, isSelf: true, keyHash: 'aa'),
+              MemberBudget(fraction: 0.5, isHost: true, keyHash: 'bb'),
+              MemberBudget(fraction: 0.3, keyHash: 'cc'),
+              MemberBudget(fraction: 0.0, isWilted: true, keyHash: 'dd'),
             ],
             emptySlots: 2,
           ),
@@ -511,6 +521,92 @@ class _ShowcaseScreenState extends State<ShowcaseScreen> {
               onChanged: (v) => setState(() => _voicePlaying = v),
             ),
           ],
+        ),
+      ],
+    );
+  }
+
+  Widget _clientBadgesSection(BuildContext context) {
+    return _card(
+      context,
+      'Client integrity badges  ·  ClientIntegrityBadge',
+      'Cryptographic attestation badges verified on-device. Tap to open info sheet.',
+      [
+        Wrap(
+          spacing: 16,
+          runSpacing: 10,
+          children: [
+            for (final type in ClientBadgeType.values)
+              ClientIntegrityBadge(
+                badgeType: type,
+                size: 18,
+                showLabel: true,
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _storyTextPlacersSection(BuildContext context) {
+    final t = context.wk;
+    return _card(
+      context,
+      'Themed Story Text Tags  ·  ThemedStoryTextTag',
+      'Draggable text tags used in Wilting Stories flattened to WebP.',
+      [
+        Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: [
+            for (final opt in StoryTextStyles.options)
+              ThemedStoryTextTag(
+                text: 'WiltKey ${opt['name']}',
+                styleId: opt['id']!,
+                textColor: Colors.white,
+                fontSize: 13.5,
+                tokens: t,
+                isEditing: false,
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _profileBackdropSection(BuildContext context) {
+    final t = context.wk;
+    final sample = PixelArtAvatar.generateIdenticon('showcase-profile');
+    return _card(
+      context,
+      'Profile backdrop  ·  profileBackdrop',
+      'The theme ambient backdrop used on contact profiles (e.g. Hearth floating candles, '
+          'Tideline sea caustics, Phosphor phosphor scanlines, Garden petal drift).',
+      [
+        SizedBox(
+          height: 180,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(t.radiusCard),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                border: Border.all(color: t.border),
+                borderRadius: BorderRadius.circular(t.radiusCard),
+              ),
+              child: context.wkc.profileBackdrop(
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      PixelArtAvatar(hexString: sample, size: 64, borderId: 'spinner'),
+                      const SizedBox(height: 8),
+                      Text('Mateusz', style: t.screenTitle.copyWith(fontSize: 18)),
+                      Text('lit May 30 · Kraków', style: t.bodySecondary.copyWith(fontSize: 12)),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
         ),
       ],
     );

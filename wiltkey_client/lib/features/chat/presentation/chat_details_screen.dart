@@ -8,6 +8,7 @@ import '../../../core/pixel_art_avatar.dart';
 import '../../../core/theme/wk.dart';
 import '../../../core/theme/wiltkey_tokens.dart';
 import '../../../core/theme/wiltkey_components.dart';
+import '../../../core/theme/nuke_capture.dart';
 import '../../groups/presentation/emoji_creator_screen.dart';
 import '../../contacts/presentation/contact_request_ui.dart';
 import '../../contacts/presentation/contact_profile_screen.dart';
@@ -31,6 +32,10 @@ class ChatDetailsScreen extends StatefulWidget {
 
 class _ChatDetailsScreenState extends State<ChatDetailsScreen> {
   final AppState _appState = AppState();
+
+  /// Captures this screen as the themed nuke overlay's base (see
+  /// `captureNukeScreen` / `nukeOverlay(screen: …)`).
+  final GlobalKey _nukeCaptureKey = GlobalKey();
 
   // Always read the freshest contact (profile/permissions can sync in live).
   Contact get _contact {
@@ -194,12 +199,17 @@ class _ChatDetailsScreenState extends State<ChatDetailsScreen> {
     );
   }
 
-  void _nukeChat() {
+  void _nukeChat() async {
     final contact = widget.contact;
+
+    // Capture the screen before covering it, so themes can use the real chat
+    // as the base of their destruction animation (Manuscript's rune burn).
+    final screen = await captureNukeScreen(_nukeCaptureKey);
 
     // The overlay lives in the root overlay (carrying our ThemeData) so it
     // survives the popUntil at the end and resolves theme tokens. onDone wipes
     // both ends (nukeContact sends NUKE_RECIPIENT for 1-on-1) and exits to root.
+    if (!mounted) return;
     final overlay = Overlay.of(context, rootOverlay: true);
     final wkc = context.wkc;
     final themeData = Theme.of(context);
@@ -211,6 +221,7 @@ class _ChatDetailsScreenState extends State<ChatDetailsScreen> {
         child: Theme(
           data: themeData,
           child: wkc.nukeOverlay(
+            screen: screen,
             onDone: () {
               entry.remove();
               _appState.nukeContact(contact.keyHash, receivedFromPeer: false);
@@ -237,7 +248,9 @@ class _ChatDetailsScreenState extends State<ChatDetailsScreen> {
       timeWilt: contact.isTimeWilt,
     );
 
-    return Scaffold(
+    return RepaintBoundary(
+      key: _nukeCaptureKey,
+      child: Scaffold(
       backgroundColor: t.bg,
       appBar: AppBar(
         backgroundColor: t.bg,
@@ -662,6 +675,7 @@ class _ChatDetailsScreenState extends State<ChatDetailsScreen> {
             ),
           ],
         ),
+      ),
       ),
     );
   }

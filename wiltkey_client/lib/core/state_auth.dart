@@ -233,6 +233,11 @@ extension AppStateAuth on AppState {
     // background workers can authenticate (also migrates existing users who
     // onboarded before the notification feature existed).
     await cacheBackgroundCredentials();
+    await loadSocialPreferences();
+    if (socialAccountEnabled && storiesEnabled) {
+      refreshStoriesFeed();
+      refreshSocialBudget();
+    }
 
     notifyListeners();
     WebSocketClient().connect(activeRelayUrl, publicKeyHex: publicKeyHex);

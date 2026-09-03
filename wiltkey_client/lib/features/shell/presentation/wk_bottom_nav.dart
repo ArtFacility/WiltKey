@@ -3,12 +3,14 @@ import '../../../core/theme/wk.dart';
 
 class WkNavItem {
   final IconData icon;
-  final String label;
-  const WkNavItem(this.icon, this.label);
+  final String? label;
+  const WkNavItem(this.icon, [this.label]);
 }
 
 /// Token-driven bottom navigation bar. Same structure in every theme; the active
 /// item uses `tokens.action`, the bar sits on a `tokens.border` top hairline.
+/// Renders clean icons without text labels to prevent clipping on small screens
+/// or wordy translations (section title is already indicated in page headers).
 class WkBottomNavBar extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onTap;
@@ -33,8 +35,9 @@ class WkBottomNavBar extends StatelessWidget {
       ),
       child: SafeArea(
         top: false,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
+        bottom: true,
+        child: SizedBox(
+          height: 54,
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: List.generate(items.length, (i) {
@@ -42,26 +45,22 @@ class WkBottomNavBar extends StatelessWidget {
               final color = selected ? t.action : t.textTertiary;
               final item = items[i];
               return Expanded(
-                child: InkWell(
-                  onTap: () => onTap(i),
-                  borderRadius: BorderRadius.circular(t.radiusControl),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(item.icon, size: 22, color: color),
-                        const SizedBox(height: 4),
-                        Text(
-                          t.uppercaseLabels
-                              ? item.label.toUpperCase()
-                              : item.label,
-                          style: t.sectionLabel.copyWith(
-                            color: color,
-                            fontSize: 9.5,
-                          ),
+                child: Semantics(
+                  label: item.label,
+                  selected: selected,
+                  button: true,
+                  child: InkWell(
+                    onTap: () => onTap(i),
+                    borderRadius: BorderRadius.circular(t.radiusControl),
+                    child: SizedBox(
+                      height: 54,
+                      child: Center(
+                        child: Icon(
+                          item.icon,
+                          size: 24,
+                          color: color,
                         ),
-                      ],
+                      ),
                     ),
                   ),
                 ),

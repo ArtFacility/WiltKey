@@ -1,3 +1,5 @@
+﻿import 'dart:ui' as ui;
+
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../wiltkey_components.dart';
@@ -183,7 +185,7 @@ class PaperinkComponents
   }) => _PaperinkProfileBackdrop(seed: seed, child: child);
 
   @override
-  Widget nukeOverlay({required VoidCallback onDone}) =>
+  Widget nukeOverlay({required VoidCallback onDone, ui.Image? screen}) =>
       PaperinkNukeFlood(onDone: onDone);
 
   // Shadows the VoiceScrubberDefaults mixin: the bespoke unrolling handscroll.

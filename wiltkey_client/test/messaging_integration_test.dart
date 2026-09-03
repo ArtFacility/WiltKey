@@ -217,6 +217,26 @@ Future<void> main() async {
   int passed = 0;
   int failed = 0;
 
+  bool serverReachable = false;
+  try {
+    final s = await Socket.connect(
+      '127.0.0.1',
+      8000,
+      timeout: const Duration(milliseconds: 300),
+    );
+    s.destroy();
+    serverReachable = true;
+  } catch (_) {
+    serverReachable = false;
+  }
+
+  if (!serverReachable) {
+    print('  ⚠️ Local relay server not running on ws://localhost:8000/ws.');
+    print('  Skipping live integration suite. (Run "go run ." in wiltkey_server/ to run)');
+    print('');
+    return;
+  }
+
   Future<void> runTest(String name, Future<void> Function() test) async {
     print('');
     print('─── TEST: $name ───');

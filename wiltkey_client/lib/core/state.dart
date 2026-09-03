@@ -27,6 +27,8 @@ import 'cosmetics/avatar_border_controller.dart';
 import 'theme/theme_controller.dart';
 import 'update/update_service.dart';
 import 'network/integrity_attestation_manager.dart';
+import 'stories/story_model.dart';
+import 'stories/story_service.dart';
 
 part 'state_auth.dart';
 part 'state_chats.dart';
@@ -46,6 +48,7 @@ part 'state_downloads.dart';
 part 'state_events.dart';
 part 'state_contacts.dart';
 part 'state_notifications.dart';
+part 'state_stories.dart';
 
 enum AppStatus { normal, nuked }
 
@@ -103,6 +106,12 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   /// Hours of inactivity after which fingerprint unlock is disabled and the PIN
   /// is required again. 0 = never (fingerprint stays available). Default 4h.
   int biometricIdleHours = 4;
+
+  /// Whether the user opted in to WiltKey Social account and server-assisted features.
+  bool socialAccountEnabled = true;
+
+  /// Whether the 24-hour Wilting Stories reel is shown on the Chats dashboard.
+  bool storiesEnabled = true;
 
   final WiltkeyPersistence _persistence = WiltkeyPersistence();
   bool isLoaded = false;
@@ -349,7 +358,9 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   /// list that looks "loaded").
   void appendLoadedMessage(String chatId, ChatMessage msg) {
     if (!loadedChats.contains(chatId)) return;
-    messages[chatId] = [...(messages[chatId] ?? []), msg];
+    final list = <ChatMessage>[...(messages[chatId] ?? []), msg];
+    list.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+    messages[chatId] = list;
   }
 
   /// Best display name for the author of [msg] in [contact]'s chat, used by reply

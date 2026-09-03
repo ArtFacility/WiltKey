@@ -565,6 +565,46 @@ class _PinKeypadKeyState extends State<_PinKeypadKey>
         context.wkc.runtimeType.toString() == 'PaperinkComponents';
     final isPhosphor =
         context.wkc.runtimeType.toString() == 'PhosphorComponents';
+    final isManuscript =
+        context.wkc.runtimeType.toString() == 'ManuscriptComponents';
+
+    if (isManuscript) {
+      // Scriptorium digit key: a hard-edged square. Pressing floods it
+      // amber-dim and lights the border — no ripple, no corners anywhere.
+      return GestureDetector(
+        onTapDown: _onTapDown,
+        onTapUp: _onTapUp,
+        onTapCancel: _onTapCancel,
+        child: AnimatedBuilder(
+          animation: _controller,
+          builder: (context, _) {
+            final val = _controller.value;
+            final pressed = val > 0.5;
+            return Container(
+              width: 60,
+              height: 60,
+              decoration: BoxDecoration(
+                color: pressed ? t.action.withValues(alpha: 0.20) : t.surface,
+                border: Border.all(
+                  color: pressed ? t.action : t.border,
+                  width: 1.4,
+                ),
+                borderRadius: BorderRadius.zero,
+              ),
+              child: Center(
+                child: Text(
+                  widget.digit,
+                  style: t.dataMono.copyWith(
+                    color: pressed ? t.action : t.textPrimary,
+                    fontSize: 15,
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      );
+    }
 
     if (isPhosphor) {
       // Square arcade key: chunky border, hard unblurred drop shadow; a press
@@ -788,6 +828,49 @@ class _PinKeypadActionKeyState extends State<_PinKeypadActionKey>
         context.wkc.runtimeType.toString() == 'PaperinkComponents';
     final isPhosphor =
         context.wkc.runtimeType.toString() == 'PhosphorComponents';
+    final isManuscript =
+        context.wkc.runtimeType.toString() == 'ManuscriptComponents';
+
+    if (isManuscript) {
+      // Scriptorium icon key: sharp outline square; press nudges it down and
+      // lights the border amber.
+      return GestureDetector(
+        onTapDown: _onTapDown,
+        onTapUp: _onTapUp,
+        onTapCancel: _onTapCancel,
+        child: AnimatedBuilder(
+          animation: _controller,
+          builder: (context, _) {
+            return Transform.translate(
+              offset: Offset(0, 2.0 * _controller.value),
+              child: Container(
+                width: 60,
+                height: 60,
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: _controller.value > 0.5 ? t.action : t.border,
+                    width: 1.4,
+                  ),
+                  borderRadius: BorderRadius.zero,
+                ),
+                child: Tooltip(
+                  message: widget.tooltip,
+                  child: Center(
+                    child: Icon(
+                      widget.icon,
+                      color: _controller.value > 0.5
+                          ? t.action
+                          : t.textSecondary,
+                      size: 20,
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      );
+    }
 
     if (isPhosphor) {
       // Square outline key (subtler than the digits — no fill, no shadow).

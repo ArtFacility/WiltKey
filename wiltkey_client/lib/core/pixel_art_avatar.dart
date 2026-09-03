@@ -43,16 +43,44 @@ class PixelArtAvatar extends StatelessWidget {
       return _pixelBody(size, framed: true);
     }
 
-    // Border equipped → inset the (unframed) avatar to 80% and overlay the
-    // border (a live painter if animated, otherwise the SVG asset).
-    final inner = size * 0.8;
+    // Border equipped → determine inset scale based on border crop shape.
+    // Circular borders fill the porthole circle (1.02x) so the avatar is prominently
+    // sized and doesn't leave empty purple background margins; square/rounded frames inset to 80-82%.
+    final double inner = switch (border.cropShape) {
+      AvatarCropShape.circle => size * 1.02,
+      AvatarCropShape.rounded => size * 0.82,
+      AvatarCropShape.square => size * 0.80,
+    };
+    Widget body = _pixelBody(inner, framed: false);
+
+    switch (border.cropShape) {
+      case AvatarCropShape.circle:
+        body = ClipOval(
+          child: SizedBox(
+            width: size * 0.84,
+            height: size * 0.84,
+            child: Center(child: body),
+          ),
+        );
+        break;
+      case AvatarCropShape.rounded:
+        final radius = inner * (border.cornerRadiusFactor ?? 0.15);
+        body = ClipRRect(
+          borderRadius: BorderRadius.circular(radius),
+          child: body,
+        );
+        break;
+      case AvatarCropShape.square:
+        break;
+    }
+
     return SizedBox(
       width: size,
       height: size,
       child: Stack(
         alignment: Alignment.center,
         children: [
-          _pixelBody(inner, framed: false),
+          body,
           Positioned.fill(
             child: border.isAnimated
                 ? AnimatedAvatarBorder(paint: border.animatedPaint!)

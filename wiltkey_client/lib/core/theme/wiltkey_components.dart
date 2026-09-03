@@ -1,3 +1,5 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 import 'wiltkey_tokens.dart';
 import 'components/voice_scrubber.dart';
@@ -241,7 +243,12 @@ abstract class WiltkeyComponents {
   /// Garden = colours rot to brown while a flower greys and sheds its petals;
   /// cyberpunk = a data-corruption glitch collapsing to black. Reduce-motion: a
   /// quick fade. Both must call [onDone].
-  Widget nukeOverlay({required VoidCallback onDone});
+  ///
+  /// [screen] is an optional raster of the chat screen being destroyed (see
+  /// `captureNukeScreen`), captured just before the overlay is inserted. Themes
+  /// that want the real screen as the animation's base (e.g. Manuscript's rune
+  /// consumption) use it; every other theme ignores it.
+  Widget nukeOverlay({required VoidCallback onDone, ui.Image? screen});
 
   /// Optional: warm up anything heavy the [unlockTransition] needs (e.g. large
   /// glyph rasterization, blur shaders) while the lock screen is idle, so the

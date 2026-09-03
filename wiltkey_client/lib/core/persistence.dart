@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:encrypt/encrypt.dart' as enc;
-import 'models.dart';
 import 'state.dart';
 import 'auth/biometric_auth.dart';
 import 'notifications/notification_service.dart';

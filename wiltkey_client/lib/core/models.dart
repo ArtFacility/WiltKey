@@ -63,6 +63,15 @@ class Contact {
   String? clientAttestation;
   int? attestationExpiresAt;
 
+  // Local private metadata (strictly local, never transmitted over wire)
+  String? customNickname;
+  String? privateNotes;
+
+  String get displayName =>
+      (customNickname != null && customNickname!.trim().isNotEmpty)
+          ? customNickname!.trim()
+          : name;
+
   // OTP partition offsets
   int outgoingOffset;
   int outgoingMaxOffset;
@@ -171,6 +180,8 @@ class Contact {
     this.avatarBorderId,
     this.clientAttestation,
     this.attestationExpiresAt,
+    this.customNickname,
+    this.privateNotes,
     this.outgoingOffset = 0,
     this.outgoingMaxOffset = 0,
     this.incomingOffset = 0,
@@ -219,6 +230,8 @@ class Contact {
     String? avatarBorderId,
     String? clientAttestation,
     int? attestationExpiresAt,
+    String? customNickname,
+    String? privateNotes,
     int? outgoingOffset,
     int? outgoingMaxOffset,
     int? incomingOffset,
@@ -267,6 +280,8 @@ class Contact {
       avatarBorderId: avatarBorderId ?? this.avatarBorderId,
       clientAttestation: clientAttestation ?? this.clientAttestation,
       attestationExpiresAt: attestationExpiresAt ?? this.attestationExpiresAt,
+      customNickname: customNickname ?? this.customNickname,
+      privateNotes: privateNotes ?? this.privateNotes,
       outgoingOffset: outgoingOffset ?? this.outgoingOffset,
       outgoingMaxOffset: outgoingMaxOffset ?? this.outgoingMaxOffset,
       incomingOffset: incomingOffset ?? this.incomingOffset,
@@ -784,6 +799,8 @@ class SocialContact {
   final int? statusExpiresAt; // Unix timestamp in ms when status expires
   final String? clientAttestation; // 'play_official', 'play_plus', or null/tinkerer
   final int? attestationExpiresAt; // Unix timestamp in seconds
+  final String? customNickname;
+  final String? privateNotes;
 
   SocialContact({
     required this.id,
@@ -806,7 +823,14 @@ class SocialContact {
     this.statusExpiresAt,
     this.clientAttestation,
     this.attestationExpiresAt,
+    this.customNickname,
+    this.privateNotes,
   });
+
+  String get displayName =>
+      (customNickname != null && customNickname!.trim().isNotEmpty)
+          ? customNickname!.trim()
+          : name;
 
   bool get isStatusExpired =>
       statusExpiresAt != null &&
@@ -837,6 +861,8 @@ class SocialContact {
     statusExpiresAt: row['status_expires_at'] as int?,
     clientAttestation: row['client_attestation'] as String?,
     attestationExpiresAt: row['attestation_expires_at'] as int?,
+    customNickname: row['custom_nickname'] as String?,
+    privateNotes: row['private_notes'] as String?,
   );
 
   Map<String, Object?> toRow() => {
@@ -859,6 +885,8 @@ class SocialContact {
     'status_expires_at': statusExpiresAt,
     'client_attestation': clientAttestation,
     'attestation_expires_at': attestationExpiresAt,
+    'custom_nickname': customNickname,
+    'private_notes': privateNotes,
   };
 
   /// Derives the theme seed from the shared secret (lazy, cached in DB).

@@ -164,6 +164,7 @@ extension AppStateDownloads on AppState {
     try {
       final token = await _requestDownloadToken(fileId);
       final envelope = await _fetchFileBody(fileId, token, msg);
+      final origTimestamp = msg.timestamp;
 
       // Drop the placeholder first: the group inbound path dedups by message id
       // and would treat our own placeholder as "already have it", so the real
@@ -185,6 +186,14 @@ extension AppStateDownloads on AppState {
         contact.isGroup ? msg.senderId : contact.keyHash,
         envelope,
         msg.contentType,
+      );
+
+      // Preserve original placeholder timestamp so the downloaded message stays in
+      // its original chronological place in the conversation instead of jumping to newest.
+      await WiltkeyDatabase.instance.updateMessageTimestamp(
+        msg.id,
+        chatId: contact.id,
+        timestamp: origTimestamp,
       );
 
       // Only now is the file genuinely ours — let the relay drop its copy.

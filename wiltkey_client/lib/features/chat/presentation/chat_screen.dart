@@ -10,6 +10,8 @@ import '../../../core/models.dart';
 import '../../../core/custom_emoji.dart';
 import '../../contacts/presentation/contact_request_ui.dart';
 import 'widgets/image_source_sheet.dart';
+import 'widgets/content_attachment_sheet.dart';
+import 'widgets/chat_search_bar.dart';
 import 'widgets/screenshot_ui.dart';
 import 'widgets/wilt_duration_sheet.dart';
 import 'widgets/reply_preview.dart';
@@ -72,6 +74,13 @@ class _ChatScreenState extends State<ChatScreen>
 
   // Wraps the message list so a consented screenshot can render it to an image.
   final GlobalKey _captureBoundaryKey = GlobalKey();
+
+  // Local keyword search
+  bool _isSearching = false;
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+  List<String> _matchingMessageIds = [];
+  int _currentMatchIndex = 0;
 
   // The chat this screen opened with — used to release the "visible chat" flag on
   // dispose only if a newer chat hasn't taken over (see [AppState.visibleChatId]).
@@ -431,11 +440,24 @@ class _ChatScreenState extends State<ChatScreen>
     );
   }
 
-  /// Tapping the image button: choose camera vs gallery, then run the send flow.
+  /// Tapping the attachment button: choose Photos, Pixel Art / Avatars, or Video.
   Future<void> _onImageButton() async {
-    final src = await showImageSourceSheet(context);
-    if (src == null || !mounted) return;
-    await _pickAndSendImage(src);
+    final res = await showContentAttachmentSheet(context);
+    if (res == null || !mounted) return;
+    if (res is PhotoAttachmentResult) {
+      await _pickAndSendImage(res.source);
+    } else if (res is PixelArtAttachmentResult) {
+      await _sendPixelArt(res.hexString);
+    }
+  }
+
+  Future<void> _sendPixelArt(String hexString) async {
+    final contact = _appState.activeContact;
+    if (contact == null) return;
+    await _appState.sendMessage(
+      hexString,
+      contentType: 'pixel_art',
+    );
   }
 
   Future<void> _pickAndSendImage(ImageSource source) async {
@@ -566,10 +588,67 @@ class _ChatScreenState extends State<ChatScreen>
       targetId: parentId,
       rowKeys: _messageRowKeys,
     );
-    if (!mounted) return;
+    _flashQuoteHighlight(parentId);
+  }
+  void _onSearchChanged(String q) {
+    final query = q.trim().toLowerCase();
+    setState(() {
+      _searchQuery = query;
+      if (query.isEmpty) {
+        _matchingMessageIds.clear();
+        _currentMatchIndex = 0;
+        return;
+      }
+      final contact = _appState.activeContact;
+      final msgs = contact != null ? _visibleMessages(contact) : <ChatMessage>[];
+      _matchingMessageIds = msgs
+          .where((m) =>
+              (m.decryptedText ?? m.text).toLowerCase().contains(query))
+          .map((m) => m.id)
+          .toList();
+      _currentMatchIndex = 0;
+    });
+    if (_matchingMessageIds.isNotEmpty) {
+      _jumpToCurrentMatch();
+    }
+  }
+
+  void _nextSearchMatch() {
+    if (_matchingMessageIds.isEmpty) return;
+    setState(() {
+      _currentMatchIndex = (_currentMatchIndex + 1) % _matchingMessageIds.length;
+    });
+    _jumpToCurrentMatch();
+  }
+
+  void _prevSearchMatch() {
+    if (_matchingMessageIds.isEmpty) return;
+    setState(() {
+      _currentMatchIndex =
+          (_currentMatchIndex - 1 + _matchingMessageIds.length) %
+              _matchingMessageIds.length;
+    });
+    _jumpToCurrentMatch();
+  }
+
+  void _jumpToCurrentMatch() {
+    if (_matchingMessageIds.isEmpty) return;
+    final contact = _appState.activeContact;
+    if (contact == null) return;
+    final targetId = _matchingMessageIds[_currentMatchIndex];
+    scrollToMessageInList(
+      controller: _scrollController,
+      messages: _visibleMessages(contact),
+      targetId: targetId,
+      rowKeys: _messageRowKeys,
+    );
+    _flashQuoteHighlight(targetId);
+  }
+
+  void _flashQuoteHighlight(String targetId) {
     _flashTimer?.cancel();
     setState(() {
-      _flashMessageId = parentId;
+      _flashMessageId = targetId;
       _flashTick++;
     });
     _flashTimer = Timer(const Duration(milliseconds: 1300), () {
@@ -893,6 +972,10 @@ class _ChatScreenState extends State<ChatScreen>
                   ),
                   onSelected: (value) {
                     switch (value) {
+                      case 'search':
+                        setState(() {
+                          _isSearching = true;
+                        });
                       case 'sync':
                         _handleSyncTap(contact);
                       case 'screenshot':
@@ -902,6 +985,14 @@ class _ChatScreenState extends State<ChatScreen>
                     }
                   },
                   itemBuilder: (context) => [
+                    PopupMenuItem(
+                      value: 'search',
+                      child: _menuRow(
+                        t,
+                        Icons.search,
+                        'Search in chat',
+                      ),
+                    ),
                     PopupMenuItem(
                       value: 'sync',
                       child: _menuRow(
@@ -932,6 +1023,25 @@ class _ChatScreenState extends State<ChatScreen>
                   ],
                 ),
               ],
+              bottom: _isSearching
+                  ? ChatSearchBar(
+                      controller: _searchController,
+                      matchCount: _matchingMessageIds.length,
+                      currentMatchIndex: _currentMatchIndex,
+                      onChanged: _onSearchChanged,
+                      onNext: _nextSearchMatch,
+                      onPrevious: _prevSearchMatch,
+                      onClose: () {
+                        setState(() {
+                          _isSearching = false;
+                          _searchController.clear();
+                          _searchQuery = '';
+                          _matchingMessageIds.clear();
+                          _currentMatchIndex = 0;
+                        });
+                      },
+                    )
+                  : null,
             ),
             body: Container(
               color: t.bg,

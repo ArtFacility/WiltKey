@@ -15,6 +15,7 @@ wiltkey_history.json
 *.keystore
 # Machine-specific SDK paths (not secret, but don't commit).
 **/local.properties
+**/adi-registration.properties
 
 # Env / secret files.
 .env

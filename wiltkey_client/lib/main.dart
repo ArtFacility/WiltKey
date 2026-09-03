@@ -12,6 +12,8 @@ import 'core/localization/locale_controller.dart';
 import 'core/notifications/background_handler.dart';
 import 'core/notifications/notification_service.dart';
 import 'core/entitlements/entitlement_service.dart';
+import 'core/update/update_service.dart';
+import 'core/update/forced_update_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -33,6 +35,10 @@ void main() async {
   // Load cached entitlements (instant/offline) and, on the Play build only,
   // kick off a background Billing refresh. No-op / Google-free on FOSS.
   await EntitlementService().load();
+
+  // Initialize version & build metadata and check for remote updates in the background.
+  await UpdateService.instance.init();
+  UpdateService.instance.checkForUpdates();
 
   runApp(const WiltkeyApp());
 }
@@ -85,21 +91,32 @@ class _WiltkeyAppState extends State<WiltkeyApp> {
               localizationsDelegates: AppLocalizations.localizationsDelegates,
               supportedLocales: AppLocalizations.supportedLocales,
               home: ListenableBuilder(
-                listenable: AppState(),
+                listenable: UpdateService.instance,
                 builder: (context, _) {
-                  final state = AppState();
-                  if (!state.isLoaded) {
-                    return const Scaffold(
-                      body: Center(child: CircularProgressIndicator()),
-                    );
+                  final updateService = UpdateService.instance;
+                  if (updateService.isImmediateUpdate &&
+                      updateService.cachedInfo != null) {
+                    return ForcedUpdateScreen(info: updateService.cachedInfo!);
                   }
-                  if (state.isOnboardingRequired) {
-                    return const OnboardingScreen();
-                  }
-                  if (state.isLocked) {
-                    return const PinLockScreen();
-                  }
-                  return const AppShell();
+
+                  return ListenableBuilder(
+                    listenable: AppState(),
+                    builder: (context, _) {
+                      final state = AppState();
+                      if (!state.isLoaded) {
+                        return const Scaffold(
+                          body: Center(child: CircularProgressIndicator()),
+                        );
+                      }
+                      if (state.isOnboardingRequired) {
+                        return const OnboardingScreen();
+                      }
+                      if (state.isLocked) {
+                        return const PinLockScreen();
+                      }
+                      return const AppShell();
+                    },
+                  );
                 },
               ),
             );

@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import '../../../core/state.dart';
@@ -10,8 +10,6 @@ import '../../proximity/controllers/ble_pairing_manager.dart';
 import '../../proximity/presentation/widgets/terminal_log_view.dart';
 import '../../proximity/presentation/widgets/bluetooth_off_banner.dart';
 // TEMPORARY (see kRemotePairingTesting): debug remote group-join entry.
-import 'package:wiltkey_client/core/build_flavor.dart';
-import 'package:wiltkey_client/features/proximity/presentation/remote_group_pair_view.dart';
 
 class GroupSearchScreen extends StatefulWidget {
   const GroupSearchScreen({super.key});
@@ -147,20 +145,6 @@ class _GroupSearchScreenState extends State<GroupSearchScreen>
             backgroundColor: t.bg,
             elevation: 0,
             actions: [
-              if (kRemotePairingTesting &&
-                  kPlayStore &&
-                  _manager.appState.showDebugButtons)
-                IconButton(
-                  icon: Icon(Icons.cloud_download_outlined,
-                      color: t.warning, size: 20),
-                  tooltip: 'Join remote group (testing)',
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const RemoteGroupJoinView(),
-                    ),
-                  ),
-                ),
               IconButton(
                 icon: Icon(Icons.terminal, color: t.identity, size: 20),
                 onPressed: () => TerminalLogView.show(context, _manager),

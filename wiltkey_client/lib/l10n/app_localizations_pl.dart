@@ -2366,4 +2366,154 @@ class AppLocalizationsPl extends AppLocalizations {
 
   @override
   String get contactSelfBadge => 'Ty';
+
+  @override
+  String get chatAttachContentTitle => 'Dołącz do czatu';
+
+  @override
+  String get chatAttachPhotos => 'Zdjęcia i aparat';
+
+  @override
+  String get chatAttachPhotosSubtitle => 'Zrób zdjęcie lub wybierz z galerii';
+
+  @override
+  String get chatAttachPixelArt => 'Pixel art i awatary';
+
+  @override
+  String get chatAttachPixelArtSubtitle =>
+      'Narysuj pixel art lub wyślij z zapisanych szablonów';
+
+  @override
+  String get chatAttachVideo => 'Wideo';
+
+  @override
+  String get chatAttachVideoSubtitle =>
+      'Szyfrowane krótkie klipy wideo w przyszłej aktualizacji';
+
+  @override
+  String get chatAttachComingSoon => 'WKRÓTCE';
+
+  @override
+  String get chatPixelArtDrawNew => 'Narysuj nowy pixel art';
+
+  @override
+  String get chatPixelArtTemplates => 'Zapisane szablony awatarów';
+
+  @override
+  String get chatPixelArtSend => 'Wyślij do czatu';
+
+  @override
+  String get chatPixelArtNoTemplates => 'Brak zapisanych szablonów awatarów';
+
+  @override
+  String get chatPixelArtActionTitle => 'Opcje pixel art';
+
+  @override
+  String get chatPixelArtActionApplyAvatar => 'Ustaw jako mój awatar profilu';
+
+  @override
+  String get chatPixelArtActionSaveTemplate => 'Zapisz w szablonach awatarów';
+
+  @override
+  String get chatPixelArtActionSaveEmoji => 'Zapisz jako własną emotikonę';
+
+  @override
+  String get chatPixelArtActionExportPng => 'Eksportuj PNG do zdjęć';
+
+  @override
+  String get chatPixelArtActionAppliedAvatarSuccess =>
+      'Awatar profilu zaktualizowany i zsynchronizowany';
+
+  @override
+  String get chatPixelArtActionSavedTemplateSuccess =>
+      'Zapisano w bibliotece szablonów awatarów';
+
+  @override
+  String get chatPixelArtActionExportedPngSuccess =>
+      'Zapisano obraz PNG w zdjęciach';
+
+  @override
+  String get chatSearchHint => 'Szukaj w czacie...';
+
+  @override
+  String get chatSearchNoMatches => '0 wyników';
+
+  @override
+  String get contactPrivateNoteTitle => 'Prywatne notatki i pseudonim';
+
+  @override
+  String get contactPrivateNoteHint =>
+      'Dodaj prywatne notatki o tym kontakcie (przechowywane tylko lokalnie)...';
+
+  @override
+  String get contactCustomNicknameTitle => 'Własny pseudonim';
+
+  @override
+  String get contactCustomNicknameHint =>
+      'Zastąp nazwę wyświetlaną lokalnie...';
+
+  @override
+  String get contactNotesSaved => 'Szczegóły kontaktu zostały zapisane';
+
+  @override
+  String get onboardingSocialTitle => 'Konto społecznościowe WiltKey';
+
+  @override
+  String get onboardingSocialExplanation =>
+      'Włącza Twój profil społecznościowy WiltKey i wykrywanie z pomocą serwera. Twój publiczny klucz tożsamości jest rejestrowany na serwerze przekaźnikowym (i może zostać w każdej chwili trwale odwołany/wyczyszczony przez Ciebie), aby weryfikować autorstwo 24-godzinnych znikających relacji i postów transmisyjnych. Cała zawartość pozostaje szyfrowana end-to-end w modelu zero-knowledge.';
+
+  @override
+  String get onboardingSocialEnable => 'Włącz WiltKey Social (Zalecane)';
+
+  @override
+  String get onboardingSocialEnableDesc =>
+      'Udostępniaj 24-godzinne znikające relacje wspólnym kontaktom, wysyłaj własny pixel art i bierz udział w transmisjach społecznościowych.';
+
+  @override
+  String get onboardingSocialZeroServer =>
+      'Tryb zerowej ilości danych na serwerze (Całkowita prywatność)';
+
+  @override
+  String get onboardingSocialZeroServerDesc =>
+      'Maksymalna anonimowość. Ściśle peer-to-peer i bezpośrednie wiadomości 1:1/grupowe bez rejestracji tożsamości na serwerze. Zdalne funkcje społecznościowe i relacje są wyłączone.';
+
+  @override
+  String get settingsSocialAccountTitle => 'Konto społecznościowe WiltKey';
+
+  @override
+  String get settingsSocialAccountSubtitle =>
+      'Zezwalaj na 24-godzinne relacje i odkrywanie wspomagane przez serwer';
+
+  @override
+  String get settingsStoriesReelTitle => 'Pasek relacji na pulpicie';
+
+  @override
+  String get settingsStoriesReelSubtitle =>
+      'Pokazuj 24-godzinne relacje na górze karty czatów';
+
+  @override
+  String get connectTabConnect => 'Połącz';
+
+  @override
+  String get connectTabSocial => 'Społeczność';
+
+  @override
+  String get forcedUpdateTitle => 'Wymagana aktualizacja';
+
+  @override
+  String get forcedUpdateSubtitle =>
+      'Wymagana jest obowiązkowa aktualizacja, aby nadal bezpiecznie korzystać z WiltKey.';
+
+  @override
+  String get forcedUpdateAction => 'Zaktualizuj teraz';
+
+  @override
+  String get forcedUpdateCheckAgain => 'Sprawdź ponownie';
+
+  @override
+  String get forcedUpdateSecurityNotice =>
+      'Ta wersja zawiera krytyczne aktualizacje protokołu lub bezpieczeństwa. Starsze wersje nie mogą już komunikować się z siecią.';
+
+  @override
+  String get forcedUpdateWhatsNew => 'Co nowego w tej aktualizacji';
 }
