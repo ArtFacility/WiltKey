@@ -69,7 +69,8 @@ class _VideoSendDialogState extends State<VideoSendDialog> {
   double _trimStart = 0.0;
   double _trimEnd = 0.0;
 
-  bool _allowSave = false;
+  // Owner call 2026-09-06: download consent defaults ON (opt-out, not opt-in).
+  bool _allowSave = true;
   bool _ephemeral = false;
   double _ttlSeconds = 10;
   bool _sent = false;
@@ -614,8 +615,8 @@ class _VideoSendDialogState extends State<VideoSendDialog> {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
+                    IconButton(
+                      style: IconButton.styleFrom(
                         backgroundColor: (exceedsPad || exceedsMaxPayload)
                             ? t.textTertiary.withValues(alpha: 0.2)
                             : t.action,
@@ -625,13 +626,14 @@ class _VideoSendDialogState extends State<VideoSendDialog> {
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(t.radiusControl),
                         ),
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                       ),
+                      // Icon-only: the old label accidentally reused the VOICE
+                      // send string ("Send voice message") on the video dialog.
+                      tooltip: l10n.chatVoiceSend,
                       onPressed: (exceedsPad || exceedsMaxPayload)
                           ? null
                           : _handleSend,
-                      icon: const Icon(Icons.send_rounded, size: 16),
-                      label: Text(l10n.chatVoiceSend),
+                      icon: const Icon(Icons.send_rounded, size: 20),
                     ),
                   ],
                 ),

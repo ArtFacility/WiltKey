@@ -177,11 +177,19 @@ class WebSocketClient {
   /// always start from the primary preference.
   void connect(String httpUrl, {required String publicKeyHex}) {
     _publicKeyHex = publicKeyHex;
+    final urlChanged = _primaryUrl != httpUrl;
     _primaryUrl = httpUrl;
     // Single-flight: a dance already in progress owns the socket. Resetting
     // rotation/counters (or dialling a second socket) here would sabotage it.
     if (isBusy) {
       _log('[WebSocket] connect() ignored — dial/auth already in flight.');
+      return;
+    }
+    // Already authenticated to THIS relay? A second dial would tear down a
+    // working socket for nothing (and the old connection's server-side
+    // unregister can then race the new one). Relay changes still re-dial.
+    if (isConnected && !urlChanged) {
+      _log('[WebSocket] connect() ignored — already connected.');
       return;
     }
     _rotationIndex = 0;

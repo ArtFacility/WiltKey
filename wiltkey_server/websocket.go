@@ -91,10 +91,15 @@ func (h *Hub) Run() {
 
 		case client := <-h.unregister:
 			h.mu.Lock()
-			if _, ok := h.clients[client.id]; ok {
+			// Only retire the connection that is ACTUALLY registered under
+			// this id. A slow-dying OLD connection can exit AFTER a newer
+			// reconnect already took its place in the map; deleting by id
+			// alone used to evict the LIVE client (relay kept queueing its
+			// messages as "offline" while the socket stayed open and able to
+			// send — a half-dead state only an app restart fixed).
+			if cur, ok := h.clients[client.id]; ok && cur == client {
 				delete(h.clients, client.id)
 				close(client.send)
-				log.Printf("Client unregistered: %s", client.id)
 			}
 			h.mu.Unlock()
 		}

@@ -293,6 +293,16 @@ class _ChatsTabState extends State<ChatsTab> {
                         context,
                         () => _appState.deleteChatLocally(c.keyHash),
                       );
+                    } else if (c.isGroup) {
+                      // Groups must go through the majority-vote proposal —
+                      // the plain local wipe here used to silently bypass the
+                      // vote (destroyed the local copy of ANY group, no
+                      // consensus needed). Solo/2-member groups still execute
+                      // immediately inside proposeGroupNuke.
+                      NukeConfirmDialog.show(
+                        context,
+                        () => _appState.proposeGroupNuke(c),
+                      );
                     } else {
                       NukeConfirmDialog.show(
                         context,

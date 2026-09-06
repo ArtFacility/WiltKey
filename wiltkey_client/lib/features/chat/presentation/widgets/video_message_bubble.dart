@@ -82,10 +82,14 @@ class _VideoMessageBubbleState extends State<VideoMessageBubble> {
       }
     }
 
-    // 3. Lazy DB load
+    // 3. Lazy DB load — must pass Contact.id (the local DB key used as
+    //    chat_id in the messages table), not keyHash: group contacts have
+    //    positional ids ('g1', 'g2'…) that differ from their keyHash, so the
+    //    keyHash lookup matched no row and every reloaded group video
+    //    rendered as a broken thumbnail.
     try {
       final raw = await WiltkeyDatabase.instance.loadMessagePayloadString(
-        widget.contact.keyHash,
+        widget.contact.id,
         widget.message.id,
         masterKeyHex: widget.appState.masterKeyHex,
       );
@@ -119,7 +123,7 @@ class _VideoMessageBubbleState extends State<VideoMessageBubble> {
     if (p == null) {
       final dt = widget.message.decryptedText ??
           await WiltkeyDatabase.instance.loadMessagePayloadString(
-            widget.contact.keyHash,
+            widget.contact.id,
             widget.message.id,
             masterKeyHex: widget.appState.masterKeyHex,
           );
