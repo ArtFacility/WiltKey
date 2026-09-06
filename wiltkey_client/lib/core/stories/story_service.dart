@@ -1,13 +1,10 @@
 import 'dart:convert';
 import 'dart:math';
-import 'dart:typed_data';
 import 'package:convert/convert.dart';
-import 'package:crypto/crypto.dart';
-import 'package:encrypt/encrypt.dart' as enc;
 import 'package:http/http.dart' as http;
 import 'package:ed25519_edwards/ed25519_edwards.dart' as ed;
 import 'package:wiltkey_client/core/chat_metadata.dart';
-import 'package:wiltkey_client/core/models.dart';
+import 'package:wiltkey_client/core/network/websocket_client.dart';
 import 'package:wiltkey_client/core/persistence.dart';
 import 'package:wiltkey_client/core/state.dart';
 import 'package:wiltkey_client/core/stories/story_model.dart';
@@ -30,11 +27,8 @@ class StoryService {
     String? textBorderId,
   }) async {
     final myKeyHash = appState.userId;
-    final myPubkey = appState.publicKeyHex;
-    final myPrivkey = appState.privateKeyHex;
-    final relayUrl = appState.activeRelayUrl;
 
-    if (myKeyHash.isEmpty || myPubkey.isEmpty || myPrivkey.isEmpty) {
+    if (myKeyHash.isEmpty) {
       throw Exception('Client identity not initialized');
     }
 
@@ -87,79 +81,34 @@ class StoryService {
       'keys': wrappedKeys,
     });
 
-    // 4. Ed25519 signature
-    final timestamp = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-    final signMessage = 'WILTKEY_STORY_POST:$myKeyHash:$storyType:$timestamp';
-    final privBytes = hex.decode(myPrivkey);
-    final privKey = ed.PrivateKey(privBytes);
-    final sigBytes = ed.sign(privKey, utf8.encode(signMessage));
-    final sigHex = hex.encode(sigBytes);
-
-    final url = Uri.parse('$relayUrl/api/v1/stories/post');
-    final response = await http.post(
-      url,
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'id': myKeyHash,
-        'pubkey': myPubkey,
-        'timestamp': timestamp,
-        'sig': sigHex,
-        'story_type': storyType,
-        'ciphertext_b64': envelopeJson,
-        'media_meta': mediaMeta ?? '',
-      }),
-    );
-
-    if (response.statusCode != 200) {
-      final body = jsonDecode(response.body);
-      throw Exception(body['error'] ?? 'Failed to post story (${response.statusCode})');
+    // 4. Dispatch over the authenticated WebSocket — the ONLY transport for
+    // stories now (the HTTP story endpoints were removed; a bare
+    // sig-over-timestamp let anyone with a self-minted keypair post at will).
+    final wsClient = WebSocketClient();
+    if (!wsClient.supportsStoriesWS) {
+      throw Exception('Relay connection unavailable or does not support stories');
     }
-
-    return jsonDecode(response.body) as Map<String, dynamic>;
+    return await wsClient.postStory(
+      storyType: storyType,
+      ciphertextB64: envelopeJson,
+      mediaMeta: mediaMeta,
+    );
   }
 
   /// Fetches stories feed from relay for self and all mutual contacts.
   Future<List<Story>> fetchFeed(AppState appState) async {
     final myKeyHash = appState.userId;
-    final myPubkey = appState.publicKeyHex;
-    final myPrivkey = appState.privateKeyHex;
-    final relayUrl = appState.activeRelayUrl;
 
-    if (myKeyHash.isEmpty || myPubkey.isEmpty || myPrivkey.isEmpty) {
+    if (myKeyHash.isEmpty) {
       return [];
     }
-
-    final timestamp = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-    final signMessage = 'WILTKEY_STORY_FEED:$myKeyHash:$timestamp';
-    final privBytes = hex.decode(myPrivkey);
-    final privKey = ed.PrivateKey(privBytes);
-    final sigBytes = ed.sign(privKey, utf8.encode(signMessage));
-    final sigHex = hex.encode(sigBytes);
 
     final contactHashes = <String>{};
     for (final s in appState.socialContacts) {
       if (!s.isBlocked) contactHashes.add(s.keyHash);
     }
 
-    final url = Uri.parse('$relayUrl/api/v1/stories/feed');
-    final response = await http.post(
-      url,
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'id': myKeyHash,
-        'pubkey': myPubkey,
-        'timestamp': timestamp,
-        'sig': sigHex,
-        'contacts': contactHashes.toList(),
-      }),
-    );
-
-    if (response.statusCode != 200) {
-      throw Exception('Failed to fetch stories feed (${response.statusCode})');
-    }
-
-    final data = jsonDecode(response.body) as Map<String, dynamic>;
-    final rawStories = (data['stories'] as List?) ?? [];
+    final rawStories = await WebSocketClient().fetchStories(contactHashes.toList());
     final List<Story> decryptedStories = [];
 
     for (final item in rawStories) {
@@ -238,35 +187,7 @@ class StoryService {
     required String storyId,
     required String emoji,
   }) async {
-    final myKeyHash = appState.userId;
-    final myPubkey = appState.publicKeyHex;
-    final myPrivkey = appState.privateKeyHex;
-    final relayUrl = appState.activeRelayUrl;
-
-    final timestamp = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-    final signMessage = 'WILTKEY_STORY_REACT:$myKeyHash:$storyId:$emoji:$timestamp';
-    final privBytes = hex.decode(myPrivkey);
-    final privKey = ed.PrivateKey(privBytes);
-    final sigBytes = ed.sign(privKey, utf8.encode(signMessage));
-    final sigHex = hex.encode(sigBytes);
-
-    final url = Uri.parse('$relayUrl/api/v1/stories/react');
-    final response = await http.post(
-      url,
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'id': myKeyHash,
-        'pubkey': myPubkey,
-        'timestamp': timestamp,
-        'sig': sigHex,
-        'story_id': storyId,
-        'emoji': emoji,
-      }),
-    );
-
-    if (response.statusCode != 200) {
-      throw Exception('Failed to record reaction (${response.statusCode})');
-    }
+    await WebSocketClient().reactToStory(storyId, emoji);
   }
 
   /// Fetches reactions for the user's own story.
@@ -274,35 +195,10 @@ class StoryService {
     required AppState appState,
     required String storyId,
   }) async {
-    final myKeyHash = appState.userId;
-    final myPubkey = appState.publicKeyHex;
-    final myPrivkey = appState.privateKeyHex;
-    final relayUrl = appState.activeRelayUrl;
-
-    final timestamp = (DateTime.now().millisecondsSinceEpoch ~/ 1000).toString();
-    final signMessage = 'WILTKEY_STORY_REACTIONS:$storyId:$myKeyHash:$timestamp';
-    final privBytes = hex.decode(myPrivkey);
-    final privKey = ed.PrivateKey(privBytes);
-    final sigBytes = ed.sign(privKey, utf8.encode(signMessage));
-    final sigHex = hex.encode(sigBytes);
-
-    final uri = Uri.parse('$relayUrl/api/v1/stories/$storyId/reactions').replace(
-      queryParameters: {
-        'user_id': myKeyHash,
-        'pubkey': myPubkey,
-        'timestamp': timestamp,
-        'sig': sigHex,
-      },
-    );
-
-    final response = await http.get(uri);
-    if (response.statusCode != 200) {
-      return [];
-    }
-
-    final data = jsonDecode(response.body) as Map<String, dynamic>;
-    final list = (data['reactions'] as List?) ?? [];
-    return list.map((r) => StoryReaction.fromJson(r as Map<String, dynamic>)).toList();
+    final list = await WebSocketClient().fetchStoryReactions(storyId);
+    return list
+        .map((r) => StoryReaction.fromJson(r as Map<String, dynamic>))
+        .toList();
   }
 
   /// Deletes a story owned by the user.
@@ -310,31 +206,7 @@ class StoryService {
     required AppState appState,
     required String storyId,
   }) async {
-    final myKeyHash = appState.userId;
-    final myPubkey = appState.publicKeyHex;
-    final myPrivkey = appState.privateKeyHex;
-    final relayUrl = appState.activeRelayUrl;
-
-    final timestamp = (DateTime.now().millisecondsSinceEpoch ~/ 1000).toString();
-    final signMessage = 'WILTKEY_STORY_DELETE:$storyId:$myKeyHash:$timestamp';
-    final privBytes = hex.decode(myPrivkey);
-    final privKey = ed.PrivateKey(privBytes);
-    final sigBytes = ed.sign(privKey, utf8.encode(signMessage));
-    final sigHex = hex.encode(sigBytes);
-
-    final uri = Uri.parse('$relayUrl/api/v1/stories/$storyId').replace(
-      queryParameters: {
-        'user_id': myKeyHash,
-        'pubkey': myPubkey,
-        'timestamp': timestamp,
-        'sig': sigHex,
-      },
-    );
-
-    final response = await http.delete(uri);
-    if (response.statusCode != 200) {
-      throw Exception('Failed to delete story (${response.statusCode})');
-    }
+    await WebSocketClient().deleteStory(storyId);
   }
 
   /// Queries weekly social budget status from relay.

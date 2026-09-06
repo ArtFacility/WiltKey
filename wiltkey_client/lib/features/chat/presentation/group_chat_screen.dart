@@ -19,6 +19,7 @@ import '../../../core/theme/wk.dart';
 import '../../../core/theme/wiltkey_tokens.dart';
 import '../../../core/theme/wiltkey_components.dart';
 import 'widgets/compression_dialog.dart';
+import 'widgets/video_send_dialog.dart';
 import 'widgets/emoji_autocomplete_bar.dart';
 import 'widgets/mention_autocomplete_bar.dart';
 import 'widgets/emoji_picker_panel.dart';
@@ -716,7 +717,71 @@ class _GroupChatScreenState extends State<GroupChatScreen>
         res.hexString,
         contentType: 'pixel_art',
       );
+    } else if (res is VideoAttachmentResult) {
+      await _pickAndSendGroupVideo(contact, res.source);
     }
+  }
+
+  Future<void> _pickAndSendGroupVideo(
+    Contact contact,
+    ImageSource source,
+  ) async {
+    final picker = ImagePicker();
+    XFile? video;
+    try {
+      _appState.isPickingMedia = true;
+      video = await picker.pickVideo(
+        source: source,
+      );
+    } finally {
+      _appState.isPickingMedia = false;
+    }
+    if (video == null || !mounted) return;
+
+    final VideoSendResult? choice = await VideoSendDialog.show(
+      context,
+      sourcePath: video.path,
+      contact: contact,
+    );
+    if (choice == null || !mounted) return;
+
+    final jsonStr = choice.payload.toJsonString();
+    final byteCost = jsonStr.length + 73;
+    final l10n = AppLocalizations.of(context)!;
+
+    if (byteCost > contact.remainingBufferBytes) {
+      _errorSnack(
+        l10n.chatImageTooLargeSnackBar(
+          AppState.formatBytes(byteCost),
+          AppState.formatBytes(contact.remainingBufferBytes),
+        ),
+      );
+      return;
+    }
+
+    if (WkPayloadLimits.exceedsOutgoing(jsonStr.length)) {
+      _errorSnack(
+        WkPayloadLimits.blockedByFreeTier(jsonStr.length)
+            ? l10n.chatImageNeedsPlusSnackBar
+            : l10n.chatImageExceedsMaxSizeSnackBar,
+      );
+      return;
+    }
+
+    final error = await _appState.sendGroupMessage(
+      jsonStr,
+      contentType: 'video',
+      allowSave: choice.allowSave,
+      ephemeral: choice.ephemeral,
+      ttlSeconds: choice.ttlSeconds,
+    );
+    try {
+      await choice.file.delete();
+    } catch (_) {}
+    if (error != null) {
+      _errorSnack(error);
+    }
+    _scrollToBottom();
   }
 
   Future<void> _pickAndSendGroupImage(

@@ -3,8 +3,10 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 import '../models.dart';
 import '../persistence.dart';
+import '../video/video_message_service.dart';
 
 class WiltkeyDatabase {
   static final WiltkeyDatabase instance = WiltkeyDatabase._();
@@ -475,6 +477,24 @@ class WiltkeyDatabase {
 
   Future<void> upsertContact(Contact contact) async {
     final db = await _database;
+    String? customNick = contact.customNickname;
+    String? privateNotes = contact.privateNotes;
+    if (customNick == null || privateNotes == null) {
+      final existing = await db.query(
+        'contacts',
+        columns: ['custom_nickname', 'private_notes'],
+        where: 'key_hash = ?',
+        whereArgs: [contact.keyHash],
+        limit: 1,
+      );
+      if (existing.isNotEmpty) {
+        customNick ??= existing.first['custom_nickname'] as String?;
+        privateNotes ??= existing.first['private_notes'] as String?;
+        contact.customNickname ??= customNick;
+        contact.privateNotes ??= privateNotes;
+      }
+    }
+
     await db.insert('contacts', {
       'id': contact.id,
       'name': contact.name,
@@ -507,8 +527,8 @@ class WiltkeyDatabase {
       'avatar_border': contact.avatarBorderId,
       'client_attestation': contact.clientAttestation,
       'attestation_expires_at': contact.attestationExpiresAt,
-      'custom_nickname': contact.customNickname,
-      'private_notes': contact.privateNotes,
+      'custom_nickname': customNick,
+      'private_notes': privateNotes,
       'outgoing_offset': contact.outgoingOffset,
       'outgoing_max_offset': contact.outgoingMaxOffset,
       'incoming_offset': contact.incomingOffset,
@@ -535,8 +555,12 @@ class WiltkeyDatabase {
   }) async {
     final db = await _database;
     final Map<String, Object?> values = {};
-    if (customNickname != null) values['custom_nickname'] = customNickname;
-    if (privateNotes != null) values['private_notes'] = privateNotes;
+    if (customNickname != null) {
+      values['custom_nickname'] = customNickname.trim().isEmpty ? null : customNickname.trim();
+    }
+    if (privateNotes != null) {
+      values['private_notes'] = privateNotes.trim().isEmpty ? null : privateNotes.trim();
+    }
     if (values.isNotEmpty) {
       await db.update(
         'contacts',
@@ -770,6 +794,43 @@ class WiltkeyDatabase {
     }
   }
 
+  /// Reads and decrypts the stored payload string (from sidecar or DB) using the
+  /// master key. Works for any content type (video JSON, text, etc).
+  Future<String?> loadMessagePayloadString(
+    String chatId,
+    String messageId, {
+    String? masterKeyHex,
+  }) async {
+    if (masterKeyHex == null) return null;
+    String? master;
+    final loaded = await _readMediaFilesAsync(_mediaBase(chatId, messageId));
+    if (loaded != null) {
+      master = loaded.$2;
+    } else {
+      try {
+        final db = await _database;
+        final rows = await db.query(
+          'messages',
+          columns: ['text_encrypted_master', 'wilted'],
+          where: 'chat_id = ? AND id = ?',
+          whereArgs: [chatId, messageId],
+          limit: 1,
+        );
+        if (rows.isEmpty) return null;
+        if ((rows.first['wilted'] as int? ?? 0) == 1) return null;
+        master = rows.first['text_encrypted_master'] as String?;
+      } catch (_) {
+        return null;
+      }
+    }
+    if (master == null) return null;
+    try {
+      return WiltkeyPersistence().decryptString(master, masterKeyHex);
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<void> _deleteMediaFiles(String base) async {
     try {
       final dir = _mediaDir;
@@ -785,15 +846,30 @@ class WiltkeyDatabase {
   Future<void> _deleteMediaForChat(String chatId) async {
     try {
       final dir = _mediaDir;
-      if (dir == null) return;
-      final prefix = '${chatId.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_')}__';
-      final d = Directory(dir);
-      if (!await d.exists()) return;
-      await for (final e in d.list()) {
-        if (e is File && p.basename(e.path).startsWith(prefix)) {
-          try {
-            await e.delete();
-          } catch (_) {}
+      if (dir != null) {
+        final prefix = '${chatId.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_')}__';
+        final d = Directory(dir);
+        if (await d.exists()) {
+          await for (final e in d.list()) {
+            if (e is File && p.basename(e.path).startsWith(prefix)) {
+              try {
+                await e.delete();
+              } catch (_) {}
+            }
+          }
+        }
+      }
+    } catch (_) {}
+    try {
+      final tempDir = await getTemporaryDirectory();
+      final d = Directory(tempDir.path);
+      if (await d.exists()) {
+        await for (final e in d.list()) {
+          if (e is File && p.basename(e.path).startsWith('wk_video_')) {
+            try {
+              await e.delete();
+            } catch (_) {}
+          }
         }
       }
     } catch (_) {}
@@ -987,6 +1063,7 @@ class WiltkeyDatabase {
     );
     final base = existing.isNotEmpty ? existing.first['media_path'] as String? : null;
     if (base != null && base.isNotEmpty) await _deleteMediaFiles(base);
+    await VideoMessageService.cleanupVideoFile(messageId);
     await db.update(
       'messages',
       {
@@ -1128,7 +1205,7 @@ class WiltkeyDatabase {
     final bool shouldDefer = deferImage ?? (
       !eagerOtp &&
       !wilted &&
-      contentType == 'image' &&
+      (contentType == 'image' || contentType == 'video') &&
       (row['ephemeral'] as int? ?? 0) == 0
     );
 
@@ -1295,6 +1372,7 @@ class WiltkeyDatabase {
     if (base != null && base.isNotEmpty) {
       await _deleteMediaFiles(base);
     }
+    await VideoMessageService.cleanupVideoFile(messageId);
     await db.update(
       'messages',
       {
@@ -1767,6 +1845,7 @@ class WiltkeyDatabase {
         existing.isNotEmpty ? existing.first['media_path'] as String? : null;
     await db.delete('messages', where: 'id = ?', whereArgs: [id]);
     if (base != null && base.isNotEmpty) await _deleteMediaFiles(base);
+    await VideoMessageService.cleanupVideoFile(id);
   }
 
   // ---------------------------------------------------------------------------
@@ -2108,9 +2187,27 @@ class WiltkeyDatabase {
 
   Future<void> upsertSocialContact(SocialContact contact) async {
     final db = await _database;
+    String? customNick = contact.customNickname;
+    String? privateNotes = contact.privateNotes;
+    if (customNick == null || privateNotes == null) {
+      final existing = await db.query(
+        'social_contacts',
+        columns: ['custom_nickname', 'private_notes'],
+        where: 'key_hash = ?',
+        whereArgs: [contact.keyHash],
+        limit: 1,
+      );
+      if (existing.isNotEmpty) {
+        customNick ??= existing.first['custom_nickname'] as String?;
+        privateNotes ??= existing.first['private_notes'] as String?;
+      }
+    }
+    final row = contact.toRow();
+    if (customNick != null) row['custom_nickname'] = customNick;
+    if (privateNotes != null) row['private_notes'] = privateNotes;
     await db.insert(
       'social_contacts',
-      contact.toRow(),
+      row,
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
   }

@@ -57,6 +57,8 @@ dependencies:
   local_auth: ^2.3.0 # Optional fingerprint/biometric unlock (bypasses the PIN within a 4h window)
   record: ^7.1.1
   just_audio: ^0.10.6
+  video_player: ^2.9.2
+  video_compress: ^3.1.2
   url_launcher: ^6.3.0 # Open the "Support the project" link on the FOSS build (Android intent; no Google Play Services)
   flutter_svg: ^2.0.10 # Render SVG avatar borders (vector, scales to every avatar size)
   qr_flutter: ^4.1.0

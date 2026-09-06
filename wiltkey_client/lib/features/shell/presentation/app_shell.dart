@@ -268,40 +268,56 @@ class _AppShellState extends State<AppShell>
     return _ShellScope(
       navigator: this,
       child: Scaffold(
-        body: context.wkc.ambientBackground(
-          child: SafeArea(
-            bottom: false,
-            child: Stack(
-              children: [
-                AnimatedBuilder(
-                  animation: _slide,
-                  builder: (context, _) {
-                    final double width = MediaQuery.sizeOf(context).width;
-                    final bool animating = _fromIndex >= 0;
-                    final int from = _fromIndex;
-                    final double t =
-                        Curves.easeOutCubic.transform(_slide.value);
-                    final double dir =
-                        animating ? (_index - from).sign.toDouble() : 0;
-                    return Stack(
-                      children: [
-                        for (int i = 0; i < _tabs.length; i++)
-                          _buildSlideableTab(i, width, animating, from, t, dir),
-                      ],
-                    );
-                  },
+        body: Column(
+          children: [
+            // Unmistakable marker when connected to a WK_TEST_MODE relay:
+            // test data lives in an isolated DB, but it must never be
+            // mistaken for production activity.
+            if (_appState.relayIsTest) const _TestRelayBanner(),
+            // A live session lost its device token and is re-issuing (PoW,
+            // seconds-long). Explain it instead of silently stalling chat.
+            if (_appState.showReauthenticatingBanner)
+              const _ReauthenticatingBanner(),
+            Expanded(
+              child: context.wkc.ambientBackground(
+                child: SafeArea(
+                  bottom: false,
+                  child: Stack(
+                    children: [
+                      AnimatedBuilder(
+                        animation: _slide,
+                        builder: (context, _) {
+                          final double width =
+                              MediaQuery.sizeOf(context).width;
+                          final bool animating = _fromIndex >= 0;
+                          final int from = _fromIndex;
+                          final double t =
+                              Curves.easeOutCubic.transform(_slide.value);
+                          final double dir =
+                              animating ? (_index - from).sign.toDouble() : 0;
+                          return Stack(
+                            children: [
+                              for (int i = 0; i < _tabs.length; i++)
+                                _buildSlideableTab(
+                                    i, width, animating, from, t, dir),
+                            ],
+                          );
+                        },
+                      ),
+                      // In-app heads-up for messages that land while the app is open and
+                      // you're not in that chat (so busy users aren't blind to them).
+                      const Positioned(
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        child: _MessageBannerHost(),
+                      ),
+                    ],
+                  ),
                 ),
-                // In-app heads-up for messages that land while the app is open and
-                // you're not in that chat (so busy users aren't blind to them).
-                const Positioned(
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  child: _MessageBannerHost(),
-                ),
-              ],
+              ),
             ),
-          ),
+          ],
         ),
         bottomNavigationBar: WkBottomNavBar(
           currentIndex: _index,
@@ -333,6 +349,83 @@ class _ShellScope extends InheritedWidget {
 
   @override
   bool updateShouldNotify(_ShellScope old) => navigator != old.navigator;
+}
+
+/// Slim persistent strip shown while connected to a WK_TEST_MODE relay.
+class _TestRelayBanner extends StatelessWidget {
+  const _TestRelayBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.amber.shade700,
+      child: SafeArea(
+        bottom: false,
+        child: SizedBox(
+          height: 26,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.science, size: 15, color: Colors.black87),
+              const SizedBox(width: 6),
+              Text(
+                AppLocalizations.of(context)!.testRelayBanner,
+                style: const TextStyle(
+                  color: Colors.black87,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.6,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Slim strip while a previously-authenticated session re-issues its device
+/// token (PoW runs for seconds). Normal token reconnects never show this.
+class _ReauthenticatingBanner extends StatelessWidget {
+  const _ReauthenticatingBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.wk;
+    return Material(
+      color: t.action,
+      child: SafeArea(
+        bottom: false,
+        child: SizedBox(
+          height: 26,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              SizedBox(
+                width: 12,
+                height: 12,
+                child: CircularProgressIndicator(
+                  strokeWidth: 1.6,
+                  valueColor: AlwaysStoppedAnimation(t.onAction),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                AppLocalizations.of(context)!.reauthenticatingBanner,
+                style: TextStyle(
+                  color: t.onAction,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.6,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 /// Top heads-up banner for messages arriving while the app is open. Listens to

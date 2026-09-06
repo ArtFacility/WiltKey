@@ -97,6 +97,57 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   bool isOnboardingRequired = false;
   String? masterKeyHex;
 
+  /// Live connection/auth lifecycle (mirrors WebSocketClient.phase). Drives
+  /// the onboarding "Securing your connection" step and the re-auth banner.
+  WsPhase wsPhase = WsPhase.idle;
+
+  /// 0..1 progress of an in-flight issuance PoW (0.95 cap); reset on each
+  /// issuance start and cleared when the dance concludes.
+  double powProgress = 0;
+
+  /// Whether ANY connection has authenticated in this app session. Splits the
+  /// token-issuance UX in two: the first issuance (token missing at startup —
+  /// right after onboarding, or after a wiped token) gets a full-screen
+  /// "Securing your connection" takeover; later re-issues (a lost token
+  /// mid-session) only get a slim "Reauthenticating…" banner.
+  bool everConnectedThisSession = false;
+
+  /// Active human-verification puzzle (Phase 2). Set from
+  /// AUTH_CHALLENGE_REQUIRED; the securing screen renders the drag puzzle
+  /// while [wsPhase] is humanVerification.
+  String? puzzleChallengeId;
+  String? puzzleSeed;
+  int puzzleStrips = 5;
+
+  /// The last puzzle answer was wrong — the dance auto-restarts; the UI
+  /// shows a brief "failed, retrying" note until the next puzzle arrives.
+  bool puzzleRejected = false;
+
+  /// Full-screen securing/puzzle takeover. Human-verification always takes
+  /// over (a challenge demands attention, even mid-session); issuance only
+  /// takes over on the FIRST connect of the session. A rejected puzzle keeps
+  /// the takeover up (with the retry note) until the fresh challenge lands.
+  bool get showSecuringConnection =>
+      isLoaded &&
+      !isOnboardingRequired &&
+      !isLocked &&
+      (wsPhase == WsPhase.humanVerification ||
+          (wsPhase == WsPhase.issuing && !everConnectedThisSession) ||
+          puzzleRejected);
+
+  bool get showReauthenticatingBanner =>
+      isLoaded &&
+      !isOnboardingRequired &&
+      !isLocked &&
+      everConnectedThisSession &&
+      wsPhase == WsPhase.issuing;
+
+  /// Submits the puzzle answer the user locked in (websocket client no-ops
+  /// when no challenge is active).
+  void submitPuzzleAnswer(int answer) {
+    WebSocketClient().submitPuzzleAnswer(answer);
+  }
+
   // Optional biometric unlock: whether the user opted in, and the epoch-ms of
   // the last successful unlock (PIN or biometric). Loaded before the lock screen
   // shows so it can decide whether to offer fingerprint. See state_auth.dart.
@@ -267,6 +318,22 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   // Multiplier applied to chat message text (and inline emoji) sizes. 1.0 is the
   // default; clamped to a sane range. Set in Settings → Appearance.
   double chatTextScale = 1.0;
+
+  // Configurable chat list swipe actions: 'mark_read', 'mute', 'pin', 'archive', 'none'
+  String swipeRightAction = 'mark_read';
+  String swipeLeftAction = 'mute';
+
+  Future<void> setSwipeRightAction(String action) async {
+    swipeRightAction = action;
+    await _persistence.saveSwipeRightAction(action);
+    notifyListeners();
+  }
+
+  Future<void> setSwipeLeftAction(String action) async {
+    swipeLeftAction = action;
+    await _persistence.saveSwipeLeftAction(action);
+    notifyListeners();
+  }
 
   // Per-chat "last read" wall-clock (ms since epoch), keyed by contact.id. Drives
   // the unread badge on the chats list: any inbound message newer than this is
@@ -465,11 +532,14 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     final ws = WebSocketClient();
     ws.onLog = log;
     ws.onSignChallenge = signMessage;
+    ws.onGetDeviceToken = getDeviceToken;
+    ws.onDeviceTokenUpdated = storeDeviceToken;
     ws.fallbackProvider = buildRelayFallbacks;
     ws.onMessageReceived = _deliverMessageToState;
     _setupDownloadCallbacks();
     ws.onStatusChanged = (connected) {
       if (connected) {
+        everConnectedThisSession = true;
         syncGroupLaneHeaders();
         // Catch up on anything we missed while offline, from every member.
         autoSyncAllGroups();
@@ -488,6 +558,45 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
         // Play flavor: request/refresh our Play Integrity attestation certificate.
         syncClientAttestation();
       }
+      notifyListeners();
+    };
+    // Connection lifecycle (dial → auth → issuance → connected) drives the
+    // onboarding "Securing your connection" step and the re-auth banner.
+    ws.onPhaseChanged = (phase) {
+      // A solved-vs-failed distinction for the puzzle UI: the dance dropping
+      // out of humanVerification means the answer was wrong (or timed out).
+      if (phase == WsPhase.idle && wsPhase == WsPhase.humanVerification) {
+        puzzleRejected = true;
+      }
+      wsPhase = phase;
+      if (phase == WsPhase.connected) {
+        puzzleChallengeId = null;
+        puzzleSeed = null;
+        puzzleRejected = false;
+      }
+      // Reset the bar on issuance start and clear it once the dance concludes
+      // (only dial/auth-in-progress keep a live value).
+      if (phase != WsPhase.connecting && phase != WsPhase.authenticating) {
+        powProgress = 0;
+      }
+      notifyListeners();
+    };
+    // Human-verification puzzle (Phase 2): stash the challenge params so the
+    // securing screen can render the drag puzzle.
+    ws.onPuzzleChallenge = (challengeId, seed, strips) {
+      puzzleChallengeId = challengeId;
+      puzzleSeed = seed;
+      puzzleStrips = strips;
+      puzzleRejected = false;
+      notifyListeners();
+    };
+    // Live PoW progress for the same UI surfaces (0..1, capped below 1.0 —
+    // the real completion signal is the phase changing).
+    ws.onPoWProgress = (iterations, zeroBits, difficulty) {
+      // Expected ~16^difficulty hashes (2^(4*difficulty)); cap below 1.0 so
+      // an unlucky-long solve never shows a full bar before AUTH_OK.
+      final expected = 1 << (difficulty * 4).clamp(0, 40);
+      powProgress = (iterations / expected).clamp(0.0, 0.95);
       notifyListeners();
     };
   }
@@ -712,11 +821,46 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
+  /// True while we're connected to a relay that advertised `test_mode` (a
+  /// WK_TEST_MODE=true instance with its own DB/storage). Drives the shell's
+  /// persistent "TEST SERVER" banner — test data must never be mistaken for
+  /// production. Live getter: re-evaluated on every AppState notify (the WS
+  /// client's status changes flow through here).
+  bool get relayIsTest => WebSocketClient().isTestRelay;
+
+  /// The device token the relay issued us after the PoW issuance gate. Stored
+  /// in plain prefs by design: it is a challenge-bound bearer credential —
+  /// useless without the private signing key, which lives in the OS keystore.
+  /// Both the main isolate and the background workers read this same key.
+  Future<String?> getDeviceToken() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getString(kPrefDeviceToken);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> storeDeviceToken(String? token) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (token == null || token.isEmpty) {
+        await prefs.remove(kPrefDeviceToken);
+      } else {
+        await prefs.setString(kPrefDeviceToken, token);
+      }
+    } catch (e) {
+      log('[Auth] Failed to store device token: $e');
+    }
+  }
+
   /// Reconnects the WebSocket if we're unlocked + open but the socket is down.
-  /// Safe to call repeatedly: connect() de-dupes via its _isConnecting/generation guard.
+  /// Safe to call repeatedly: connect() is single-flight — a dial/auth dance in
+  /// progress (isBusy) is left alone so in-flight token issuance never dies.
   void _checkConnectionHealth() {
     if (isLocked || masterKeyHex == null) return;
     final ws = WebSocketClient();
+    if (ws.isBusy) return;
     if (!ws.isConnected) {
       log('[WS Watchdog] Socket down while unlocked. Reconnecting...');
       ws.connect(activeRelayUrl, publicKeyHex: publicKeyHex);
@@ -765,22 +909,21 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
 
   Future<void> ensureWebSocketConnected() async {
     final ws = WebSocketClient();
-    if (!ws.isConnected) {
-      log('[WS Self-Heal] WebSocket is not connected. Triggering connect...');
-      ws.connect(activeRelayUrl, publicKeyHex: publicKeyHex);
+    if (ws.isConnected || ws.isBusy) return;
+    log('[WS Self-Heal] WebSocket is not connected. Triggering connect...');
+    ws.connect(activeRelayUrl, publicKeyHex: publicKeyHex);
 
-      int elapsed = 0;
-      while (!ws.isConnected && elapsed < 2000) {
-        await Future.delayed(const Duration(milliseconds: 100));
-        elapsed += 100;
-      }
-      if (ws.isConnected) {
-        log('[WS Self-Heal] WebSocket connected successfully.');
-      } else {
-        log(
-          '[WS Self-Heal] WebSocket connection attempt timed out or still connecting.',
-        );
-      }
+    int elapsed = 0;
+    while (!ws.isConnected && elapsed < 2000) {
+      await Future.delayed(const Duration(milliseconds: 100));
+      elapsed += 100;
+    }
+    if (ws.isConnected) {
+      log('[WS Self-Heal] WebSocket connected successfully.');
+    } else {
+      log(
+        '[WS Self-Heal] WebSocket connection attempt timed out or still connecting.',
+      );
     }
   }
 }

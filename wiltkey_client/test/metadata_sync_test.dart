@@ -1,4 +1,4 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
@@ -205,6 +205,7 @@ void main() {
           bufferSize,
           bobKeyHash,
           bobSeed,
+          freshSeedHex: bobSeed,
         );
 
         final contact = appState.contacts.firstWhere(
@@ -342,6 +343,7 @@ void main() {
         10000,
         bobKeyHash,
         'abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789',
+        freshSeedHex: 'abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789',
       );
 
       final contact = appState.contacts.firstWhere(

@@ -84,8 +84,6 @@ Future<void> showAddContactFlow(
     _toast(context, err);
     return;
   }
-  if (!context.mounted) return;
-  _toast(context, l10n.contactAddSent);
 }
 void _toast(BuildContext context, String text) {
   if (!context.mounted) return;

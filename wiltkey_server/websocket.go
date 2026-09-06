@@ -29,6 +29,26 @@ const (
 	wsRefillPerSec   = 100.0 // sustained messages/sec
 )
 
+// Device-token issuance gate: PoW difficulty (leading hex zeros of
+// sha256(challenge + nonce + pubkey)) and the per-IP DAILY mint cap. Tunable
+// via WK_ISSUANCE_DIFFICULTY / WK_ISSUANCE_DAILY_IP — raise them if identity
+// farming is ever observed. Difficulty 5 ≈ ~1M hashes (a second or two on a
+// phone, once per install).
+var (
+	issuanceDifficulty = 5
+	issuanceDailyIPCap = int64(5)
+)
+
+// capabilitiesForThisRelay lists what THIS relay supports, advertised in
+// AUTH_OK. "test_mode" is appended when running under WK_TEST_MODE=true.
+func capabilitiesForThisRelay() []string {
+	caps := []string{"group_fanout", "social_stories", "stories_ws"}
+	if testMode {
+		caps = append(caps, "test_mode")
+	}
+	return caps
+}
+
 // Client represents a connected WebSocket user.
 type Client struct {
 	id         string
@@ -247,6 +267,42 @@ type WSMessage struct {
 	Size      int64  `json:"size,omitempty"`
 	Token     string `json:"token,omitempty"`
 	ExpiresAt int64  `json:"expires_at,omitempty"`
+	// Stories WebSocket fields
+	StoryType     string `json:"story_type,omitempty"`
+	CiphertextB64 string `json:"ciphertext_b64,omitempty"`
+	MediaMeta     string `json:"media_meta,omitempty"`
+	StoryID       string `json:"story_id,omitempty"`
+	BytesUsed     int64  `json:"bytes_used,omitempty"`
+	MaxBytes      int64  `json:"max_bytes,omitempty"`
+	// Story feed / reactions frames. `Contacts` limits FETCH_STORIES to senders
+	// the client actually knows (server always adds the caller itself); the
+	// client-supplied list is only a query filter, never an authorization.
+	Contacts  []string          `json:"contacts,omitempty"`
+	Emoji     string            `json:"emoji,omitempty"`
+	Stories   []PGStory         `json:"stories,omitempty"`
+	Reactions []PGStoryReaction `json:"reactions,omitempty"`
+	// Device-token auth. `DeviceToken` is the raw token the client presents in
+	// AUTH (the AUTH signature covers challenge||token); AUTH_OK hands back a
+	// fresh token when the presented one is near expiry. TOKEN_CHALLENGE asks
+	// a token-less client to solve a PoW over THIS connection's challenge;
+	// AUTH_TOKEN_ISSUE carries the solution. The raw token NEVER reaches the
+	// database — only its SHA-256 (db.go device_tokens).
+	DeviceToken         string `json:"device_token,omitempty"`
+	DeviceTokenExpiresAt int64 `json:"device_token_expires_at,omitempty"`
+	PowNonce            int64  `json:"pow_nonce,omitempty"`
+	Difficulty          int    `json:"difficulty,omitempty"`
+	// Human-verification challenge (Phase 2, puzzle.go). The client
+	// ADVERTISES "human_challenge" in AUTH client_caps; the relay answers
+	// token-less issuance with AUTH_CHALLENGE_REQUIRED (seed the client
+	// renders locally) and expects AUTH_CHALLENGE_SOLUTION back. PuzzleAnswer
+	// is a POINTER because 0 is a valid rotation — json null vs 0 matters.
+	ClientCaps   []string `json:"client_caps,omitempty"`
+	ChallengeID  string   `json:"challenge_id,omitempty"`
+	PuzzleSeed   string   `json:"seed,omitempty"`
+	PuzzleKind   string   `json:"kind,omitempty"`
+	PuzzleStrips int      `json:"strips,omitempty"`
+	PuzzleAnswer *int     `json:"answer,omitempty"`
+	TTL          int      `json:"ttl,omitempty"`
 }
 
 // readPump pumps messages from the websocket connection to the hub.
@@ -375,6 +431,16 @@ func (c *Client) handleWSMessage(msg WSMessage) {
 		// still-connected client recover a live FILE_OFFER it missed, without a
 		// full reconnect. Idempotent (client dedups by id).
 		c.resendPendingFileOffers()
+	case "POST_STORY":
+		c.handlePostStoryWS(msg)
+	case "FETCH_STORIES":
+		c.handleFetchStoriesWS(msg)
+	case "STORY_REACT":
+		c.handleStoryReactWS(msg)
+	case "FETCH_STORY_REACTIONS":
+		c.handleStoryReactionsWS(msg)
+	case "DELETE_STORY":
+		c.handleDeleteStoryWS(msg)
 	default:
 		log.Printf("[WebSocket] Unhandled message type: %s", msg.Type)
 	}
@@ -382,6 +448,26 @@ func (c *Client) handleWSMessage(msg WSMessage) {
 
 // ServeWS handles WebSocket upgrading and challenge authentication.
 func ServeWS(hub *Hub, w http.ResponseWriter, r *http.Request) {
+	ip := clientIP(r)
+
+	// Banned IPs (repeat auth failures, etc.) never get a challenge at all.
+	// Fail CLOSED on Redis error, matching the HTTP middleware — during an infra
+	// blip a banned IP must not get free auth attempts.
+	banned, err := rdb.CheckIPBan(ip)
+	if err != nil || banned {
+		if err != nil {
+			log.Printf("[Auth] IP-ban check failed for %s: %v — refusing", ip, err)
+		} else {
+			log.Printf("[Auth] Banned IP %s attempted WS connect — refusing", ip)
+		}
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err == nil {
+			conn.WriteMessage(websocket.TextMessage, []byte(`{"type":"ERROR","message":"Banned"}`))
+			conn.Close()
+		}
+		return
+	}
+
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Printf("WebSocket Upgrade Error: %v", err)
@@ -412,16 +498,26 @@ func ServeWS(hub *Hub, w http.ResponseWriter, r *http.Request) {
 
 	var authMsg WSMessage
 	if err := json.Unmarshal(msgBytes, &authMsg); err != nil || authMsg.Type != "AUTH" {
+		// No punishment here: no auth was even attempted. A truncated frame on a
+		// flaky mobile link must not 5-minute-ban a whole carrier-NAT exit IP.
 		log.Printf("[Auth Error] Invalid AUTH structure or type: %v, body: %s", err, string(msgBytes))
 		conn.WriteMessage(websocket.TextMessage, []byte(`{"type":"ERROR","message":"Expected AUTH frame"}`))
 		conn.Close()
 		return
 	}
 
-	// Verify signature
-	ok, err := VerifySignature(authMsg.Pubkey, authMsg.Signature, []byte(challengeHex))
+	// The AUTH signature covers the challenge PLUS the presented device token
+	// (when there is one): challenge-bound tokens mean a stolen token alone is
+	// useless AND a captured AUTH frame cannot be replayed on a new connection
+	// (the challenge is fresh every time).
+	signedPayload := challengeHex
+	if authMsg.DeviceToken != "" {
+		signedPayload = challengeHex + authMsg.DeviceToken
+	}
+	ok, err := VerifySignature(authMsg.Pubkey, authMsg.Signature, []byte(signedPayload))
 	if err != nil || !ok {
 		log.Printf("[Auth Error] Signature verification failed: verified=%t, error=%v", ok, err)
+		registerIPFailure(ip, "WS: invalid auth signature")
 		conn.WriteMessage(websocket.TextMessage, []byte(`{"type":"ERROR","message":"Authentication failed"}`))
 		conn.Close()
 		return
@@ -429,7 +525,173 @@ func ServeWS(hub *Hub, w http.ResponseWriter, r *http.Request) {
 
 	pubBytes, _ := hex.DecodeString(authMsg.Pubkey)
 	userID := GenerateUserID(pubBytes)
-	log.Printf("[Auth Success] Client verified. User ID generated: %s", userID)
+
+	// ---- Device-token gate ------------------------------------------------
+	// Identity is cheap (anyone can mint an ed25519 keypair), so a keypair
+	// alone no longer authenticates: a connection is admitted only with a
+	// valid device token (issued after paying the PoW gate once) — or by
+	// paying that gate right now.
+	if pg == nil {
+		// Fail CLOSED: the token store IS the gate. Without Postgres the relay
+		// refuses everything rather than silently degrading to free identity.
+		log.Printf("[Auth] Postgres unavailable — refusing WS auth (token store down)")
+		conn.WriteMessage(websocket.TextMessage, []byte(`{"type":"ERROR","message":"Token store unavailable"}`))
+		conn.Close()
+		return
+	}
+
+	var newTokenForClient string
+	var newTokenExpiresAt int64
+
+	if authMsg.DeviceToken != "" {
+		valid, nearExpiry, err := pg.VerifyDeviceToken(userID, authMsg.DeviceToken)
+		if err != nil {
+			log.Printf("[Auth Error] Token verification failed for %s: %v", userID, err)
+			conn.WriteMessage(websocket.TextMessage, []byte(`{"type":"ERROR","message":"Token store error"}`))
+			conn.Close()
+			return
+		}
+		if !valid {
+			// No IP ban on purpose: an expired/rotated/unknown token self-heals
+			// via the issuance path on the client's next connect. Punishing
+			// here would brick legitimate users (e.g. 60+ days offline)
+			// behind shared NATs for the ban duration.
+			log.Printf("[Auth Rejected] Invalid device token for %s from %s", userID, ip)
+			reject := WSMessage{Type: "AUTH_REJECTED", Message: "token_invalid"}
+			rejBytes, _ := json.Marshal(reject)
+			conn.WriteMessage(websocket.TextMessage, rejBytes)
+			conn.Close()
+			return
+		}
+		pg.TouchDeviceToken(userID)
+		if nearExpiry {
+			tok, expires, err := mintDeviceToken(userID)
+			if err != nil {
+				log.Printf("[Auth Error] Token rotation failed for %s: %v", userID, err)
+				// The presented token is still valid — continue WITHOUT a
+				// refresh rather than dropping a working client.
+			} else {
+				newTokenForClient = tok
+				newTokenExpiresAt = expires
+			}
+		}
+	} else {
+		// Issuance path: challenge the client to prove spend (PoW over THIS
+		// connection's challenge, bound to its identity via the payload).
+		tc := WSMessage{
+			Type:       "TOKEN_CHALLENGE",
+			Challenge:  challengeHex,
+			Difficulty: issuanceDifficulty,
+		}
+		tcBytes, _ := json.Marshal(tc)
+		conn.WriteMessage(websocket.TextMessage, tcBytes)
+
+		conn.SetReadDeadline(time.Now().Add(30 * time.Second))
+		_, issueBytes, err := conn.ReadMessage()
+		if err != nil {
+			log.Printf("[Auth Error] Failed to read AUTH_TOKEN_ISSUE: %v", err)
+			conn.Close()
+			return
+		}
+		var issueMsg WSMessage
+		if err := json.Unmarshal(issueBytes, &issueMsg); err != nil || issueMsg.Type != "AUTH_TOKEN_ISSUE" {
+			log.Printf("[Auth Error] Expected AUTH_TOKEN_ISSUE, got: %s", string(issueBytes))
+			conn.WriteMessage(websocket.TextMessage, []byte(`{"type":"ERROR","message":"Expected AUTH_TOKEN_ISSUE frame"}`))
+			conn.Close()
+			return
+		}
+		if !VerifyPoW(challengeHex, issueMsg.PowNonce, authMsg.Pubkey, issuanceDifficulty) {
+			log.Printf("[Auth Rejected] PoW verification failed during issuance for %s", userID)
+			reject := WSMessage{Type: "AUTH_REJECTED", Message: "pow_invalid"}
+			rejBytes, _ := json.Marshal(reject)
+			conn.WriteMessage(websocket.TextMessage, rejBytes)
+			conn.Close()
+			return
+		}
+
+		// Human-verification gate (Phase 2, puzzle.go): AFTER the PoW proves
+		// spend, a challenge-required issuance must ALSO solve the drag
+		// puzzle. Placed before AllowIssuance so a failed puzzle never burns
+		// the IP's daily mint quota; the cooldown check keeps replay loops
+		// out during an armed window.
+		//
+		// Enforcement flip (review 2026-09-06 HIGH): with the mode ON, a
+		// client that does NOT advertise the cap is refused outright —
+		// otherwise a bot farm strips "human_challenge" from client_caps and
+		// downgrades to PoW-only forever. Safe under the no-backcompat
+		// release model (app + relay ship together; the website force-update
+		// catches stragglers).
+		if challengeUpgradeRequired(authMsg.ClientCaps) {
+			log.Printf("[Auth Rejected] Issuance without human_challenge cap while mode=%s for %s (ip %s)",
+				challengeMode, userID, ip)
+			reject := WSMessage{Type: "AUTH_REJECTED", Message: "challenge_upgrade_required"}
+			rejBytes, _ := json.Marshal(reject)
+			conn.WriteMessage(websocket.TextMessage, rejBytes)
+			conn.Close()
+			return
+		}
+		if puzzleRequiredForClient(authMsg.ClientCaps, ip) {
+			cooling, err := rdb.CheckChallengeCooldown(ip)
+			if err != nil {
+				log.Printf("[Challenge] Cooldown check failed for %s: %v — refusing", ip, err)
+				reject := WSMessage{Type: "AUTH_REJECTED", Message: "challenge_unavailable"}
+				rejBytes, _ := json.Marshal(reject)
+				conn.WriteMessage(websocket.TextMessage, rejBytes)
+				conn.Close()
+				return
+			}
+			if cooling {
+				log.Printf("[Auth Rejected] Challenge cooldown active for %s", ip)
+				reject := WSMessage{Type: "AUTH_REJECTED", Message: "challenge_cooldown"}
+				rejBytes, _ := json.Marshal(reject)
+				conn.WriteMessage(websocket.TextMessage, rejBytes)
+				conn.Close()
+				return
+			}
+			if err := runPuzzleChallenge(conn, ip); err != nil {
+				log.Printf("[Auth Rejected] Human challenge failed for %s: %v", ip, err)
+				reject := WSMessage{Type: "AUTH_REJECTED", Message: "challenge_failed"}
+				rejBytes, _ := json.Marshal(reject)
+				conn.WriteMessage(websocket.TextMessage, rejBytes)
+				conn.Close()
+				return
+			}
+		}
+
+		allowed, err := rdb.AllowIssuance(ip, issuanceDailyIPCap)
+		if err != nil {
+			log.Printf("[Auth Error] Issuance cap check failed for %s: %v", ip, err)
+			reject := WSMessage{Type: "AUTH_REJECTED", Message: "issuance_unavailable"}
+			rejBytes, _ := json.Marshal(reject)
+			conn.WriteMessage(websocket.TextMessage, rejBytes)
+			conn.Close()
+			return
+		}
+		if !allowed {
+			log.Printf("[Auth Rejected] Issuance rate limit hit for %s", ip)
+			reject := WSMessage{Type: "AUTH_REJECTED", Message: "issuance_rate_limited"}
+			rejBytes, _ := json.Marshal(reject)
+			conn.WriteMessage(websocket.TextMessage, rejBytes)
+			conn.Close()
+			return
+		}
+		tok, expires, err := mintDeviceToken(userID)
+		if err != nil {
+			log.Printf("[Auth Error] Token minting failed for %s: %v", userID, err)
+			conn.WriteMessage(websocket.TextMessage, []byte(`{"type":"ERROR","message":"Token store error"}`))
+			conn.Close()
+			return
+		}
+		newTokenForClient = tok
+		newTokenExpiresAt = expires
+		log.Printf("[Auth] Device token minted for %s (ip %s)", userID, ip)
+	}
+
+	authKind := "device-token"
+	if newTokenForClient != "" && authMsg.DeviceToken == "" {
+		authKind = "issued new device token"
+	}
+	log.Printf("[Auth Success] Client verified. User ID: %s (%s)", userID, authKind)
 
 	// Authentication successful
 	client := &Client{
@@ -446,11 +708,34 @@ func ServeWS(hub *Hub, w http.ResponseWriter, r *http.Request) {
 	client.SendJSON(WSMessage{
 		Type:         "AUTH_OK",
 		UserID:       userID,
-		Capabilities: []string{"group_fanout"},
+		DeviceToken:  newTokenForClient,
+		DeviceTokenExpiresAt: newTokenExpiresAt,
+		// "stories_ws" gates the full story frame set (fetch/react/reactions/
+		// delete); "social_stories" only ever covered POST_STORY. The HTTP story
+		// endpoints were removed — WS is the only transport for stories now.
+		// "test_mode" marks a WK_TEST_MODE=true relay so clients can banner
+		// "TEST SERVER" and nobody confuses the two during device testing.
+		Capabilities: capabilitiesForThisRelay(),
 	})
 
 	// Reset read deadlines and start pumps
 	conn.SetReadDeadline(time.Now().Add(60 * time.Second))
 	go client.writePump()
 	go client.readPump()
+}
+
+// mintDeviceToken generates a fresh random 256-bit device token, stores only
+// its SHA-256, and returns the raw token (for the client) plus its expiry as
+// a unix timestamp.
+func mintDeviceToken(userID string) (string, int64, error) {
+	raw := make([]byte, 32)
+	if _, err := rand.Read(raw); err != nil {
+		return "", 0, err
+	}
+	token := hex.EncodeToString(raw)
+	expiresAt, err := pg.MintDeviceToken(userID, token)
+	if err != nil {
+		return "", 0, err
+	}
+	return token, expiresAt.Unix(), nil
 }

@@ -1,4 +1,4 @@
-package main
+﻿package main
 
 import (
 	"context"
@@ -11,7 +11,6 @@ import (
 	"io"
 	"log"
 	"math"
-	"math/big"
 	"net"
 	"net/http"
 	"os"
@@ -27,6 +26,9 @@ import (
 var rdb *RedisClient
 var pg *PostgresClient
 var storage ObjectStorage
+// True when WK_TEST_MODE=true (a second, fully isolated test-relay instance).
+// Advertised to clients so they can banner "TEST SERVER" (see AUTH_OK / ping).
+var testMode bool
 
 // clientIP resolves the real client IP for rate-limiting / bans. In production the
 // relay only ever sees traffic from nginx on loopback (ufw blocks the relay port),
@@ -86,8 +88,11 @@ func rateLimitMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-// Log a validation failure and escalate IP bans if necessary
-func handleValidationFailure(w http.ResponseWriter, ip string, reason string) {
+// Log a validation failure and escalate IP bans if necessary. Shared by the
+// HTTP middleware and the WebSocket auth path (ServeWS), where a failed
+// signature used to just close the socket with no record — unlimited auth
+// guessing for free.
+func registerIPFailure(ip string, reason string) {
 	fails, err := rdb.IncrementIPFailure(ip)
 	if err != nil {
 		log.Printf("Failed to increment IP failure count: %v", err)
@@ -107,6 +112,11 @@ func handleValidationFailure(w http.ResponseWriter, ip string, reason string) {
 		}
 		log.Printf("IP %s banned for %v due to repeated validation failures. Reason: %s", ip, banDuration, reason)
 	}
+}
+
+// Log a validation failure and escalate IP bans if necessary
+func handleValidationFailure(w http.ResponseWriter, ip string, reason string) {
+	registerIPFailure(ip, reason)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusBadRequest)
@@ -475,6 +485,10 @@ func handleQueueStatus(w http.ResponseWriter, r *http.Request) {
 	timestampStr := q.Get("timestamp")
 	sig := q.Get("sig")
 	pubkey := q.Get("pubkey")
+	// The raw device token rides a HEADER, never the query string — query
+	// params land in nginx access logs verbatim, and this is a long-lived
+	// bearer credential.
+	deviceToken := r.Header.Get("X-Device-Token")
 
 	if id == "" || timestampStr == "" || sig == "" || pubkey == "" {
 		http.Error(w, "Missing query parameters", http.StatusBadRequest)
@@ -513,7 +527,13 @@ func handleQueueStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 4. Query queue status
+	// 4. Device-token gate (no IP punishment on failure — a stale token
+	//    self-heals via the WS issuance path; see verifyDeviceTokenGate).
+	if !verifyDeviceTokenGate(w, id, deviceToken) {
+		return
+	}
+
+	// 5. Query queue status
 	blocked, err := rdb.IsQueueBlocked(id)
 	if err != nil {
 		http.Error(w, "Database error checking block status", http.StatusInternalServerError)
@@ -539,294 +559,6 @@ func handleQueueStatus(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(resp)
 }
 
-type PairInitRequest struct {
-	InitiatorID string `json:"initiator_id"`
-	Pubkey      string `json:"pubkey"`
-	BufferBytes int64  `json:"buffer_bytes"`
-}
-
-type PairInitResponse struct {
-	PIN string `json:"pin"`
-}
-
-type PairState struct {
-	InitiatorID  string `json:"initiator_id"`
-	InitiatorPub string `json:"initiator_pub"`
-	BufferBytes  int64  `json:"buffer_bytes"`
-	ReceiverID   string `json:"receiver_id,omitempty"`
-	ReceiverPub  string `json:"receiver_pub,omitempty"`
-	// SecretBlob carries the debug remote GROUP-invite payload (see the
-	// kRemotePairingTesting feature). The host posts it AFTER poll gives it the
-	// joiner's pubkey — only then can it derive the pairwise seed to encrypt the
-	// group seed inside. The relay stays blind: the group seed is pairwise-
-	// encrypted client-side. Empty for a 1-on-1 pairing.
-	SecretBlob string `json:"secret_blob,omitempty"`
-}
-
-func handlePairInit(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	var req PairInitRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request", http.StatusBadRequest)
-		return
-	}
-
-	if req.InitiatorID == "" || req.Pubkey == "" {
-		http.Error(w, "Missing fields", http.StatusBadRequest)
-		return
-	}
-
-	var pin string
-	for i := 0; i < 5; i++ {
-		n, err := crypto_rand.Int(crypto_rand.Reader, big.NewInt(900000))
-		if err != nil {
-			http.Error(w, "Entropy failure", http.StatusInternalServerError)
-			return
-		}
-		candidate := fmt.Sprintf("%06d", n.Int64()+100000)
-
-		_, err = rdb.GetPairing(candidate)
-		if err != nil {
-			pin = candidate
-			break
-		}
-	}
-
-	if pin == "" {
-		http.Error(w, "PIN collision timeout", http.StatusInternalServerError)
-		return
-	}
-
-	state := PairState{
-		InitiatorID:  req.InitiatorID,
-		InitiatorPub: req.Pubkey,
-		BufferBytes:  req.BufferBytes,
-	}
-
-	stateBytes, _ := json.Marshal(state)
-	err := rdb.StorePairing(pin, string(stateBytes), 5*time.Minute)
-	if err != nil {
-		http.Error(w, "Database error storing pairing", http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(PairInitResponse{PIN: pin})
-}
-
-type PairJoinRequest struct {
-	PIN        string `json:"pin"`
-	ReceiverID string `json:"receiver_id"`
-	Pubkey     string `json:"pubkey"`
-}
-
-func handlePairJoin(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	var req PairJoinRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request", http.StatusBadRequest)
-		return
-	}
-
-	if req.PIN == "" || req.ReceiverID == "" || req.Pubkey == "" {
-		http.Error(w, "Missing fields", http.StatusBadRequest)
-		return
-	}
-
-	data, err := rdb.GetPairing(req.PIN)
-	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(`{"error":"Invalid or expired PIN"}`))
-		return
-	}
-
-	var state PairState
-	if err := json.Unmarshal([]byte(data), &state); err != nil {
-		http.Error(w, "State corrupted", http.StatusInternalServerError)
-		return
-	}
-
-	// A PIN pairs exactly two parties. If a receiver already claimed it, reject
-	// the second joiner instead of overwriting — otherwise last-writer-wins and
-	// the first joiner has already generated a pad for a peer that will never
-	// complete the handshake.
-	if state.ReceiverID != "" {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusConflict)
-		w.Write([]byte(`{"error":"This PIN has already been claimed by another device."}`))
-		return
-	}
-
-	state.ReceiverID = req.ReceiverID
-	state.ReceiverPub = req.Pubkey
-
-	stateBytes, _ := json.Marshal(state)
-	err = rdb.StorePairing(req.PIN, string(stateBytes), 2*time.Minute)
-	if err != nil {
-		http.Error(w, "Database error updating pairing", http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"initiator_id": state.InitiatorID,
-		"pubkey":       state.InitiatorPub,
-		"buffer_bytes": state.BufferBytes,
-	})
-}
-
-func handlePairPoll(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	pin := r.URL.Query().Get("pin")
-	id := r.URL.Query().Get("id")
-
-	if pin == "" || id == "" {
-		http.Error(w, "Missing parameters", http.StatusBadRequest)
-		return
-	}
-
-	data, err := rdb.GetPairing(pin)
-	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{"status": "expired"})
-		return
-	}
-
-	var state PairState
-	if err := json.Unmarshal([]byte(data), &state); err != nil {
-		http.Error(w, "State corrupted", http.StatusInternalServerError)
-		return
-	}
-
-	if state.InitiatorID != id {
-		http.Error(w, "Unauthorized poll", http.StatusUnauthorized)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	if state.ReceiverID != "" {
-		// Do NOT delete on first "joined": if this response is lost to a network
-		// blip the initiator could never recover while the joiner has already
-		// built its contact. Let the short TTL reap the record instead, so a
-		// retried poll still returns "joined".
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"status":      "joined",
-			"receiver_id": state.ReceiverID,
-			"pubkey":      state.ReceiverPub,
-		})
-	} else {
-		json.NewEncoder(w).Encode(map[string]string{"status": "pending"})
-	}
-}
-
-type PairInviteRequest struct {
-	PIN         string `json:"pin"`
-	InitiatorID string `json:"initiator_id"`
-	Blob        string `json:"blob"`
-}
-
-// handlePairInvite carries the encrypted group-invite blob for a debug remote
-// GROUP pairing (see the kRemotePairingTesting client feature). Two-sided:
-//
-//	POST {pin, initiator_id, blob}  — the HOST uploads the invite after poll has
-//	                                  given it the joiner's pubkey. Only the PIN's
-//	                                  initiator may write. Refreshes the TTL so the
-//	                                  joiner has time to fetch.
-//	GET  ?pin=&receiver_id=         — the JOINER polls until the blob is ready.
-//	                                  Only the joined receiver may read.
-//
-// The relay never learns the group seed: the blob's seed field is encrypted with
-// the pairwise seed (derived from both pubkeys) on the client. 1-on-1 pairings
-// never touch this endpoint.
-func handlePairInvite(w http.ResponseWriter, r *http.Request) {
-	switch r.Method {
-	case http.MethodPost:
-		var req PairInviteRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, "Invalid request", http.StatusBadRequest)
-			return
-		}
-		if req.PIN == "" || req.InitiatorID == "" || req.Blob == "" {
-			http.Error(w, "Missing fields", http.StatusBadRequest)
-			return
-		}
-		data, err := rdb.GetPairing(req.PIN)
-		if err != nil {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(`{"error":"Invalid or expired PIN"}`))
-			return
-		}
-		var state PairState
-		if err := json.Unmarshal([]byte(data), &state); err != nil {
-			http.Error(w, "State corrupted", http.StatusInternalServerError)
-			return
-		}
-		// Only the host that created this PIN may post the invite.
-		if state.InitiatorID != req.InitiatorID {
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
-			return
-		}
-		state.SecretBlob = req.Blob
-		stateBytes, _ := json.Marshal(state)
-		// Refresh the TTL: the host has just posted, give the joiner time to fetch.
-		if err := rdb.StorePairing(req.PIN, string(stateBytes), 5*time.Minute); err != nil {
-			http.Error(w, "Database error", http.StatusInternalServerError)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"status":"ok"}`))
-
-	case http.MethodGet:
-		pin := r.URL.Query().Get("pin")
-		id := r.URL.Query().Get("receiver_id")
-		if pin == "" || id == "" {
-			http.Error(w, "Missing parameters", http.StatusBadRequest)
-			return
-		}
-		data, err := rdb.GetPairing(pin)
-		w.Header().Set("Content-Type", "application/json")
-		if err != nil {
-			// Record gone (TTL lapsed) — tell the joiner explicitly so it stops
-			// polling instead of hanging on a spinner.
-			json.NewEncoder(w).Encode(map[string]string{"status": "expired"})
-			return
-		}
-		var state PairState
-		if err := json.Unmarshal([]byte(data), &state); err != nil {
-			http.Error(w, "State corrupted", http.StatusInternalServerError)
-			return
-		}
-		if state.ReceiverID != id {
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
-			return
-		}
-		if state.SecretBlob != "" {
-			json.NewEncoder(w).Encode(map[string]string{
-				"status": "ready",
-				"blob":   state.SecretBlob,
-			})
-		} else {
-			json.NewEncoder(w).Encode(map[string]string{"status": "pending"})
-		}
-
-	default:
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-	}
-}
 
 // isHighRAMLoad returns true if virtual memory usage is above the configured threshold.
 func isHighRAMLoad() bool {
@@ -1356,10 +1088,48 @@ func main() {
 		port = "8000"
 	}
 
+	// Test-relay mode: a second relay instance (test.wiltkey.org) running
+	// against its OWN Postgres DB / Redis DB / storage dir. Everything is
+	// env-isolated; this flag only (a) screams TEST at startup and (b) lets
+	// clients display an unmistakable "TEST SERVER" banner so nobody ever
+	// posts test data into production by accident.
+	testMode = os.Getenv("WK_TEST_MODE") == "true"
+	if testMode {
+		log.Printf("==============================================")
+		log.Printf("==========  TEST RELAY — WK_TEST_MODE=true ===")
+		log.Printf("== NOT PRODUCTION. Isolated DB/storage only.=")
+		log.Printf("==============================================")
+		if port == "8000" {
+			log.Printf("Warning: test relay on the default port 8000 — production runs a separate instance/port.")
+		}
+	}
+
 	redisAddr := os.Getenv("REDIS_ADDR")
 	if redisAddr == "" {
 		redisAddr = "localhost:6379"
 	}
+
+	// Device-token issuance gate tuning (see websocket.go).
+	if d := os.Getenv("WK_ISSUANCE_DIFFICULTY"); d != "" {
+		if n, err := strconv.Atoi(d); err == nil && n >= 1 && n <= 12 {
+			issuanceDifficulty = n
+		} else {
+			log.Printf("Warning: invalid WK_ISSUANCE_DIFFICULTY %q — keeping default %d", d, issuanceDifficulty)
+		}
+	}
+	if c := os.Getenv("WK_ISSUANCE_DAILY_IP"); c != "" {
+		if n, err := strconv.ParseInt(c, 10, 64); err == nil && n >= 1 {
+			issuanceDailyIPCap = n
+		} else {
+			log.Printf("Warning: invalid WK_ISSUANCE_DAILY_IP %q — keeping default %d", c, issuanceDailyIPCap)
+		}
+	}
+	log.Printf("Token issuance gate: PoW difficulty %d, %d mints/IP/day", issuanceDifficulty, issuanceDailyIPCap)
+
+	// Human-verification challenge mode (Phase 2, puzzle.go). Off by default
+	// everywhere; flip prod to `adaptive` only after app + relay ship together.
+	initChallengeEnv()
+	log.Printf("Human challenge mode: %s (strips %d, solution window %s)", challengeMode, puzzleStrips, puzzleSolutionDeadline)
 
 	var err error
 	rdb, err = NewRedisClient(redisAddr)
@@ -1398,7 +1168,10 @@ func main() {
 	useSSLStr := os.Getenv("BUCKET_USE_SSL")
 	useSSL := useSSLStr == "true"
 
-	localDir := "./wiltkey_local_storage"
+	localDir := os.Getenv("WK_LOCAL_STORAGE_DIR")
+	if localDir == "" {
+		localDir = "./wiltkey_local_storage"
+	}
 	if bucketEndpoint != "" && bucketAccessKey != "" && bucketSecretKey != "" {
 		storage, err = NewS3Storage(bucketEndpoint, bucketAccessKey, bucketSecretKey, bucketName, useSSL)
 		if err != nil {
@@ -1446,30 +1219,28 @@ func main() {
 	http.HandleFunc("/api/v1/queue/status", rateLimitMiddleware(handleQueueStatus))
 	http.HandleFunc("/api/v1/push/register", rateLimitMiddleware(handlePushRegister))
 	http.HandleFunc("/api/v1/push/unregister", rateLimitMiddleware(handlePushUnregister))
-	http.HandleFunc("/api/v1/pair/init", rateLimitMiddleware(handlePairInit))
-	http.HandleFunc("/api/v1/pair/join", rateLimitMiddleware(handlePairJoin))
-	http.HandleFunc("/api/v1/pair/poll", rateLimitMiddleware(handlePairPoll))
-	http.HandleFunc("/api/v1/pair/invite", rateLimitMiddleware(handlePairInvite))
+	// /api/v1/pair/* (init/join/poll/invite) were REMOVED: they carried NO
+	// authentication at all (PIN-space guessing, PIN burning) and were only ever
+	// used by the debug remote-pairing feature; BLE pairing is offline-first and
+	// normal onboarding never calls them.
 	http.HandleFunc("/api/v1/entitlement", rateLimitMiddleware(handlePostEntitlement))
 	http.HandleFunc("/api/v1/integrity/challenge", rateLimitMiddleware(handleIntegrityChallenge))
 	http.HandleFunc("/api/v1/integrity/attest", rateLimitMiddleware(handleIntegrityAttest))
 	http.HandleFunc("/api/v1/integrity/query", rateLimitMiddleware(handleIntegrityQuery))
 	http.HandleFunc("/api/v1/file", rateLimitMiddleware(handleFileDownload))
-	http.HandleFunc("/api/v1/stories/post", rateLimitMiddleware(handlePostStory))
-	http.HandleFunc("/api/v1/stories/feed", rateLimitMiddleware(handleGetStoriesFeed))
-	http.HandleFunc("/api/v1/stories/react", rateLimitMiddleware(handleReactStory))
-	http.HandleFunc("/api/v1/stories/", rateLimitMiddleware(func(w http.ResponseWriter, r *http.Request) {
-		if strings.HasSuffix(r.URL.Path, "/reactions") {
-			handleStoryReactions(w, r)
-		} else {
-			handleDeleteStory(w, r)
-		}
-	}))
+	// Story HTTP endpoints (post/feed/react/reactions/delete) were REMOVED:
+	// they were sig-over-timestamp authenticated only, i.e. anyone with a
+	// self-minted keypair could post/interact at HTTP rate-limit speed. Stories
+	// now ride the authenticated WebSocket exclusively ("stories_ws" capability).
 	http.HandleFunc("/api/v1/social/budget", rateLimitMiddleware(handleGetSocialBudget))
 	http.HandleFunc("/api/v1/social/wipe", rateLimitMiddleware(handleSocialWipe))
 	http.HandleFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"status":"ok"}`))
+		if testMode {
+			w.Write([]byte(`{"status":"ok","mode":"test"}`))
+		} else {
+			w.Write([]byte(`{"status":"ok","mode":"production"}`))
+		}
 	})
 
 	// WebSocket upgrading

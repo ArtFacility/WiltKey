@@ -4128,6 +4128,90 @@ abstract class AppLocalizations {
   /// **'Enter PIN manually'**
   String get qrConnectManualPin;
 
+  /// No description provided for @qrConnectShowYourCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan complete! Now show your QR code to them too.'**
+  String get qrConnectShowYourCode;
+
+  /// No description provided for @qrConnectFinishPairing.
+  ///
+  /// In en, this message translates to:
+  /// **'Finish pairing'**
+  String get qrConnectFinishPairing;
+
+  /// No description provided for @qrConnectOutdatedCode.
+  ///
+  /// In en, this message translates to:
+  /// **'This QR code is from an older app version. Both of you need the latest update to connect this way.'**
+  String get qrConnectOutdatedCode;
+
+  /// No description provided for @qrConnectOwnCode.
+  ///
+  /// In en, this message translates to:
+  /// **'That\'s your own QR code — point the camera at theirs instead.'**
+  String get qrConnectOwnCode;
+
+  /// No description provided for @qrConnectAlreadyPaired.
+  ///
+  /// In en, this message translates to:
+  /// **'You already have a chat with this person. Refreshing an existing chat requires an in-person pairing.'**
+  String get qrConnectAlreadyPaired;
+
+  /// No description provided for @testRelayBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'TEST SERVER — NOT PRODUCTION'**
+  String get testRelayBanner;
+
+  /// No description provided for @securingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Securing your connection'**
+  String get securingTitle;
+
+  /// No description provided for @securingBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Your device is verifying itself with the relay before connecting. This one-time proof-of-work protects everyone from spam and abuse — no phone number, no email, no account.'**
+  String get securingBody;
+
+  /// No description provided for @securingWorking.
+  ///
+  /// In en, this message translates to:
+  /// **'PROVING DEVICE — WORKING…'**
+  String get securingWorking;
+
+  /// No description provided for @securingOnceNote.
+  ///
+  /// In en, this message translates to:
+  /// **'This happens only on your first connection. Reconnecting afterwards is instant.'**
+  String get securingOnceNote;
+
+  /// No description provided for @puzzleInstruction.
+  ///
+  /// In en, this message translates to:
+  /// **'A piece of your connection check is scrambled. Slide the strip until the picture locks in, then confirm.'**
+  String get puzzleInstruction;
+
+  /// No description provided for @puzzleLockIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Lock in'**
+  String get puzzleLockIn;
+
+  /// No description provided for @puzzleFailedRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'That didn\'t line up — starting a fresh check…'**
+  String get puzzleFailedRetry;
+
+  /// No description provided for @reauthenticatingBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'REAUTHENTICATING — PLEASE WAIT…'**
+  String get reauthenticatingBanner;
+
   /// No description provided for @badgePlayPlus.
   ///
   /// In en, this message translates to:
@@ -4469,6 +4553,192 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'What\'s in this update'**
   String get forcedUpdateWhatsNew;
+
+  /// No description provided for @settingsSwipeGesturesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat Swipe Gestures'**
+  String get settingsSwipeGesturesTitle;
+
+  /// No description provided for @settingsSwipeGesturesSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Customize swipe right and swipe left actions in the chats list'**
+  String get settingsSwipeGesturesSubtitle;
+
+  /// No description provided for @settingsSwipeRight.
+  ///
+  /// In en, this message translates to:
+  /// **'Swipe Right'**
+  String get settingsSwipeRight;
+
+  /// No description provided for @settingsSwipeLeft.
+  ///
+  /// In en, this message translates to:
+  /// **'Swipe Left'**
+  String get settingsSwipeLeft;
+
+  /// No description provided for @swipeActionMarkRead.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark Read / Unread'**
+  String get swipeActionMarkRead;
+
+  /// No description provided for @swipeActionMute.
+  ///
+  /// In en, this message translates to:
+  /// **'Mute / Unmute'**
+  String get swipeActionMute;
+
+  /// No description provided for @swipeActionPin.
+  ///
+  /// In en, this message translates to:
+  /// **'Pin / Unpin'**
+  String get swipeActionPin;
+
+  /// No description provided for @swipeActionArchive.
+  ///
+  /// In en, this message translates to:
+  /// **'Archive'**
+  String get swipeActionArchive;
+
+  /// No description provided for @swipeActionNone.
+  ///
+  /// In en, this message translates to:
+  /// **'Disabled'**
+  String get swipeActionNone;
+
+  /// No description provided for @chatSwipeMarkRead.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark Read'**
+  String get chatSwipeMarkRead;
+
+  /// No description provided for @chatSwipeMarkUnread.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark Unread'**
+  String get chatSwipeMarkUnread;
+
+  /// No description provided for @chatSwipePin.
+  ///
+  /// In en, this message translates to:
+  /// **'Pin'**
+  String get chatSwipePin;
+
+  /// No description provided for @chatSwipeUnpin.
+  ///
+  /// In en, this message translates to:
+  /// **'Unpin'**
+  String get chatSwipeUnpin;
+
+  /// No description provided for @chatSwipeMute.
+  ///
+  /// In en, this message translates to:
+  /// **'Mute'**
+  String get chatSwipeMute;
+
+  /// No description provided for @chatSwipeUnmute.
+  ///
+  /// In en, this message translates to:
+  /// **'Unmute'**
+  String get chatSwipeUnmute;
+
+  /// No description provided for @chatSwipeArchive.
+  ///
+  /// In en, this message translates to:
+  /// **'Archive'**
+  String get chatSwipeArchive;
+
+  /// No description provided for @chatAttachVideoSubtitleEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Record up to 15s or pick from gallery'**
+  String get chatAttachVideoSubtitleEnabled;
+
+  /// No description provided for @chatVideoSelectSourceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Send Video'**
+  String get chatVideoSelectSourceTitle;
+
+  /// No description provided for @chatVideoQualityLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Quality'**
+  String get chatVideoQualityLabel;
+
+  /// No description provided for @chatVideoQualityLow.
+  ///
+  /// In en, this message translates to:
+  /// **'Low'**
+  String get chatVideoQualityLow;
+
+  /// No description provided for @chatVideoQualityMedium.
+  ///
+  /// In en, this message translates to:
+  /// **'Medium'**
+  String get chatVideoQualityMedium;
+
+  /// No description provided for @chatVideoQualityHigh.
+  ///
+  /// In en, this message translates to:
+  /// **'High'**
+  String get chatVideoQualityHigh;
+
+  /// No description provided for @chatVideoCompressionFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t compress this clip. Try a shorter or lower-quality selection.'**
+  String get chatVideoCompressionFailed;
+
+  /// No description provided for @chatVideoRecordCamera.
+  ///
+  /// In en, this message translates to:
+  /// **'Record Video (Camera)'**
+  String get chatVideoRecordCamera;
+
+  /// No description provided for @chatVideoPickGallery.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose Video from Gallery'**
+  String get chatVideoPickGallery;
+
+  /// No description provided for @chatVideoCompressing.
+  ///
+  /// In en, this message translates to:
+  /// **'Compressing video...'**
+  String get chatVideoCompressing;
+
+  /// No description provided for @chatVideoTooLarge.
+  ///
+  /// In en, this message translates to:
+  /// **'Video exceeds size limit ({size})'**
+  String chatVideoTooLarge(String size);
+
+  /// No description provided for @chatVideoTooLong.
+  ///
+  /// In en, this message translates to:
+  /// **'Video exceeds 15-second duration limit'**
+  String get chatVideoTooLong;
+
+  /// No description provided for @chatVideoSaveGallery.
+  ///
+  /// In en, this message translates to:
+  /// **'Save Video to Gallery'**
+  String get chatVideoSaveGallery;
+
+  /// No description provided for @chatVideoSavedGallery.
+  ///
+  /// In en, this message translates to:
+  /// **'Video saved to gallery'**
+  String get chatVideoSavedGallery;
+
+  /// No description provided for @chatVideoError.
+  ///
+  /// In en, this message translates to:
+  /// **'Unable to play video clip'**
+  String get chatVideoError;
 }
 
 class _AppLocalizationsDelegate

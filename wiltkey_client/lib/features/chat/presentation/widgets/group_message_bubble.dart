@@ -19,6 +19,7 @@ import 'reply_preview.dart';
 import 'voice_message_player.dart';
 import 'wilt_widgets.dart';
 import 'pixel_art_message_bubble.dart';
+import 'video_message_bubble.dart';
 
 /// A complete message bubble for group chats.
 ///
@@ -352,6 +353,13 @@ class GroupMessageBubble extends StatelessWidget {
     }
     if (ct == 'image' || ct == 'image_hidden') {
       return _buildImageContent(context, t, l10n);
+    }
+    if (ct == 'video') {
+      return VideoMessageBubble(
+        appState: appState,
+        contact: group,
+        message: message,
+      );
     }
     if (ct == 'voice') {
       if (message.decodedAudioBytes == null) {

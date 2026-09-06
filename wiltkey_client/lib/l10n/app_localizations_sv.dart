@@ -2311,6 +2311,56 @@ class AppLocalizationsSv extends AppLocalizations {
   String get qrConnectManualPin => 'Ange PIN manuellt';
 
   @override
+  String get qrConnectShowYourCode =>
+      'Skanning klar! Visa nu din QR-kod för dem också.';
+
+  @override
+  String get qrConnectFinishPairing => 'Slutför parkoppling';
+
+  @override
+  String get qrConnectOutdatedCode =>
+      'Den här QR-koden kommer från en äldre appversion. Ni behöver båda ha den senaste versionen för att ansluta på det här sättet.';
+
+  @override
+  String get qrConnectOwnCode =>
+      'Det där är din egen QR-kod — rikta kameran mot deras istället.';
+
+  @override
+  String get qrConnectAlreadyPaired =>
+      'Du har redan en chatt med den här personen. Att förnya en befintlig chatt kräver ihopparning på plats.';
+
+  @override
+  String get testRelayBanner => 'TESTSERVER — INTE PRODUKTION';
+
+  @override
+  String get securingTitle => 'Säkrar din anslutning';
+
+  @override
+  String get securingBody =>
+      'Din enhet verifierar sig mot reläet innan den ansluter. Detta engångs proof-of-work skyddar alla mot spam och missbruk — inget telefonnummer, ingen e-post, inget konto.';
+
+  @override
+  String get securingWorking => 'VERIFIERAR ENHET — ARBETAR…';
+
+  @override
+  String get securingOnceNote =>
+      'Detta händer bara vid din första anslutning. Därefter är återanslutningen omedelbar.';
+
+  @override
+  String get puzzleInstruction =>
+      'En del av din anslutningskontroll är förvrängd. Dra i listen tills bilden klickar på plats och bekräfta sedan.';
+
+  @override
+  String get puzzleLockIn => 'Lås fast';
+
+  @override
+  String get puzzleFailedRetry =>
+      'Det blev inte helt rätt — vi startar en ny kontroll…';
+
+  @override
+  String get reauthenticatingBanner => 'ÅTERAUTENTISIERAR — VÄNLIGEN VÄNTA…';
+
+  @override
   String get badgePlayPlus => 'Play Butik · Plus';
 
   @override
@@ -2499,4 +2549,103 @@ class AppLocalizationsSv extends AppLocalizations {
 
   @override
   String get forcedUpdateWhatsNew => 'Nyheter i denna uppdatering';
+
+  @override
+  String get settingsSwipeGesturesTitle => 'Svepgester för chatt';
+
+  @override
+  String get settingsSwipeGesturesSubtitle =>
+      'Anpassa åtgärder för svep åt höger och vänster i chattlistan';
+
+  @override
+  String get settingsSwipeRight => 'Svep åt höger';
+
+  @override
+  String get settingsSwipeLeft => 'Svep åt vänster';
+
+  @override
+  String get swipeActionMarkRead => 'Läst / Oläst';
+
+  @override
+  String get swipeActionMute => 'Tysta / Sluta tysta';
+
+  @override
+  String get swipeActionPin => 'Fäst / Lossa';
+
+  @override
+  String get swipeActionArchive => 'Arkivera';
+
+  @override
+  String get swipeActionNone => 'Inaktiverad';
+
+  @override
+  String get chatSwipeMarkRead => 'Läst';
+
+  @override
+  String get chatSwipeMarkUnread => 'Oläst';
+
+  @override
+  String get chatSwipePin => 'Fäst';
+
+  @override
+  String get chatSwipeUnpin => 'Lossa';
+
+  @override
+  String get chatSwipeMute => 'Tysta';
+
+  @override
+  String get chatSwipeUnmute => 'Sluta tysta';
+
+  @override
+  String get chatSwipeArchive => 'Arkivera';
+
+  @override
+  String get chatAttachVideoSubtitleEnabled =>
+      'Spela in upp till 15 s eller välj från galleriet';
+
+  @override
+  String get chatVideoSelectSourceTitle => 'Skicka video';
+
+  @override
+  String get chatVideoQualityLabel => 'Kvalitet';
+
+  @override
+  String get chatVideoQualityLow => 'Låg';
+
+  @override
+  String get chatVideoQualityMedium => 'Mellan';
+
+  @override
+  String get chatVideoQualityHigh => 'Hög';
+
+  @override
+  String get chatVideoCompressionFailed =>
+      'Det gick inte att komprimera klippet. Prova ett kortare klipp eller lägre kvalitet.';
+
+  @override
+  String get chatVideoRecordCamera => 'Spela in video (Kamera)';
+
+  @override
+  String get chatVideoPickGallery => 'Välj video från galleriet';
+
+  @override
+  String get chatVideoCompressing => 'Komprimerar video...';
+
+  @override
+  String chatVideoTooLarge(String size) {
+    return 'Videon överskrider storleksgränsen ($size)';
+  }
+
+  @override
+  String get chatVideoTooLong =>
+      'Videon överskrider tidsgränsen på 15 sekunder';
+
+  @override
+  String get chatVideoSaveGallery => 'Spara video i galleriet';
+
+  @override
+  String get chatVideoSavedGallery => 'Video sparad i galleriet';
+
+  @override
+  String get chatVideoError => 'Det går inte att spela upp videoklippet';
 }

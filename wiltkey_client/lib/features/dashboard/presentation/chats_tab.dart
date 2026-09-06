@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:wiltkey_client/l10n/app_localizations.dart';
 import '../../../core/state.dart';
 import '../../../core/models.dart';
@@ -448,7 +449,9 @@ class _ChatsTabState extends State<ChatsTab> {
         .where(
           (c) =>
               _matchesFilter(c) &&
-              (q.isEmpty || c.name.toLowerCase().contains(q)),
+              (q.isEmpty ||
+                  c.displayName.toLowerCase().contains(q) ||
+                  c.name.toLowerCase().contains(q)),
         )
         .toList();
     int byRecency(Contact a, Contact b) =>
@@ -574,29 +577,182 @@ class _ChatsTabState extends State<ChatsTab> {
                       return _sectionHeader(t, entry.label);
                     }
                     final c = entry as Contact;
+                    final rightAct = _appState.swipeRightAction;
+                    final leftAct = _appState.swipeLeftAction;
+                    final hasRight = rightAct != 'none';
+                    final hasLeft = leftAct != 'none';
+                    final direction = (hasRight && hasLeft)
+                        ? DismissDirection.horizontal
+                        : (hasRight
+                            ? DismissDirection.startToEnd
+                            : (hasLeft
+                                ? DismissDirection.endToStart
+                                : DismissDirection.none));
+
+                    Widget row = _ContactRow(
+                      contact: c,
+                      myId: _appState.userId,
+                      onTap: () => _openContact(c),
+                      onLongPress: () => _showChatActions(c),
+                      // Recharge is a known target — skip the hub menu and go
+                      // straight into the in-person pairing flow.
+                      onSync: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const PairingScreen(),
+                        ),
+                      ),
+                    );
+
+                    if (direction != DismissDirection.none) {
+                      row = Dismissible(
+                        key: ValueKey(
+                          'swipe_${c.id}_${c.isPinned}_${c.isMuted}_${_appState.unreadCount(c)}',
+                        ),
+                        direction: direction,
+                        background: _buildSwipeBackground(
+                          context: context,
+                          contact: c,
+                          action: rightAct,
+                          isRightSwipe: true,
+                        ),
+                        secondaryBackground: _buildSwipeBackground(
+                          context: context,
+                          contact: c,
+                          action: leftAct,
+                          isRightSwipe: false,
+                        ),
+                        confirmDismiss: (dismissDir) async {
+                          if (dismissDir == DismissDirection.startToEnd) {
+                            _executeSwipeAction(rightAct, c);
+                          } else if (dismissDir == DismissDirection.endToStart) {
+                            _executeSwipeAction(leftAct, c);
+                          }
+                          return false; // Snap back cleanly
+                        },
+                        child: row,
+                      );
+                    }
+
                     return _EntranceItem(
                       key: ValueKey(c.id),
                       index: i,
-                      child: _ContactRow(
-                        contact: c,
-                        myId: _appState.userId,
-                        onTap: () => _openContact(c),
-                        onLongPress: () => _showChatActions(c),
-                        // Recharge is a known target — skip the hub menu and go
-                        // straight into the in-person pairing flow.
-                        onSync: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const PairingScreen(),
-                          ),
-                        ),
-                      ),
+                      child: row,
                     );
                   },
                 ),
         ),
       ],
     ));
+  }
+
+  Widget? _buildSwipeBackground({
+    required BuildContext context,
+    required Contact contact,
+    required String action,
+    required bool isRightSwipe,
+  }) {
+    if (action == 'none') return null;
+    final t = context.wk;
+    final l10n = AppLocalizations.of(context)!;
+
+    IconData icon;
+    String label;
+    Color color;
+
+    switch (action) {
+      case 'mark_read':
+        final unread = _appState.unreadCount(contact) > 0;
+        icon = unread ? Icons.done_all : Icons.mark_chat_unread_outlined;
+        label = unread ? l10n.chatSwipeMarkRead : l10n.chatSwipeMarkUnread;
+        color = t.action;
+        break;
+      case 'mute':
+        final muted = contact.isMuted;
+        icon = muted
+            ? Icons.notifications_active_outlined
+            : Icons.notifications_off_outlined;
+        label = muted ? l10n.chatSwipeUnmute : l10n.chatSwipeMute;
+        color = muted ? t.action : t.textSecondary;
+        break;
+      case 'pin':
+        final pinned = contact.isPinned;
+        icon = pinned ? Icons.push_pin_outlined : Icons.push_pin;
+        label = pinned ? l10n.chatSwipeUnpin : l10n.chatSwipePin;
+        color = t.action;
+        break;
+      case 'archive':
+        icon = Icons.inventory_2_outlined;
+        label = l10n.chatSwipeArchive;
+        color = t.textSecondary;
+        break;
+      default:
+        return null;
+    }
+
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(t.radiusCard),
+        border: Border.all(
+          color: color.withValues(alpha: 0.3),
+          width: t.borderWidth,
+        ),
+      ),
+      alignment: isRightSwipe ? Alignment.centerLeft : Alignment.centerRight,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: isRightSwipe
+            ? [
+                Icon(icon, color: color, size: 20),
+                const SizedBox(width: 8),
+                Text(
+                  label,
+                  style: t.body.copyWith(
+                    color: color,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                ),
+              ]
+            : [
+                Text(
+                  label,
+                  style: t.body.copyWith(
+                    color: color,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Icon(icon, color: color, size: 20),
+              ],
+      ),
+    );
+  }
+
+  void _executeSwipeAction(String action, Contact c) {
+    HapticFeedback.mediumImpact();
+    switch (action) {
+      case 'mark_read':
+        _appState.toggleChatReadUnread(c);
+        break;
+      case 'mute':
+        if (c.isGroup) {
+          _showGroupNotificationSettingsSheet(c);
+        } else {
+          _appState.setChatNotificationMode(c, c.isMuted ? 'all' : 'muted');
+        }
+        break;
+      case 'pin':
+        _appState.togglePin(c.keyHash);
+        break;
+      case 'archive':
+        _confirmArchive(c);
+        break;
+    }
   }
 
   Widget _filterChip(WiltkeyTokens t, String label, _ChatFilter value) {
@@ -736,7 +892,7 @@ class _ContactRow extends StatelessWidget {
                     children: [
                       Flexible(
                         child: Text(
-                          c.name,
+                          c.displayName,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: t.body.copyWith(fontWeight: FontWeight.w600),

@@ -54,6 +54,10 @@ const String kPrefPushMigrationDone = 'wk_push_migration_done';
 const String kPrefBgRelayUrl = 'wk_bg_relay_url';
 const String kPrefBgUserId = 'wk_bg_user_id';
 const String kPrefBgPubKey = 'wk_bg_pubkey';
+/// The relay-issued device token (raw). Shared by the main isolate and the
+/// background workers — challenge-bound at every auth, so useless without the
+/// private signing key that lives in the OS keystore.
+const String kPrefDeviceToken = 'wk_device_token';
 const String kSecureSigningKey = 'wk_bg_signing_key';
 
 const String kLowPowerTaskName = 'wk_low_power_poll';
@@ -314,6 +318,7 @@ class WiltkeyNotifications {
     await prefs.remove(kPrefBgRelayUrl);
     await prefs.remove(kPrefBgUserId);
     await prefs.remove(kPrefBgPubKey);
+    await prefs.remove(kPrefDeviceToken);
     await prefs.remove(kPrefNotificationMode);
     try {
       await _secure.delete(key: kSecureSigningKey);

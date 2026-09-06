@@ -101,10 +101,16 @@ class BlePairingManager extends ChangeNotifier {
   /// instead of a byte-budget pad. [_sentWiltExpiryMillis] is the ABSOLUTE
   /// expiry the initiator computed and put on the wire, remembered so the
   /// initiator stores the exact same instant the responder does (no clock-skew
-  /// disagreement). All null/false for a normal byte-budget pairing.
+  /// disagreement). [_sentWiltFreshSeedHex] is a FRESH random 256-bit stream
+  /// seed the initiator generates per pairing and puts on the wire ('tws'):
+  /// re-pairing (re-meet) then swaps to brand-new key material, so resetting
+  /// the lane offsets can never re-encrypt into already-burned keystream of
+  /// the previous chat era (same model as group recharge / emergency chat).
+  /// All null/false for a normal byte-budget pairing.
   bool timeWiltMode = false;
   int timeWiltLifetimeSecs = 0;
   int? _sentWiltExpiryMillis;
+  String? _sentWiltFreshSeedHex;
 
   DiscoveredBleDevice? selectedDevice;
   BluetoothDevice? activeConnection;
@@ -149,6 +155,10 @@ class BlePairingManager extends ChangeNotifier {
     // null for a normal byte-budget request. The accept dialog echoes it back
     // into [respondToPairRequest] so both sides store the same instant.
     int? wiltExpiresMillis,
+    // Time Wilt: the initiator's fresh random 256-bit stream seed ('tws') for
+    // this pairing. Echoed back into [respondToPairRequest] so the contact
+    // (new OR re-meet) is keyed on material that has never been burned.
+    String? wiltFreshSeedHex,
   })?
   onIncomingRequest;
 
@@ -391,10 +401,23 @@ class BlePairingManager extends ChangeNotifier {
       final peerPubKey = json['pubkey'] as String;
       final bufferBytes = json['buffer_bytes'] as int;
       // Time Wilt: 'tw' flags the mode, 'twx' is the initiator's absolute expiry
-      // (unix millis). Absent for a normal byte-budget request.
+      // (unix millis). 'tws' (BOTH modes) is the initiator's fresh random
+      // stream seed for this pairing — the chat's key material.
       final int? wiltExpiresMillis = json['tw'] == 1
           ? (json['twx'] as int?)
           : null;
+      final String? wiltFreshSeedHex =
+          json['tws'] as String?;
+
+      // 'tws' keys the entire chat (pad file, meta channel, group blob). A
+      // PRESENT-but-malformed value is attacker-influenced wire input — never
+      // let it fall through to any derivation: drop the pairing request.
+      if (wiltFreshSeedHex != null &&
+          (wiltFreshSeedHex.length != 64 ||
+              !RegExp(r'^[0-9a-fA-F]+$').hasMatch(wiltFreshSeedHex))) {
+        log('[BLE Host] Malformed tws in pairing request — ignored.');
+        return;
+      }
 
       final peerPubBytes = _hexToBytes(peerPubKey);
       final peerId = sha256.convert(peerPubBytes).toString();
@@ -408,6 +431,7 @@ class BlePairingManager extends ChangeNotifier {
           peerShortNick: peerShortNick,
           peerProfileImage: peerProfileImage,
           wiltExpiresMillis: wiltExpiresMillis,
+          wiltFreshSeedHex: wiltFreshSeedHex,
         );
       }
     } catch (e) {
@@ -426,6 +450,12 @@ class BlePairingManager extends ChangeNotifier {
     // Time Wilt: the initiator's absolute expiry (unix millis) from the request,
     // stored verbatim so both sides wilt on the same instant. Null = byte budget.
     int? wiltExpiresMillis,
+    // The initiator's fresh random stream seed ('tws') from the request —
+    // sent for BOTH modes. The contact's stream seed (and thus its
+    // meta-channel key / pad file / group-invite blob key) is keyed on THIS,
+    // never on the deterministic pubkey derivation, which is publicly
+    // recomputable from the pubkeys the relay sees in AUTH frames.
+    String? wiltFreshSeedHex,
   }) async {
     try {
       if (accepted) {
@@ -469,9 +499,12 @@ class BlePairingManager extends ChangeNotifier {
             }
             assignedSlot = emptyLanes.first['slot_index'] as int;
           }
+          // The group-seed blob is encrypted with the pairing's FRESH seed
+          // ('tws', which the joiner generated and sent) — never the
+          // deterministic pubkey derivation, which is publicly recomputable.
           final encryptedSeed = _encryptGroupSeed(
             groupToInvite!.groupSeed!,
-            derivedSeed,
+            wiltFreshSeedHex ?? derivedSeed,
           );
 
           responseMap["pairing_type"] = "group_invite";
@@ -540,6 +573,7 @@ class BlePairingManager extends ChangeNotifier {
           peerShortNick: peerShortNick,
           peerProfileImage: peerProfileImage,
           wiltExpiresMillis: wiltExpiresMillis,
+          wiltFreshSeedHex: wiltFreshSeedHex,
         );
       } else {
         final response = jsonEncode({"status": "rejected"});
@@ -798,8 +832,10 @@ class BlePairingManager extends ChangeNotifier {
           peerName: selectedDevice!.name,
           peerShortNick: peerShortNick,
           peerProfileImage: peerProfileImage,
-          // We're the initiator: store the exact expiry we put on the wire.
+          // We're the initiator: store the exact expiry and the exact fresh
+          // seed we put on the wire.
           wiltExpiresMillis: _sentWiltExpiryMillis,
+          wiltFreshSeedHex: _sentWiltFreshSeedHex,
           deviceToDisconnect: device,
         );
       } else if (json['status'] == 'rejected') {
@@ -981,9 +1017,16 @@ class BlePairingManager extends ChangeNotifier {
         }
       });
 
-      // Time Wilt: compute the ABSOLUTE expiry now and remember it, so we store
-      // the exact same instant the responder does. Short keys ('tw'/'twx') keep
-      // the request well inside the 512-byte GATT MTU.
+      // Fresh random 256-bit stream seed generated per pairing ('tws' on the
+      // wire) for BOTH modes: Time Wilt AND byte-budget pads. The seed keys
+      // the chat's keystream AND meta channel, so it must be material the
+      // relay can never recompute: the old deterministic pubkey derivation is
+      // publicly computable by anyone holding both pubkeys (the relay sees
+      // every pubkey in the AUTH frame), which made every 1:1 chat
+      // relay-transparent. The fresh seed only ever crosses the proximity
+      // channel, so re-pairing also always swaps to unburned key material.
+      _sentWiltFreshSeedHex = _bytesToHex(
+          List<int>.generate(32, (_) => Random.secure().nextInt(256)));
       _sentWiltExpiryMillis = timeWiltMode
           ? DateTime.now()
                   .add(Duration(seconds: timeWiltLifetimeSecs))
@@ -998,6 +1041,7 @@ class BlePairingManager extends ChangeNotifier {
         "user_id": appState.userId,
         "pubkey": appState.publicKeyHex,
         "buffer_bytes": byteSize,
+        "tws": _sentWiltFreshSeedHex,
         if (timeWiltMode) "tw": 1,
         if (timeWiltMode) "twx": _sentWiltExpiryMillis,
       });
@@ -1024,6 +1068,10 @@ class BlePairingManager extends ChangeNotifier {
     // Time Wilt: negotiated absolute expiry (unix millis), or null for byte
     // budget. Same value on both sides (initiator remembers what it sent).
     int? wiltExpiresMillis,
+    // Time Wilt: the initiator's fresh random stream seed ('tws'). Same value
+    // on both sides — this, not the deterministic pubkey derivation, keys the
+    // contact's keystream and meta channel.
+    String? wiltFreshSeedHex,
   }) {
     isSyncing = true;
     syncProgress = 0.0;
@@ -1065,6 +1113,7 @@ class BlePairingManager extends ChangeNotifier {
         peerShortNick: peerShortNick,
         peerProfileImage: peerProfileImage,
         wiltExpiresMillis: wiltExpiresMillis,
+        wiltFreshSeedHex: wiltFreshSeedHex,
         deviceToDisconnect: deviceToDisconnect,
       );
     });
@@ -1091,6 +1140,9 @@ class BlePairingManager extends ChangeNotifier {
     String peerShortNick = '',
     String peerProfileImage = '',
     int? wiltExpiresMillis,
+    // Time Wilt: the initiator's fresh random stream seed ('tws'). Same value
+    // on both sides — the contact's keystream/meta channel are keyed on this.
+    String? wiltFreshSeedHex,
     BluetoothDevice? deviceToDisconnect,
   }) async {
     try {
@@ -1132,9 +1184,11 @@ class BlePairingManager extends ChangeNotifier {
       } else if (incomingGroupMetadata != null) {
         // Spoke path:
         final meta = incomingGroupMetadata!;
+        // Decrypt with the SAME fresh seed we generated and sent in the
+        // pairing request — matches the host's blob encryption key.
         final groupSeed = _decryptGroupSeed(
           meta['group_seed_encrypted'] as String,
-          derivedSeed,
+          _sentWiltFreshSeedHex ?? derivedSeed,
         );
 
         await appState.addOrRechargeGroupContact(
@@ -1159,7 +1213,10 @@ class BlePairingManager extends ChangeNotifier {
         log('[Pairing] Joined group ${meta['groupName']} successfully');
       } else if (wiltExpiresMillis != null) {
         // Time Wilt 1-on-1: no pad file — the seed is persisted and keystream is
-        // derived on demand. Both sides store the same absolute expiry.
+        // derived on demand. Both sides store the same absolute expiry AND the
+        // same fresh random seed the initiator put on the wire ('tws') — a
+        // re-meet therefore always swaps to unburned key material before the
+        // lane offsets reset.
         await appState.addOrRechargeTimeWiltContact(
           peerName,
           appState.activeRelayUrl,
@@ -1168,10 +1225,12 @@ class BlePairingManager extends ChangeNotifier {
           DateTime.fromMillisecondsSinceEpoch(wiltExpiresMillis),
           shortNick: peerShortNick,
           profileImage: peerProfileImage,
+          freshSeedHex: wiltFreshSeedHex,
         );
         log('[Pairing] Time Wilt contact created for $peerName ($peerId)');
       } else {
-        // Standard 1-on-1 contact sync:
+        // Standard 1-on-1 contact sync — the pad file is generated from the
+        // pairing's FRESH seed ('tws'), never the public pubkey derivation.
         await appState.addOrRechargeContact(
           peerName,
           appState.activeRelayUrl,
@@ -1180,6 +1239,7 @@ class BlePairingManager extends ChangeNotifier {
           derivedSeed,
           shortNick: peerShortNick,
           profileImage: peerProfileImage,
+          freshSeedHex: wiltFreshSeedHex,
           onPadProgress: _onPadProgress,
         );
         log('[Pairing] Contact created successfully for $peerName ($peerId)');

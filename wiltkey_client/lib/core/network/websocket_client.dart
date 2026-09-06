@@ -2,6 +2,32 @@ import 'dart:io';
 import 'dart:convert';
 import 'dart:async';
 
+import 'pow_solver.dart';
+
+/// Lifecycle of the connection/auth dance. Surfaced so the UI can explain
+/// what a slow connect is doing (one-time token issuance can take seconds).
+enum WsPhase {
+  /// No connection attempt in flight.
+  idle,
+
+  /// Dialling the relay (TCP/TLS + WS handshake pending).
+  connecting,
+
+  /// Socket open, waiting for the relay's challenge / presenting our token.
+  authenticating,
+
+  /// Token-less connect: solving the PoW issuance challenge (slow path).
+  issuing,
+
+  /// PoW accepted — the relay demands the human-verification puzzle
+  /// (Phase 2). The UI swaps the securing screen's progress column for the
+  /// puzzle and submits the answer via [submitPuzzleAnswer].
+  humanVerification,
+
+  /// Authenticated — the socket is usable.
+  connected,
+}
+
 class WebSocketClient {
   static final WebSocketClient _instance = WebSocketClient._internal();
   factory WebSocketClient() => _instance;
@@ -13,16 +39,49 @@ class WebSocketClient {
   // Whether the relay we're CURRENTLY connected to advertised group fan-out
   // (server-side broadcast). Per-connection: reset on every disconnect and set
   // from AUTH_OK, so switching to an older self-hosted relay falls back to the
-  // per-member send loop instead of dropping messages into its `default:` case.
   bool _supportsGroupFanout = false;
   bool get supportsGroupFanout => _isAuthenticated && _supportsGroupFanout;
+  bool _supportsSocialStories = false;
+  bool get supportsSocialStories => _isAuthenticated && _supportsSocialStories;
+  // Relay advertised the full story frame set (fetch/react/reactions/delete) —
+  // the HTTP story endpoints no longer exist, so these operations are WS-only.
+  bool _supportsStoriesWS = false;
+  bool get supportsStoriesWS => _isAuthenticated && _supportsStoriesWS;
+  // Connected relay runs WK_TEST_MODE=true (an isolated test instance) — the
+  // shell shows an unmistakable "TEST SERVER" banner so test data never ends
+  // up mistaken for production.
+  bool _isTestRelay = false;
+  bool get isTestRelay => _isAuthenticated && _isTestRelay;
+  Completer<Map<String, dynamic>>? _pendingStoryCompleter;
+  Completer<List<dynamic>>? _pendingFeedCompleter;
+  Completer<void>? _pendingReactCompleter;
+  Completer<List<dynamic>>? _pendingReactionsCompleter;
+  Completer<void>? _pendingDeleteCompleter;
   bool _isConnecting = false;
+  // Socket open but the auth dance (CHALLENGE → AUTH → AUTH_OK, possibly with
+  // a PoW issuance detour) has not concluded yet. While this is true, NO other
+  // code path may dial: a second socket would bump the generation, kill the
+  // in-flight dance mid-PoW, and inject a solved nonce into a socket that never
+  // asked for it ("Expected AUTH_TOKEN_ISSUE frame"). Single-flight, end to end.
+  bool _isAuthenticating = false;
+  Timer? _authDeadline;
   String? _currentUrl; // the URL we're actively trying right now
   String? _primaryUrl; // the user's configured relay (rotation anchor)
   String? _publicKeyHex;
   Timer? _reconnectTimer;
   int _connectionGeneration =
       0; // Tracks connection lifecycle to ignore stale events
+
+  /// Current lifecycle phase of the connection (for UI surfaces like the
+  /// onboarding "Securing your connection" step and the re-auth banner).
+  WsPhase _phase = WsPhase.idle;
+  WsPhase get phase => _phase;
+  void Function(WsPhase phase)? onPhaseChanged;
+  void _setPhase(WsPhase p) {
+    if (_phase == p) return;
+    _phase = p;
+    onPhaseChanged?.call(p);
+  }
 
   // --- Relay fallback ---
   // When the configured relay can't be reached after a few tries, rotate through
@@ -47,6 +106,11 @@ class WebSocketClient {
 
   bool get isConnected => _socket != null && _isAuthenticated;
 
+  /// True while a connect/auth dance is in flight (dial → AUTH_OK). Watchdogs
+  /// and self-heal must treat this as "the socket is being tended to" and NOT
+  /// force a reconnect — that's what kills in-flight issuance.
+  bool get isBusy => _isConnecting || _isAuthenticating;
+
   // Stream controller to broadcast connection status updates
   final _statusController = StreamController<bool>.broadcast();
   Stream<bool> get statusStream => _statusController.stream;
@@ -55,6 +119,27 @@ class WebSocketClient {
   void Function(String message)? onLog;
   void Function(bool connected)? onStatusChanged;
   FutureOr<String> Function(String challenge)? onSignChallenge;
+  /// Loads the stored device token (raw). The token is the credential that
+  /// lets a connect skip the relay's PoW issuance gate; it is challenge-bound
+  /// at every auth (the signature covers challenge||token), so it stays a
+  /// low-sensitivity bearer secret — useless without the private key.
+  Future<String?> Function()? onGetDeviceToken;
+  /// Persists a refreshed/issued device token (null = clear: the relay
+  /// rejected ours, so the next connect goes through issuance instead).
+  Future<void> Function(String? token)? onDeviceTokenUpdated;
+  /// Live progress while solving the issuance PoW: (iterations so far, best
+  /// leading zero-bits achieved, requested difficulty). Fires periodically from
+  /// the solver isolate; used by the onboarding "Securing your connection" step.
+  void Function(int iterations, int zeroBits, int difficulty)? onPoWProgress;
+  /// The relay demands the human-verification puzzle (Phase 2): render it
+  /// from (challengeId, seed, strips) and submit via [submitPuzzleAnswer].
+  void Function(String challengeId, String seed, int strips)? onPuzzleChallenge;
+  String? _activeChallengeId;
+  String? _deviceToken;
+  /// Hard backoff after an issuance rejection (rate-limited / bad PoW):
+  /// connects are skipped until this lapses so we never burn battery
+  /// re-solving a PoW the relay will refuse anyway.
+  DateTime? _issuanceBackoffUntil;
   void Function(String senderId, String envelope, String contentType)?
   onMessageReceived;
   void Function(Map<String, dynamic> message)? onRawMessageReceived;
@@ -93,19 +178,42 @@ class WebSocketClient {
   void connect(String httpUrl, {required String publicKeyHex}) {
     _publicKeyHex = publicKeyHex;
     _primaryUrl = httpUrl;
+    // Single-flight: a dance already in progress owns the socket. Resetting
+    // rotation/counters (or dialling a second socket) here would sabotage it.
+    if (isBusy) {
+      _log('[WebSocket] connect() ignored — dial/auth already in flight.');
+      return;
+    }
     _rotationIndex = 0;
     _failCount = 0;
     _attemptConnect(httpUrl);
   }
 
   void _attemptConnect(String httpUrl) {
-    if (_isConnecting) return;
+    if (isBusy) {
+      _log('[WebSocket] Connect suppressed — dial/auth already in flight.');
+      return;
+    }
+    // Respect the issuance backoff — the relay refused our last attempt and
+    // will keep refusing until the window lapses.
+    final backoff = _issuanceBackoffUntil;
+    if (backoff != null && DateTime.now().isBefore(backoff)) {
+      final remaining = backoff.difference(DateTime.now());
+      _log('[WebSocket] Connect deferred — issuance backoff active (${remaining.inMinutes} min left)');
+      _reconnectTimer?.cancel();
+      _reconnectTimer = Timer(remaining, () {
+        _issuanceBackoffUntil = null;
+        _attemptConnect(httpUrl);
+      });
+      return;
+    }
     _currentUrl = httpUrl;
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
     _connectionGeneration++; // Invalidate all callbacks from previous connections
     final gen = _connectionGeneration;
     _closeSocket();
+    _setPhase(WsPhase.connecting);
 
     _isConnecting = true;
     final wsUrl = _getWsUrl(httpUrl);
@@ -123,7 +231,19 @@ class WebSocketClient {
 
           _socket = socket;
           _isConnecting = false;
+          _isAuthenticating = true;
+          _setPhase(WsPhase.authenticating);
           _log('[WebSocket] Connected. Waiting for challenge...');
+          // Handshake deadline: if the relay never completes the auth dance
+          // (dead relay behind a live LB, black-holed socket), single-flight
+          // would otherwise block every future reconnect forever. 60s covers
+          // slow-device PoW solving with headroom.
+          _authDeadline?.cancel();
+          _authDeadline = Timer(const Duration(seconds: 60), () {
+            if (gen != _connectionGeneration) return;
+            _log('[WebSocket] Auth deadline exceeded — tearing down.');
+            _handleDisconnect();
+          });
 
           socket.listen(
             (data) {
@@ -156,14 +276,35 @@ class WebSocketClient {
     if (_isAuthenticated) {
       _isAuthenticated = false;
       _supportsGroupFanout = false; // re-learned from the next AUTH_OK
+      _supportsSocialStories = false;
+      _supportsStoriesWS = false;
+      _isTestRelay = false;
       _statusController.add(false);
       onStatusChanged?.call(false);
     }
+    void fail(Completer? c) {
+      if (c != null && !c.isCompleted) c.completeError(Exception('WebSocket connection closed'));
+    }
+    fail(_pendingStoryCompleter);
+    fail(_pendingFeedCompleter);
+    fail(_pendingReactCompleter);
+    fail(_pendingReactionsCompleter);
+    fail(_pendingDeleteCompleter);
+    _pendingStoryCompleter = null;
+    _pendingFeedCompleter = null;
+    _pendingReactCompleter = null;
+    _pendingReactionsCompleter = null;
+    _pendingDeleteCompleter = null;
     old?.close();
   }
 
   void _handleDisconnect() {
-    if (_isConnecting) return;
+    _isConnecting = false;
+    _isAuthenticating = false;
+    _activeChallengeId = null;
+    _authDeadline?.cancel();
+    _authDeadline = null;
+    _setPhase(WsPhase.idle);
     _closeSocket();
     _failCount++;
 
@@ -195,6 +336,13 @@ class WebSocketClient {
     _failCount = 0;
     _rotationIndex = 0;
     _reconnectTimer?.cancel();
+    _reconnectTimer = null;
+    _authDeadline?.cancel();
+    _authDeadline = null;
+    _activeChallengeId = null;
+    _isConnecting = false;
+    _isAuthenticating = false;
+    _setPhase(WsPhase.idle);
     _closeSocket();
   }
 
@@ -211,6 +359,21 @@ class WebSocketClient {
       return;
     }
     _socket!.add(jsonEncode(msgMap));
+  }
+
+  /// Submits the human-verification puzzle answer for the active challenge
+  /// (Phase 2). The UI calls this from the puzzle's Lock-in button.
+  void submitPuzzleAnswer(int answer) {
+    final id = _activeChallengeId;
+    if (id == null) {
+      _log('[WebSocket] submitPuzzleAnswer with no active challenge');
+      return;
+    }
+    sendWSMessage({
+      'type': 'AUTH_CHALLENGE_SOLUTION',
+      'challenge_id': id,
+      'answer': answer,
+    });
   }
 
   /// Ask the relay for a short-lived download token for a pending large file.
@@ -273,7 +436,144 @@ class WebSocketClient {
     });
   }
 
-  void _handleIncomingData(dynamic data) {
+  /// Publishes a 24-hour Wilting Story over the authenticated WebSocket.
+  Future<Map<String, dynamic>> postStory({
+    required String storyType,
+    required String ciphertextB64,
+    String? mediaMeta,
+  }) async {
+    if (!supportsStoriesWS) {
+      throw Exception('Relay does not support WebSocket stories');
+    }
+    if (_pendingStoryCompleter != null && !_pendingStoryCompleter!.isCompleted) {
+      _pendingStoryCompleter!.completeError(Exception('Cancelled by newer story publish'));
+      _pendingStoryCompleter = null;
+    }
+    final completer = Completer<Map<String, dynamic>>();
+    _pendingStoryCompleter = completer;
+
+    sendWSMessage({
+      'type': 'POST_STORY',
+      'story_type': storyType,
+      'ciphertext_b64': ciphertextB64,
+      'media_meta': mediaMeta ?? '',
+    });
+
+    return completer.future.timeout(
+      const Duration(seconds: 45),
+      onTimeout: () {
+        if (_pendingStoryCompleter == completer) {
+          _pendingStoryCompleter = null;
+        }
+        throw TimeoutException('Timed out waiting for story confirmation from relay');
+      },
+    );
+  }
+
+  /// Fetches the stories feed (own + [contacts]' stories) over the WS.
+  /// Requires the relay to advertise [supportsStoriesWS] — the HTTP feed
+  /// endpoint no longer exists.
+  ///
+  /// While NOT authenticated (background refresh racing a disconnect), this
+  /// returns [] quietly instead of erroring: the feed refreshes again when
+  /// AUTH_OK lands. A CONNECTED relay lacking the capability still throws —
+  /// that's a genuine old-relay mismatch worth surfacing.
+  Future<List<dynamic>> fetchStories(List<String> contacts) async {
+    if (!isConnected) {
+      _log('[WebSocket] fetchStories skipped — not authenticated (offline?).');
+      return [];
+    }
+    if (!supportsStoriesWS) {
+      throw Exception('Relay does not support WebSocket stories');
+    }
+    if (_pendingFeedCompleter != null && !_pendingFeedCompleter!.isCompleted) {
+      _pendingFeedCompleter!.completeError(Exception('Cancelled by newer feed fetch'));
+      _pendingFeedCompleter = null;
+    }
+    final completer = Completer<List<dynamic>>();
+    _pendingFeedCompleter = completer;
+
+    sendWSMessage({'type': 'FETCH_STORIES', 'contacts': contacts});
+
+    return completer.future.timeout(
+      const Duration(seconds: 30),
+      onTimeout: () {
+        if (_pendingFeedCompleter == completer) _pendingFeedCompleter = null;
+        throw TimeoutException('Timed out waiting for stories feed from relay');
+      },
+    );
+  }
+
+  /// Records/updates our reaction emoji on [storyId] over the WS.
+  Future<void> reactToStory(String storyId, String emoji) async {
+    if (!supportsStoriesWS) {
+      throw Exception('Relay does not support WebSocket stories');
+    }
+    if (_pendingReactCompleter != null && !_pendingReactCompleter!.isCompleted) {
+      _pendingReactCompleter!.completeError(Exception('Cancelled by newer reaction'));
+      _pendingReactCompleter = null;
+    }
+    final completer = Completer<void>();
+    _pendingReactCompleter = completer;
+
+    sendWSMessage({'type': 'STORY_REACT', 'story_id': storyId, 'emoji': emoji});
+
+    return completer.future.timeout(
+      const Duration(seconds: 20),
+      onTimeout: () {
+        if (_pendingReactCompleter == completer) _pendingReactCompleter = null;
+        throw TimeoutException('Timed out waiting for reaction confirmation');
+      },
+    );
+  }
+
+  /// Fetches the reaction list of one of OUR stories (author-only server-side).
+  Future<List<dynamic>> fetchStoryReactions(String storyId) async {
+    if (!supportsStoriesWS) {
+      throw Exception('Relay does not support WebSocket stories');
+    }
+    if (_pendingReactionsCompleter != null && !_pendingReactionsCompleter!.isCompleted) {
+      _pendingReactionsCompleter!.completeError(Exception('Cancelled by newer reactions fetch'));
+      _pendingReactionsCompleter = null;
+    }
+    final completer = Completer<List<dynamic>>();
+    _pendingReactionsCompleter = completer;
+
+    sendWSMessage({'type': 'FETCH_STORY_REACTIONS', 'story_id': storyId});
+
+    return completer.future.timeout(
+      const Duration(seconds: 20),
+      onTimeout: () {
+        if (_pendingReactionsCompleter == completer) _pendingReactionsCompleter = null;
+        throw TimeoutException('Timed out waiting for story reactions');
+      },
+    );
+  }
+
+  /// Deletes one of our own stories over the WS.
+  Future<void> deleteStory(String storyId) async {
+    if (!supportsStoriesWS) {
+      throw Exception('Relay does not support WebSocket stories');
+    }
+    if (_pendingDeleteCompleter != null && !_pendingDeleteCompleter!.isCompleted) {
+      _pendingDeleteCompleter!.completeError(Exception('Cancelled by newer delete'));
+      _pendingDeleteCompleter = null;
+    }
+    final completer = Completer<void>();
+    _pendingDeleteCompleter = completer;
+
+    sendWSMessage({'type': 'DELETE_STORY', 'story_id': storyId});
+
+    return completer.future.timeout(
+      const Duration(seconds: 20),
+      onTimeout: () {
+        if (_pendingDeleteCompleter == completer) _pendingDeleteCompleter = null;
+        throw TimeoutException('Timed out waiting for story deletion');
+      },
+    );
+  }
+
+  Future<void> _handleIncomingData(dynamic data) async {
     try {
       final msgStr = data as String;
       final Map<String, dynamic> jsonMap = jsonDecode(msgStr);
@@ -285,11 +585,116 @@ class WebSocketClient {
           final challenge = jsonMap['challenge'] as String;
           _authenticate(challenge);
           break;
+        case 'TOKEN_CHALLENGE':
+          // Token-less connect: the relay wants proof-of-spend before minting
+          // our device token. Solve the PoW (background isolate — one-time per
+          // install) and submit it, bound to our pubkey via the payload.
+          final challenge = jsonMap['challenge'] as String? ?? '';
+          final difficulty = (jsonMap['difficulty'] as num?)?.toInt() ?? 5;
+          if (_publicKeyHex == null || challenge.isEmpty) {
+            _log('[WebSocket] TOKEN_CHALLENGE received but identity missing');
+            break;
+          }
+          _setPhase(WsPhase.issuing);
+          _log('[WebSocket] Solving issuance PoW (difficulty $difficulty)...');
+          // The solve outlives the socket that asked for it (slow devices can
+          // take 10s+). Bind the result to THIS generation: if the socket died
+          // mid-solve, the nonce belongs to a dead challenge and must never be
+          // injected into the replacement connection.
+          final powGen = _connectionGeneration;
+          try {
+            final nonce = await solvePoW(
+              challenge: challenge,
+              payload: _publicKeyHex!,
+              difficulty: difficulty,
+              onProgress: (it, zb) => onPoWProgress?.call(it, zb, difficulty),
+            );
+            if (powGen != _connectionGeneration || _socket == null) {
+              _log(
+                '[WebSocket] PoW solved but its connection is gone (gen=$powGen, current=$_connectionGeneration) — discarding.',
+              );
+              break;
+            }
+            _log('[WebSocket] PoW solved (nonce $nonce) — requesting token');
+            sendWSMessage({'type': 'AUTH_TOKEN_ISSUE', 'pow_nonce': nonce});
+          } catch (e) {
+            _log('[WebSocket] PoW solving failed: $e');
+          }
+          break;
+        case 'AUTH_CHALLENGE_REQUIRED':
+          // Phase 2: the PoW was accepted; the relay wants the human puzzle
+          // solved before minting. The auth deadline still runs — the relay
+          // enforces its own 90s solution window and closes on lapse, which
+          // lands as a normal disconnect/reconnect.
+          final challengeId = jsonMap['challenge_id'] as String? ?? '';
+          final seed = jsonMap['seed'] as String? ?? '';
+          final strips = (jsonMap['strips'] as num?)?.toInt() ?? 5;
+          if (challengeId.isEmpty || seed.isEmpty) {
+            _log('[WebSocket] AUTH_CHALLENGE_REQUIRED missing seed/id');
+            break;
+          }
+          _log('[WebSocket] Human challenge required ($challengeId, $strips strips)');
+          _activeChallengeId = challengeId;
+          _setPhase(WsPhase.humanVerification);
+          onPuzzleChallenge?.call(challengeId, seed, strips);
+          break;
+        case 'AUTH_REJECTED':
+          final reason = jsonMap['message'] as String? ?? 'rejected';
+          _log('[WebSocket] Auth rejected: $reason');
+          if (reason == 'token_invalid') {
+            // Our stored token is unknown/expired/revoked — drop it so the
+            // next connect goes through the issuance gate, then reconnect.
+            _deviceToken = null;
+            await onDeviceTokenUpdated?.call(null);
+            _handleDisconnect();
+          } else if (reason == 'challenge_failed') {
+            // Wrong puzzle answer — the dance is dead; a fresh reconnect
+            // presents a NEW puzzle. Strikes/cooldown are the relay's job;
+            // the client just restarts cleanly.
+            _handleDisconnect();
+          } else if (reason == 'challenge_cooldown' ||
+              reason == 'challenge_unavailable') {
+            // Cooldown armed from earlier wrong answers — back off instead
+            // of tight-looping reconnects into a guaranteed rejection.
+            _issuanceBackoffUntil =
+                DateTime.now().add(const Duration(minutes: 2));
+            _log('[WebSocket] Challenge cooldown — backing off until $_issuanceBackoffUntil');
+          } else if (reason == 'challenge_upgrade_required') {
+            // The relay runs the challenge mode but this app build predates
+            // the puzzle — the website force-update path takes over from
+            // here; back off instead of hammering a guaranteed rejection.
+            _issuanceBackoffUntil =
+                DateTime.now().add(const Duration(minutes: 30));
+            _log('[WebSocket] Challenge upgrade required — update the app (backing off)');
+          } else if (reason == 'issuance_rate_limited') {
+            // The whole NAT IP is capped until day-rollover. Re-solving the
+            // PoW every 5s would drain battery and hammer the relay for a
+            // guaranteed rejection — back off HARD (the watchdog still
+            // reconnects once the backoff lapses).
+            _issuanceBackoffUntil = DateTime.now().add(const Duration(hours: 1));
+            _log('[WebSocket] Issuance rate-limited — backing off until $_issuanceBackoffUntil');
+          } else if (reason == 'pow_invalid') {
+            // Our solver/protocol disagrees with the relay — retry later, not
+            // in a tight loop.
+            _issuanceBackoffUntil = DateTime.now().add(const Duration(minutes: 5));
+          }
+          break;
         case 'AUTH_OK':
           _isAuthenticated = true;
+          // A refreshed/issued device token rides AUTH_OK — persist it before
+          // anything else so a crash right after connect can't lose it.
+          final freshToken = jsonMap['device_token'] as String?;
+          if (freshToken != null && freshToken.isNotEmpty) {
+            _deviceToken = freshToken;
+            await onDeviceTokenUpdated?.call(freshToken);
+          }
           final caps = jsonMap['capabilities'];
           _supportsGroupFanout =
               caps is List && caps.contains('group_fanout');
+          _supportsSocialStories =
+              caps is List && caps.contains('social_stories');
+          _supportsStoriesWS = caps is List && caps.contains('stories_ws');
+          _isTestRelay = caps is List && caps.contains('test_mode');
           // A live connection clears the failure streak and pins rotation to the
           // relay that actually worked, so we stay put instead of drifting off it.
           _failCount = 0;
@@ -298,6 +703,11 @@ class WebSocketClient {
           _statusController.add(true);
           onStatusChanged?.call(true);
           final serverUserId = jsonMap['user_id'] as String;
+          _isAuthenticating = false;
+          _authDeadline?.cancel();
+          _authDeadline = null;
+          _activeChallengeId = null;
+          _setPhase(WsPhase.connected);
           _log(
             '[WebSocket] Authentication successful! Server User ID: $serverUserId',
           );
@@ -368,6 +778,58 @@ class WebSocketClient {
           _log('[WebSocket] Received SPOKE_CANCEL_INTENT from spoke: $spokeId');
           onSpokeCancelIntent?.call(spokeId);
           break;
+        case 'POST_STORY_OK':
+          _log('[WebSocket] Received POST_STORY_OK, storyId: ${jsonMap['story_id']}');
+          _pendingStoryCompleter?.complete(jsonMap);
+          _pendingStoryCompleter = null;
+          break;
+        case 'POST_STORY_ERROR':
+          final errorMsg = jsonMap['message'] as String? ?? 'Failed to publish story';
+          _log('[WebSocket] Received POST_STORY_ERROR: $errorMsg');
+          _pendingStoryCompleter?.completeError(Exception(errorMsg));
+          _pendingStoryCompleter = null;
+          break;
+        case 'STORIES_FEED':
+          final stories = jsonMap['stories'] as List? ?? [];
+          _pendingFeedCompleter?.complete(stories);
+          _pendingFeedCompleter = null;
+          break;
+        case 'STORIES_ERROR':
+          _pendingFeedCompleter?.completeError(
+            Exception(jsonMap['message'] as String? ?? 'Failed to fetch stories feed'),
+          );
+          _pendingFeedCompleter = null;
+          break;
+        case 'STORY_REACT_OK':
+          _pendingReactCompleter?.complete(null);
+          _pendingReactCompleter = null;
+          break;
+        case 'STORY_REACT_ERROR':
+          _pendingReactCompleter?.completeError(
+            Exception(jsonMap['message'] as String? ?? 'Failed to record reaction'),
+          );
+          _pendingReactCompleter = null;
+          break;
+        case 'STORY_REACTIONS':
+          _pendingReactionsCompleter?.complete(jsonMap['reactions'] as List? ?? []);
+          _pendingReactionsCompleter = null;
+          break;
+        case 'STORY_REACTIONS_ERROR':
+          _pendingReactionsCompleter?.completeError(
+            Exception(jsonMap['message'] as String? ?? 'Failed to fetch story reactions'),
+          );
+          _pendingReactionsCompleter = null;
+          break;
+        case 'DELETE_STORY_OK':
+          _pendingDeleteCompleter?.complete(null);
+          _pendingDeleteCompleter = null;
+          break;
+        case 'DELETE_STORY_ERROR':
+          _pendingDeleteCompleter?.completeError(
+            Exception(jsonMap['message'] as String? ?? 'Failed to delete story'),
+          );
+          _pendingDeleteCompleter = null;
+          break;
         case 'ERROR':
           _log('[WebSocket] Error from server: ${jsonMap['message']}');
           break;
@@ -386,14 +848,38 @@ class WebSocketClient {
       );
       return;
     }
+    // Signing crosses an async platform channel; the socket can die under us.
+    // Only answer on the connection that asked.
+    final gen = _connectionGeneration;
 
-    _log('[WebSocket] Responding to CHALLENGE...');
-    final signatureHex = await onSignChallenge!(challenge);
+    // Present our device token when we hold one: the signature then covers
+    // challenge||token, binding token possession to the private key on THIS
+    // connection. Without a token we sign the bare challenge and the relay
+    // answers with a PoW issuance challenge instead of AUTH_OK.
+    String? token = _deviceToken;
+    if (token == null || token.isEmpty) {
+      token = await onGetDeviceToken?.call();
+      _deviceToken = (token != null && token.isNotEmpty) ? token : null;
+    }
+    final hasToken = _deviceToken != null && _deviceToken!.isNotEmpty;
+    final payload = hasToken ? '$challenge$_deviceToken' : challenge;
+
+    _log('[WebSocket] Responding to CHALLENGE (${hasToken ? "with device token" : "tokenless — issuance expected"})...');
+    final signatureHex = await onSignChallenge!(payload);
+    if (gen != _connectionGeneration || _socket == null) {
+      _log('[WebSocket] Challenge response discarded — connection replaced.');
+      return;
+    }
 
     sendWSMessage({
       'type': 'AUTH',
       'pubkey': _publicKeyHex,
       'signature': signatureHex,
+      if (hasToken) 'device_token': _deviceToken,
+      // Negotiation: only clients advertising the human-verification cap can
+      // be served the Phase-2 puzzle; the relay flips per-capability so app
+      // and relay rollouts stay independent.
+      'client_caps': ['human_challenge'],
     });
   }
 

@@ -2326,6 +2326,56 @@ class AppLocalizationsHu extends AppLocalizations {
   String get qrConnectManualPin => 'PIN megadása manuálisan';
 
   @override
+  String get qrConnectShowYourCode =>
+      'Beolvasás kész! Most mutasd meg te is a QR-kódodat.';
+
+  @override
+  String get qrConnectFinishPairing => 'Párosítás befejezése';
+
+  @override
+  String get qrConnectOutdatedCode =>
+      'Ez a QR-kód egy régebbi appverzióból van. Mindkettőtöknek a legújabb verzió kell az ilyen kapcsolódáshoz.';
+
+  @override
+  String get qrConnectOwnCode =>
+      'Ez a saját QR-kódod — inkább az övékére irányítsd a kamerát.';
+
+  @override
+  String get qrConnectAlreadyPaired =>
+      'Már van csevegésed ezzel a személlyel. Egy meglévő csevegés frissítéséhez személyes párosítás szükséges.';
+
+  @override
+  String get testRelayBanner => 'TESZTSZERVER — NEM ÉLES RENDSZER';
+
+  @override
+  String get securingTitle => 'Kapcsolat biztosítása';
+
+  @override
+  String get securingBody =>
+      'Az eszközöd a csatlakozás előtt hitelesíti magát a relénél. Ez az egyszeri proof-of-work mindenkit véd a spamtől és a visszaélésektől — telefonszám, e-mail és fiók nélkül.';
+
+  @override
+  String get securingWorking => 'ESZKÖZ HITELESÍTÉSE — FOLYAMATBAN…';
+
+  @override
+  String get securingOnceNote =>
+      'Ez csak az első csatlakozáskor történik. Az újracsatlakozás utána azonnali.';
+
+  @override
+  String get puzzleInstruction =>
+      'A kapcsolati ellenőrzésed egy része összekeveredett. Húzd el a csíkot, amíg a kép a helyére nem illeszkedik, majd erősítsd meg.';
+
+  @override
+  String get puzzleLockIn => 'Rögzítés';
+
+  @override
+  String get puzzleFailedRetry =>
+      'Ez nem illeszkedett — új ellenőrzést indítunk…';
+
+  @override
+  String get reauthenticatingBanner => 'ÚJRAHITELESÍTÉS — KÉRJÜK, VÁRJ…';
+
+  @override
   String get badgePlayPlus => 'Play Áruház · Plus';
 
   @override
@@ -2517,4 +2567,103 @@ class AppLocalizationsHu extends AppLocalizations {
 
   @override
   String get forcedUpdateWhatsNew => 'Újdonságok ebben a frissítésben';
+
+  @override
+  String get settingsSwipeGesturesTitle => 'Csevegési húzási gesztusok';
+
+  @override
+  String get settingsSwipeGesturesSubtitle =>
+      'A jobbra és balra húzási műveletek testreszabása a csevegéslistában';
+
+  @override
+  String get settingsSwipeRight => 'Húzás jobbra';
+
+  @override
+  String get settingsSwipeLeft => 'Húzás balra';
+
+  @override
+  String get swipeActionMarkRead => 'Olvasott / Olvasatlan';
+
+  @override
+  String get swipeActionMute => 'Némítás / Feloldás';
+
+  @override
+  String get swipeActionPin => 'Rögzítés / Feloldás';
+
+  @override
+  String get swipeActionArchive => 'Archiválás';
+
+  @override
+  String get swipeActionNone => 'Letiltva';
+
+  @override
+  String get chatSwipeMarkRead => 'Olvasott';
+
+  @override
+  String get chatSwipeMarkUnread => 'Olvasatlan';
+
+  @override
+  String get chatSwipePin => 'Rögzítés';
+
+  @override
+  String get chatSwipeUnpin => 'Rögzítés feloldása';
+
+  @override
+  String get chatSwipeMute => 'Némítás';
+
+  @override
+  String get chatSwipeUnmute => 'Némítás feloldása';
+
+  @override
+  String get chatSwipeArchive => 'Archiválás';
+
+  @override
+  String get chatAttachVideoSubtitleEnabled =>
+      'Legfeljebb 15 mp rögzítése vagy választás a galériából';
+
+  @override
+  String get chatVideoSelectSourceTitle => 'Videó küldése';
+
+  @override
+  String get chatVideoQualityLabel => 'Minőség';
+
+  @override
+  String get chatVideoQualityLow => 'Alacsony';
+
+  @override
+  String get chatVideoQualityMedium => 'Közepes';
+
+  @override
+  String get chatVideoQualityHigh => 'Magas';
+
+  @override
+  String get chatVideoCompressionFailed =>
+      'Nem sikerült tömöríteni a klipet. Próbálj rövidebb klipet vagy alacsonyabb minőséget választani.';
+
+  @override
+  String get chatVideoRecordCamera => 'Videó rögzítése (Kamera)';
+
+  @override
+  String get chatVideoPickGallery => 'Videó választása a galériából';
+
+  @override
+  String get chatVideoCompressing => 'Videó tömörítése...';
+
+  @override
+  String chatVideoTooLarge(String size) {
+    return 'A videó meghaladja a méretkorlátot ($size)';
+  }
+
+  @override
+  String get chatVideoTooLong =>
+      'A videó meghaladja a 15 másodperces időkorlátot';
+
+  @override
+  String get chatVideoSaveGallery => 'Videó mentése a galériába';
+
+  @override
+  String get chatVideoSavedGallery => 'Videó elmentve a galériába';
+
+  @override
+  String get chatVideoError => 'A videoklip nem játszható le';
 }

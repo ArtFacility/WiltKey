@@ -563,7 +563,7 @@ class _ContactRow extends StatelessWidget {
                       ],
                       Flexible(
                         child: Text(
-                          contact.name,
+                          contact.displayName,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: t.body.copyWith(fontWeight: FontWeight.w600),

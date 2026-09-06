@@ -36,8 +36,6 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
 
   // Host-editable policy state.
   late bool _imagesAllowed;
-  late int _maxMembers;
-  late double _maxMessageSizeKb;
 
   List<CustomEmoji> _emojis = [];
 
@@ -45,8 +43,6 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
   void initState() {
     super.initState();
     _imagesAllowed = widget.group.imagesAllowed ?? true;
-    _maxMembers = widget.group.maxMembers ?? 20;
-    _maxMessageSizeKb = (widget.group.maxMessageSize ?? 2048) / 1024.0;
     _appState.addListener(_updateState);
     _loadEmojis();
   }
@@ -79,8 +75,6 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
         // copyWith (not a manual rebuild) so fields the policy editor doesn't
         // touch — Time Wilt lifetime/expiry, recharge-pending, etc. — survive.
         _appState.contacts[idx] = existing.copyWith(
-          maxMembers: _maxMembers,
-          maxMessageSize: (_maxMessageSizeKb * 1024).toInt(),
           imagesAllowed: _imagesAllowed,
         );
         _appState.notifyMessageReceived();
@@ -536,54 +530,6 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
                               setState(() => _imagesAllowed = val),
                         ),
                       ],
-                    ),
-                    Divider(color: t.border, height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          l10n.groupCreatePolicyMaxMembersLabel,
-                          style: t.bodySecondary,
-                        ),
-                        Text(
-                          l10n.chatsMemberCount(_maxMembers),
-                          style: t.dataMono.copyWith(color: t.action),
-                        ),
-                      ],
-                    ),
-                    Slider(
-                      value: _maxMembers.toDouble(),
-                      min: 2,
-                      max: 100,
-                      divisions: 98,
-                      activeColor: t.action,
-                      inactiveColor: t.budgetEmpty,
-                      onChanged: (val) =>
-                          setState(() => _maxMembers = val.round()),
-                    ),
-                    Divider(color: t.border, height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          l10n.groupCreatePolicyPayloadSize,
-                          style: t.bodySecondary,
-                        ),
-                        Text(
-                          '${_maxMessageSizeKb.toStringAsFixed(1)} KB',
-                          style: t.dataMono.copyWith(color: t.action),
-                        ),
-                      ],
-                    ),
-                    Slider(
-                      value: _maxMessageSizeKb,
-                      min: 0.5,
-                      max: 10.0,
-                      divisions: 19,
-                      activeColor: t.action,
-                      inactiveColor: t.budgetEmpty,
-                      onChanged: (val) =>
-                          setState(() => _maxMessageSizeKb = val),
                     ),
                   ],
                 ),

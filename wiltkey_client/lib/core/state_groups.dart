@@ -678,12 +678,13 @@ extension AppStateGroups on AppState {
       }
     }
 
-    // maxMessageSize is a TEXT policy; images, voice notes and emoji defs are
+    // maxMessageSize is a TEXT policy; images, voice notes, video clips and emoji defs are
     // bounded by lane space + the sender's own pre-send size checks, so don't
     // reject them here.
     final bool isImage =
         contentType == 'image' || contentType == 'image_hidden';
     final bool isVoice = contentType == 'voice';
+    final bool isVideo = contentType == 'video';
     final bool isEmojiCtl =
         contentType == 'emoji_def' || contentType == 'emoji_delete';
     // Replies embed the parent id in the OTP body (hidden from the relay), so the
@@ -693,6 +694,7 @@ extension AppStateGroups on AppState {
     final payloadBytes = utf8.encode(wireText).length;
     if (!isImage &&
         !isVoice &&
+        !isVideo &&
         !isEmojiCtl &&
         contact.maxMessageSize != null &&
         payloadBytes > contact.maxMessageSize!) {
@@ -1171,8 +1173,10 @@ extension AppStateGroups on AppState {
 
       int assignedSlots = 0;
       for (final lane in lanes) {
+        final slotIdx = lane['slot_index'] as int? ?? 0;
         final memberHash = lane['member_key_hash'] as String?;
-        if (memberHash != null) {
+        // slot_index == 0 is the reserved group metadata info lane; only slots > 0 are message lanes.
+        if (slotIdx > 0 && memberHash != null) {
           final start = lane['start_offset'] as int;
           final max = lane['max_offset'] as int;
           final current = lane['current_write_offset'] as int;
@@ -1180,10 +1184,8 @@ extension AppStateGroups on AppState {
           memberRemainingBytes[memberHash] =
               (memberRemainingBytes[memberHash] ?? 0) + remaining;
 
-          if ((lane['slot_index'] as int) > 0) {
-            assignedSlots++;
-            assignedHashes.add(memberHash);
-          }
+          assignedSlots++;
+          assignedHashes.add(memberHash);
         }
       }
 

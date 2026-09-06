@@ -8,6 +8,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:workmanager/workmanager.dart';
 
+import '../network/pow_solver.dart';
 import 'notification_service.dart';
 import 'pending_inbox.dart';
 
@@ -31,6 +32,9 @@ class _BgCreds {
   final String userId;
   final String pubKeyHex;
   final String privKeyHex;
+  /// Relay-issued device token (raw) — read fresh from prefs on every load so
+  /// a refresh that happened in the main isolate is picked up automatically.
+  String? deviceToken;
   _BgCreds(this.relayUrl, this.userId, this.pubKeyHex, this.privKeyHex);
 }
 
@@ -43,7 +47,20 @@ Future<_BgCreds?> _loadCreds() async {
   if (relay == null || userId == null || pub == null || priv == null) {
     return null;
   }
-  return _BgCreds(relay, userId, pub, priv);
+  final creds = _BgCreds(relay, userId, pub, priv);
+  creds.deviceToken = prefs.getString(kPrefDeviceToken);
+  return creds;
+}
+
+Future<void> _storeDeviceToken(String? token) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    if (token == null || token.isEmpty) {
+      await prefs.remove(kPrefDeviceToken);
+    } else {
+      await prefs.setString(kPrefDeviceToken, token);
+    }
+  } catch (_) {}
 }
 
 List<int> _hexToBytes(String hex) {
@@ -145,17 +162,52 @@ class _MessageTaskHandler extends TaskHandler {
       switch (msg['type']) {
         case 'CHALLENGE':
           final challenge = msg['challenge'] as String;
-          final sig = _sign(creds.privKeyHex, challenge);
+          // Token-aware auth, mirroring the main WS client: with a token the
+          // signature covers challenge||token (challenge-bound); without one
+          // we sign the bare challenge and answer the issuance PoW instead.
+          final token = creds.deviceToken;
+          final hasToken = token != null && token.isNotEmpty;
+          final sig = _sign(creds.privKeyHex, hasToken ? '$challenge$token' : challenge);
           _socket?.add(
             jsonEncode({
               'type': 'AUTH',
               'pubkey': creds.pubKeyHex,
               'signature': sig,
+              if (hasToken) 'device_token': token,
             }),
           );
           break;
+        case 'TOKEN_CHALLENGE':
+          final challenge = msg['challenge'] as String? ?? '';
+          final difficulty = (msg['difficulty'] as num?)?.toInt() ?? 5;
+          if (challenge.isEmpty) break;
+          // One-time per install — a few seconds of hashing is fine here.
+          solvePoW(
+            challenge: challenge,
+            payload: creds.pubKeyHex,
+            difficulty: difficulty,
+          ).then((nonce) {
+            _socket?.add(jsonEncode({
+              'type': 'AUTH_TOKEN_ISSUE',
+              'pow_nonce': nonce,
+            }));
+          }).catchError((_) {});
+          break;
         case 'AUTH_OK':
-          // Authenticated; the server will now stream queued + live frames.
+          // Persist a refreshed/issued token so the poll + main isolate stay
+          // current. Creds are re-read from prefs on the next connect.
+          final fresh = msg['device_token'] as String?;
+          if (fresh != null && fresh.isNotEmpty) {
+            creds.deviceToken = fresh;
+            _storeDeviceToken(fresh);
+          }
+          break;
+        case 'AUTH_REJECTED':
+          if ((msg['message'] as String? ?? '') == 'token_invalid') {
+            creds.deviceToken = null;
+            _storeDeviceToken(null);
+            _close(); // next repeat-event reconnect goes through issuance
+          }
           break;
         case 'NEW_MESSAGE':
           final senderId = msg['sender_id'] as String? ?? '';
@@ -254,6 +306,7 @@ void callbackDispatcher() {
     if (task != kLowPowerTaskName) return true;
     bool foundMessage = false;
     bool fgAlive = false;
+    bool tokenInvalid = false;
     try {
       // Stay silent while the Instant foreground service is alive — it's already
       // delivering, so polling here would only risk a duplicate alert and waste
@@ -263,7 +316,18 @@ void callbackDispatcher() {
       if (!fgAlive) {
         final creds = await _loadCreds();
         if (creds != null) {
-          foundMessage = await _pollQueueStatus(creds);
+          var result = await _pollQueueStatus(creds);
+          if (result == _PollResult.tokenInvalid) {
+            // Self-heal: mint a fresh token right here (the worker holds the
+            // identity key), then retry the poll once — otherwise low-power
+            // mode would silently miss notifications until the app is
+            // foregrounded.
+            if (await _issueTokenViaWS(creds)) {
+              result = await _pollQueueStatus(creds);
+            }
+          }
+          foundMessage = result == _PollResult.found;
+          tokenInvalid = result == _PollResult.tokenInvalid;
           if (foundMessage) {
             await WiltkeyNotifications.initLocalNotifications();
             await WiltkeyNotifications.showMessageNotification();
@@ -273,41 +337,116 @@ void callbackDispatcher() {
     } catch (_) {
       // Swallow — a failed poll should not disable future runs.
     } finally {
-      await _rescheduleAdaptivePoll(foundMessage: foundMessage, fgAlive: fgAlive);
+      await _rescheduleAdaptivePoll(
+        foundMessage: foundMessage,
+        fgAlive: fgAlive,
+        tokenInvalid: tokenInvalid,
+      );
     }
     return true;
   });
 }
 
-Future<bool> _pollQueueStatus(_BgCreds creds) async {
-  final ts = (DateTime.now().millisecondsSinceEpoch ~/ 1000).toString();
-  final sig = _sign(creds.privKeyHex, '${creds.userId}:$ts');
-  final base = Uri.parse(creds.relayUrl);
-  final uri = base.replace(
-    path: base.path.endsWith('/')
-        ? '${base.path}api/v1/queue/status'
-        : '${base.path}/api/v1/queue/status',
-    queryParameters: {
-      'id': creds.userId,
-      'timestamp': ts,
-      'sig': sig,
-      'pubkey': creds.pubKeyHex,
-    },
-  );
-  final client = HttpClient();
+/// One-shot WS connect that walks the token issuance gate (tokenless AUTH →
+/// TOKEN_CHALLENGE → PoW → AUTH_TOKEN_ISSUE → AUTH_OK) and persists the minted
+/// token. Used by the low-power worker when its stored token has gone invalid.
+Future<bool> _issueTokenViaWS(_BgCreds creds) async {
+  WebSocket? socket;
   try {
-    final req = await client.getUrl(uri).timeout(const Duration(seconds: 20));
-    final resp = await req.close().timeout(const Duration(seconds: 20));
-    if (resp.statusCode != 200) return false;
-    final body = await resp.transform(utf8.decoder).join();
-    final json = jsonDecode(body) as Map<String, dynamic>;
-    return json['has_payload'] == true;
+    socket = await WebSocket.connect(_wsUrl(creds.relayUrl))
+        .timeout(const Duration(seconds: 15));
+    final challenge = await socket
+        .firstWhere((d) =>
+            (jsonDecode(d as String) as Map<String, dynamic>)['type'] ==
+            'CHALLENGE')
+        .timeout(const Duration(seconds: 15));
+    final ch = jsonDecode(challenge as String) as Map<String, dynamic>;
+    final chHex = ch['challenge'] as String;
+    socket.add(jsonEncode({
+      'type': 'AUTH',
+      'pubkey': creds.pubKeyHex,
+      'signature': _sign(creds.privKeyHex, chHex),
+    }));
+    final tcRaw = await socket
+        .firstWhere((d) =>
+            (jsonDecode(d as String) as Map<String, dynamic>)['type'] ==
+            'TOKEN_CHALLENGE')
+        .timeout(const Duration(seconds: 15));
+    final tc = jsonDecode(tcRaw as String) as Map<String, dynamic>;
+    final nonce = await solvePoW(
+      challenge: chHex,
+      payload: creds.pubKeyHex,
+      difficulty: (tc['difficulty'] as num?)?.toInt() ?? 5,
+    ).timeout(const Duration(minutes: 5));
+    socket.add(jsonEncode({'type': 'AUTH_TOKEN_ISSUE', 'pow_nonce': nonce}));
+    final okRaw = await socket
+        .firstWhere((d) =>
+            (jsonDecode(d as String) as Map<String, dynamic>)['type'] ==
+            'AUTH_OK')
+        .timeout(const Duration(seconds: 15));
+    final ok = jsonDecode(okRaw as String) as Map<String, dynamic>;
+    final token = ok['device_token'] as String?;
+    if (token == null || token.isEmpty) return false;
+    creds.deviceToken = token;
+    await _storeDeviceToken(token);
+    return true;
   } catch (_) {
     return false;
   } finally {
-    client.close(force: true);
+    try {
+      await socket?.close();
+    } catch (_) {}
   }
 }
+
+  /// Poll outcomes the scheduler needs to react to.
+  enum _PollResult { empty, found, tokenInvalid }
+
+  Future<_PollResult> _pollQueueStatus(_BgCreds creds) async {
+    final ts = (DateTime.now().millisecondsSinceEpoch ~/ 1000).toString();
+    final sig = _sign(creds.privKeyHex, '${creds.userId}:$ts');
+    final base = Uri.parse(creds.relayUrl);
+    final token = creds.deviceToken;
+    final uri = base.replace(
+      path: base.path.endsWith('/')
+          ? '${base.path}api/v1/queue/status'
+          : '${base.path}/api/v1/queue/status',
+      queryParameters: {
+        'id': creds.userId,
+        'timestamp': ts,
+        'sig': sig,
+        'pubkey': creds.pubKeyHex,
+      },
+    );
+    final client = HttpClient();
+    try {
+      final req = await client.getUrl(uri).timeout(const Duration(seconds: 20));
+      // The raw token rides a HEADER, never the query string — query params
+      // land in relay/nginx access logs verbatim.
+      if (token != null && token.isNotEmpty) {
+        req.headers.add('X-Device-Token', token);
+      }
+      final resp = await req.close().timeout(const Duration(seconds: 20));
+      if (resp.statusCode == 403) {
+        // Our token is dead/missing and this worker has no issuance path of
+        // its own — clear it so the next foreground connect re-issues, and
+        // tell the scheduler to hold the fast rung (this is NOT "no mail").
+        await _storeDeviceToken(null);
+        creds.deviceToken = null;
+        return _PollResult.tokenInvalid;
+      }
+      if (resp.statusCode != 200) return _PollResult.empty;
+      final body = await resp.transform(utf8.decoder).join();
+      final json = jsonDecode(body) as Map<String, dynamic>;
+      return json['has_payload'] == true
+          ? _PollResult.found
+          : _PollResult.empty;
+    } catch (_) {
+      return _PollResult.empty;
+    } finally {
+      client.close(force: true);
+    }
+  }
 
 // Re-enqueue the next poll on the adaptive ladder, if the app still wants it
 // ([kPrefBgPollActive], cleared on foreground / mode off):
@@ -317,6 +456,7 @@ Future<bool> _pollQueueStatus(_BgCreds creds) async {
 Future<void> _rescheduleAdaptivePoll({
   required bool foundMessage,
   required bool fgAlive,
+  bool tokenInvalid = false,
 }) async {
   final prefs = await SharedPreferences.getInstance();
   if (!(prefs.getBool(kPrefBgPollActive) ?? false)) return;
@@ -324,7 +464,9 @@ Future<void> _rescheduleAdaptivePoll({
   int index = prefs.getInt(kPrefLowPowerBackoffIndex) ?? 0;
   if (fgAlive) {
     index = kLowPowerBackoff.length - 1;
-  } else if (foundMessage) {
+  } else if (foundMessage || tokenInvalid) {
+    // A dead token is NOT "no mail" — hold the fast rung so delivery resumes
+    // the moment the token self-heals (or the app is foregrounded).
     index = 0;
   } else {
     index = (index + 1).clamp(0, kLowPowerBackoff.length - 1);

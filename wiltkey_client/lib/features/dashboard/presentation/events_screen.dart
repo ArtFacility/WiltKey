@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:wiltkey_client/l10n/app_localizations.dart';
 import '../../../core/state.dart';
@@ -21,6 +22,7 @@ class EventsScreen extends StatefulWidget {
 
 class _EventsScreenState extends State<EventsScreen> {
   final AppState _appState = AppState();
+  final Map<String, String> _actionStatus = {};
 
   @override
   void initState() {
@@ -118,9 +120,51 @@ class _EventsScreenState extends State<EventsScreen> {
   Widget _row(WiltkeyTokens t, AppLocalizations l10n, AppEvent e) {
     final (icon, title, body) = _present(l10n, e);
     final bool isUpdate = e.type == 'update_available';
+    final bool isContactRequest = e.type == 'contact_request';
     final bool tappable = isUpdate ||
         (e.chatKey != null &&
             _appState.contacts.any((c) => c.keyHash == e.chatKey));
+
+    Contact? contact;
+    String? reqId;
+    String? requestStatus;
+
+    if (isContactRequest) {
+      if (e.chatKey != null) {
+        for (final c in _appState.contacts) {
+          if (c.keyHash == e.chatKey) {
+            contact = c;
+            break;
+          }
+        }
+      }
+      reqId = e.id.startsWith('contact_request_')
+          ? e.id.substring('contact_request_'.length)
+          : e.id;
+
+      requestStatus = _actionStatus[reqId];
+      if (requestStatus == null) {
+        if (e.chatKey != null &&
+            _appState.socialContacts.any((sc) => sc.keyHash == e.chatKey)) {
+          requestStatus = 'accepted';
+        } else if (contact != null) {
+          final list = _appState.messages[contact.id];
+          if (list != null) {
+            final msg = list.cast<ChatMessage?>().firstWhere(
+                  (m) => m?.id == 'contact_req_recv_$reqId',
+                  orElse: () => null,
+                );
+            if (msg != null) {
+              try {
+                final p = jsonDecode(msg.text) as Map<String, dynamic>;
+                requestStatus = p['status'] as String?;
+              } catch (_) {}
+            }
+          }
+        }
+      }
+    }
+
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
@@ -131,25 +175,121 @@ class _EventsScreenState extends State<EventsScreen> {
         ),
         borderRadius: BorderRadius.circular(t.radiusCard),
       ),
-      child: ListTile(
-        onTap: isUpdate
-            ? () => UpdateService.showWhatsNewSheet(context)
-            : (tappable ? () => _openChat(e.chatKey!) : null),
-        leading: Icon(icon, color: t.action, size: 22),
-        title: Text(
-          title,
-          style: t.body.copyWith(fontWeight: FontWeight.w600),
-        ),
-        subtitle: Text(
-          body,
-          style: t.bodySecondary,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-        ),
-        trailing: Text(
-          _relTime(e.timestamp),
-          style: t.dataMono.copyWith(fontSize: 11, color: t.textTertiary),
-        ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ListTile(
+            onTap: isUpdate
+                ? () => UpdateService.showWhatsNewSheet(context)
+                : (tappable ? () => _openChat(e.chatKey!) : null),
+            leading: Icon(icon, color: t.action, size: 22),
+            title: Text(
+              title,
+              style: t.body.copyWith(fontWeight: FontWeight.w600),
+            ),
+            subtitle: Text(
+              body,
+              style: t.bodySecondary,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            trailing: Text(
+              _relTime(e.timestamp),
+              style: t.dataMono.copyWith(fontSize: 11, color: t.textTertiary),
+            ),
+          ),
+          if (isContactRequest && reqId != null) ...[
+            if (requestStatus == 'accepted' || requestStatus == 'declined')
+              Padding(
+                padding: const EdgeInsets.only(left: 16, right: 16, bottom: 12),
+                child: Row(
+                  children: [
+                    Icon(
+                      requestStatus == 'accepted'
+                          ? Icons.check_circle_outline
+                          : Icons.cancel_outlined,
+                      size: 15,
+                      color: requestStatus == 'accepted'
+                          ? t.action
+                          : t.textTertiary,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      requestStatus == 'accepted'
+                          ? l10n.contactRequestApproved
+                          : l10n.contactRequestDeclined,
+                      style: t.bodySecondary.copyWith(
+                        fontSize: 12,
+                        color: requestStatus == 'accepted'
+                            ? t.action
+                            : t.textTertiary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else if (contact != null)
+              Padding(
+                padding: const EdgeInsets.only(left: 16, right: 16, bottom: 12),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    OutlinedButton(
+                      onPressed: () async {
+                        setState(() => _actionStatus[reqId!] = 'declined');
+                        await _appState.respondToContactRequest(
+                          contact!,
+                          reqId!,
+                          false,
+                        );
+                        if (mounted) setState(() {});
+                      },
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: t.textSecondary,
+                        side: BorderSide(color: t.border),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 4,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius:
+                              BorderRadius.circular(t.radiusControl),
+                        ),
+                      ),
+                      child: Text(l10n.contactRequestDeny),
+                    ),
+                    const SizedBox(width: 8),
+                    ElevatedButton(
+                      onPressed: () async {
+                        setState(() => _actionStatus[reqId!] = 'accepted');
+                        await _appState.respondToContactRequest(
+                          contact!,
+                          reqId!,
+                          true,
+                        );
+                        if (mounted) setState(() {});
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: t.action,
+                        foregroundColor: t.onAction,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 4,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius:
+                              BorderRadius.circular(t.radiusControl),
+                        ),
+                      ),
+                      child: Text(l10n.contactRequestApprove),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ],
       ),
     );
   }

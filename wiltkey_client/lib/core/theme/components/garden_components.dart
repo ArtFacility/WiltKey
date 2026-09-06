@@ -1,4 +1,4 @@
-﻿import 'dart:ui' as ui;
+import 'dart:ui' as ui;
 
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
@@ -150,6 +150,7 @@ class GardenComponents with VoiceScrubberDefaults implements WiltkeyComponents {
     int seed = 0,
     ValueChanged<double>? onSeek,
     Color? accent,
+    List<int>? waveform,
   }) => GardenVoicePlayback(
     progress: progress,
     isPlaying: isPlaying,

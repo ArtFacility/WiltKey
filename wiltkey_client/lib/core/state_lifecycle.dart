@@ -370,12 +370,54 @@ extension AppStateLifecycle on AppState {
     int? maxMembers,
     int? maxMessageSize,
     bool? imagesAllowed,
+    /// FRESH random 256-bit seed for this pairing (the BLE initiator's 'tws').
+    /// REQUIRED when recharging an existing 1:1 pad: the pad file is
+    /// regenerated from this seed and the offsets reset — under fresh material
+    /// that is safe; under the old seed (or the publicly-derivable pubkey
+    /// derivation, which the relay can recompute from the AUTH frames) it
+    /// would re-encrypt into already-burned keystream. Null is only acceptable
+    /// for a brand-new 1:1 contact (or group sync, which keys on the group
+    /// seed and is untouched by this parameter).
+    String? freshSeedHex,
     void Function(int written, int total)? onPadProgress,
   }) async {
     // Reset nuke status if re-pairing after a nuke — the user is starting fresh
     if (status == AppStatus.nuked) {
       status = AppStatus.normal;
       log('[State] Cleared nuke status on new contact creation.');
+    }
+
+    // Security invariant (1:1 only — group sync keys on the group seed):
+    // fresh 256-bit seed material is MANDATORY for every 1:1 pad pairing and
+    // every recharge. The fallback would be the publicly-derivable pubkey
+    // derivation (recomputable by the relay from the AUTH frames), so there
+    // is no fallback: missing or malformed seed → fail closed, before any
+    // state is mutated.
+    if (!isGroup) {
+      if (freshSeedHex == null ||
+          freshSeedHex.length != 64 ||
+          !RegExp(r'^[0-9a-fA-F]+$').hasMatch(freshSeedHex)) {
+        throw Exception(
+          'Pad pairing refused for $keyHash: no valid fresh seed supplied. '
+          'Every 1:1 pairing MUST use fresh 256-bit key material.',
+        );
+      }
+    }
+    final seedForPad = (!isGroup)
+        ? freshSeedHex!
+        : derivedSeed;
+
+    // Replay guard: a 1:1 recharge whose seed matches the EXISTING pad (a
+    // replayed/stale 'tws') would regenerate the identical pad and rewind the
+    // offsets — re-encrypting into already-burned keystream. The pad's seed
+    // is not stored on the contact, so detect it byte-wise: the file head is
+    // exactly keystreamRange(seed, 0, …). Fail closed before overwriting.
+    if (!isGroup &&
+        await WiltkeyOtpService.padMatchesSeed(keyHash, seedForPad)) {
+      throw Exception(
+        'Pad recharge refused for $keyHash: offered seed matches the '
+        'already-burned pad. A recharge MUST use new key material.',
+      );
     }
 
     // On a recharge the existing pad is about to be overwritten — first preserve
@@ -386,7 +428,7 @@ extension AppStateLifecycle on AppState {
     // Generate the keystream file locally (progress bubbles up to the pairing UI).
     await WiltkeyOtpService.generateKeystreamFile(
       keyHash,
-      derivedSeed,
+      seedForPad,
       bufferBytes,
       onProgress: onPadProgress,
     );
@@ -396,7 +438,7 @@ extension AppStateLifecycle on AppState {
     // reconstruct the message keystream, so message forward secrecy is kept.
     if (!isGroup) {
       final metaKeyHex = sha256
-          .convert(utf8.encode('$derivedSeed:meta'))
+          .convert(utf8.encode('$seedForPad:meta'))
           .toString();
       await ChatMetaStore.setKey(keyHash, metaKeyHex);
     }
@@ -530,6 +572,12 @@ extension AppStateLifecycle on AppState {
   /// negotiated ABSOLUTE expiry (identical on both sides); at that instant the
   /// archive sweep flips the chat to read-only. The two directions run on
   /// disjoint, effectively-unbounded lanes so their keystreams never overlap.
+  ///
+  /// Seed contract: [freshSeedHex] (the BLE initiator's fresh random 'tws') is
+  /// REQUIRED whenever this identity may already exist — a re-pair swaps to
+  /// unburned key material before the offsets reset, so the reset can never
+  /// re-encrypt into the previous era's keystream. Passing no fresh seed for an
+  /// existing contact, or a seed identical to the stored one, THROWS.
   Future<void> addOrRechargeTimeWiltContact(
     String name,
     String relayUrl,
@@ -538,17 +586,65 @@ extension AppStateLifecycle on AppState {
     DateTime wiltExpiresAt, {
     String shortNick = '',
     String profileImage = '',
+    /// FRESH random 256-bit seed for this pairing (the BLE initiator's 'tws').
+    /// The contact's keystream AND meta channel are keyed on this, never on
+    /// the deterministic pubkey derivation, when re-pairing: [derivedSeed] is
+    /// a pure function of the two pubkeys, so resetting lane offsets under it
+    /// would re-encrypt new messages into keystream the previous chat era
+    /// already burned (its history is retained, even archived). Fresh material
+    /// makes the offset reset safe — the same model as group recharge and the
+    /// emergency chat. Null is only acceptable for a brand-new contact.
+    String? freshSeedHex,
   }) async {
     if (status == AppStatus.nuked) {
       status = AppStatus.normal;
       log('[State] Cleared nuke status on new Time Wilt contact creation.');
     }
 
+    final seedForContact = (freshSeedHex != null &&
+            freshSeedHex.length == 64 &&
+            RegExp(r'^[0-9a-fA-F]+$').hasMatch(freshSeedHex))
+        ? freshSeedHex
+        : null;
+    if (seedForContact == null) {
+      // No fallback to the deterministic pubkey derivation: the relay sees
+      // both pubkeys in the AUTH frames and could recompute that seed and
+      // decrypt the whole chat. Fail closed before anything is mutated.
+      throw Exception(
+        'Time Wilt pairing refused for $keyHash: no valid fresh seed '
+        'supplied. Every pairing MUST use fresh 256-bit key material.',
+      );
+    }
+
+    // Guards BEFORE any state is mutated (a failed re-pair must not leave a
+    // half-swapped meta key or contact behind):
+    final int existingIndex = contacts.indexWhere((c) => c.keyHash == keyHash);
+    if (existingIndex != -1) {
+      final existing = contacts[existingIndex];
+      // Security invariant: a remote/re-pair can never touch an OTP pad —
+      // upserting lane bases over a pad contact would rewind its write pointer.
+      if (existing.maxBufferBytes > 0) {
+        throw Exception(
+          'Time Wilt pairing refused: contact $keyHash holds a one-time pad. '
+          'Pad recharging requires in-person BLE pairing.',
+        );
+      }
+      // Security invariant: never rewind offsets under the SAME seed. If the
+      // offered seed is the one already burned by this contact, refuse — the
+      // caller (or an outdated peer) failed to supply fresh material.
+      if (existing.streamSeedHex == seedForContact) {
+        throw Exception(
+          'Time Wilt re-pair refused for $keyHash: offered seed matches the '
+          'already-burned one. A re-pair MUST use fresh key material.',
+        );
+      }
+    }
+
     // Metadata-channel key (profile/permission updates) — same one-way
     // derivation as byte-budget 1:1; encrypts chat_info_update but cannot
     // reconstruct the message keystream.
     final metaKeyHex = sha256
-        .convert(utf8.encode('$derivedSeed:meta'))
+        .convert(utf8.encode('$seedForContact:meta'))
         .toString();
     await ChatMetaStore.setKey(keyHash, metaKeyHex);
 
@@ -560,7 +656,6 @@ extension AppStateLifecycle on AppState {
     final int outBase = isInitiator ? 0 : stride;
     final int inBase = isInitiator ? stride : 0;
 
-    final int existingIndex = contacts.indexWhere((c) => c.keyHash == keyHash);
     final String contactId = existingIndex != -1
         ? contacts[existingIndex].id
         : _nextContactId(isGroup: false);
@@ -588,7 +683,7 @@ extension AppStateLifecycle on AppState {
       // now→newExpiry (keeping the old start would leave a huge span and a
       // near-empty gauge even right after re-pairing).
       wiltCreatedAt: DateTime.now(),
-      streamSeedHex: derivedSeed,
+      streamSeedHex: seedForContact,
     );
 
     if (existingIndex != -1) {

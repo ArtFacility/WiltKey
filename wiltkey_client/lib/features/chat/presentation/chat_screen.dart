@@ -28,6 +28,7 @@ import 'widgets/diagnostics_dialog.dart';
 import 'widgets/nuke_confirm_dialog.dart';
 import 'widgets/failed_actions_dialog.dart';
 import 'widgets/compression_dialog.dart';
+import 'widgets/video_send_dialog.dart';
 import 'widgets/debug_console_sheet.dart';
 import 'widgets/voice_recording_mixin.dart';
 import 'widgets/highlight_flash.dart';
@@ -448,7 +449,72 @@ class _ChatScreenState extends State<ChatScreen>
       await _pickAndSendImage(res.source);
     } else if (res is PixelArtAttachmentResult) {
       await _sendPixelArt(res.hexString);
+    } else if (res is VideoAttachmentResult) {
+      await _pickAndSendVideo(res.source);
     }
+  }
+
+  Future<void> _pickAndSendVideo(ImageSource source) async {
+    final contact = _appState.activeContact;
+    if (contact == null) return;
+
+    final picker = ImagePicker();
+    XFile? video;
+    try {
+      _appState.isPickingMedia = true;
+      video = await picker.pickVideo(
+        source: source,
+      );
+    } finally {
+      _appState.isPickingMedia = false;
+    }
+    if (video == null || !mounted) return;
+
+    final VideoSendResult? choice = await VideoSendDialog.show(
+      context,
+      sourcePath: video.path,
+      contact: contact,
+    );
+    if (choice == null || !mounted) return;
+
+    final jsonStr = choice.payload.toJsonString();
+    final byteCost = jsonStr.length + 73;
+    final l10n = AppLocalizations.of(context)!;
+
+    if (!contact.isTimeWilt && byteCost > contact.remainingBufferBytes) {
+      _errorSnack(
+        l10n.chatImageTooLargeSnackBar(
+          AppState.formatBytes(byteCost),
+          AppState.formatBytes(contact.remainingBufferBytes),
+        ),
+      );
+      return;
+    }
+
+    if (WkPayloadLimits.exceedsOutgoing(jsonStr.length)) {
+      _errorSnack(
+        WkPayloadLimits.blockedByFreeTier(jsonStr.length)
+            ? l10n.chatImageNeedsPlusSnackBar
+            : l10n.chatImageExceedsMaxSizeSnackBar,
+      );
+      return;
+    }
+
+    final error = await _appState.sendMessage(
+      jsonStr,
+      contentType: 'video',
+      mimeType: 'video/mp4',
+      allowSave: choice.allowSave,
+      ephemeral: choice.ephemeral,
+      ttlSeconds: choice.ttlSeconds,
+    );
+    try {
+      await choice.file.delete();
+    } catch (_) {}
+    if (error != null) {
+      _errorSnack(error);
+    }
+    _scrollToBottom();
   }
 
   Future<void> _sendPixelArt(String hexString) async {
@@ -901,7 +967,7 @@ class _ChatScreenState extends State<ChatScreen>
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                            contact.name,
+                            contact.displayName,
                             style: t.body.copyWith(fontWeight: FontWeight.w600),
                             overflow: TextOverflow.ellipsis,
                           ),

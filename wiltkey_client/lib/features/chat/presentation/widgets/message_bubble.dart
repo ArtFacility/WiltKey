@@ -17,6 +17,7 @@ import 'chat_markdown.dart';
 import 'reply_preview.dart';
 import 'wilt_widgets.dart';
 import 'pixel_art_message_bubble.dart';
+import 'video_message_bubble.dart';
 
 class MessageBubble extends StatelessWidget {
   final ChatMessage message;
@@ -366,6 +367,19 @@ class MessageBubble extends StatelessWidget {
         message: message,
         isMe: isMe,
         content: ChatImageThumbnail(
+          appState: appState,
+          contact: contact,
+          message: message,
+        ),
+      );
+    }
+
+    if (message.contentType == 'video') {
+      return wrapWiltingContent(
+        context: context,
+        message: message,
+        isMe: isMe,
+        content: VideoMessageBubble(
           appState: appState,
           contact: contact,
           message: message,

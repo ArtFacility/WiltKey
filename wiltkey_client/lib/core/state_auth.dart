@@ -171,6 +171,8 @@ extension AppStateAuth on AppState {
     await loadEvents(); // hydrate the activity feed + its unread badge
     await loadSocialContacts(); // hydrate the friends list (persisted between launches)
     await loadNotificationPreferences(); // hydrate notification category preferences & muted list
+    swipeRightAction = await _persistence.loadSwipeRightAction();
+    swipeLeftAction = await _persistence.loadSwipeLeftAction();
     log(
       '[Load] ${contacts.length} contact(s): '
       '${contacts.map((c) => "${c.id}:${c.keyHash.substring(0, c.keyHash.length >= 8 ? 8 : c.keyHash.length)}").join(", ")}',

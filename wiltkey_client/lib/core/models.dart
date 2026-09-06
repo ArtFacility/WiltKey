@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'custom_emoji.dart' show stickerPayload;
@@ -501,6 +502,9 @@ class ChatMessage {
   // 'voice' message is sent or its ciphertext is decrypted. Never persisted (the
   // DB keeps the base64 ciphertext in `text`, like images).
   Uint8List? decodedAudioBytes;
+  // In-memory decoded thumbnail and local playback path for 'video' messages.
+  Uint8List? decodedVideoThumbnail;
+  String? cachedVideoPath;
   String? decryptedText; // In-memory cached decrypted plaintext
 
   // Emoji reactions: token -> set of reactor identity ids (userId for us, the
@@ -563,6 +567,8 @@ class ChatMessage {
     this.isDelivered = false,
     this.isPending = false,
     this.decodedImageBytes,
+    this.decodedVideoThumbnail,
+    this.cachedVideoPath,
     this.allowSave = false,
     this.replyToId,
     this.decodedAudioBytes,
@@ -672,6 +678,14 @@ class ChatMessage {
     decryptedText = null;
     decodedImageBytes = null;
     decodedAudioBytes = null;
+    decodedVideoThumbnail = null;
+    if (cachedVideoPath != null) {
+      try {
+        final f = File(cachedVideoPath!);
+        if (f.existsSync()) f.deleteSync();
+      } catch (_) {}
+      cachedVideoPath = null;
+    }
     offset = -1;
   }
 
@@ -682,6 +696,14 @@ class ChatMessage {
     decryptedText = '[Message deleted]';
     decodedImageBytes = null;
     decodedAudioBytes = null;
+    decodedVideoThumbnail = null;
+    if (cachedVideoPath != null) {
+      try {
+        final f = File(cachedVideoPath!);
+        if (f.existsSync()) f.deleteSync();
+      } catch (_) {}
+      cachedVideoPath = null;
+    }
   }
 
   /// Serialise [reactions] (sets → lists) to a JSON string, or null if empty.

@@ -1,15 +1,20 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:wiltkey_client/l10n/app_localizations.dart';
 import '../../../core/state.dart';
-import '../../../core/network/remote_pairing_controller.dart';
+import '../../../core/network/qr_pair_controller.dart';
 import '../../../core/theme/wk.dart';
 import '../../../core/theme/wiltkey_tokens.dart';
 import '../../chat/presentation/chat_screen.dart';
 
-/// Full-screen QR code connect flow (7-day Time Wilt default for 1:1 chats).
+/// Full-screen offline QR connect: a vertical split view — camera on top,
+/// our own QR below. Both users scan each other's code; each QR carries the
+/// owner's public key, so no relay round-trip is needed at any point.
+/// Resulting contact is a 7-day Time Wilt 1:1 chat (same template as before).
 class QrPairingScreen extends StatefulWidget {
   const QrPairingScreen({super.key});
 
@@ -17,46 +22,22 @@ class QrPairingScreen extends StatefulWidget {
   State<QrPairingScreen> createState() => _QrPairingScreenState();
 }
 
-class _QrPairingScreenState extends State<QrPairingScreen>
-    with SingleTickerProviderStateMixin {
-  late final RemotePairingController _controller;
-  late final TabController _tabController;
+class _QrPairingScreenState extends State<QrPairingScreen> {
+  late final QrPairController _controller;
   final MobileScannerController _scannerController = MobileScannerController();
-
-  final TextEditingController _pinController = TextEditingController();
-  final TextEditingController _hashController = TextEditingController();
-  bool _manualEntry = false;
-  bool _scanned = false;
+  Timer? _cooldownTimer;
+  int _cooldownSeconds = 0;
 
   @override
   void initState() {
     super.initState();
-    _controller = RemotePairingController()..addListener(_onStateChange);
-    _tabController = TabController(length: 2, vsync: this);
-    _tabController.addListener(_onTabChange);
-  }
-
-  void _onTabChange() {
-    if (_tabController.index == 1) {
-      // Switched to My QR Code tab -> pause scanner to save camera & start hosting
-      _scannerController.stop();
-      if (_controller.phase == RemotePairPhase.idle) {
-        _controller.startHosting();
-      }
-    } else {
-      // Switched to Scan QR tab -> resume camera scanner
-      _scanned = false;
-      _scannerController.start();
-    }
+    _controller = QrPairController()..addListener(_onStateChange);
   }
 
   @override
   void dispose() {
-    _tabController.removeListener(_onTabChange);
-    _tabController.dispose();
+    _cooldownTimer?.cancel();
     _scannerController.dispose();
-    _pinController.dispose();
-    _hashController.dispose();
     _controller.removeListener(_onStateChange);
     _controller.dispose();
     super.dispose();
@@ -66,7 +47,21 @@ class _QrPairingScreenState extends State<QrPairingScreen>
     if (!mounted) return;
     setState(() {});
 
-    if (_controller.phase == RemotePairPhase.success &&
+    if (_controller.phase == QrPairPhase.scanned) {
+      // Pause the scanner: we hold their pubkey; now they scan ours.
+      _scannerController.stop();
+      HapticFeedback.mediumImpact();
+      _startCooldown();
+    } else if (_controller.phase == QrPairPhase.error ||
+        _controller.phase == QrPairPhase.idle) {
+      _cancelCooldown();
+      if (_controller.phase == QrPairPhase.idle ||
+          _controller.phase == QrPairPhase.error) {
+        _scannerController.start();
+      }
+    }
+
+    if (_controller.phase == QrPairPhase.success &&
         _controller.result != null) {
       final contact = _controller.result!;
       AppState().activeContact = contact;
@@ -76,26 +71,58 @@ class _QrPairingScreenState extends State<QrPairingScreen>
     }
   }
 
+  void _startCooldown() {
+    _cooldownTimer?.cancel();
+    setState(() => _cooldownSeconds = 5);
+    _cooldownTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted) {
+        t.cancel();
+        return;
+      }
+      setState(() {
+        _cooldownSeconds--;
+        if (_cooldownSeconds <= 0) {
+          _cooldownSeconds = 0;
+          t.cancel();
+        }
+      });
+    });
+  }
+
+  void _cancelCooldown() {
+    _cooldownTimer?.cancel();
+    _cooldownSeconds = 0;
+  }
+
   void _onBarcodeScanned(BarcodeCapture capture) {
-    if (_scanned ||
-        _controller.phase == RemotePairPhase.joining ||
-        _controller.phase == RemotePairPhase.generating) {
-      return;
-    }
-    final List<Barcode> barcodes = capture.barcodes;
-    for (final barcode in barcodes) {
+    if (_controller.phase != QrPairPhase.idle) return;
+    for (final barcode in capture.barcodes) {
       final rawValue = barcode.rawValue;
       if (rawValue != null && rawValue.startsWith('wiltkey://pair')) {
-        _scanned = true;
-        HapticFeedback.mediumImpact();
         try {
-          final uri = Uri.parse(rawValue);
-          _controller.joinUri(uri);
-        } catch (e) {
-          _scanned = false;
+          _controller.handleScannedUri(Uri.parse(rawValue));
+        } catch (_) {
+          // Malformed URI — leave the scanner on the next code.
         }
         break;
       }
+    }
+  }
+
+  /// Controller errors carry either an l10n key (no context there) or a raw
+  /// message; map the keys to localized text here.
+  String _localizedError(AppLocalizations l10n, String? error) {
+    switch (error) {
+      case 'qrConnectOutdatedCode':
+        return l10n.qrConnectOutdatedCode;
+      case 'qrConnectOwnCode':
+        return l10n.qrConnectOwnCode;
+      case 'qrConnectRechargeBlocked':
+        return l10n.qrConnectRechargeBlocked;
+      case 'qrConnectAlreadyPaired':
+        return l10n.qrConnectAlreadyPaired;
+      default:
+        return error ?? '';
     }
   }
 
@@ -103,6 +130,7 @@ class _QrPairingScreenState extends State<QrPairingScreen>
   Widget build(BuildContext context) {
     final t = context.wk;
     final l10n = AppLocalizations.of(context)!;
+    final busy = _controller.phase == QrPairPhase.generating;
 
     return Scaffold(
       backgroundColor: t.bg,
@@ -116,64 +144,39 @@ class _QrPairingScreenState extends State<QrPairingScreen>
               : l10n.qrConnectTitle,
           style: t.screenTitle.copyWith(fontSize: 16),
         ),
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: t.action,
-          labelColor: t.action,
-          unselectedLabelColor: t.textTertiary,
-          labelStyle: t.sectionLabel.copyWith(fontSize: 11),
-          tabs: [
-            Tab(
-              icon: const Icon(Icons.qr_code_scanner, size: 20),
-              text: t.uppercaseLabels
-                  ? l10n.qrConnectScanTab.toUpperCase()
-                  : l10n.qrConnectScanTab,
-            ),
-            Tab(
-              icon: const Icon(Icons.qr_code, size: 20),
-              text: t.uppercaseLabels
-                  ? l10n.qrConnectMyCodeTab.toUpperCase()
-                  : l10n.qrConnectMyCodeTab,
-            ),
-          ],
-        ),
       ),
-      body: TabBarView(
-        controller: _tabController,
+      body: Column(
         children: [
-          _buildScanTab(t, l10n),
-          _buildMyCodeTab(t, l10n),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildScanTab(WiltkeyTokens t, AppLocalizations l10n) {
-    if (_controller.phase == RemotePairPhase.joining ||
-        _controller.phase == RemotePairPhase.generating) {
-      return _buildBusyOverlay(t);
-    }
-
-    return Column(
-      children: [
-        if (_controller.error != null)
-          Container(
-            width: double.infinity,
-            margin: const EdgeInsets.all(16),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: t.danger.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(t.radiusCard),
-              border: Border.all(color: t.danger.withValues(alpha: 0.3)),
+          if (_controller.error != null && !busy)
+            Container(
+              width: double.infinity,
+              margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: t.danger.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(t.radiusCard),
+                border: Border.all(color: t.danger.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _localizedError(l10n, _controller.error),
+                      style: TextStyle(color: t.danger, fontSize: 13),
+                    ),
+                  ),
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    icon: Icon(Icons.refresh, color: t.danger, size: 20),
+                    onPressed: () => _controller.reset(),
+                  ),
+                ],
+              ),
             ),
-            child: Text(
-              _controller.error!,
-              style: TextStyle(color: t.danger, fontSize: 13),
-            ),
-          ),
 
-        if (!_manualEntry) ...[
+          // --- Top half: camera ---
           Expanded(
+            flex: 5,
             child: Stack(
               alignment: Alignment.center,
               children: [
@@ -181,229 +184,156 @@ class _QrPairingScreenState extends State<QrPairingScreen>
                   controller: _scannerController,
                   onDetect: _onBarcodeScanned,
                 ),
-                Container(
-                  width: 240,
-                  height: 240,
-                  decoration: BoxDecoration(
-                    border: Border.all(color: t.action, width: 2),
-                    borderRadius: BorderRadius.circular(16),
+                // Scan frame (idle) / scanned checkmark circle (scanned)
+                if (_controller.phase == QrPairPhase.scanned)
+                  Container(
+                    width: 200,
+                    height: 200,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.85),
+                      shape: BoxShape.circle,
+                    ),
+                    alignment: Alignment.center,
+                    child:
+                        Icon(Icons.check_circle, color: Colors.green, size: 72),
+                  )
+                else
+                  Container(
+                    width: 200,
+                    height: 200,
+                    decoration: BoxDecoration(
+                      border: Border.all(color: t.action, width: 2),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
                   ),
-                ),
+                if (busy)
+                  Container(
+                    color: t.bg.withValues(alpha: 0.7),
+                    alignment: Alignment.center,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        CircularProgressIndicator(color: t.action),
+                        const SizedBox(height: 16),
+                        Text(
+                          _controller.status,
+                          style: t.body.copyWith(fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ),
+                  ),
               ],
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                Text(
-                  l10n.qrConnectScanPrompt,
-                  textAlign: TextAlign.center,
-                  style: t.bodySecondary.copyWith(fontSize: 13),
-                ),
-                const SizedBox(height: 12),
-                TextButton(
-                  onPressed: () => setState(() => _manualEntry = true),
-                  child: Text(
-                    l10n.qrConnectManualPin,
-                    style: TextStyle(color: t.action),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ] else ...[
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
+
+          // --- Bottom half: our QR + state controls ---
+          SafeArea(
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: t.surface,
+                borderRadius:
+                    BorderRadius.vertical(top: Radius.circular(t.radiusCard)),
+              ),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  TextField(
-                    controller: _pinController,
-                    keyboardType: TextInputType.number,
-                    maxLength: 6,
-                    decoration: InputDecoration(
-                      labelText: '6-digit PIN',
-                      labelStyle: TextStyle(color: t.textSecondary),
-                      enabledBorder: OutlineInputBorder(
-                        borderSide: BorderSide(color: t.border),
-                        borderRadius: BorderRadius.circular(t.radiusControl),
+                  SizedBox(
+                    width: 150,
+                    height: 150,
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                      focusedBorder: OutlineInputBorder(
-                        borderSide: BorderSide(color: t.action),
-                        borderRadius: BorderRadius.circular(t.radiusControl),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: _hashController,
-                    decoration: InputDecoration(
-                      labelText: 'Host Identity Fingerprint',
-                      labelStyle: TextStyle(color: t.textSecondary),
-                      enabledBorder: OutlineInputBorder(
-                        borderSide: BorderSide(color: t.border),
-                        borderRadius: BorderRadius.circular(t.radiusControl),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderSide: BorderSide(color: t.action),
-                        borderRadius: BorderRadius.circular(t.radiusControl),
+                      child: QrImageView(
+                        data: _controller.myQrPayload,
+                        version: QrVersions.auto,
+                        size: 134.0,
+                        backgroundColor: Colors.white,
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 24),
-                  ElevatedButton(
-                    onPressed: () {
-                      _controller.join(
-                        _pinController.text,
-                        _hashController.text,
-                      );
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: t.action,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                    ),
-                    child: Text(l10n.qrConnectTitle),
                   ),
                   const SizedBox(height: 12),
-                  TextButton(
-                    onPressed: () => setState(() => _manualEntry = false),
-                    child: Text(
-                      l10n.qrConnectScanTab,
-                      style: TextStyle(color: t.textSecondary),
-                    ),
-                  ),
+                  _buildBottomState(t, l10n),
                 ],
               ),
             ),
           ),
         ],
-      ],
+      ),
     );
   }
 
-  Widget _buildMyCodeTab(WiltkeyTokens t, AppLocalizations l10n) {
-    final payload = _controller.qrPayload;
-    final pin = _controller.pin;
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: t.action.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(t.radiusCard),
-              border: Border.all(color: t.action.withValues(alpha: 0.2)),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.info_outline, color: t.action, size: 18),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    l10n.qrConnect7DayNotice,
-                    style: t.bodySecondary.copyWith(fontSize: 12),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 28),
-
-          if (payload.isNotEmpty)
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.1),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: QrImageView(
-                data: payload,
-                version: QrVersions.auto,
-                size: 200.0,
-                backgroundColor: Colors.white,
-              ),
-            )
-          else
-            Container(
-              width: 200,
-              height: 200,
-              alignment: Alignment.center,
-              child: CircularProgressIndicator(color: t.action),
-            ),
-
-          const SizedBox(height: 24),
-          if (pin != null) ...[
+  Widget _buildBottomState(WiltkeyTokens t, AppLocalizations l10n) {
+    switch (_controller.phase) {
+      case QrPairPhase.scanned:
+        final ready = _cooldownSeconds == 0;
+        return Column(
+          children: [
             Text(
-              'PIN: $pin',
-              style: t.screenTitle.copyWith(
-                fontSize: 24,
-                letterSpacing: 4,
-                color: t.action,
+              l10n.qrConnectShowYourCode,
+              textAlign: TextAlign.center,
+              style: t.body.copyWith(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                // 5s cooldown forces reading the "show them your QR" prompt.
+                onPressed:
+                    ready ? () => _controller.finalizePair() : null,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: t.action,
+                  foregroundColor: Colors.white,
+                  disabledBackgroundColor: t.action.withValues(alpha: 0.35),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                icon: const Icon(Icons.verified_user, size: 18),
+                label: Text(
+                  ready
+                      ? l10n.qrConnectFinishPairing
+                      : '${l10n.qrConnectFinishPairing} ($_cooldownSeconds)',
+                ),
               ),
+            ),
+          ],
+        );
+
+      case QrPairPhase.generating:
+        return Text(
+          _controller.status,
+          style: t.bodySecondary.copyWith(fontSize: 13),
+        );
+
+      case QrPairPhase.success:
+        return Text(
+          _controller.status,
+          style: t.bodySecondary.copyWith(fontSize: 13),
+        );
+
+      case QrPairPhase.idle:
+      case QrPairPhase.error:
+        return Column(
+          children: [
+            Text(
+              l10n.qrConnectScanPrompt,
+              textAlign: TextAlign.center,
+              style: t.bodySecondary.copyWith(fontSize: 13),
             ),
             const SizedBox(height: 8),
             Text(
-              _controller.status,
+              l10n.qrConnect7DayNotice,
               textAlign: TextAlign.center,
-              style: t.bodySecondary.copyWith(fontSize: 12),
+              style: t.bodySecondary.copyWith(
+                fontSize: 11,
+                color: t.textTertiary,
+              ),
             ),
           ],
-
-          const SizedBox(height: 24),
-          OutlinedButton.icon(
-            onPressed: pin == null
-                ? null
-                : () {
-                    Clipboard.setData(ClipboardData(text: payload));
-                    HapticFeedback.lightImpact();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        backgroundColor: t.surface,
-                        content: Text(
-                          l10n.commonCopied,
-                          style: TextStyle(color: t.action),
-                        ),
-                      ),
-                    );
-                  },
-            icon: const Icon(Icons.copy, size: 16),
-            label: Text(l10n.commonCopy),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: t.action,
-              side: BorderSide(color: t.action.withValues(alpha: 0.5)),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBusyOverlay(WiltkeyTokens t) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          CircularProgressIndicator(color: t.action),
-          const SizedBox(height: 20),
-          Text(
-            _controller.status,
-            style: t.body.copyWith(fontWeight: FontWeight.w600),
-          ),
-        ],
-      ),
-    );
+        );
+    }
   }
 }

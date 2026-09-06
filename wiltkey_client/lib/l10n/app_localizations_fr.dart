@@ -2325,6 +2325,57 @@ class AppLocalizationsFr extends AppLocalizations {
   String get qrConnectManualPin => 'Saisir le PIN manuellement';
 
   @override
+  String get qrConnectShowYourCode =>
+      'Scan réussi ! Montre-leur ton QR code à ton tour.';
+
+  @override
+  String get qrConnectFinishPairing => 'Terminer le jumelage';
+
+  @override
+  String get qrConnectOutdatedCode =>
+      'Ce QR code provient d\'une ancienne version de l\'app. Vous devez tous les deux être à jour pour vous connecter ainsi.';
+
+  @override
+  String get qrConnectOwnCode =>
+      'C\'est ton propre QR code — vise celui de ton correspondant.';
+
+  @override
+  String get qrConnectAlreadyPaired =>
+      'Tu as déjà un chat avec cette personne. Rafraîchir un chat existant nécessite un appairage en personne.';
+
+  @override
+  String get testRelayBanner => 'SERVEUR DE TEST — HORS PRODUCTION';
+
+  @override
+  String get securingTitle => 'Sécurisation de ta connexion';
+
+  @override
+  String get securingBody =>
+      'Ton appareil se vérifie auprès du relais avant de se connecter. Cette preuve de travail unique protège tout le monde contre le spam et les abus — sans numéro de téléphone, sans e-mail, sans compte.';
+
+  @override
+  String get securingWorking => 'VÉRIFICATION DE L\'APPAREIL — EN COURS…';
+
+  @override
+  String get securingOnceNote =>
+      'Cela n\'arrive que lors de ta première connexion. Les reconnexions suivantes sont instantanées.';
+
+  @override
+  String get puzzleInstruction =>
+      'Une partie de ta vérification de connexion est brouillée. Fais glisser la bande jusqu\'à ce que l\'image s\'emboîte, puis confirme.';
+
+  @override
+  String get puzzleLockIn => 'Valider';
+
+  @override
+  String get puzzleFailedRetry =>
+      'Ça ne s\'est pas aligné — on relance une nouvelle vérification…';
+
+  @override
+  String get reauthenticatingBanner =>
+      'RÉAUTHENTIFICATION — VEUILLEZ PATIENTER…';
+
+  @override
   String get badgePlayPlus => 'Play Store · Plus';
 
   @override
@@ -2519,4 +2570,103 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get forcedUpdateWhatsNew => 'Nouveautés de cette mise à jour';
+
+  @override
+  String get settingsSwipeGesturesTitle => 'Gestes de balayage';
+
+  @override
+  String get settingsSwipeGesturesSubtitle =>
+      'Personnaliser les actions de balayage vers la droite et la gauche dans la liste des discussions';
+
+  @override
+  String get settingsSwipeRight => 'Balayer vers la droite';
+
+  @override
+  String get settingsSwipeLeft => 'Balayer vers la gauche';
+
+  @override
+  String get swipeActionMarkRead => 'Marquer lu / non lu';
+
+  @override
+  String get swipeActionMute => 'Sourdine / Réactiver';
+
+  @override
+  String get swipeActionPin => 'Épingler / Détacher';
+
+  @override
+  String get swipeActionArchive => 'Archiver';
+
+  @override
+  String get swipeActionNone => 'Désactivé';
+
+  @override
+  String get chatSwipeMarkRead => 'Lu';
+
+  @override
+  String get chatSwipeMarkUnread => 'Non lu';
+
+  @override
+  String get chatSwipePin => 'Épingler';
+
+  @override
+  String get chatSwipeUnpin => 'Détacher';
+
+  @override
+  String get chatSwipeMute => 'Sourdine';
+
+  @override
+  String get chatSwipeUnmute => 'Réactiver';
+
+  @override
+  String get chatSwipeArchive => 'Archiver';
+
+  @override
+  String get chatAttachVideoSubtitleEnabled =>
+      'Enregistrer jusqu\'à 15 s ou choisir dans la galerie';
+
+  @override
+  String get chatVideoSelectSourceTitle => 'Envoyer une vidéo';
+
+  @override
+  String get chatVideoQualityLabel => 'Qualité';
+
+  @override
+  String get chatVideoQualityLow => 'Basse';
+
+  @override
+  String get chatVideoQualityMedium => 'Moyenne';
+
+  @override
+  String get chatVideoQualityHigh => 'Haute';
+
+  @override
+  String get chatVideoCompressionFailed =>
+      'Impossible de compresser ce clip. Essayez avec un clip plus court ou une qualité inférieure.';
+
+  @override
+  String get chatVideoRecordCamera => 'Enregistrer une vidéo (Appareil photo)';
+
+  @override
+  String get chatVideoPickGallery => 'Choisir une vidéo dans la galerie';
+
+  @override
+  String get chatVideoCompressing => 'Compression de la vidéo...';
+
+  @override
+  String chatVideoTooLarge(String size) {
+    return 'La vidéo dépasse la taille limite ($size)';
+  }
+
+  @override
+  String get chatVideoTooLong =>
+      'La vidéo dépasse la limite de durée de 15 secondes';
+
+  @override
+  String get chatVideoSaveGallery => 'Enregistrer la vidéo dans la galerie';
+
+  @override
+  String get chatVideoSavedGallery => 'Vidéo enregistrée dans la galerie';
+
+  @override
+  String get chatVideoError => 'Impossible de lire le clip vidéo';
 }

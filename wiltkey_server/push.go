@@ -22,6 +22,39 @@ type PushRequest struct {
 	Timestamp int64  `json:"timestamp"`
 	Sig       string `json:"sig"`
 	Token     string `json:"token,omitempty"`
+	// Device token (the WS-auth credential). Push registration is a
+	// token-gated endpoint: a bare keypair no longer proves "paid entry".
+	DeviceToken string `json:"device_token,omitempty"`
+}
+
+// verifyDeviceTokenGate enforces the device-token requirement on token-gated
+// HTTP endpoints. Deliberately does NOT punish via handleValidationFailure:
+// a stale/expired token self-heals through the WS issuance path on the next
+// connect, and banning would brick legitimate users behind shared NATs.
+func verifyDeviceTokenGate(w http.ResponseWriter, userID, deviceToken string) bool {
+	if pg == nil {
+		http.Error(w, `{"error":"token store unavailable"}`, http.StatusServiceUnavailable)
+		return false
+	}
+	if deviceToken == "" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusForbidden)
+		w.Write([]byte(`{"error":"device_token_required"}`))
+		return false
+	}
+	valid, _, err := pg.VerifyDeviceToken(userID, deviceToken)
+	if err != nil {
+		log.Printf("[Token Gate] Verification error for %s: %v", userID, err)
+		http.Error(w, `{"error":"token store error"}`, http.StatusInternalServerError)
+		return false
+	}
+	if !valid {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusForbidden)
+		w.Write([]byte(`{"error":"device_token_invalid"}`))
+		return false
+	}
+	return true
 }
 
 // verifyPushIdentity runs the shared timestamp/identity/signature checks. On
@@ -82,6 +115,9 @@ func handlePushRegister(w http.ResponseWriter, r *http.Request) {
 	if !verifyPushIdentity(w, ip, req, signed) {
 		return
 	}
+	if !verifyDeviceTokenGate(w, req.ID, req.DeviceToken) {
+		return
+	}
 
 	if err := rdb.SetPushToken(req.ID, req.Token); err != nil {
 		log.Printf("[Push Register Error] Failed to store FCM token for %s: %v", req.ID, err)
@@ -111,6 +147,9 @@ func handlePushUnregister(w http.ResponseWriter, r *http.Request) {
 
 	signed := fmt.Sprintf("%s:%d", req.ID, req.Timestamp)
 	if !verifyPushIdentity(w, ip, req, signed) {
+		return
+	}
+	if !verifyDeviceTokenGate(w, req.ID, req.DeviceToken) {
 		return
 	}
 

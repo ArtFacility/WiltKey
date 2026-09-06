@@ -100,49 +100,96 @@ Future<VoiceCodec> pickRecordCodec(AudioRecorder recorder) async {
   return VoiceCodec.aacLc;
 }
 
-/// A fixed-size header prepended to the raw audio before base64-encoding, so a
+/// A header prepended to the raw audio before base64-encoding, so a
 /// voice payload is self-describing on the receiver without a DB schema change
 /// (it rides inside the existing base64 `ChatMessage.text`, like an image).
 ///
-/// Layout (big-endian): `[0] version | [1] codec id | [2..3] duration ×100 ms`.
+/// v1 Layout (big-endian, 4 bytes): `[0] version(1) | [1] codec id | [2..3] duration ×100 ms`.
+/// v2 Layout (big-endian, 5+N bytes): `[0] version(2) | [1] codec id | [2..3] duration ×100 ms | [4] count N | [5..4+N] amplitudes (0..255)`.
 class VoiceHeader {
-  static const int _version = 1;
+  static const int v1Version = 1;
+  static const int v2Version = 2;
 
-  /// Header size in bytes.
+  /// Legacy header size in bytes for v1 (kept as byteLength for compatibility).
   static const int byteLength = 4;
+
+  /// Target count of waveform amplitude samples captured in v2 header.
+  static const int kDefaultWaveformSamples = 28;
 
   final VoiceCodec codec;
   final Duration duration;
+  final List<int> waveform;
 
-  const VoiceHeader({required this.codec, required this.duration});
+  const VoiceHeader({
+    required this.codec,
+    required this.duration,
+    this.waveform = const [],
+  });
 
   /// Prepend the header to [audio], yielding the payload to base64-encode + send.
   Uint8List wrap(Uint8List audio) {
     // Duration stored in deciseconds (×100 ms) → max ~109 min in 16 bits, far
     // beyond [kVoiceMaxDuration].
     final ds = (duration.inMilliseconds / 100).round().clamp(0, 0xFFFF);
-    final out = Uint8List(byteLength + audio.length);
-    out[0] = _version;
-    out[1] = codec.id;
-    out[2] = (ds >> 8) & 0xFF;
-    out[3] = ds & 0xFF;
-    out.setRange(byteLength, out.length, audio);
-    return out;
+    if (waveform.isEmpty) {
+      final out = Uint8List(byteLength + audio.length);
+      out[0] = v1Version;
+      out[1] = codec.id;
+      out[2] = (ds >> 8) & 0xFF;
+      out[3] = ds & 0xFF;
+      out.setRange(byteLength, out.length, audio);
+      return out;
+    } else {
+      final wfCount = waveform.length.clamp(0, 255);
+      final hLen = 5 + wfCount;
+      final out = Uint8List(hLen + audio.length);
+      out[0] = v2Version;
+      out[1] = codec.id;
+      out[2] = (ds >> 8) & 0xFF;
+      out[3] = ds & 0xFF;
+      out[4] = wfCount;
+      for (int i = 0; i < wfCount; i++) {
+        out[5 + i] = waveform[i].clamp(0, 255);
+      }
+      out.setRange(hLen, out.length, audio);
+      return out;
+    }
   }
 
-  /// Parse a payload produced by [wrap]. Returns null if [payload] isn't a v1
+  /// Parse a payload produced by [wrap]. Returns null if [payload] isn't a recognized
   /// voice blob (wrong version / too short), so callers can fail soft.
   static VoicePayload? unwrap(Uint8List payload) {
-    if (payload.length < byteLength || payload[0] != _version) return null;
-    final codec = VoiceCodec.fromId(payload[1]);
-    final ds = (payload[2] << 8) | payload[3];
-    return VoicePayload(
-      header: VoiceHeader(
-        codec: codec,
-        duration: Duration(milliseconds: ds * 100),
-      ),
-      audio: Uint8List.sublistView(payload, byteLength),
-    );
+    if (payload.length < 4) return null;
+    final ver = payload[0];
+    if (ver == v1Version) {
+      final codec = VoiceCodec.fromId(payload[1]);
+      final ds = (payload[2] << 8) | payload[3];
+      return VoicePayload(
+        header: VoiceHeader(
+          codec: codec,
+          duration: Duration(milliseconds: ds * 100),
+          waveform: const [],
+        ),
+        audio: Uint8List.sublistView(payload, byteLength),
+      );
+    } else if (ver == v2Version) {
+      if (payload.length < 5) return null;
+      final codec = VoiceCodec.fromId(payload[1]);
+      final ds = (payload[2] << 8) | payload[3];
+      final wfCount = payload[4];
+      final hLen = 5 + wfCount;
+      if (payload.length < hLen) return null;
+      final wf = Uint8List.fromList(payload.sublist(5, hLen));
+      return VoicePayload(
+        header: VoiceHeader(
+          codec: codec,
+          duration: Duration(milliseconds: ds * 100),
+          waveform: wf,
+        ),
+        audio: Uint8List.sublistView(payload, hLen),
+      );
+    }
+    return null;
   }
 }
 

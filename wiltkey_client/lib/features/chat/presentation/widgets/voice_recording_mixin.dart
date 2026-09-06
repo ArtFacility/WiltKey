@@ -324,6 +324,7 @@ mixin VoiceRecordingMixin<T extends StatefulWidget> on State<T> {
     final payload = VoiceHeader(
       codec: capture.codec,
       duration: capture.duration,
+      waveform: capture.waveform,
     ).wrap(capture.bytes);
     final base64Data = base64Encode(payload);
     final byteCost = base64Data.length + 73;

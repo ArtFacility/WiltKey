@@ -40,6 +40,23 @@ func TestIntegration(t *testing.T) {
 	// Clear test keys
 	rdb.FlushAll()
 
+	// The device-token gate fails closed without Postgres (the token store IS
+	// the auth gate), so WS-level tests need the DB up.
+	if pg == nil {
+		pgURL := os.Getenv("POSTGRES_URL")
+		if pgURL == "" {
+			pgURL = "postgres://wiltkey:wiltkey@localhost:5432/wiltkey?sslmode=disable"
+		}
+		testPg, pgErr := NewPostgresClient(pgURL)
+		if pgErr != nil {
+			t.Skipf("Skipping: Postgres not running (%v) — required by the device-token gate", pgErr)
+			return
+		}
+		defer testPg.Close()
+		pg = testPg
+	}
+	pg.db.Exec("DELETE FROM device_tokens")
+
 	hub := NewHub(rdb, NewPushSender()) // NewPushSender() is disabled without FCM env
 	go hub.Run()
 
@@ -54,64 +71,17 @@ func TestIntegration(t *testing.T) {
 	server := httptest.NewServer(mux)
 	defer server.Close()
 
-	// 1. Alice connects to WS and Authenticates
+	// 1. Alice connects to WS and Authenticates (tokenless → issuance dance)
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
-	aliceConn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
-	if err != nil {
-		t.Fatalf("failed to dial Alice WS: %v", err)
-	}
+	aliceConn, aliceToken := authWSForTest(t, wsURL, alicePubHex, alicePriv, "")
 	defer aliceConn.Close()
-
-	var aliceChallenge WSMessage
-	if err := aliceConn.ReadJSON(&aliceChallenge); err != nil {
-		t.Fatalf("failed to read challenge: %v", err)
-	}
-
-	// Sign Alice challenge
-	aliceSig := ed25519.Sign(alicePriv, []byte(aliceChallenge.Challenge))
-	authMsg := WSMessage{
-		Type:      "AUTH",
-		Pubkey:    alicePubHex,
-		Signature: hex.EncodeToString(aliceSig),
-	}
-	if err := aliceConn.WriteJSON(authMsg); err != nil {
-		t.Fatalf("failed to send Alice AUTH: %v", err)
-	}
-
-	var authOk WSMessage
-	if err := aliceConn.ReadJSON(&authOk); err != nil || authOk.Type != "AUTH_OK" {
-		t.Fatalf("Alice auth failed or returned wrong response: %v", err)
-	}
-	if authOk.UserID != aliceID {
-		t.Errorf("expected UserID %s, got %s", aliceID, authOk.UserID)
+	if aliceToken == "" {
+		t.Fatalf("expected Alice to receive a device token")
 	}
 
 	// 2. Bob connects to WS and Authenticates
-	bobConn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
-	if err != nil {
-		t.Fatalf("failed to dial Bob WS: %v", err)
-	}
+	bobConn, _ := authWSForTest(t, wsURL, bobPubHex, bobPriv, "")
 	defer bobConn.Close()
-
-	var bobChallenge WSMessage
-	if err := bobConn.ReadJSON(&bobChallenge); err != nil {
-		t.Fatalf("failed to read Bob challenge: %v", err)
-	}
-
-	bobSig := ed25519.Sign(bobPriv, []byte(bobChallenge.Challenge))
-	bobAuthMsg := WSMessage{
-		Type:      "AUTH",
-		Pubkey:    bobPubHex,
-		Signature: hex.EncodeToString(bobSig),
-	}
-	if err := bobConn.WriteJSON(bobAuthMsg); err != nil {
-		t.Fatalf("failed to send Bob AUTH: %v", err)
-	}
-
-	var bobAuthOk WSMessage
-	if err := bobConn.ReadJSON(&bobAuthOk); err != nil || bobAuthOk.Type != "AUTH_OK" {
-		t.Fatalf("Bob auth failed: %v", err)
-	}
 
 	// 3. Alice sends a message to Bob via WebSocket
 	aliceMsg := WSMessage{
@@ -294,6 +264,23 @@ func TestGroupChatHubAndSpoke(t *testing.T) {
 	rdb = testRdb
 	rdb.FlushAll()
 
+	// The device-token gate fails closed without Postgres (the token store IS
+	// the auth gate), so WS-level tests need the DB up.
+	if pg == nil {
+		pgURL := os.Getenv("POSTGRES_URL")
+		if pgURL == "" {
+			pgURL = "postgres://wiltkey:wiltkey@localhost:5432/wiltkey?sslmode=disable"
+		}
+		testPg, pgErr := NewPostgresClient(pgURL)
+		if pgErr != nil {
+			t.Skipf("Skipping: Postgres not running (%v) — required by the device-token gate", pgErr)
+			return
+		}
+		defer testPg.Close()
+		pg = testPg
+	}
+	pg.db.Exec("DELETE FROM device_tokens")
+
 	hub := NewHub(rdb, NewPushSender()) // NewPushSender() is disabled without FCM env
 	go hub.Run()
 
@@ -309,27 +296,7 @@ func TestGroupChatHubAndSpoke(t *testing.T) {
 
 	// Helper function to connect and authenticate a user
 	connectAndAuth := func(pubHex string, privKey ed25519.PrivateKey) *websocket.Conn {
-		conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
-		if err != nil {
-			t.Fatalf("failed to dial: %v", err)
-		}
-		var challenge WSMessage
-		if err := conn.ReadJSON(&challenge); err != nil {
-			t.Fatalf("failed to read challenge: %v", err)
-		}
-		sig := ed25519.Sign(privKey, []byte(challenge.Challenge))
-		authMsg := WSMessage{
-			Type:      "AUTH",
-			Pubkey:    pubHex,
-			Signature: hex.EncodeToString(sig),
-		}
-		if err := conn.WriteJSON(authMsg); err != nil {
-			t.Fatalf("failed to write auth: %v", err)
-		}
-		var authOk WSMessage
-		if err := conn.ReadJSON(&authOk); err != nil || authOk.Type != "AUTH_OK" {
-			t.Fatalf("auth failed: %v", err)
-		}
+		conn, _ := authWSForTest(t, wsURL, pubHex, privKey, "")
 		return conn
 	}
 
@@ -474,6 +441,7 @@ func TestStorageAndSubscriptions(t *testing.T) {
 
 	// Clean DB
 	rdb.FlushAll()
+	pg.db.Exec("DELETE FROM device_tokens")
 	pg.db.Exec("DELETE FROM messages")
 	pg.db.Exec("DELETE FROM entitlements")
 
@@ -490,30 +458,10 @@ func TestStorageAndSubscriptions(t *testing.T) {
 	server := httptest.NewServer(mux)
 	defer server.Close()
 
-	// Helper to dial WS
+	// Helper to dial WS (full device-token handshake)
 	dialWS := func(pubHex string, priv ed25519.PrivateKey) *websocket.Conn {
 		wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
-		conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
-		if err != nil {
-			t.Fatalf("failed to dial WS: %v", err)
-		}
-		var challenge WSMessage
-		if err := conn.ReadJSON(&challenge); err != nil {
-			t.Fatalf("failed to read challenge: %v", err)
-		}
-		sig := ed25519.Sign(priv, []byte(challenge.Challenge))
-		authMsg := WSMessage{
-			Type:      "AUTH",
-			Pubkey:    pubHex,
-			Signature: hex.EncodeToString(sig),
-		}
-		if err := conn.WriteJSON(authMsg); err != nil {
-			t.Fatalf("failed to send AUTH: %v", err)
-		}
-		var authOk WSMessage
-		if err := conn.ReadJSON(&authOk); err != nil || authOk.Type != "AUTH_OK" {
-			t.Fatalf("auth failed: %v", err)
-		}
+		conn, _ := authWSForTest(t, wsURL, pubHex, priv, "")
 		return conn
 	}
 

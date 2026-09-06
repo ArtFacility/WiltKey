@@ -137,6 +137,10 @@ extension AppStateContacts on AppState {
     try {
       contacts = await WiltkeyDatabase.instance.getAllContacts();
       await loadSocialContacts();
+      if (activeContact != null) {
+        final idx = contacts.indexWhere((c) => c.keyHash == activeContact!.keyHash);
+        if (idx != -1) activeContact = contacts[idx];
+      }
       notifyListeners();
     } catch (e) {
       log('[Contacts] reloadAllContacts failed: $e');
