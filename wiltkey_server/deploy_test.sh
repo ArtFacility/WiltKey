@@ -86,6 +86,7 @@ scp "$LOCAL_BIN" "$SSH_HOST:$REMOTE_DIR/$BIN_NAME.new"
 rm -f "$LOCAL_BIN"
 
 echo "==> Writing pm2 ecosystem config ($PM2_APP)…"
+CHALLENGE_MODE="${WK_TEST_CHALLENGE_MODE:-}"
 ssh "$SSH_HOST" "cat > $REMOTE_DIR/ecosystem.test.config.js <<'EOF'
 module.exports = {
   apps: [{
@@ -98,7 +99,8 @@ module.exports = {
       REDIS_ADDR: 'localhost:6379',
       REDIS_DB: '$REDIS_DB',
       WK_LOCAL_STORAGE_DIR: '$STORAGE_DIR',
-      WK_ISSUANCE_DAILY_IP: '$DAILY_MINTS'
+      WK_ISSUANCE_DAILY_IP: '$DAILY_MINTS',
+      WK_CHALLENGE_MODE: '$CHALLENGE_MODE'
     }
   }]
 };
@@ -108,14 +110,10 @@ echo "==> Swapping in the new binary…"
 ssh "$SSH_HOST" "chmod +x $REMOTE_DIR/$BIN_NAME.new \
   && mv -f $REMOTE_DIR/$BIN_NAME.new $REMOTE_DIR/$BIN_NAME"
 
-echo "==> Starting/restarting pm2 app '$PM2_APP'…"
-ssh "$SSH_HOST" "if pm2 describe $PM2_APP >/dev/null 2>&1; then \
-    pm2 restart $PM2_APP; \
-  else \
-    pm2 start $REMOTE_DIR/ecosystem.test.config.js; \
-  fi; pm2 save"
-echo "    (note: envs live in ecosystem.test.config.js, baked at first start —"
-echo "     to CHANGE an env: pm2 delete $PM2_APP && pm2 start $REMOTE_DIR/ecosystem.test.config.js)"
+echo "==> Restarting pm2 app '$PM2_APP' (delete + start so fresh ecosystem envs apply)…"
+ssh "$SSH_HOST" "pm2 delete $PM2_APP >/dev/null 2>&1 || true; \
+  pm2 start $REMOTE_DIR/ecosystem.test.config.js; pm2 save"
+echo "    (envs come from ecosystem.test.config.js — edit + re-run this script to change)"
 
 echo "==> Verifying (local port ping must say mode:test)…"
 sleep 2
