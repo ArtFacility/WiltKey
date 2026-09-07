@@ -737,7 +737,7 @@
   "securingBody": "Dein Gerät weist sich beim Relay aus, bevor es sich verbindet. Dieser einmalige Proof-of-Work schützt alle vor Spam und Missbrauch — ohne Telefonnummer, ohne E-Mail, ohne Konto.",
   "securingWorking": "GERÄT WIRD GEPRÜFT — ARBEITE…",
   "securingOnceNote": "Das passiert nur bei deiner ersten Verbindung. Danach ist das Wiederverbinden sofort erledigt.",
-  "puzzleInstruction": "Ein Teil deiner Verbindungsprüfung ist verschoben. Schiebe den Streifen, bis das Bild einrastet, und bestätige dann.",
+  "puzzleInstruction": "Schiebe, bis das Pixel-Bild symmetrisch ist.",
   "puzzleLockIn": "Einrasten",
   "puzzleFailedRetry": "Das hat nicht gepasst — starte eine neue Prüfung…",
   "reauthenticatingBanner": "NEUAUTHENTIFIZIERUNG — BITTE WARTEN…",

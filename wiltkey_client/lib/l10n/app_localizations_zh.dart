@@ -2214,7 +2214,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get securingOnceNote => '这仅在首次连接时发生，之后重新连接将瞬间完成。';
 
   @override
-  String get puzzleInstruction => '你的连接验证中有一部分被打乱了。请拖动滑条，直到图片完整对齐，然后确认。';
+  String get puzzleInstruction => '滑动直到像素画对称。';
 
   @override
   String get puzzleLockIn => '确认';

@@ -2347,8 +2347,7 @@ class AppLocalizationsSv extends AppLocalizations {
       'Detta händer bara vid din första anslutning. Därefter är återanslutningen omedelbar.';
 
   @override
-  String get puzzleInstruction =>
-      'En del av din anslutningskontroll är förvrängd. Dra i listen tills bilden klickar på plats och bekräfta sedan.';
+  String get puzzleInstruction => 'Dra tills pixelarten är symmetrisk.';
 
   @override
   String get puzzleLockIn => 'Lås fast';

@@ -2363,7 +2363,7 @@ class AppLocalizationsHu extends AppLocalizations {
 
   @override
   String get puzzleInstruction =>
-      'A kapcsolati ellenőrzésed egy része összekeveredett. Húzd el a csíkot, amíg a kép a helyére nem illeszkedik, majd erősítsd meg.';
+      'Csúsztasd, amíg a pixel art szimmetrikus nem lesz.';
 
   @override
   String get puzzleLockIn => 'Rögzítés';

@@ -2362,7 +2362,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get puzzleInstruction =>
-      'Une partie de ta vérification de connexion est brouillée. Fais glisser la bande jusqu\'à ce que l\'image s\'emboîte, puis confirme.';
+      'Fais glisser jusqu\'à ce que le pixel art soit symétrique.';
 
   @override
   String get puzzleLockIn => 'Valider';

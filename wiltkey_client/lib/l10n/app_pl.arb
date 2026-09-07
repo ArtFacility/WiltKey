@@ -737,7 +737,7 @@
   "securingBody": "Twoje urządzenie weryfikuje się na przekaźniku przed połączeniem. Ten jednorazowy proof-of-work chroni wszystkich przed spamem i nadużyciami — bez numeru telefonu, bez e-maila, bez konta.",
   "securingWorking": "WERYFIKACJA URZĄDZENIA — TRWA…",
   "securingOnceNote": "Dzieje się to tylko przy pierwszym połączeniu. Późniejsze ponowne połączenia są natychmiastowe.",
-  "puzzleInstruction": "Fragment twojej weryfikacji połączenia jest przesunięty. Przesuń pasek, aż obraz wskoczy na miejsce, a następnie potwierdź.",
+  "puzzleInstruction": "Przesuń, aż pixel art będzie symetryczny.",
   "puzzleLockIn": "Zatwierdź",
   "puzzleFailedRetry": "Nie udało się dopasować — zaczynamy nową weryfikację…",
   "reauthenticatingBanner": "PONOWNE UWIERZYTELNIANIE — PROSZĘ CZEKAĆ…",

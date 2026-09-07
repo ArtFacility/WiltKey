@@ -2359,7 +2359,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get puzzleInstruction =>
-      'Ein Teil deiner Verbindungsprüfung ist verschoben. Schiebe den Streifen, bis das Bild einrastet, und bestätige dann.';
+      'Schiebe, bis das Pixel-Bild symmetrisch ist.';
 
   @override
   String get puzzleLockIn => 'Einrasten';

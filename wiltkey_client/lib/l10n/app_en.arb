@@ -1368,7 +1368,7 @@
   "securingBody": "Your device is verifying itself with the relay before connecting. This one-time proof-of-work protects everyone from spam and abuse — no phone number, no email, no account.",
   "securingWorking": "PROVING DEVICE — WORKING…",
   "securingOnceNote": "This happens only on your first connection. Reconnecting afterwards is instant.",
-  "puzzleInstruction": "A piece of your connection check is scrambled. Slide the strip until the picture locks in, then confirm.",
+  "puzzleInstruction": "Slide until the pixel art is symmetrical.",
   "puzzleLockIn": "Lock in",
   "puzzleFailedRetry": "That didn't line up — starting a fresh check…",
   "reauthenticatingBanner": "REAUTHENTICATING — PLEASE WAIT…",

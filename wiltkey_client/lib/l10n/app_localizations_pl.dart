@@ -2363,8 +2363,7 @@ class AppLocalizationsPl extends AppLocalizations {
       'Dzieje się to tylko przy pierwszym połączeniu. Późniejsze ponowne połączenia są natychmiastowe.';
 
   @override
-  String get puzzleInstruction =>
-      'Fragment twojej weryfikacji połączenia jest przesunięty. Przesuń pasek, aż obraz wskoczy na miejsce, a następnie potwierdź.';
+  String get puzzleInstruction => 'Przesuń, aż pixel art będzie symetryczny.';
 
   @override
   String get puzzleLockIn => 'Zatwierdź';

@@ -98,7 +98,12 @@ class _PixelPuzzleDragState extends State<PixelPuzzleDrag> {
     final t = context.wk;
     final l10n = AppLocalizations.of(context)!;
     final sprite = _displayedSprite;
-    final solved = _touched && _solvedLocally;
+    // Solved-state styling exists ONLY in the tester (localCheck) mode. In
+    // live mode a pre-submit "this is correct" border would be a visual
+    // oracle: a screenshot-loop bot could step the slider and watch for it
+    // instead of ever having to judge symmetry.
+    final solved =
+        widget.localCheck != null && _touched && _solvedLocally;
 
     return Column(
       mainAxisSize: MainAxisSize.min,

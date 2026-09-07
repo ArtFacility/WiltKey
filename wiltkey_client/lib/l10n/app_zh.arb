@@ -1026,7 +1026,7 @@
   "securingBody": "你的设备会在连接前向中继服务器验证自身。这是一次性的工作量证明，可保护大家免受垃圾信息和滥用困扰——无需手机号，无需邮箱，无需账号。",
   "securingWorking": "正在验证设备 — 处理中…",
   "securingOnceNote": "这仅在首次连接时发生，之后重新连接将瞬间完成。",
-  "puzzleInstruction": "你的连接验证中有一部分被打乱了。请拖动滑条，直到图片完整对齐，然后确认。",
+  "puzzleInstruction": "滑动直到像素画对称。",
   "puzzleLockIn": "确认",
   "puzzleFailedRetry": "好像没对上——正在开始新的验证…",
   "reauthenticatingBanner": "正在重新验证 — 请稍候…",

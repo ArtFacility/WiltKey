@@ -737,7 +737,7 @@
   "securingBody": "Din enhet verifierar sig mot reläet innan den ansluter. Detta engångs proof-of-work skyddar alla mot spam och missbruk — inget telefonnummer, ingen e-post, inget konto.",
   "securingWorking": "VERIFIERAR ENHET — ARBETAR…",
   "securingOnceNote": "Detta händer bara vid din första anslutning. Därefter är återanslutningen omedelbar.",
-  "puzzleInstruction": "En del av din anslutningskontroll är förvrängd. Dra i listen tills bilden klickar på plats och bekräfta sedan.",
+  "puzzleInstruction": "Dra tills pixelarten är symmetrisk.",
   "puzzleLockIn": "Lås fast",
   "puzzleFailedRetry": "Det blev inte helt rätt — vi startar en ny kontroll…",
   "reauthenticatingBanner": "ÅTERAUTENTISIERAR — VÄNLIGEN VÄNTA…",

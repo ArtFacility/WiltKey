@@ -2331,8 +2331,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'This happens only on your first connection. Reconnecting afterwards is instant.';
 
   @override
-  String get puzzleInstruction =>
-      'A piece of your connection check is scrambled. Slide the strip until the picture locks in, then confirm.';
+  String get puzzleInstruction => 'Slide until the pixel art is symmetrical.';
 
   @override
   String get puzzleLockIn => 'Lock in';

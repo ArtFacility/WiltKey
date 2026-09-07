@@ -737,7 +737,7 @@
   "securingBody": "Az eszközöd a csatlakozás előtt hitelesíti magát a relénél. Ez az egyszeri proof-of-work mindenkit véd a spamtől és a visszaélésektől — telefonszám, e-mail és fiók nélkül.",
   "securingWorking": "ESZKÖZ HITELESÍTÉSE — FOLYAMATBAN…",
   "securingOnceNote": "Ez csak az első csatlakozáskor történik. Az újracsatlakozás utána azonnali.",
-  "puzzleInstruction": "A kapcsolati ellenőrzésed egy része összekeveredett. Húzd el a csíkot, amíg a kép a helyére nem illeszkedik, majd erősítsd meg.",
+  "puzzleInstruction": "Csúsztasd, amíg a pixel art szimmetrikus nem lesz.",
   "puzzleLockIn": "Rögzítés",
   "puzzleFailedRetry": "Ez nem illeszkedett — új ellenőrzést indítunk…",
   "reauthenticatingBanner": "ÚJRAHITELESÍTÉS — KÉRJÜK, VÁRJ…",

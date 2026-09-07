@@ -4191,7 +4191,7 @@ abstract class AppLocalizations {
   /// No description provided for @puzzleInstruction.
   ///
   /// In en, this message translates to:
-  /// **'A piece of your connection check is scrambled. Slide the strip until the picture locks in, then confirm.'**
+  /// **'Slide until the pixel art is symmetrical.'**
   String get puzzleInstruction;
 
   /// No description provided for @puzzleLockIn.

@@ -737,7 +737,7 @@
   "securingBody": "Ton appareil se vérifie auprès du relais avant de se connecter. Cette preuve de travail unique protège tout le monde contre le spam et les abus — sans numéro de téléphone, sans e-mail, sans compte.",
   "securingWorking": "VÉRIFICATION DE L'APPAREIL — EN COURS…",
   "securingOnceNote": "Cela n'arrive que lors de ta première connexion. Les reconnexions suivantes sont instantanées.",
-  "puzzleInstruction": "Une partie de ta vérification de connexion est brouillée. Fais glisser la bande jusqu'à ce que l'image s'emboîte, puis confirme.",
+  "puzzleInstruction": "Fais glisser jusqu'à ce que le pixel art soit symétrique.",
   "puzzleLockIn": "Valider",
   "puzzleFailedRetry": "Ça ne s'est pas aligné — on relance une nouvelle vérification…",
   "reauthenticatingBanner": "RÉAUTHENTIFICATION — VEUILLEZ PATIENTER…",
