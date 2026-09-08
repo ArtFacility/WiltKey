@@ -107,6 +107,13 @@ class _AppShellState extends State<AppShell>
     // re-run initState, so the deep-link would otherwise be missed — the stashed
     // target chat sits unopened and its unread badge lingers. Re-check on resume.
     if (state == AppLifecycleState.resumed) {
+      // Opening the app lands on the Chats tab — unless the user is mid-
+      // activity (a pushed screen: chat, editor, composer…). Tabs alone are
+      // not "mid-activity": whatever tab was left showing (e.g. Connect) used
+      // to greet every app reopen.
+      if (mounted && !Navigator.of(context).canPop()) {
+        selectTab(ShellTab.chats);
+      }
       WidgetsBinding.instance.addPostFrameCallback((_) => _openPendingChat());
       // The user may have enabled an accessibility service while away.
       WidgetsBinding.instance

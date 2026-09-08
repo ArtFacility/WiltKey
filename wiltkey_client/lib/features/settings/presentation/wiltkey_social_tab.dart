@@ -54,7 +54,12 @@ class _WiltkeySocialSettingsTabState extends State<WiltkeySocialSettingsTab> {
         ? (isPlus ? ClientBadgeType.playPlus : ClientBadgeType.playOfficial)
         : ClientBadgeType.tinkerer;
 
-    return RefreshIndicator(
+    return ListenableBuilder(
+      listenable: _appState,
+      // The tab must react to AppState changes: publishing a story refreshes
+      // socialBudget in AppState, and this gauge used to stay stale until the
+      // user pulled to refresh because the widget never listened.
+      builder: (context, _) => RefreshIndicator(
       color: t.action,
       backgroundColor: t.surface,
       onRefresh: _refresh,
@@ -390,6 +395,7 @@ class _WiltkeySocialSettingsTabState extends State<WiltkeySocialSettingsTab> {
             ),
           ),
         ],
+      ),
       ),
     );
   }
