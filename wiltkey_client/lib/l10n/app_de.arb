@@ -741,6 +741,7 @@
   "puzzleLockIn": "Einrasten",
   "puzzleFailedRetry": "Das hat nicht gepasst — starte eine neue Prüfung…",
   "reauthenticatingBanner": "NEUAUTHENTIFIZIERUNG — BITTE WARTEN…",
+  "connectionLostBanner": "WEBSOCKET-VERBINDUNG FEHLGESCHLAGEN — ERNEUTER VERSUCH…",
   "badgePlayPlus": "Play Store · Plus",
   "badgePlayPlusSubtitle": "Verifizierter Google Play-Build + Plus-Unterstützer",
   "badgePlayPlusExplainer": "Dieser Benutzer nutzt einen offiziellen, unveränderten Build, der über Google Play Integrity verifiziert wurde, und unterstützt WiltKey aktiv mit einer Plus-Mitgliedschaft.",

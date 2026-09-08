@@ -142,6 +142,16 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
       everConnectedThisSession &&
       wsPhase == WsPhase.issuing;
 
+  /// Relay unreachable while the app is open: the socket is neither connected
+  /// nor mid-dance. Pairing stays usable, but messaging/stories are down —
+  /// the shell says so instead of leaving the user guessing why sends fail.
+  bool get showConnectionLostBanner =>
+      isLoaded &&
+      !isOnboardingRequired &&
+      !isLocked &&
+      !WebSocketClient().isBusy &&
+      !WebSocketClient().isConnected;
+
   /// Submits the puzzle answer the user locked in (websocket client no-ops
   /// when no challenge is active).
   void submitPuzzleAnswer(int answer) {
@@ -658,6 +668,8 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     shortNick = '';
     profileImageB64 = '';
     cancelAllWiltTimers();
+    cancelAllGroupMetaSyncTimers();
+    groupNukeSessions.clear();
   }
 
   // Signs a message string using our private key and returns signature in hex

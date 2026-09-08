@@ -107,6 +107,9 @@ extension AppStateLifecycle on AppState {
       hasMoreOlder.remove(contact.id);
       unreadCounts.remove(contact.id);
       groupMembersMetadata.remove(contact.id);
+      // Stop the metadata retry loop for this group — without this, the
+      // timer keeps pinging the wiped group's member hashes for ~10 minutes.
+      if (isGroup) groupMetaSyncTimers.remove(contact.keyHash)?.cancel();
       if (activeContact?.keyHash == contactKeyHash) {
         activeContact = null;
       }

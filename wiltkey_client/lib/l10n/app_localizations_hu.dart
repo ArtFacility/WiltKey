@@ -2376,6 +2376,10 @@ class AppLocalizationsHu extends AppLocalizations {
   String get reauthenticatingBanner => 'ÚJRAHITELESÍTÉS — KÉRJÜK, VÁRJ…';
 
   @override
+  String get connectionLostBanner =>
+      'WEBSOCKET-KAPCSOLAT SIKERTELEN — ÚJRAPRÓBÁLKOZÁS…';
+
+  @override
   String get badgePlayPlus => 'Play Áruház · Plus';
 
   @override

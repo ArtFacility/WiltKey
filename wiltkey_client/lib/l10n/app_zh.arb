@@ -1030,6 +1030,7 @@
   "puzzleLockIn": "确认",
   "puzzleFailedRetry": "好像没对上——正在开始新的验证…",
   "reauthenticatingBanner": "正在重新验证 — 请稍候…",
+  "connectionLostBanner": "WEBSOCKET 连接失败 — 正在重试…",
   "badgePlayPlus": "Play 商店 · Plus",
   "badgePlayPlusSubtitle": "已验证的 Google Play 版本 + Plus 支持者",
   "badgePlayPlusExplainer": "此用户正在运行经 Google Play Integrity 验证的官方未修改版本，并通过有效的 Plus 会员资格积极支持 WiltKey。",

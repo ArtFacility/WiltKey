@@ -741,6 +741,7 @@
   "puzzleLockIn": "Lås fast",
   "puzzleFailedRetry": "Det blev inte helt rätt — vi startar en ny kontroll…",
   "reauthenticatingBanner": "ÅTERAUTENTISIERAR — VÄNLIGEN VÄNTA…",
+  "connectionLostBanner": "WEBSOCKET-ANSLUTNINGEN MISSLYCKADES — FÖRSÖKER IGEN…",
   "badgePlayPlus": "Play Butik · Plus",
   "badgePlayPlusSubtitle": "Verifierad Google Play-version + Plus-supporter",
   "badgePlayPlusExplainer": "Den här användaren kör en officiell, omodifierad version som verifierats via Google Play Integrity och stöder aktivt WiltKey med ett aktivt Plus-medlemskap.",

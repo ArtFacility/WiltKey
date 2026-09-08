@@ -9,6 +9,21 @@ a local relay tuned for automation (instant PoW, no puzzle).
 
 ---
 
+## First run checklist (the short version)
+
+1. Plug devices in (USB debugging on, RSA prompt approved) → `adb devices -l`.
+2. Copy each serial into `devices.json` (FOSS for the Huawei; `play` only for GMS devices).
+3. `.\RUN_FARM_RELAY.ps1` (needs `POSTGRES_URL` pointing at the `wiltkey_farm` DB — see the script header).
+4. `.\build_farm_apks.ps1` → farm APKs land in `dist\farm\`.
+5. `.\run_farm.ps1 -Mode fresh` — expect the first run to be the *tuning* run:
+   failure logs + screenshots land in `results\<timestamp>\<serial>\` and show
+   exactly which tap points need nudging per OEM (PIN fields, story sheet,
+   chat-row positions). Fix the `point:` values in the failing flow, re-run.
+6. Once fresh passes: pair devices manually once, then `.\run_farm.ps1`
+   (keep mode) for the recurring suite; `-Mode quick` after every rebuild.
+
+---
+
 ## One-time setup
 
 ### 1. Install Maestro (done on this machine)

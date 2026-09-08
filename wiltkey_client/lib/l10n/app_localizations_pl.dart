@@ -2377,6 +2377,10 @@ class AppLocalizationsPl extends AppLocalizations {
       'PONOWNE UWIERZYTELNIANIE — PROSZĘ CZEKAĆ…';
 
   @override
+  String get connectionLostBanner =>
+      'POŁĄCZENIE WEBSOCKET NIEUDANE — PONAWIANIE PRÓBY…';
+
+  @override
   String get badgePlayPlus => 'Sklep Play · Plus';
 
   @override

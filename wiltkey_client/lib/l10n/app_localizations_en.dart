@@ -2344,6 +2344,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get reauthenticatingBanner => 'REAUTHENTICATING — PLEASE WAIT…';
 
   @override
+  String get connectionLostBanner => 'WEBSOCKET CONNECTION FAILED — RETRYING…';
+
+  @override
   String get badgePlayPlus => 'Play Store · Plus';
 
   @override

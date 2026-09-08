@@ -2360,6 +2360,10 @@ class AppLocalizationsSv extends AppLocalizations {
   String get reauthenticatingBanner => 'ÅTERAUTENTISIERAR — VÄNLIGEN VÄNTA…';
 
   @override
+  String get connectionLostBanner =>
+      'WEBSOCKET-ANSLUTNINGEN MISSLYCKADES — FÖRSÖKER IGEN…';
+
+  @override
   String get badgePlayPlus => 'Play Butik · Plus';
 
   @override

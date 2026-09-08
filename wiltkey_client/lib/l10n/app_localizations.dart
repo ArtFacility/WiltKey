@@ -4212,6 +4212,12 @@ abstract class AppLocalizations {
   /// **'REAUTHENTICATING — PLEASE WAIT…'**
   String get reauthenticatingBanner;
 
+  /// No description provided for @connectionLostBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'WEBSOCKET CONNECTION FAILED — RETRYING…'**
+  String get connectionLostBanner;
+
   /// No description provided for @badgePlayPlus.
   ///
   /// In en, this message translates to:

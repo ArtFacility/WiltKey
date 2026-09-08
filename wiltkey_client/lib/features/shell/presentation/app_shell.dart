@@ -285,6 +285,10 @@ class _AppShellState extends State<AppShell>
             // seconds-long). Explain it instead of silently stalling chat.
             if (_appState.showReauthenticatingBanner)
               const _ReauthenticatingBanner(),
+            // Relay unreachable while the app is open: pairing still works,
+            // but messaging/stories are down. Grace-delayed so a normal
+            // 1-2s connect never flashes it.
+            const _ConnectionLostBannerHost(),
             Expanded(
               child: context.wkc.ambientBackground(
                 child: SafeArea(
@@ -422,6 +426,91 @@ class _ReauthenticatingBanner extends StatelessWidget {
                 AppLocalizations.of(context)!.reauthenticatingBanner,
                 style: TextStyle(
                   color: t.onAction,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.6,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Persistent strip while the relay is unreachable and no reconnect dance is
+/// even running (network down / relay dead). Stays up until a connection
+/// succeeds — pairing remains usable, messaging does not. Deliberately
+/// grace-delayed (~2.5s) so ordinary sub-second connects never flash it.
+class _ConnectionLostBannerHost extends StatefulWidget {
+  const _ConnectionLostBannerHost();
+
+  @override
+  State<_ConnectionLostBannerHost> createState() =>
+      _ConnectionLostBannerHostState();
+}
+
+class _ConnectionLostBannerHostState extends State<_ConnectionLostBannerHost> {
+  final AppState _appState = AppState();
+  Timer? _graceTimer;
+  bool _visible = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _appState.addListener(_onState);
+    if (_appState.showConnectionLostBanner) {
+      _startGrace();
+    }
+  }
+
+  @override
+  void dispose() {
+    _appState.removeListener(_onState);
+    _graceTimer?.cancel();
+    super.dispose();
+  }
+
+  void _onState() {
+    if (!mounted) return;
+    if (_appState.showConnectionLostBanner) {
+      if (!_visible && _graceTimer == null) _startGrace();
+    } else {
+      _graceTimer?.cancel();
+      _graceTimer = null;
+      if (_visible) setState(() => _visible = false);
+    }
+  }
+
+  void _startGrace() {
+    _graceTimer = Timer(const Duration(milliseconds: 2500), () {
+      _graceTimer = null;
+      if (mounted && _appState.showConnectionLostBanner && !_visible) {
+        setState(() => _visible = true);
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_visible) return const SizedBox(width: 0, height: 0);
+    final t = context.wk;
+    return Material(
+      color: t.danger,
+      child: SafeArea(
+        bottom: false,
+        child: SizedBox(
+          height: 26,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.wifi_off, size: 14, color: Colors.white),
+              const SizedBox(width: 6),
+              Text(
+                AppLocalizations.of(context)!.connectionLostBanner,
+                style: const TextStyle(
+                  color: Colors.white,
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
                   letterSpacing: 0.6,

@@ -741,6 +741,7 @@
   "puzzleLockIn": "Rögzítés",
   "puzzleFailedRetry": "Ez nem illeszkedett — új ellenőrzést indítunk…",
   "reauthenticatingBanner": "ÚJRAHITELESÍTÉS — KÉRJÜK, VÁRJ…",
+  "connectionLostBanner": "WEBSOCKET-KAPCSOLAT SIKERTELEN — ÚJRAPRÓBÁLKOZÁS…",
   "badgePlayPlus": "Play Áruház · Plus",
   "badgePlayPlusSubtitle": "Ellenőrzött Google Play build + Plus támogató",
   "badgePlayPlusExplainer": "Ez a felhasználó hivatalos, módosítatlan buildet használ, amelyet a Google Play Integrity ellenőrzött, és aktív Plus tagsággal támogatja a WiltKeyt.",

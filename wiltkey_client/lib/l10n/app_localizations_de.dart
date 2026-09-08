@@ -2372,6 +2372,10 @@ class AppLocalizationsDe extends AppLocalizations {
   String get reauthenticatingBanner => 'NEUAUTHENTIFIZIERUNG — BITTE WARTEN…';
 
   @override
+  String get connectionLostBanner =>
+      'WEBSOCKET-VERBINDUNG FEHLGESCHLAGEN — ERNEUTER VERSUCH…';
+
+  @override
   String get badgePlayPlus => 'Play Store · Plus';
 
   @override

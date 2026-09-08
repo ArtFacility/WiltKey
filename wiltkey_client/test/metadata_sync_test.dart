@@ -199,6 +199,12 @@ void main() {
             'abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789';
         final int bufferSize = 10000;
 
+        // Pre-clean any stale pad from a previous (crashed) run: the pad
+        // files persist on disk between test processes, and the fresh-seed
+        // guard correctly refuses a "recharge" whose seed matches a burned
+        // leftover pad.
+        await WiltkeyOtpService.deleteKeystreamFile(bobKeyHash);
+
         await appState.addOrRechargeContact(
           'Bob',
           'http://localhost:8000',
@@ -337,6 +343,8 @@ void main() {
       }
 
       final bobKeyHash = 'bob_key_hash_456';
+      // Pre-clean any stale pad from a previous (crashed) run — see 6.4.
+      await WiltkeyOtpService.deleteKeystreamFile(bobKeyHash);
       await appState.addOrRechargeContact(
         'Bob',
         'http://localhost:8000',

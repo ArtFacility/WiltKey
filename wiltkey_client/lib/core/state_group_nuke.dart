@@ -82,7 +82,12 @@ extension AppStateGroupNuke on AppState {
     if (keyHex == null) return;
 
     final requestId = _newGroupNukeRequestId();
-    final needed = (peers.length ~/ 2) + 1;
+    // Majority of the WHOLE group, proposer included (the proposer's intent
+    // is an implicit yes). owner call 2026-09-08: on a 3-member group one
+    // agreeing peer is enough (2 of 3); the old rule (majority of the OTHER
+    // members only) demanded unanimous peers and stalled every vote.
+    final totalMembers = peers.length + 1;
+    final needed = totalMembers ~/ 2;
     final session = GroupNukeSession(
       requestId: requestId,
       contactId: group.id,

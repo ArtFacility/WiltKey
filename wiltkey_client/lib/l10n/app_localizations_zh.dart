@@ -2226,6 +2226,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get reauthenticatingBanner => '正在重新验证 — 请稍候…';
 
   @override
+  String get connectionLostBanner => 'WEBSOCKET 连接失败 — 正在重试…';
+
+  @override
   String get badgePlayPlus => 'Play 商店 · Plus';
 
   @override

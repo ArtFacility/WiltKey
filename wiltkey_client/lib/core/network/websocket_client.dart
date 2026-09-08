@@ -306,7 +306,14 @@ class WebSocketClient {
     old?.close();
   }
 
-  void _handleDisconnect() {
+  /// Set when the relay EXPLICITLY rejected us (AUTH_REJECTED): the relay
+  /// closes the socket right after, and that teardown must not count toward
+  /// relay-unreachable rotation. Consumed by the next [_handleDisconnect].
+  bool _rejectionPending = false;
+
+  void _handleDisconnect({bool serverRejected = false}) {
+    serverRejected = serverRejected || _rejectionPending;
+    _rejectionPending = false;
     _isConnecting = false;
     _isAuthenticating = false;
     _activeChallengeId = null;
@@ -314,7 +321,12 @@ class WebSocketClient {
     _authDeadline = null;
     _setPhase(WsPhase.idle);
     _closeSocket();
-    _failCount++;
+    // Server REJECTIONS mean the relay was reached and answered — they say
+    // nothing about the relay being unreachable. Counting them as connection
+    // failures rotated us onto OTHER relays mid-issuance, scattering
+    // per-relay state (challenge strikes, tokens, queues) and even dropping
+    // test-relay devices onto production. Only network failures rotate.
+    if (!serverRejected) _failCount++;
 
     // Default: retry the same URL. After a few straight failures, rotate to the
     // next candidate (peer-advertised relay / production default) so a bad saved
@@ -361,6 +373,17 @@ class WebSocketClient {
       } catch (e) {
         _log('[WebSocket Error] Error in onMessageSent callback: $e');
       }
+    }
+    // Auth gate: while the handshake hasn't concluded, ONLY the auth-dance
+    // frames may go out. Any other frame here is a caller that ignored
+    // isBusy (e.g. a group-sync retry firing mid-issuance) — the relay
+    // expects AUTH_TOKEN_ISSUE and closes on junk ("Expected
+    // AUTH_TOKEN_ISSUE frame" from the field, 2026-09-08).
+    const authFrames = {'AUTH', 'AUTH_TOKEN_ISSUE', 'AUTH_CHALLENGE_SOLUTION'};
+    final type = msgMap['type'] as String? ?? '';
+    if (!_isAuthenticated && !authFrames.contains(type)) {
+      _log('[WebSocket] Dropped $type — connection not authenticated yet.');
+      return;
     }
     if (_socket == null) {
       _log('[WebSocket] Cannot send message, socket is null');
@@ -649,17 +672,21 @@ class WebSocketClient {
         case 'AUTH_REJECTED':
           final reason = jsonMap['message'] as String? ?? 'rejected';
           _log('[WebSocket] Auth rejected: $reason');
+          // The relay always closes after a rejection; the resulting onDone
+          // must not count as a relay-unreachable failure (see
+          // _handleDisconnect). Consumed by the next disconnect.
+          _rejectionPending = true;
           if (reason == 'token_invalid') {
             // Our stored token is unknown/expired/revoked — drop it so the
             // next connect goes through the issuance gate, then reconnect.
             _deviceToken = null;
             await onDeviceTokenUpdated?.call(null);
-            _handleDisconnect();
+            _handleDisconnect(serverRejected: true);
           } else if (reason == 'challenge_failed') {
             // Wrong puzzle answer — the dance is dead; a fresh reconnect
             // presents a NEW puzzle. Strikes/cooldown are the relay's job;
             // the client just restarts cleanly.
-            _handleDisconnect();
+            _handleDisconnect(serverRejected: true);
           } else if (reason == 'challenge_cooldown' ||
               reason == 'challenge_unavailable') {
             // Cooldown armed from earlier wrong answers — back off instead

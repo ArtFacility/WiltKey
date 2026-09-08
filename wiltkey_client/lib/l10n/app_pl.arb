@@ -741,6 +741,7 @@
   "puzzleLockIn": "Zatwierdź",
   "puzzleFailedRetry": "Nie udało się dopasować — zaczynamy nową weryfikację…",
   "reauthenticatingBanner": "PONOWNE UWIERZYTELNIANIE — PROSZĘ CZEKAĆ…",
+  "connectionLostBanner": "POŁĄCZENIE WEBSOCKET NIEUDANE — PONAWIANIE PRÓBY…",
   "badgePlayPlus": "Sklep Play · Plus",
   "badgePlayPlusSubtitle": "Zweryfikowana kompilacja Google Play + Wspierający Plus",
   "badgePlayPlusExplainer": "Ten użytkownik korzysta z oficjalnej, niezmodyfikowanej kompilacji zweryfikowanej przez Google Play Integrity i aktywnie wspiera WiltKey z aktywnym członkostwem Plus.",

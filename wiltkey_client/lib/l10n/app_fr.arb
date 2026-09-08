@@ -741,6 +741,7 @@
   "puzzleLockIn": "Valider",
   "puzzleFailedRetry": "Ça ne s'est pas aligné — on relance une nouvelle vérification…",
   "reauthenticatingBanner": "RÉAUTHENTIFICATION — VEUILLEZ PATIENTER…",
+  "connectionLostBanner": "CONNEXION WEBSOCKET ÉCHOUÉE — NOUVELLE TENTATIVE…",
   "badgePlayPlus": "Play Store · Plus",
   "badgePlayPlusSubtitle": "Version Google Play vérifiée + Supporter Plus",
   "badgePlayPlusExplainer": "Cet utilisateur utilise une version officielle et non modifiée, vérifiée via Google Play Integrity, et soutient activement WiltKey avec un abonnement Plus.",

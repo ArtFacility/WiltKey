@@ -918,6 +918,16 @@ extension AppStateGroups on AppState {
     return null;
   }
 
+  /// Cancels every in-flight group metadata retry timer. Called on wipe/reset —
+  /// the retry loop otherwise keeps pinging stale member hashes for ~10 minutes
+  /// after the group (and its contacts) no longer exist.
+  void cancelAllGroupMetaSyncTimers() {
+    for (final t in groupMetaSyncTimers.values) {
+      t.cancel();
+    }
+    groupMetaSyncTimers.clear();
+  }
+
   void requestLaneRefill(Contact group) {
     if (group.isGroup && !group.isHost && group.hostKeyHash != null) {
       log(

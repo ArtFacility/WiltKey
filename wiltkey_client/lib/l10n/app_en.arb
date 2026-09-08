@@ -1372,6 +1372,7 @@
   "puzzleLockIn": "Lock in",
   "puzzleFailedRetry": "That didn't line up — starting a fresh check…",
   "reauthenticatingBanner": "REAUTHENTICATING — PLEASE WAIT…",
+  "connectionLostBanner": "WEBSOCKET CONNECTION FAILED — RETRYING…",
   "badgePlayPlus": "Play Store · Plus",
   "badgePlayPlusSubtitle": "Verified Google Play Build + Plus Supporter",
   "badgePlayPlusExplainer": "This user is running an official, unmodified build verified through Google Play Integrity, and is actively supporting WiltKey with an active Plus membership.",

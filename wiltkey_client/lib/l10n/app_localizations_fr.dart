@@ -2376,6 +2376,10 @@ class AppLocalizationsFr extends AppLocalizations {
       'RÉAUTHENTIFICATION — VEUILLEZ PATIENTER…';
 
   @override
+  String get connectionLostBanner =>
+      'CONNEXION WEBSOCKET ÉCHOUÉE — NOUVELLE TENTATIVE…';
+
+  @override
   String get badgePlayPlus => 'Play Store · Plus';
 
   @override
