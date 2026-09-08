@@ -303,7 +303,13 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   String localDevRelayUrl = 'http://192.168.1.234:8000';
 
   /// The always-reachable default relay; also the last-resort connection fallback.
-  static const String productionRelayUrl = 'https://api.wiltkey.org';
+  /// Overridable at build time for device-farm builds (`--dart-define=WK_DEFAULT_RELAY=http://<laptop>:8000`):
+  /// a fresh farm install then connects to the local automation relay from first
+  /// launch — without the define (every normal build), the production default applies.
+  static const String productionRelayUrl = String.fromEnvironment(
+    'WK_DEFAULT_RELAY',
+    defaultValue: 'https://api.wiltkey.org',
+  );
 
   /// Public relays advertised by peers (via chat_info_update). Used purely as
   /// connection fallbacks when our own relay is unreachable — never auto-saved as

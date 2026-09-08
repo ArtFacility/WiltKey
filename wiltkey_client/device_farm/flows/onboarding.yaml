@@ -1,0 +1,63 @@
+# FULL ONBOARDING (fresh install) — language → welcome → theme → profile →
+# avatar → notifications → social → PIN → securing screen → Chats tab.
+#
+# Run by the orchestrator in -Mode fresh AFTER a clean install. The farm relay
+# (PoW difficulty 1, puzzle off) is baked into the APK via WK_DEFAULT_RELAY.
+#
+# NOTE: PIN entry uses screen-percentage taps because the PIN fields are
+# custom-drawn (invisible text fields with tap-anywhere boxes). If a device's
+# aspect ratio misplaces them, nudge the `point` values below.
+
+appId: ${APP_ID}
+---
+# Fresh install → language page (shows on first run only)
+- launchApp:
+    clearState: true
+- assertVisible: "English"
+- tapOn: "English"
+- tapOn: "Continue"
+
+# Welcome page
+- assertVisible: "Welcome to Wiltkey"
+- tapOn: "Continue"
+
+# Theme page
+- assertVisible: "Choose your theme"
+- tapOn: "Continue"
+
+# Profile page — defaults (Anonymous + random codename) are fine
+- assertVisible: "Your Identity"
+- tapOn: "Continue"
+
+# Avatar page — skip editing
+- assertVisible: "Edit avatar"
+- tapOn: "Continue"
+
+# Notifications page — default (Off) is fine
+- assertVisible: "Alerts"
+- tapOn: "Continue"
+
+# Social page — Enable (Recommended) is preselected
+- assertVisible: "WiltKey Social Account"
+- tapOn: "Continue"
+
+# PIN setup: two custom input boxes. Tap the box areas by percentage point,
+# then type. (See the header note about nudging per device.)
+- assertVisible: "Passcode PIN"
+- tapOn:
+    point: "50%, 38%"
+- inputText: ${PIN}
+- tapOn:
+    point: "50%, 52%"
+- inputText: ${PIN}
+- tapOn: "Finish"
+
+# Securing your connection — with the farm relay (difficulty 1, puzzle off)
+# this can flash by in well under a second, so it's optional.
+- assertVisible:
+    text: "Securing your connection"
+    optional: true
+
+# Shell mounts, landing on the Chats tab
+- assertVisible: "Chats"
+- assertVisible: "No chats yet"

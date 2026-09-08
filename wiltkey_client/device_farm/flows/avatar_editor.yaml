@@ -1,0 +1,26 @@
+# AVATAR EDITOR — open the pixel editor, draw a few pixels, save.
+
+appId: ${APP_ID}
+---
+- launchApp
+- assertVisible: "Enter PIN to unlock"
+- tapOn:
+    point: "50%, 45%"
+- inputText: ${PIN}
+- tapOn: "Unlock"
+
+# Settings → profile → edit avatar
+- tapOn: "Settings"
+- assertVisible: "Settings"
+- tapOn: "Edit avatar"
+
+# Editor is open (its Save/Cancel row confirms we're in it)
+- assertVisible: "Cancel"
+
+# Draw: Random chip gives a deterministic-enough new sprite without needing
+# precise canvas coordinates across OEM screen shapes.
+- tapOn: "Random"
+- tapOn: "Save"
+
+# Back on Settings with the new avatar applied
+- assertVisible: "Settings"

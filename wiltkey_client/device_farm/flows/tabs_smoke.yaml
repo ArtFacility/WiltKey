@@ -1,0 +1,32 @@
+# TABS SMOKE — unlock, then visit every tab and assert the nav bar survives.
+# Also validates the app-opens-on-Chats behavior (shell mounts on the Chats
+# tab; Contacts/Connect/Settings are reachable from there).
+
+appId: ${APP_ID}
+---
+- launchApp
+# PIN lock screen (fresh launch with an enrolled PIN)
+- assertVisible: "Enter PIN to unlock"
+- tapOn:
+    point: "50%, 45%"
+- inputText: ${PIN}
+- tapOn: "Unlock"
+
+# Shell visible, landed on Chats
+- assertVisible: "Chats"
+
+# Contacts tab
+- tapOn: "Contacts"
+- assertVisible: "Chats"   # bottom nav stays present
+
+# Connect tab
+- tapOn: "Connect"
+- assertVisible: "Chats"
+
+# Settings tab
+- tapOn: "Settings"
+- assertVisible: "Settings"
+
+# Back to Chats
+- tapOn: "Chats"
+- assertVisible: "Chats"

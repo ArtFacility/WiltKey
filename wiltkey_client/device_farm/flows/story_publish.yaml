@@ -1,0 +1,34 @@
+# STORY PUBLISH — compose a text-tag story and publish it.
+#
+# "Add Story" opens the composer in PHOTO mode, which auto-opens the system
+# gallery picker — we Back out of it and switch to a text story (no camera
+# dependency, deterministic across OEMs). Requires social account enabled
+# (onboarding default) and the farm relay up.
+
+appId: ${APP_ID}
+---
+- launchApp
+- assertVisible: "Enter PIN to unlock"
+- tapOn:
+    point: "50%, 45%"
+- inputText: ${PIN}
+- tapOn: "Unlock"
+
+- assertVisible: "Add Story"
+- tapOn: "Add Story"
+
+# Composer opens in photo mode → the system gallery picker appears. Leave it.
+- waitForAnimationToEnd:
+    timeout: 4000
+- back
+
+# Text story: add a text tag (the tooltip doubles as the a11y label), type
+# into it, then publish.
+- assertVisible: "Share 24h"
+- tapOn: "Add Text Tag"
+- inputText: "Farm story test"
+- tapOn: "Share 24h"
+- assertVisible: "Story published to mutual contacts (24h)"
+
+# Back on the dashboard, our story ring now says "Your Story"
+- assertVisible: "Your Story"

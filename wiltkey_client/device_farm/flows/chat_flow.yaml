@@ -1,0 +1,35 @@
+# CHAT FLOW (single-device) — open the first paired chat and send a message.
+#
+# REQUIRES a paired contact (pair devices once manually — BLE/QR can't be
+# scripted; see README). Run with -Mode keep after pairing. The message text
+# is chosen to be unique enough to find in the sent bubble.
+
+appId: ${APP_ID}
+---
+- launchApp
+- assertVisible: "Enter PIN to unlock"
+- tapOn:
+    point: "50%, 45%"
+- inputText: ${PIN}
+- tapOn: "Unlock"
+
+# There must be at least one chat
+- assertVisible: "Chats"
+- assertNotVisible: "No chats yet"
+
+# Open the topmost chat row (below the header; percentage tap — chat rows
+# start under the stories rail, ~30% down on common aspect ratios).
+- tapOn:
+    point: "50%, 30%"
+- waitForAnimationToEnd:
+    timeout: 4000
+
+# Send a text message
+- tapOn:
+    point: "50%, 92%"
+- inputText: "Farm automated test message"
+- tapOn:
+    point: "92%, 92%"
+
+# The sent bubble echoes our text
+- assertVisible: "Farm automated test message"
