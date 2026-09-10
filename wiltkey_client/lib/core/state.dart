@@ -152,6 +152,11 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
       !WebSocketClient().isBusy &&
       !WebSocketClient().isConnected;
 
+  /// WHY the last issuance was refused (cooldown / daily cap / stale app), or
+  /// null when the connection trouble isn't a server rejection. The
+  /// connection-issue dialog reads this at tap time to pick its wording.
+  String? get relayIssueReason => WebSocketClient().issuanceBackoffReason;
+
   /// Submits the puzzle answer the user locked in (websocket client no-ops
   /// when no challenge is active).
   void submitPuzzleAnswer(int answer) {

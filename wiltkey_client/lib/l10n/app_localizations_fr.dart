@@ -2380,6 +2380,24 @@ class AppLocalizationsFr extends AppLocalizations {
       'CONNEXION WEBSOCKET ÉCHOUÉE — NOUVELLE TENTATIVE…';
 
   @override
+  String get commonOk => 'OK';
+
+  @override
+  String get connectionIssueTitle => 'Relais injoignable';
+
+  @override
+  String get connectionIssueGeneric =>
+      'Soit ce relais rencontre un problème, soit ton réseau ne parvient pas à le joindre pour le moment. Jumeler des appareils à proximité fonctionne toujours — la messagerie a besoin du relais. L\'app réessaie automatiquement.';
+
+  @override
+  String get connectionIssueCooldown =>
+      'Ce réseau est temporairement limité par la protection anti-spam du relais — trop de vérifications échouées sont venues de son adresse. Tout continue de réessayer automatiquement ; cela se résorbe généralement en quelques minutes.';
+
+  @override
+  String get connectionIssueRateLimit =>
+      'Ce réseau a atteint sa limite quotidienne d\'appareils (trop de nouveaux appareils se sont connectés depuis la même adresse). Tu peux toujours discuter avec un appareil déjà vérifié sur ce réseau — ou réessayer après la réinitialisation quotidienne.';
+
+  @override
   String get badgePlayPlus => 'Play Store · Plus';
 
   @override

@@ -2229,6 +2229,24 @@ class AppLocalizationsZh extends AppLocalizations {
   String get connectionLostBanner => 'WEBSOCKET 连接失败 — 正在重试…';
 
   @override
+  String get commonOk => '确定';
+
+  @override
+  String get connectionIssueTitle => '无法连接到中继';
+
+  @override
+  String get connectionIssueGeneric =>
+      '可能是此中继暂时出现问题，也可能是你当前的网络暂时无法连接。附近设备配对仍可正常使用——收发消息则需要中继，应用会自动持续重试。';
+
+  @override
+  String get connectionIssueCooldown =>
+      '此网络暂时受到中继垃圾防护的限制——该地址发送了过多验证失败的请求。应用会自动持续重试，通常几分钟内就会恢复。';
+
+  @override
+  String get connectionIssueRateLimit =>
+      '此网络今日的新设备数量已达到上限（同一地址连接了过多新设备）。你仍可与此网络中已验证的设备聊天——或等待每日重置后再试。';
+
+  @override
   String get badgePlayPlus => 'Play 商店 · Plus';
 
   @override

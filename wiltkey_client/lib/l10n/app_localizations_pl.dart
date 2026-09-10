@@ -2381,6 +2381,24 @@ class AppLocalizationsPl extends AppLocalizations {
       'POŁĄCZENIE WEBSOCKET NIEUDANE — PONAWIANIE PRÓBY…';
 
   @override
+  String get commonOk => 'OK';
+
+  @override
+  String get connectionIssueTitle => 'Brak połączenia z przekaźnikiem';
+
+  @override
+  String get connectionIssueGeneric =>
+      'Albo ten przekaźnik ma chwilowe problemy, albo Twoja sieć nie może się z nim teraz połączyć. Parowanie urządzeń w pobliżu nadal działa — wiadomości wymagają przekaźnika. Aplikacja automatycznie ponawia próby.';
+
+  @override
+  String get connectionIssueCooldown =>
+      'Ta sieć została tymczasowo ograniczona przez ochronę antyspamową przekaźnika — z tego adresu przyszło zbyt wiele nieudanych weryfikacji. Wszystko automatycznie ponawia próby; zazwyczaj ustępuje to w ciągu kilku minut.';
+
+  @override
+  String get connectionIssueRateLimit =>
+      'Ta sieć wykorzystała dziś limit urządzeń (zbyt wiele nowych urządzeń połączyło się z tego samego adresu). Nadal możesz rozmawiać z urządzeniem już zweryfikowanym w tej sieci — lub spróbować ponownie po codziennym resecie.';
+
+  @override
   String get badgePlayPlus => 'Sklep Play · Plus';
 
   @override

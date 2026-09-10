@@ -255,20 +255,41 @@ void main() {
         // Deliver this message. This should trigger gap detection for [gapStart, gapEnd]
         ws.onMessageReceived!(bobKeyHash, envelope, 'text');
 
-        // Wait for async DB and gap detection
-        await Future.delayed(const Duration(milliseconds: 400));
+        // Wait for async DB + gap detection. POLL (up to 5s) instead of a
+        // fixed delay: under full-suite load the async chain can miss a
+        // fixed 400ms window and flake the suite.
+        Future<bool> waitUntil(bool Function() cond) async {
+          final deadline = DateTime.now().add(const Duration(seconds: 5));
+          while (!cond()) {
+            if (DateTime.now().isAfter(deadline)) return false;
+            await Future.delayed(const Duration(milliseconds: 50));
+          }
+          return true;
+        }
 
-        // 4. Assert that a resync request was sent for the gap [gapStart, gapEnd]
-        expect(sentMessages, isNotEmpty);
-        final resyncRequest = sentMessages.firstWhere(
-          (m) => m['content_type'] == 'chat_resync_request',
+        Map<String, dynamic>? resyncRequest;
+        expect(
+          await waitUntil(() {
+            try {
+              resyncRequest = sentMessages.firstWhere(
+                (m) => m['content_type'] == 'chat_resync_request',
+                orElse: () => <String, dynamic>{},
+              );
+              return resyncRequest!.isNotEmpty;
+            } catch (_) {
+              return false;
+            }
+          }),
+          isTrue,
+          reason: 'gap detection never emitted a resync request',
         );
         expect(resyncRequest, isNotNull);
-        expect(resyncRequest['type'], equals('SEND_MESSAGE'));
-        expect(resyncRequest['recipient_id'], equals(bobKeyHash));
+        final r = resyncRequest!;
+        expect(r['type'], equals('SEND_MESSAGE'));
+        expect(r['recipient_id'], equals(bobKeyHash));
 
         final requestEnvelope =
-            jsonDecode(resyncRequest['envelope']) as Map<String, dynamic>;
+            jsonDecode(r['envelope'] as String) as Map<String, dynamic>;
         expect(requestEnvelope['start_offset'], equals(gapStart));
         expect(requestEnvelope['end_offset'], equals(gapEnd));
         expect(requestEnvelope['group_id'], isNull);
@@ -306,7 +327,17 @@ void main() {
           responseEnvelope,
           'chat_resync_response',
         );
-        await Future.delayed(const Duration(milliseconds: 1000));
+        // Poll for the healed gap (up to 5s) — same suite-load reasoning.
+        expect(
+          await waitUntil(
+            () => (appState.messages[contact.id] ?? []).any(
+              (m) => m.id == missedMsgId,
+            ),
+          ),
+          isTrue,
+          reason: 'resync response never healed the gap',
+        );
+        await Future.delayed(const Duration(milliseconds: 200));
 
         // 6. Assert that the gap is healed
         final chatMessages = appState.messages[contact.id] ?? [];

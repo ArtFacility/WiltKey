@@ -4218,6 +4218,36 @@ abstract class AppLocalizations {
   /// **'WEBSOCKET CONNECTION FAILED — RETRYING…'**
   String get connectionLostBanner;
 
+  /// No description provided for @commonOk.
+  ///
+  /// In en, this message translates to:
+  /// **'OK'**
+  String get commonOk;
+
+  /// No description provided for @connectionIssueTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Can\'t reach the relay'**
+  String get connectionIssueTitle;
+
+  /// No description provided for @connectionIssueGeneric.
+  ///
+  /// In en, this message translates to:
+  /// **'Either this relay is having problems, or your network can\'t reach it right now. Pairing devices nearby still works — messaging needs the relay. The app keeps retrying automatically.'**
+  String get connectionIssueGeneric;
+
+  /// No description provided for @connectionIssueCooldown.
+  ///
+  /// In en, this message translates to:
+  /// **'This network is temporarily limited by the relay\'s spam protection — too many failed verifications came from its address. Everything keeps retrying automatically; this usually clears within minutes.'**
+  String get connectionIssueCooldown;
+
+  /// No description provided for @connectionIssueRateLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'This network has used up its device limit for today (too many new devices connected from the same address). You can still chat with an already-verified device on this network — or try again after the daily reset.'**
+  String get connectionIssueRateLimit;
+
   /// No description provided for @badgePlayPlus.
   ///
   /// In en, this message translates to:

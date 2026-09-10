@@ -2347,6 +2347,24 @@ class AppLocalizationsEn extends AppLocalizations {
   String get connectionLostBanner => 'WEBSOCKET CONNECTION FAILED — RETRYING…';
 
   @override
+  String get commonOk => 'OK';
+
+  @override
+  String get connectionIssueTitle => 'Can\'t reach the relay';
+
+  @override
+  String get connectionIssueGeneric =>
+      'Either this relay is having problems, or your network can\'t reach it right now. Pairing devices nearby still works — messaging needs the relay. The app keeps retrying automatically.';
+
+  @override
+  String get connectionIssueCooldown =>
+      'This network is temporarily limited by the relay\'s spam protection — too many failed verifications came from its address. Everything keeps retrying automatically; this usually clears within minutes.';
+
+  @override
+  String get connectionIssueRateLimit =>
+      'This network has used up its device limit for today (too many new devices connected from the same address). You can still chat with an already-verified device on this network — or try again after the daily reset.';
+
+  @override
   String get badgePlayPlus => 'Play Store · Plus';
 
   @override

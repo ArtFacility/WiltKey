@@ -2380,6 +2380,24 @@ class AppLocalizationsHu extends AppLocalizations {
       'WEBSOCKET-KAPCSOLAT SIKERTELEN — ÚJRAPRÓBÁLKOZÁS…';
 
   @override
+  String get commonOk => 'Rendben';
+
+  @override
+  String get connectionIssueTitle => 'A relé nem elérhető';
+
+  @override
+  String get connectionIssueGeneric =>
+      'Vagy a relének van pillanatnyi problémája, vagy a hálózatod most nem éri el. A közeli eszközök párosítása továbbra is működik — az üzenetküldéshez a relé kell. Az alkalmazás automatikusan újrapróbálkozik.';
+
+  @override
+  String get connectionIssueCooldown =>
+      'Ezt a hálózatot ideiglenesen korlátozza a relé spamszűrése — túl sok sikertelen hitelesítés érkezett erről a címről. Minden automatikusan újrapróbálkozik; ez általában néhány percen belül megszűnik.';
+
+  @override
+  String get connectionIssueRateLimit =>
+      'Ez a hálózat mára elérte a napi eszközlimitet (túl sok új eszköz csatlakozott ugyanarról a címről). A hálózaton már hitelesített eszközzel továbbra is cseveghetsz — vagy próbáld újra a napi visszaállítás után.';
+
+  @override
   String get badgePlayPlus => 'Play Áruház · Plus';
 
   @override

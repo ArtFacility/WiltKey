@@ -2364,6 +2364,24 @@ class AppLocalizationsSv extends AppLocalizations {
       'WEBSOCKET-ANSLUTNINGEN MISSLYCKADES — FÖRSÖKER IGEN…';
 
   @override
+  String get commonOk => 'OK';
+
+  @override
+  String get connectionIssueTitle => 'Går inte att nå reläet';
+
+  @override
+  String get connectionIssueGeneric =>
+      'Antingen har reläet tillfälliga problem eller så kan ditt nätverk inte nå det just nu. Att koppla enheter i närheten fungerar fortfarande — meddelanden behöver reläet. Appen försöker automatiskt igen.';
+
+  @override
+  String get connectionIssueCooldown =>
+      'Det här nätverket begränsas tillfälligt av reläets spamskydd — för många misslyckade verifieringar har kommit från adressen. Allt försöker automatiskt igen; det brukar släppa inom några minuter.';
+
+  @override
+  String get connectionIssueRateLimit =>
+      'Det här nätverket har nått dagens enhetsgräns (för många nya enheter har anslutit från samma adress). Du kan fortfarande chatta med en redan verifierad enhet i det här nätverket — eller försöka igen efter dygnets återställning.';
+
+  @override
   String get badgePlayPlus => 'Play Butik · Plus';
 
   @override

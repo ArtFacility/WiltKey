@@ -2376,6 +2376,24 @@ class AppLocalizationsDe extends AppLocalizations {
       'WEBSOCKET-VERBINDUNG FEHLGESCHLAGEN — ERNEUTER VERSUCH…';
 
   @override
+  String get commonOk => 'OK';
+
+  @override
+  String get connectionIssueTitle => 'Relay nicht erreichbar';
+
+  @override
+  String get connectionIssueGeneric =>
+      'Entweder hat dieses Relay gerade Probleme oder dein Netzwerk kann es im Moment nicht erreichen. Das Koppeln von Geräten in der Nähe funktioniert weiterhin — für Nachrichten wird das Relay benötigt. Die App versucht automatisch, die Verbindung wiederherzustellen.';
+
+  @override
+  String get connectionIssueCooldown =>
+      'Dieses Netzwerk wird vorübergehend vom Spamschutz des Relays begrenzt — zu viele fehlgeschlagene Verifizierungen kamen von dieser Adresse. Alles wird automatisch weiter versucht; das legt sich meist innerhalb weniger Minuten.';
+
+  @override
+  String get connectionIssueRateLimit =>
+      'Dieses Netzwerk hat sein Tageslimit für neue Geräte aufgebraucht (zu viele neue Geräte haben sich von derselben Adresse verbunden). Du kannst weiterhin mit einem bereits verifizierten Gerät in diesem Netzwerk chatten — oder es nach dem täglichen Reset erneut versuchen.';
+
+  @override
   String get badgePlayPlus => 'Play Store · Plus';
 
   @override

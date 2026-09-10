@@ -140,6 +140,16 @@ class WebSocketClient {
   /// connects are skipped until this lapses so we never burn battery
   /// re-solving a PoW the relay will refuse anyway.
   DateTime? _issuanceBackoffUntil;
+  /// WHY the last issuance backoff was armed (challenge_cooldown,
+  /// issuance_rate_limited, ...) — surfaced in the connection-issue dialog so
+  /// users can tell "relay is down" from "this network tripped spam
+  /// protection". Null when the last dance failed for other reasons.
+  String? _issuanceBackoffReason;
+  String? get issuanceBackoffReason => _issuanceBackoffReason;
+  bool get isIssuanceBackoffActive {
+    final b = _issuanceBackoffUntil;
+    return b != null && DateTime.now().isBefore(b);
+  }
   void Function(String senderId, String envelope, String contentType)?
   onMessageReceived;
   void Function(Map<String, dynamic> message)? onRawMessageReceived;
@@ -691,6 +701,7 @@ class WebSocketClient {
               reason == 'challenge_unavailable') {
             // Cooldown armed from earlier wrong answers — back off instead
             // of tight-looping reconnects into a guaranteed rejection.
+            _issuanceBackoffReason = 'challenge_cooldown';
             _issuanceBackoffUntil =
                 DateTime.now().add(const Duration(minutes: 2));
             _log('[WebSocket] Challenge cooldown — backing off until $_issuanceBackoffUntil');
@@ -698,6 +709,7 @@ class WebSocketClient {
             // The relay runs the challenge mode but this app build predates
             // the puzzle — the website force-update path takes over from
             // here; back off instead of hammering a guaranteed rejection.
+            _issuanceBackoffReason = 'challenge_upgrade_required';
             _issuanceBackoffUntil =
                 DateTime.now().add(const Duration(minutes: 30));
             _log('[WebSocket] Challenge upgrade required — update the app (backing off)');
@@ -706,15 +718,21 @@ class WebSocketClient {
             // PoW every 5s would drain battery and hammer the relay for a
             // guaranteed rejection — back off HARD (the watchdog still
             // reconnects once the backoff lapses).
+            _issuanceBackoffReason = 'issuance_rate_limited';
             _issuanceBackoffUntil = DateTime.now().add(const Duration(hours: 1));
             _log('[WebSocket] Issuance rate-limited — backing off until $_issuanceBackoffUntil');
           } else if (reason == 'pow_invalid') {
             // Our solver/protocol disagrees with the relay — retry later, not
             // in a tight loop.
+            _issuanceBackoffReason = 'pow_invalid';
             _issuanceBackoffUntil = DateTime.now().add(const Duration(minutes: 5));
           }
           break;
         case 'AUTH_OK':
+          // A successful dance retires any armed issuance backoff — the gate
+          // is behind us and future reconnects must not be deferred.
+          _issuanceBackoffUntil = null;
+          _issuanceBackoffReason = null;
           _isAuthenticated = true;
           // A refreshed/issued device token rides AUTH_OK — persist it before
           // anything else so a crash right after connect can't lose it.

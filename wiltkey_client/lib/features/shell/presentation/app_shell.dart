@@ -496,29 +496,76 @@ class _ConnectionLostBannerHostState extends State<_ConnectionLostBannerHost> {
   Widget build(BuildContext context) {
     if (!_visible) return const SizedBox(width: 0, height: 0);
     final t = context.wk;
-    return Material(
-      color: t.danger,
-      child: SafeArea(
-        bottom: false,
-        child: SizedBox(
-          height: 26,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.wifi_off, size: 14, color: Colors.white),
-              const SizedBox(width: 6),
-              Text(
-                AppLocalizations.of(context)!.connectionLostBanner,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.6,
+    return GestureDetector(
+      // Tapping the banner explains the situation: relay-side trouble vs this
+      // network tripping the relay's spam protection (cooldown / daily cap).
+      onTap: () => _showConnectionIssueDialog(context),
+      child: Material(
+        color: t.danger,
+        child: SafeArea(
+          bottom: false,
+          child: SizedBox(
+            height: 26,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.wifi_off, size: 14, color: Colors.white),
+                const SizedBox(width: 6),
+                Text(
+                  AppLocalizations.of(context)!.connectionLostBanner,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.6,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
+      ),
+    );
+  }
+
+  void _showConnectionIssueDialog(BuildContext context) {
+    final t = context.wk;
+    final l10n = AppLocalizations.of(context)!;
+    final appState = AppState();
+    final reason = appState.relayIssueReason;
+    final String body;
+    if (reason == 'challenge_cooldown') {
+      body = l10n.connectionIssueCooldown;
+    } else if (reason == 'issuance_rate_limited') {
+      body = l10n.connectionIssueRateLimit;
+    } else {
+      body = l10n.connectionIssueGeneric;
+    }
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: t.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(t.radiusCard),
+          side: BorderSide(color: t.border),
+        ),
+        title: Text(
+          l10n.connectionIssueTitle,
+          style: t.screenTitle.copyWith(fontSize: 17),
+        ),
+        content: Text(
+          body,
+          style: t.bodySecondary.copyWith(height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text(
+              l10n.commonOk,
+              style: t.body.copyWith(color: t.action, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
       ),
     );
   }
