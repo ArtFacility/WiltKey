@@ -1674,12 +1674,50 @@ extension AppStateGroups on AppState {
     if (memberKeyHash == userId) return; // never kick yourself (the host)
     final groupId = group.keyHash;
 
+    final seed = group.groupSeed ?? '';
     final lane = await GroupDatabase.instance.getLaneByMember(
       groupId,
       memberKeyHash,
     );
+    int? kickedSlot;
     if (lane != null) {
-      await GroupDatabase.instance.freeLane(groupId, lane['slot_index'] as int);
+      kickedSlot = lane['slot_index'] as int;
+      await GroupDatabase.instance.freeLane(groupId, kickedSlot);
+    }
+
+    // Singled-out kick notice (owner design, 2026-09-10): a group_kick frame
+    // addressed ONLY to the kicked device. It wipes their local copy (data
+    // destroyed instead of lingering as a stale readable snapshot) and stops
+    // them burning relay bandwidth on a tombstoned lane — without propagating
+    // to anyone else. Slot-attested: a replay after they later rejoin into a
+    // fresh slot mismatches and is ignored.
+    if (seed.isNotEmpty && kickedSlot != null) {
+      try {
+        final keyHex = sha256.convert(utf8.encode(seed)).toString();
+        final enc = WiltkeyPersistence().encryptString(
+          jsonEncode({
+            'v': 1,
+            'kicked': memberKeyHash,
+            'slot': kickedSlot,
+          }),
+          keyHex,
+        );
+        await ensureWebSocketConnected();
+        WebSocketClient().sendWSMessage({
+          'type': 'SEND_MESSAGE',
+          'recipient_id': memberKeyHash,
+          'envelope': jsonEncode({
+            'group_id': groupId,
+            'sender_id': userId,
+            'd': enc,
+            't': 'group_kick',
+          }),
+          'content_type': 'group_kick',
+        });
+      } catch (e) {
+        // Best-effort: the kick proceeds even if the notice can't go out.
+        log('[Group Host] kick notice failed for $memberKeyHash: $e');
+      }
     }
 
     final idx = contacts.indexWhere((c) => c.isGroup && c.keyHash == groupId);
@@ -1845,6 +1883,65 @@ extension AppStateGroups on AppState {
     log('[Group] $senderId left the group (lane tombstoned).');
   }
 
+  /// We were KICKED: the host sent us a singled-out group_kick frame. Wipe the
+  /// group locally (keys + data destroyed — a stale readable copy of a group
+  /// we no longer belong to serves nobody), which also exits the chat via the
+  /// nuke-while-open guard if we were looking at it.
+  ///
+  /// Authentication: the relay-authenticated sender must be our CURRENT host
+  /// (only the host kicks), the payload must self-identify us, and the
+  /// attested slot must still be OURS — a replayed kick after we re-joined
+  /// into a fresh slot (or after a recharge rotated everything) mismatches
+  /// and is ignored.
+  Future<void> _handleGroupKick(
+    Contact group,
+    String senderId,
+    Map<String, dynamic> envelopeJson,
+  ) async {
+    if (group.isHost) return; // the host never kicks themselves
+    // Authority gate FAILS CLOSED (review 2026-09-10 HIGH): any member can
+    // ENCRYPT a kick payload (shared group seed), so sender==host is the only
+    // authority check — it must never be skipped when the host is unknown.
+    if (group.hostKeyHash == null || senderId != group.hostKeyHash) return;
+    final seed = group.groupSeed ?? '';
+    if (seed.isEmpty) return;
+    try {
+      final keyHex = sha256.convert(utf8.encode(seed)).toString();
+      final dec = WiltkeyPersistence().decryptString(
+        envelopeJson['d'] as String,
+        keyHex,
+      );
+      final p = jsonDecode(dec) as Map<String, dynamic>;
+      if (p['kicked'] != userId) return; // must self-identify the victim
+      final attestedSlot = (p['slot'] as num?)?.toInt();
+      if (attestedSlot == null) return;
+
+      // The attested slot must still be the one we currently hold.
+      final myLane = await GroupDatabase.instance.getLaneByMember(
+        group.keyHash,
+        userId,
+      );
+      if (myLane == null) return; // already gone (idempotent)
+      if ((myLane['slot_index'] as int) != attestedSlot) {
+        log('[Group] Ignoring stale group_kick (slot ${p['slot']} ≠ our slot '
+            '${myLane['slot_index']}) — likely a replay after a rejoin.');
+        return;
+      }
+    } catch (e) {
+      log('[Group] group_kick failed to authenticate: $e');
+      return;
+    }
+
+    log('[Group] Kicked from group by host — wiping local copy.');
+    await nukeContact(
+      group.keyHash,
+      receivedFromPeer: true,
+      eventOverrideType: 'group_kicked',
+      eventOverrideTitle: 'Removed from a group',
+      eventOverrideBody: 'The group host removed you from a secure group.',
+    );
+  }
+
   /// Member side of a host recharge: the group's seed was reset, so our lane is
   /// dead. Lock the chat (composer → "meet the host again") until we re-meet the
   /// host. History is kept — only sending is blocked. Decrypts with our current
@@ -1855,9 +1952,10 @@ extension AppStateGroups on AppState {
     Map<String, dynamic> envelopeJson,
   ) async {
     // Only the host may recharge; ignore a frame not from our host, and ignore
-    // it on the host's own device (we never lock ourselves out).
+    // it on the host's own device (we never lock ourselves out). Authority
+    // gate FAILS CLOSED (same latent pattern as group_kick — review 2026-09-10).
     if (group.isHost) return;
-    if (group.hostKeyHash != null && senderId != group.hostKeyHash) return;
+    if (group.hostKeyHash == null || senderId != group.hostKeyHash) return;
     try {
       final seed = group.groupSeed ?? '';
       if (seed.isEmpty) return;

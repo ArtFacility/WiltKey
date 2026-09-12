@@ -90,6 +90,9 @@ extension AppStateLifecycle on AppState {
   Future<void> nukeContact(
     String contactKeyHash, {
     required bool receivedFromPeer,
+    String? eventOverrideType,
+    String? eventOverrideTitle,
+    String? eventOverrideBody,
   }) async {
     log(
       'nukeContact starting. keyHash: $contactKeyHash, receivedFromPeer: $receivedFromPeer',
@@ -140,11 +143,15 @@ extension AppStateLifecycle on AppState {
       await purgeEventsForChat(contactKeyHash);
       if (receivedFromPeer) {
         await logEvent(
-          type: isGroup ? 'group_nuked' : 'nuke_received',
-          title: isGroup ? 'Group destroyed' : 'Chat destroyed',
-          body: isGroup
-              ? 'A secure group was destroyed.'
-              : 'A secure chat was destroyed.',
+          // An override lets specific remote events (e.g. "kicked from group")
+          // tell the truth instead of the generic destruction copy.
+          type: eventOverrideType ?? (isGroup ? 'group_nuked' : 'nuke_received'),
+          title: eventOverrideTitle ??
+              (isGroup ? 'Group destroyed' : 'Chat destroyed'),
+          body: eventOverrideBody ??
+              (isGroup
+                  ? 'A secure group was destroyed.'
+                  : 'A secure chat was destroyed.'),
         );
       }
     } else {

@@ -388,6 +388,11 @@ extension AppStateInbound on AppState {
         return;
       }
 
+      if (contentType == 'group_kick') {
+        await _handleGroupKick(contact, senderId, envelopeJson!);
+        return;
+      }
+
       if (contentType == 'group_nuke_request') {
         await _handleGroupNukeRequest(contact, senderId, envelopeJson!);
         return;

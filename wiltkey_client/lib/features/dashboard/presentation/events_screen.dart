@@ -316,6 +316,12 @@ class _EventsScreenState extends State<EventsScreen> {
           l10n.eventGroupNukedTitle,
           l10n.eventGroupNukedBody,
         );
+      case 'group_kicked':
+        return (
+          Icons.person_remove_outlined,
+          e.title,
+          e.body,
+        );
       case 'contact_request':
         return (
           Icons.person_add_alt_1,
