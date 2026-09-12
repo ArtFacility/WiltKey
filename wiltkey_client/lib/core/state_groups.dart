@@ -1087,7 +1087,9 @@ extension AppStateGroups on AppState {
     for (final lane in lanes) {
       final slot = lane['slot_index'] as int;
       if (slot <= 1) continue; // keep info lane + host's fresh lane
-      await GroupDatabase.instance.freeLane(groupId, slot);
+      // Safe reset: the seed was just rotated, so these offset ranges are
+      // unburned and the slots are freely assignable again.
+      await GroupDatabase.instance.resetLane(groupId, slot);
     }
 
     // 4. Update the in-memory Contact: new seed, host is the only active member
@@ -1705,7 +1707,142 @@ extension AppStateGroups on AppState {
         contacts.firstWhere((c) => c.keyHash == groupId),
       );
     }
-    log('[Group Host] Kicked $memberKeyHash (lane freed, profile kept).');
+    log('[Group Host] Kicked $memberKeyHash (lane tombstoned, profile kept).');
+  }
+
+  /// Announce a voluntary leave to the other members, then wipe the group
+  /// locally. The announcement rides the group's AES meta channel; receivers
+  /// tombstone the leaver's lane (retired forever — its offset range was
+  /// burned, so re-assignment on this seed would reuse keystream) and note
+  /// the departure in the chat.
+  Future<void> leaveGroup(Contact group) async {
+    if (!group.isGroup) return;
+    final groupId = group.keyHash;
+    final seed = group.groupSeed ?? '';
+    final peers = group.memberKeyHashes.where((h) => h != userId).toList();
+
+    if (seed.isNotEmpty && peers.isNotEmpty) {
+      try {
+        final keyHex = sha256.convert(utf8.encode(seed)).toString();
+        // Attest OUR slot(s) in the payload: a replayed leave after we later
+        // rejoined (fresh slot) must only ever retire the slot generation it
+        // was issued from, never the new one.
+        final myLanes = await GroupDatabase.instance.getAllLanes(groupId);
+        final mySlots = myLanes
+            .where((l) => l['member_key_hash'] == userId)
+            .map((l) => l['slot_index'] as int)
+            .toList();
+        final enc = WiltkeyPersistence().encryptString(
+          jsonEncode({'v': 1, 'leaver': userId, 'slots': mySlots}),
+          keyHex,
+        );
+        final envelope = jsonEncode({
+          'group_id': groupId,
+          'sender_id': userId,
+          'd': enc,
+          't': 'group_leave',
+        });
+        await ensureWebSocketConnected();
+        for (final memberHash in peers) {
+          WebSocketClient().sendWSMessage({
+            'type': 'SEND_MESSAGE',
+            'recipient_id': memberHash,
+            'envelope': envelope,
+            'content_type': 'group_leave',
+          });
+        }
+      } catch (e) {
+        log('[Group] leave announcement failed (continuing): $e');
+      }
+    }
+
+    await nukeContact(groupId, receivedFromPeer: false);
+  }
+
+  /// Another member announced their departure. Tombstone their lane (the
+  /// offset range is burned — never re-assignable on this seed), drop them
+  /// from the delivery roster, and note it in the chat.
+  Future<void> _handleGroupLeave(
+    Contact group,
+    String senderId,
+    Map<String, dynamic> envelopeJson,
+  ) async {
+    if (senderId == userId) return;
+    final seed = group.groupSeed ?? '';
+    if (seed.isEmpty) return;
+    if (!group.memberKeyHashes.contains(senderId)) return; // not a member
+    try {
+      final keyHex = sha256.convert(utf8.encode(seed)).toString();
+      final dec = WiltkeyPersistence().decryptString(
+        envelopeJson['d'] as String,
+        keyHex,
+      );
+      final p = jsonDecode(dec) as Map<String, dynamic>;
+      if (p['leaver'] != senderId) return; // payload must self-identify
+      // Scope the tombstone to the slots the leaver attested. A replayed
+      // leave after the leaver rejoined (fresh slot) only re-retires the OLD
+      // slot generation — the new one is untouched.
+      final attestedSlots = ((p['slots'] as List<dynamic>?) ?? [])
+          .map((s) => (s as num).toInt())
+          .toSet();
+      if (attestedSlots.isEmpty) {
+        // Older-format leave (no slot attestation): fall back to the lanes
+        // currently owned by the leaver.
+        attestedSlots.addAll(
+          (await GroupDatabase.instance.getAllLanes(group.keyHash))
+              .where((l) => l['member_key_hash'] == senderId)
+              .map((l) => l['slot_index'] as int),
+        );
+      }
+      for (final slot in attestedSlots) {
+        await GroupDatabase.instance.tombstoneLane(group.keyHash, slot);
+      }
+    } catch (e) {
+      log('[Group] group_leave failed to authenticate: $e');
+      return;
+    }
+
+    // Drop from the delivery roster (profile row kept for attribution).
+    final idx = contacts.indexWhere((c) => c.isGroup && c.keyHash == group.keyHash);
+    if (idx != -1) {
+      final existing = contacts[idx];
+      final newHashes = existing.memberKeyHashes
+          .where((h) => h != senderId)
+          .toList();
+      final updated = existing.copyWith(
+        memberKeyHashes: newHashes,
+        memberCount: newHashes.length,
+      );
+      contacts[idx] = updated;
+      if (activeContact?.keyHash == group.keyHash) activeContact = updated;
+      await WiltkeyDatabase.instance.upsertContact(updated);
+      updateGroupMembersMetadata(updated);
+
+      // System note in the chat (plain-English like all system notes).
+      final leaverProfile =
+          groupProfilesCache[group.keyHash]?[senderId];
+      final leaverNameRaw = leaverProfile?['name'] as String?;
+      final leaverName =
+          (leaverNameRaw?.isNotEmpty ?? false) ? leaverNameRaw! : 'A member';
+      final note = ChatMessage(
+        id: 'system_leave_${senderId.substring(0, 8)}_${DateTime.now().millisecondsSinceEpoch}',
+        senderId: 'system',
+        text: '',
+        decryptedText: '$leaverName left the group',
+        timestamp: DateTime.now(),
+        isSentByMe: false,
+      );
+      appendLoadedMessage(group.id, note);
+      await WiltkeyDatabase.instance.saveMessage(
+        note,
+        group.id,
+        masterKeyHex: masterKeyHex,
+      );
+    }
+
+    notifyListeners();
+    _persistence.saveState(this);
+    log('[Group] $senderId left the group (lane tombstoned).');
   }
 
   /// Member side of a host recharge: the group's seed was reset, so our lane is

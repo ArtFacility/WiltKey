@@ -309,12 +309,18 @@ class RemotePairingController extends ChangeNotifier {
 
     try {
       // Re-meet reuses the joiner's existing slot (Time Wilt time-refresh), so a
-      // full group only blocks brand-new joiners.
+      // full group only blocks brand-new joiners. Tombstoned lanes are
+      // excluded: a departed member's old slot is retired forever (keystream
+      // burned) and they get a FRESH slot like any first-time joiner.
       final existingLane = await GroupDatabase.instance.getLaneByMember(
         group.keyHash,
         joinerId,
       );
       int? slot = existingLane?['slot_index'] as int?;
+      if (slot != null &&
+          ((existingLane!['tombstoned'] as int? ?? 0) == 1)) {
+        slot = null; // retired — allocate fresh below
+      }
       if (slot == null) {
         final emptyLanes = await GroupDatabase.instance.getEmptyLanes(
           group.keyHash,

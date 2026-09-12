@@ -383,6 +383,11 @@ extension AppStateInbound on AppState {
         return;
       }
 
+      if (contentType == 'group_leave') {
+        await _handleGroupLeave(contact, senderId, envelopeJson!);
+        return;
+      }
+
       if (contentType == 'group_nuke_request') {
         await _handleGroupNukeRequest(contact, senderId, envelopeJson!);
         return;
@@ -930,6 +935,16 @@ extension AppStateInbound on AppState {
       );
 
       if (innerType == 'group_lane_header') {
+        // Tombstoned slot: the member left/was kicked — a fresh header would
+        // re-attribute the retired lane AND (pre-preservation) could clear its
+        // tombstone. Drop it.
+        final laneNow = await GroupDatabase.instance.getLane(groupId, slotIndex);
+        if (laneNow != null &&
+            (laneNow['tombstoned'] as int? ?? 0) == 1 &&
+            innerSenderId != userId) {
+          log('[Group Security] Dropping lane header for tombstoned slot $slotIndex ($innerSenderId).');
+          return;
+        }
         try {
           final header = parseLaneHeader(Uint8List.fromList(plainBytes));
           await upsertGroupProfileMerged(
@@ -993,6 +1008,15 @@ extension AppStateInbound on AppState {
       // Ensure a lane row exists for this slot (create on the fly for peers we
       // haven't fully synced yet).
       final lane = await GroupDatabase.instance.getLane(groupId, slotIndex);
+      // Tombstoned lane (member left / was kicked): their offset range is
+      // retired — accept no further writes from it. The leaver still holds
+      // the group seed, so without this guard they could keep posting.
+      if (lane != null &&
+          (lane['tombstoned'] as int? ?? 0) == 1 &&
+          innerSenderId != userId) {
+        log('[Group Security] Dropping frame from tombstoned lane $slotIndex ($innerSenderId).');
+        return;
+      }
       final int cursor = lane?['current_write_offset'] as int? ?? 0;
       final int incomingRelative = offset - laneStart;
       // Gap detection: we received bytes beyond where we expected this lane to be.
@@ -1649,15 +1673,16 @@ extension AppStateInbound on AppState {
       final contact = contacts[contactIndex];
 
       if (contact.isGroup) {
-        final knownProfile =
-            await GroupDatabase.instance.getProfile(chatKey, senderId);
+        // ACTIVE membership only. Profiles are intentionally kept after a
+        // leave/kick for attribution, so profile existence is NOT a membership
+        // signal — a departed member who kept the seed could otherwise keep
+        // pulling the group's full history.
         final isMember =
             contact.isHost ||
-            contact.memberKeyHashes.contains(senderId) ||
-            knownProfile != null;
+            contact.memberKeyHashes.contains(senderId);
         if (!isMember) {
           log(
-            '[Resync Warning] $senderId requested group resync but is not a member of $chatKey',
+            '[Resync Warning] $senderId requested group resync but is not an active member of $chatKey',
           );
           return;
         }
@@ -1817,6 +1842,40 @@ extension AppStateInbound on AppState {
         final String ciphertextB64 = m['text'] as String;
         final String contentType = m['contentType'] as String;
         final String innerSenderId = m['senderId'] as String;
+
+        // Forward-write guard (group): a resync responder is a peer we asked
+        // for HISTORY, but a malicious member could smuggle NEW ciphertext at
+        // NEW offsets (fresh writes) for a lane they don't own — e.g. a
+        // departed member's tombstoned lane. Accept only items within that
+        // lane's already-acked write range, unless the inner sender is still
+        // an active member of the slot it writes into. Items at already-seen
+        // offsets always pass (genuine history fill).
+        if (contact.isGroup && innerSenderId != userId) {
+          final infoLaneSize = AppState.infoLaneSize;
+          final laneSize = contact.laneSize ?? 0;
+          if (laneSize > 0) {
+            final itemSlot = ((offset - infoLaneSize) ~/ laneSize) + 1;
+            final itemLane = await GroupDatabase.instance.getLane(
+              contact.keyHash,
+              itemSlot,
+            );
+            final bool tombstoned =
+                itemLane != null &&
+                (itemLane['tombstoned'] as int? ?? 0) == 1;
+            if (tombstoned) continue; // retired lane: no writes ever
+            final bool itemBeyondCursor =
+                itemLane != null &&
+                (offset + (base64Decode(ciphertextB64).length)) -
+                        ((itemLane['start_offset'] as int) +
+                            (itemLane['current_write_offset'] as int? ?? 0)) >
+                    0;
+            if (itemBeyondCursor &&
+                !contact.memberKeyHashes.contains(innerSenderId)) {
+              log('[Group Security] Dropping resync forward-write from non-member $innerSenderId (slot $itemSlot).');
+              continue;
+            }
+          }
+        }
         // Prefer the timezone-independent epoch (new clients). Fall back to the
         // ISO string, forcing UTC so a legacy tz-less string from an old client
         // isn't reinterpreted in our local zone (the ordering/display bug).

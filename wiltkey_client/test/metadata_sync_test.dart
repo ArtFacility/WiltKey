@@ -199,10 +199,14 @@ void main() {
             'abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789';
         final int bufferSize = 10000;
 
-        // Pre-clean any stale pad from a previous (crashed) run: the pad
-        // files persist on disk between test processes, and the fresh-seed
-        // guard correctly refuses a "recharge" whose seed matches a burned
-        // leftover pad.
+        // Pre-clean any stale state from a previous (crashed) run: pads AND
+        // DB rows persist between test processes. A leftover contact row
+        // would route creation into the recharge path with different offset
+        // bookkeeping (the flake: gapStart computed from stale offsets), so
+        // remove the contact + its messages + the pad entirely.
+        await WiltkeyDatabase.instance.deleteMessagesForChat(bobKeyHash);
+        await WiltkeyDatabase.instance.deleteContactRecord(bobKeyHash);
+        appState.contacts.removeWhere((c) => c.keyHash == bobKeyHash);
         await WiltkeyOtpService.deleteKeystreamFile(bobKeyHash);
 
         await appState.addOrRechargeContact(
@@ -374,7 +378,10 @@ void main() {
       }
 
       final bobKeyHash = 'bob_key_hash_456';
-      // Pre-clean any stale pad from a previous (crashed) run — see 6.4.
+      // Pre-clean stale state (see 6.4).
+      await WiltkeyDatabase.instance.deleteMessagesForChat(bobKeyHash);
+      await WiltkeyDatabase.instance.deleteContactRecord(bobKeyHash);
+      appState.contacts.removeWhere((c) => c.keyHash == bobKeyHash);
       await WiltkeyOtpService.deleteKeystreamFile(bobKeyHash);
       await appState.addOrRechargeContact(
         'Bob',

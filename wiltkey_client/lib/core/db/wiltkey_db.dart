@@ -45,7 +45,7 @@ class WiltkeyDatabase {
     } catch (_) {}
     _db = await openDatabase(
       path,
-      version: 27,
+      version: 28,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -241,6 +241,16 @@ class WiltkeyDatabase {
         await db.execute('CREATE INDEX IF NOT EXISTS idx_stories_expiry ON stories(expires_at)');
       } catch (_) {}
     }
+
+    // v28: tombstoned group lanes. A lane whose member left (or was kicked)
+    // is RETIRED, never freed for re-assignment: its offset range was already
+    // burned into the shared group keystream, so handing the same range to a
+    // new member on the same seed would XOR fresh messages with used
+    // keystream (stream-cipher reuse). Tombstoned lanes stay out of
+    // getEmptyLanes forever, and inbound frames from them are dropped.
+    if (oldVersion < 28) {
+      await _safeAddColumn(db, 'group_lanes', 'tombstoned', 'INTEGER DEFAULT 0');
+    }
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -271,6 +281,7 @@ class WiltkeyDatabase {
         max_offset INTEGER,
         current_write_offset INTEGER DEFAULT 0,
         header_written INTEGER DEFAULT 0,
+        tombstoned INTEGER DEFAULT 0,
         UNIQUE(group_id, slot_index),
         FOREIGN KEY (group_id) REFERENCES group_info(group_id) ON DELETE CASCADE
       )
@@ -1927,6 +1938,11 @@ class WiltkeyDatabase {
   // Lane CRUD
   // ---------------------------------------------------------------------------
 
+  /// Insert-or-update a lane row. PRESERVES the tombstone: an upsert that
+  /// silently cleared `tombstoned` would make a retired (keystream-burned)
+  /// slot assignable again on a live seed — stream-cipher reuse. Callers
+  /// must never pass [forceClearTombstone] except on seed rotation
+  /// (recharge), where resetLane/upsert with clear is safe.
   Future<void> upsertLane({
     required String groupId,
     required int slotIndex,
@@ -1935,8 +1951,14 @@ class WiltkeyDatabase {
     required int maxOffset,
     int currentWriteOffset = 0,
     bool headerWritten = false,
+    bool forceClearTombstone = false,
   }) async {
     final db = await _database;
+    // Read the existing tombstone so REPLACE can re-assert it verbatim.
+    final existing = await getLane(groupId, slotIndex);
+    final preservedTombstoned = forceClearTombstone
+        ? 0
+        : (existing?['tombstoned'] as int? ?? 0);
     await db.insert('group_lanes', {
       'group_id': groupId,
       'slot_index': slotIndex,
@@ -1945,6 +1967,7 @@ class WiltkeyDatabase {
       'max_offset': maxOffset,
       'current_write_offset': currentWriteOffset,
       'header_written': headerWritten ? 1 : 0,
+      'tombstoned': preservedTombstoned,
     }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
@@ -1987,7 +2010,7 @@ class WiltkeyDatabase {
     final db = await _database;
     return db.query(
       'group_lanes',
-      where: 'group_id = ? AND member_key_hash IS NULL',
+      where: 'group_id = ? AND member_key_hash IS NULL AND (tombstoned = 0 OR tombstoned IS NULL)',
       whereArgs: [groupId],
       orderBy: 'slot_index ASC',
     );
@@ -2013,6 +2036,17 @@ class WiltkeyDatabase {
     String memberKeyHash,
   ) async {
     final db = await _database;
+    // NEVER assign a tombstoned slot on a live seed: its offset range was
+    // burned by the departing member and re-using it would XOR fresh
+    // messages with already-consumed keystream. Callers must pick a fresh
+    // slot from [getEmptyLanes] instead (refills already do).
+    final lane = await getLane(groupId, slotIndex);
+    if (lane != null && (lane['tombstoned'] as int? ?? 0) == 1) {
+      throw StateError(
+        'Refusing to assign tombstoned slot $slotIndex in $groupId '
+        '(keystream-reuse guard) — allocate a fresh slot.',
+      );
+    }
     await db.update(
       'group_lanes',
       {'member_key_hash': memberKeyHash},
@@ -2021,11 +2055,64 @@ class WiltkeyDatabase {
     );
   }
 
+  /// RETIRES a lane permanently: its offset range was already burned into
+  /// the shared group keystream by the leaving/kicked member, so it must
+  /// never be handed to a new member on the same seed (keystream reuse).
+  /// Keeps member + offsets intact for history attribution; [getEmptyLanes]
+  /// filters tombstoned lanes out forever.
+  Future<void> tombstoneLane(String groupId, int slotIndex) async {
+    final db = await _database;
+    // Also detach the member: retired slots drop out of used-capacity
+    // accounting, and re-invites allocate a fresh slot via getEmptyLanes
+    // (tombstoned lanes are filtered forever) instead of silently reusing
+    // the retired one.
+    await db.update(
+      'group_lanes',
+      {'tombstoned': 1, 'member_key_hash': null},
+      where: 'group_id = ? AND slot_index = ?',
+      whereArgs: [groupId, slotIndex],
+    );
+  }
+
+  Future<bool> isLaneTombstoned(String groupId, int slotIndex) async {
+    final db = await _database;
+    final rows = await db.query(
+      'group_lanes',
+      columns: ['tombstoned'],
+      where: 'group_id = ? AND slot_index = ?',
+      whereArgs: [groupId, slotIndex],
+      limit: 1,
+    );
+    if (rows.isEmpty) return false;
+    return (rows.first['tombstoned'] as int? ?? 0) == 1;
+  }
+
   Future<void> freeLane(String groupId, int slotIndex) async {
+    // Legacy free = tombstone: resetting a lane for re-assignment on the same
+    // seed would reuse burned keystream. (Kept for callers we haven't
+    // migrated; new code should call [tombstoneLane] directly.)
     final db = await _database;
     await db.update(
       'group_lanes',
-      {'member_key_hash': null, 'current_write_offset': 0, 'header_written': 0},
+      {'member_key_hash': null, 'tombstoned': 1},
+      where: 'group_id = ? AND slot_index = ?',
+      whereArgs: [groupId, slotIndex],
+    );
+  }
+
+  /// Full lane reset back to assignable. ONLY safe when the group's seed was
+  /// rotated (recharge): fresh seed means the offset range was never burned.
+  /// Never call this on a live seed — use [tombstoneLane].
+  Future<void> resetLane(String groupId, int slotIndex) async {
+    final db = await _database;
+    await db.update(
+      'group_lanes',
+      {
+        'member_key_hash': null,
+        'current_write_offset': 0,
+        'header_written': 0,
+        'tombstoned': 0,
+      },
       where: 'group_id = ? AND slot_index = ?',
       whereArgs: [groupId, slotIndex],
     );

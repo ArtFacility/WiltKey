@@ -33,6 +33,7 @@ import 'widgets/debug_console_sheet.dart';
 import 'widgets/voice_recording_mixin.dart';
 import 'widgets/highlight_flash.dart';
 import 'widgets/scroll_to_message.dart';
+import '../../../core/theme/nuke_capture.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -75,6 +76,12 @@ class _ChatScreenState extends State<ChatScreen>
 
   // Wraps the message list so a consented screenshot can render it to an image.
   final GlobalKey _captureBoundaryKey = GlobalKey();
+
+  // Nuke handling: when this chat is destroyed while on screen (peer wipe),
+  // play the theme's nuke overlay over the captured chat and auto-drop back
+  // to the main screen instead of stranding the user on an empty shell.
+  String? _nukeWatchedContactId;
+  bool _nukePlaying = false;
 
   // Local keyword search
   bool _isSearching = false;
@@ -131,6 +138,7 @@ class _ChatScreenState extends State<ChatScreen>
     final contact = _appState.activeContact;
     if (contact != null) {
       _openChatId = contact.id;
+      _nukeWatchedContactId = contact.id;
       _appState.visibleChatId = contact.id; // now on screen → mute its own alerts
       // Load the most-recent page (windowed), then decrypt any OTP-only ones.
       _appState.loadInitialMessages(contact).then((_) async {
@@ -306,6 +314,41 @@ class _ChatScreenState extends State<ChatScreen>
     _loadingOlder = false;
   }
 
+  /// This chat was destroyed while we're looking at it (peer nuke): play the
+  /// theme's nuke animation, then auto-drop back to the main screen. Only
+  /// fires when this route is actually on top.
+  Future<void> _checkNukedWhileOpen() async {
+    if (!mounted || _nukePlaying) return;
+    final id = _nukeWatchedContactId;
+    if (id == null) return;
+    if (_appState.contacts.any((c) => c.id == id)) return; // still alive
+    final route = ModalRoute.of(context);
+    if (route != null && !route.isCurrent) return;
+    _nukePlaying = true;
+
+    final screen = await captureNukeScreen(_captureBoundaryKey);
+    if (!mounted) return;
+    late final OverlayEntry entry;
+    entry = OverlayEntry(
+      builder: (overlayContext) => context.wkc.nukeOverlay(
+        onDone: () {
+          entry.remove();
+          if (mounted) {
+            Navigator.of(context, rootNavigator: true)
+                .popUntil((route) => route.isFirst);
+          }
+        },
+        screen: screen,
+      ),
+    );
+    Overlay.of(context, rootOverlay: true).insert(entry);
+    Future.delayed(const Duration(seconds: 6), () {
+      if (!mounted) return;
+      Navigator.of(context, rootNavigator: true)
+          .popUntil((route) => route.isFirst);
+    });
+  }
+
   void _updateState() {
     if (mounted) {
       setState(() {});
@@ -314,6 +357,7 @@ class _ChatScreenState extends State<ChatScreen>
         return;
       }
 
+      _checkNukedWhileOpen();
       final contact = _appState.activeContact;
       if (contact != null) {
         final messages = _visibleMessages(contact);

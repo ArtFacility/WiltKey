@@ -722,15 +722,20 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
               t.action,
             ),
             const SizedBox(height: 10),
-            Container(
-              decoration: _panelDeco(t),
-              child: ListView.separated(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                itemCount: allHashes.length,
-                separatorBuilder: (_, _) => Divider(color: t.border, height: 1),
-                itemBuilder: (context, idx) {
+            // Capped + scrollable: a 20-member group used to grow the section
+            // unbounded inside the page scroll, pushing every other setting
+            // off-screen.
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 320),
+              child: Container(
+                decoration: _panelDeco(t),
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  itemCount: allHashes.length,
+                  separatorBuilder: (_, _) => Divider(color: t.border, height: 1),
+                  itemBuilder: (context, idx) {
                   final hash = allHashes[idx];
                   final isMe = hash == myUserId;
                   final isHost = hash == group.hostKeyHash;
@@ -832,14 +837,15 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
                       ],
                     ),
                   );
-                },
-              ),
+                 },
+               ),
+             ),
             ),
-          ],
-        );
-      },
-    );
-  }
+           ],
+         );
+       },
+     );
+   }
 
   Widget _buildEmojiSection(WiltkeyTokens t) {
     final l10n = AppLocalizations.of(context)!;

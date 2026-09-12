@@ -28,6 +28,9 @@ mixin VoiceRecordingMixin<T extends StatefulWidget> on State<T> {
   bool _voiceCancelArmed = false; // slid far enough left to cancel on release
   bool _voiceStopping = false; // guards a double-stop (auto-cap + release)
   bool _voicePressActive = false; // the finger is still down on the mic
+  bool _voiceStarting = false; // recorder.start() still awaiting — the mic
+  // isn't live yet; stop gestures during this window are ignored and the
+  // start path's own abandoned-gesture check cleans the state up.
   Duration _voiceElapsed = Duration.zero;
   double _voiceLevel = 0; // 0..1 smoothed mic level for the meter
   Offset _voiceDragOffset = Offset.zero;
@@ -235,25 +238,10 @@ mixin VoiceRecordingMixin<T extends StatefulWidget> on State<T> {
 
     onVoiceRecordingStarted();
 
-    final started = await _voiceRecorder.start(_voiceQuality);
-    if (!mounted) {
-      await _voiceRecorder.cancel();
-      return;
-    }
-    if (!started) {
-      onVoiceError(AppLocalizations.of(context)!.chatVoicePermissionDenied);
-      return;
-    }
-
-    // The press may have ended (or a permission dialog stole it) while start()
-    // was awaiting — don't leave a recording running with no gesture to stop it.
-    if (!_voicePressActive) {
-      await _voiceRecorder.cancel();
-      return;
-    }
-
-    HapticFeedback.mediumImpact();
-
+    // Optimistic UI: show the recording HUD immediately. The recorder can
+    // take a second or two to actually start (mic init, permission checks)
+    // and the button used to sit dead that whole time. Rolled back below on
+    // any failure or abandoned gesture.
     setState(() {
       _isRecording = true;
       _isRecordingLocked = false;
@@ -263,6 +251,39 @@ mixin VoiceRecordingMixin<T extends StatefulWidget> on State<T> {
       _voiceLevel = 0;
       _voiceDragOffset = Offset.zero;
     });
+    HapticFeedback.mediumImpact();
+
+    _voiceStarting = true;
+    final started = await _voiceRecorder.start(_voiceQuality);
+    _voiceStarting = false;
+    Future<void> rollback() async {
+      await _voiceRecorder.cancel();
+      if (mounted) {
+        setState(() {
+          _isRecording = false;
+          _isRecordingLocked = false;
+        });
+      }
+    }
+
+    if (!mounted) {
+      await rollback();
+      return;
+    }
+    if (!started) {
+      await rollback();
+      if (mounted) {
+        onVoiceError(AppLocalizations.of(context)!.chatVoicePermissionDenied);
+      }
+      return;
+    }
+
+    // The press may have ended (or a permission dialog stole it) while start()
+    // was awaiting — don't leave a recording running with no gesture to stop it.
+    if (!_voicePressActive) {
+      await rollback();
+      return;
+    }
 
     _voiceAmpSub = _voiceRecorder.amplitude().listen((amp) {
       // amp.current is dBFS (~-45 quiet .. 0 loud); map onto 0..1 for the meter.
@@ -288,6 +309,10 @@ mixin VoiceRecordingMixin<T extends StatefulWidget> on State<T> {
   }
 
   Future<void> _stopVoiceRecording({required bool cancel}) async {
+    // The HUD is optimistic while the mic is still initializing; the start
+    // path's abandoned-gesture check handles this window (a release during
+    // init means no recording was ever live).
+    if (_voiceStarting) return;
     if (!_isRecording || _voiceStopping) return;
     _voiceStopping = true;
     _voiceTimer?.cancel();

@@ -16,6 +16,7 @@ import 'widgets/image_source_sheet.dart';
 import 'widgets/content_attachment_sheet.dart';
 import 'widgets/chat_search_bar.dart';
 import '../../../core/theme/wk.dart';
+import '../../../core/theme/nuke_capture.dart';
 import '../../../core/theme/wiltkey_tokens.dart';
 import '../../../core/theme/wiltkey_components.dart';
 import 'widgets/compression_dialog.dart';
@@ -104,6 +105,14 @@ class _GroupChatScreenState extends State<GroupChatScreen>
   // Wraps the message list so a consented screenshot can render it to an image.
   final GlobalKey _captureBoundaryKey = GlobalKey();
 
+  // Nuke handling: when THIS group is destroyed while the chat is on screen
+  // (vote-nuke / peer wipe), the contact disappears and [activeContact] goes
+  // null — which used to render an empty shell until back-press. Instead:
+  // capture the chat as the animation base, play the theme's nuke overlay,
+  // then drop back to the main screen automatically.
+  String? _nukeWatchedContactId;
+  bool _nukePlaying = false;
+
   // Local keyword search
   bool _isSearching = false;
   final TextEditingController _searchController = TextEditingController();
@@ -129,6 +138,7 @@ class _GroupChatScreenState extends State<GroupChatScreen>
     final contact = _appState.activeContact;
     if (contact != null) {
       _openChatId = contact.id;
+      _nukeWatchedContactId = contact.id;
       _appState.visibleChatId = contact.id; // now on screen → mute its own alerts
       _appState.loadInitialMessages(contact).then((_) async {
         if (!mounted) return;
@@ -277,6 +287,7 @@ class _GroupChatScreenState extends State<GroupChatScreen>
         return;
       }
 
+      _checkNukedWhileOpen();
       final contact = _appState.activeContact;
       if (contact != null) {
         final messages = _visibleMessages(contact);
@@ -2177,10 +2188,9 @@ class _GroupChatScreenState extends State<GroupChatScreen>
             ElevatedButton(
               onPressed: () async {
                 Navigator.pop(context);
-                await _appState.nukeContact(
-                  contact.keyHash,
-                  receivedFromPeer: false,
-                );
+                // Announce the departure to the other members FIRST (they
+                // tombstone our lane + note it in the chat), then wipe locally.
+                await _appState.leaveGroup(contact);
                 if (mounted) {
                   Navigator.pop(context);
                 }
@@ -2694,30 +2704,51 @@ class _GroupChatScreenState extends State<GroupChatScreen>
                       ),
                     ),
                   )
-                else if (!notYetMet)
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        _appState.syncGroupFromMember(contact, keyHash);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(l10n.groupSyncingFromMember(name)),
-                            backgroundColor: t.identity,
+                else if (!notYetMet) ...[
+                  // Lead action: adding a non-contact as a contact (the whole
+                  // point of tapping a member). Sync got demoted to a compact
+                  // icon — auto-sync made the full-width button rare.
+                  if (!_appState.socialContacts
+                      .any((c) => c.keyHash == keyHash))
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.pop(sheetContext);
+                          _promptAddContactFor(keyHash, name);
+                        },
+                        icon: const Icon(Icons.person_add_alt, size: 16),
+                        label: Text(l10n.contactAddTitle),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: t.positive,
+                          foregroundColor: Colors.white,
+                          minimumSize: const Size.fromHeight(42),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(t.radiusControl),
                           ),
-                        );
-                      },
-                      icon: const Icon(Icons.sync, size: 16),
-                      label: Text(l10n.groupSyncStepText),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: t.positive,
-                        foregroundColor: Colors.white,
-                        minimumSize: const Size.fromHeight(42),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(t.radiusControl),
                         ),
                       ),
                     ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    tooltip: l10n.groupSyncStepText,
+                    onPressed: () {
+                      Navigator.pop(sheetContext);
+                      _appState.syncGroupFromMember(contact, keyHash);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(l10n.groupSyncingFromMember(name)),
+                          backgroundColor: t.identity,
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.sync, size: 18),
+                    style: IconButton.styleFrom(
+                      foregroundColor: t.textSecondary,
+                      side: BorderSide(color: t.border),
+                      minimumSize: const Size(42, 42),
+                    ),
                   ),
+                ],
                 if (contact.isHost && !isMemberHost) ...[
                   const SizedBox(width: 10),
                   Expanded(
@@ -2743,6 +2774,45 @@ class _GroupChatScreenState extends State<GroupChatScreen>
       ),
       ),
     );
+  }
+
+  /// This group was destroyed while we're looking at it (vote reached
+  /// majority, or the host wiped it): play the theme's nuke animation over the
+  /// captured chat, then auto-drop back to the main screen. Only fires when
+  /// this route is actually on top (the user is HERE, not elsewhere).
+  Future<void> _checkNukedWhileOpen() async {
+    if (!mounted || _nukePlaying) return;
+    final id = _nukeWatchedContactId;
+    if (id == null) return;
+    if (_appState.contacts.any((c) => c.id == id)) return; // still alive
+    final route = ModalRoute.of(context);
+    if (route != null && !route.isCurrent) return;
+    _nukePlaying = true;
+
+    final screen = await captureNukeScreen(_captureBoundaryKey);
+    if (!mounted) return;
+    final t = context.wk;
+    late final OverlayEntry entry;
+    entry = OverlayEntry(
+      builder: (overlayContext) => context.wkc.nukeOverlay(
+        onDone: () {
+          entry.remove();
+          if (mounted) {
+            Navigator.of(context, rootNavigator: true)
+                .popUntil((route) => route.isFirst);
+          }
+        },
+        screen: screen,
+      ),
+    );
+    Overlay.of(context, rootOverlay: true).insert(entry);
+    // Safety: if a theme's overlay never calls onDone (or the app was
+    // backgrounded mid-animation), still exit after a generous window.
+    Future.delayed(const Duration(seconds: 6), () {
+      if (!mounted) return;
+      Navigator.of(context, rootNavigator: true)
+          .popUntil((route) => route.isFirst);
+    });
   }
 
   /// Tapping a member row offers to add them as a contact. The request is sent

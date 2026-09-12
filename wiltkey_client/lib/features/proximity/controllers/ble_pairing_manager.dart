@@ -474,12 +474,19 @@ class BlePairingManager extends ChangeNotifier {
           // Re-meet (Time Wilt time-refresh / re-invite after a byte recharge):
           // if this peer already holds a lane, reuse THAT slot rather than
           // consuming a fresh one — otherwise the same member would occupy two
-          // slots. First-time joiners fall through to the lowest empty slot.
+          // slots. Tombstoned lanes are excluded: a departed member's old slot
+          // is retired forever (keystream burned) and they get a FRESH slot
+          // like any first-time joiner. First-time joiners fall through to the
+          // lowest empty slot.
           final existingLane = await GroupDatabase.instance.getLaneByMember(
             groupToInvite!.keyHash,
             peerId,
           );
           int? assignedSlot = existingLane?['slot_index'] as int?;
+          if (assignedSlot != null &&
+              ((existingLane!['tombstoned'] as int? ?? 0) == 1)) {
+            assignedSlot = null; // retired — allocate fresh below
+          }
           if (assignedSlot == null) {
             final emptyLanes = await GroupDatabase.instance.getEmptyLanes(
               groupToInvite!.keyHash,
