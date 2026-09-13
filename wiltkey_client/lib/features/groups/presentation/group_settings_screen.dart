@@ -196,11 +196,11 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(context);
-              await CustomEmojiStore.clear(widget.group.keyHash);
-              await _appState.nukeContact(
-                widget.group.keyHash,
-                receivedFromPeer: false,
-              );
+              // Announce the departure FIRST (members tombstone our lane +
+              // note it in the chat), then wipe locally — see leaveGroup.
+              // (This used to call nukeContact directly, silently skipping
+              // the announcement — caught in device testing 2026-09-12.)
+              await _appState.leaveGroup(widget.group);
               if (!mounted) return;
               Navigator.pop(context); // details
               Navigator.pop(context); // chat

@@ -2271,12 +2271,20 @@ class _GroupChatScreenState extends State<GroupChatScreen>
                     ),
                     // Per-member byte gauges are meaningless for a Time Wilt group
                     // (unbounded budget), so the members sheet skips them there.
+                    // The indicator is capped and scrollable: with a full roster
+                    // it would otherwise grow tall enough to push the action
+                    // buttons off the sheet (device-testing feedback 2026-09-12).
                     if (memberList.isNotEmpty && !contact.isTimeWilt)
                       Padding(
                         padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                        child: context.wkc.groupBudgetIndicator(
-                          members: _memberBudgets(memberList),
-                          emptySlots: emptySlots,
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxHeight: 96),
+                          child: SingleChildScrollView(
+                            child: context.wkc.groupBudgetIndicator(
+                              members: _memberBudgets(memberList),
+                              emptySlots: emptySlots,
+                            ),
+                          ),
                         ),
                       ),
                     Padding(

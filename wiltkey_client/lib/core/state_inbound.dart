@@ -393,6 +393,11 @@ extension AppStateInbound on AppState {
         return;
       }
 
+      if (contentType == 'group_kick_notice') {
+        await _handleGroupKickNotice(contact, senderId, envelopeJson!);
+        return;
+      }
+
       if (contentType == 'group_nuke_request') {
         await _handleGroupNukeRequest(contact, senderId, envelopeJson!);
         return;
