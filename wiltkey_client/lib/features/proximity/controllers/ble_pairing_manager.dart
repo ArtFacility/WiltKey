@@ -471,41 +471,30 @@ class BlePairingManager extends ChangeNotifier {
         };
 
         if (groupToInvite != null) {
-          // Re-meet (Time Wilt time-refresh / re-invite after a byte recharge):
-          // if this peer already holds a lane, reuse THAT slot rather than
-          // consuming a fresh one — otherwise the same member would occupy two
-          // slots. Tombstoned lanes are excluded: a departed member's old slot
-          // is retired forever (keystream burned) and they get a FRESH slot
-          // like any first-time joiner. First-time joiners fall through to the
-          // lowest empty slot.
-          final existingLane = await GroupDatabase.instance.getLaneByMember(
+          // Slot allocation (device-tested race, 2026-09-13): Time Wilt
+          // re-meet reuses the peer's existing lane (time-refresh). Byte-budget
+          // rejoin NEVER reuses — slotForJoiner tombstones the old lane and
+          // allocates a fresh slot, so a late leave/kick frame can't retire
+          // the rejoined member's NEW lane.
+          final int? freshSlot = await GroupDatabase.instance.slotForJoiner(
             groupToInvite!.keyHash,
             peerId,
+            allowReMeetReuse: groupToInvite!.isTimeWilt,
           );
-          int? assignedSlot = existingLane?['slot_index'] as int?;
-          if (assignedSlot != null &&
-              ((existingLane!['tombstoned'] as int? ?? 0) == 1)) {
-            assignedSlot = null; // retired — allocate fresh below
-          }
-          if (assignedSlot == null) {
-            final emptyLanes = await GroupDatabase.instance.getEmptyLanes(
-              groupToInvite!.keyHash,
+          if (freshSlot == null) {
+            log('[BLE Host Error] No empty slots available to invite peer!');
+            final response = jsonEncode({
+              "status": "rejected",
+              "message": "Group capacity reached",
+            });
+            _gattResponseBytes = Uint8List.fromList(utf8.encode(response));
+            await BlePeripheral.updateCharacteristic(
+              characteristicId: '098ed89c-5b2d-4f70-91f6-7ccff798f5b2',
+              value: _gattResponseBytes!,
             );
-            if (emptyLanes.isEmpty) {
-              log('[BLE Host Error] No empty slots available to invite peer!');
-              final response = jsonEncode({
-                "status": "rejected",
-                "message": "Group capacity reached",
-              });
-              _gattResponseBytes = Uint8List.fromList(utf8.encode(response));
-              await BlePeripheral.updateCharacteristic(
-                characteristicId: '098ed89c-5b2d-4f70-91f6-7ccff798f5b2',
-                value: _gattResponseBytes!,
-              );
-              return;
-            }
-            assignedSlot = emptyLanes.first['slot_index'] as int;
+            return;
           }
+          final int assignedSlot = freshSlot;
           // The group-seed blob is encrypted with the pairing's FRESH seed
           // ('tws', which the joiner generated and sent) — never the
           // deterministic pubkey derivation, which is publicly recomputable.
@@ -1161,21 +1150,18 @@ class BlePairingManager extends ChangeNotifier {
         // Host path:
         final groupId = groupToInvite!.keyHash;
 
-        // Re-meet reuses the peer's existing slot (Time Wilt time-refresh /
-        // re-invite); first-timers take the lowest empty slot.
-        final existingLane = await GroupDatabase.instance.getLaneByMember(
+        // Same allocation rules as the accept path (byte-budget rejoin always
+        // fresh + old lane tombstoned; Time Wilt re-meet reuses).
+        final int? assignedSlotFresh = await GroupDatabase.instance.slotForJoiner(
           groupId,
           peerId,
+          allowReMeetReuse: groupToInvite!.isTimeWilt,
         );
-        int? assignedSlot = existingLane?['slot_index'] as int?;
-        if (assignedSlot == null) {
-          final emptyLanes = await GroupDatabase.instance.getEmptyLanes(groupId);
-          if (emptyLanes.isEmpty) {
-            log('[BLE Host Error] No empty slots available to assign to member.');
-            return;
-          }
-          assignedSlot = emptyLanes.first['slot_index'] as int;
+        if (assignedSlotFresh == null) {
+          log('[BLE Host Error] No empty slots available to assign to member.');
+          return;
         }
+        final int assignedSlot = assignedSlotFresh;
 
         await appState.hostRegisterMember(
           groupId: groupId,

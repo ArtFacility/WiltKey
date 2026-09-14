@@ -1184,6 +1184,7 @@ extension AppStateGroups on AppState {
       final Set<String> assignedHashes = {};
 
       int assignedSlots = 0;
+      final List<int> tombstonedSlots = [];
       for (final lane in lanes) {
         final slotIdx = lane['slot_index'] as int? ?? 0;
         final memberHash = lane['member_key_hash'] as String?;
@@ -1198,10 +1199,21 @@ extension AppStateGroups on AppState {
 
           assignedSlots++;
           assignedHashes.add(memberHash);
+        } else if (slotIdx > 0 && (lane['tombstoned'] as int? ?? 0) == 1) {
+          // Retired (keystream-burned) lane: never assignable again on this
+          // seed. Tracked separately so the UI can render it as a Tombstone
+          // pseudo-member rather than a deceptively-available empty slot.
+          tombstonedSlots.add(slotIdx);
         }
       }
 
-      groupSlotsInfo[group.id] = {'used': assignedSlots, 'total': totalSlots};
+      groupSlotsInfo[group.id] = {
+        'used': assignedSlots,
+        'total': totalSlots,
+        'tombstoned': tombstonedSlots.length,
+      };
+      tombstonedSlots.sort();
+      groupTombstoneSlots[group.id] = tombstonedSlots;
 
       final Map<String, Map<String, String>> cachedGroupProfiles = {};
       // Host-stamped per-member Time Wilt expiry (ISO8601), keyed by member hash.

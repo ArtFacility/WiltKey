@@ -517,6 +517,11 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   // Track pairwise charge metrics for group members (UI topology panel)
   final Map<String, List<Map<String, dynamic>>> groupMembersMetadata = {};
   final Map<String, Map<String, int>> groupSlotsInfo = {};
+  /// Tombstoned (retired, keystream-burned) lane slots per group, keyed by the
+  /// local contact id — rendered as "Tombstone" pseudo-members in the members
+  /// sheet so a departed/kicked member's slot is visibly unavailable instead
+  /// of silently looking like a fresh empty slot (user feedback 2026-09-13).
+  final Map<String, List<int>> groupTombstoneSlots = {};
   final Map<String, Map<String, Map<String, String>>> groupProfilesCache = {};
 
   // Per-group fallback timers for host-first metadata sync (groupId -> active timer)

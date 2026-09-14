@@ -2074,6 +2074,36 @@ class WiltkeyDatabase {
     );
   }
 
+  /// Compute the slot a joiner should get. Re-meet reuse (returning the
+  /// joiner's existing lane) is ONLY allowed when [allowReMeetReuse] — i.e.
+  /// Time Wilt time-refresh, where the same identity continues and offsets
+  /// only advance. On a BYTE-BUDGET group a rejoin must NEVER reuse the old
+  /// lane: the previous device generation already burned that offset range,
+  /// and if the rejoin beats a queued leave/kick frame the late frame would
+  /// otherwise retire the rejoined member's NEW lane too (device-tested race
+  /// 2026-09-13). So on byte groups we tombstone the old lane HERE and hand
+  /// out a fresh slot; the late control frame then harmlessly re-retires the
+  /// old slot. Returns null when no fresh slot is available.
+  Future<int?> slotForJoiner(
+    String groupId,
+    String joinerId, {
+    required bool allowReMeetReuse,
+  }) async {
+    final existing = await getLaneByMember(groupId, joinerId);
+    if (existing != null) {
+      final isTombstoned = (existing['tombstoned'] as int? ?? 0) == 1;
+      final slot = existing['slot_index'] as int;
+      if (!isTombstoned) {
+        if (allowReMeetReuse) return slot;
+        await tombstoneLane(groupId, slot);
+      }
+      // Tombstoned (or just retired above) → fall through to a fresh slot.
+    }
+    final empty = await getEmptyLanes(groupId);
+    if (empty.isEmpty) return null;
+    return empty.first['slot_index'] as int;
+  }
+
   Future<bool> isLaneTombstoned(String groupId, int slotIndex) async {
     final db = await _database;
     final rows = await db.query(

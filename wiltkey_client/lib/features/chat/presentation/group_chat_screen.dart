@@ -2232,7 +2232,15 @@ class _GroupChatScreenState extends State<GroupChatScreen>
                 final slotsInfo = _appState.groupSlotsInfo[contact.id];
                 final usedSlots = slotsInfo?['used'] ?? 0;
                 final totalSlots = slotsInfo?['total'] ?? 0;
-                final emptySlots = max(0, totalSlots - usedSlots);
+                // Retired (tombstoned) lanes render as pseudo-members below and
+                // must NOT count as available — otherwise a departed member's
+                // burned slot looks like a fresh empty one (user feedback
+                // 2026-09-13).
+                final tombstoneSlots =
+                    _appState.groupTombstoneSlots[contact.id] ?? const <int>[];
+                final tombstoned =
+                    slotsInfo?['tombstoned'] ?? tombstoneSlots.length;
+                final emptySlots = max(0, totalSlots - usedSlots - tombstoned);
 
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -2281,7 +2289,17 @@ class _GroupChatScreenState extends State<GroupChatScreen>
                           constraints: const BoxConstraints(maxHeight: 96),
                           child: SingleChildScrollView(
                             child: context.wkc.groupBudgetIndicator(
-                              members: _memberBudgets(memberList),
+                              members: [
+                                ..._memberBudgets(memberList),
+                                // Tombstones render as wilted/grey markers —
+                                // visibly distinct from an AVAILABLE empty slot.
+                                for (final s in tombstoneSlots)
+                                  MemberBudget(
+                                    fraction: 0,
+                                    keyHash: 'tombstone_$s',
+                                    isWilted: true,
+                                  ),
+                              ],
                               emptySlots: emptySlots,
                             ),
                           ),
@@ -2310,16 +2328,21 @@ class _GroupChatScreenState extends State<GroupChatScreen>
                     Expanded(
                       child: ListView(
                         padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
-                        children: memberList
-                            .map(
-                              (m) => _buildMemberSheetCard(
-                                t,
-                                m,
-                                contact,
-                                sheetContext,
-                              ),
-                            )
-                            .toList(),
+                        children: [
+                          ...memberList.map(
+                            (m) => _buildMemberSheetCard(
+                              t,
+                              m,
+                              contact,
+                              sheetContext,
+                            ),
+                          ),
+                          // Retired lanes: visible "Tombstone" pseudo-members
+                          // (user request 2026-09-13) so a departed/kicked
+                          // member's burned slot is clearly gone for good.
+                          for (final s in tombstoneSlots)
+                            _buildTombstoneCard(t, contact, s),
+                        ],
                       ),
                     ),
                     Padding(
@@ -2521,6 +2544,69 @@ class _GroupChatScreenState extends State<GroupChatScreen>
           ),
         ),
       ],
+    );
+  }
+
+  /// Pseudo-member card for a retired (tombstoned) lane. User request
+  /// 2026-09-13: a departed/kicked member's slot must be VISIBLE as gone for
+  /// good — full byte offset consumed, grave pixel art — not an anonymous
+  /// empty slot that looks assignable.
+  Widget _buildTombstoneCard(WiltkeyTokens t, Contact contact, int slot) {
+    final int laneBytes = contact.laneSize ?? 0;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: t.surface.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(t.radiusCard),
+        border: Border.all(color: t.border, width: t.borderWidth),
+      ),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 40,
+            height: 40,
+            child: CustomPaint(
+              painter: _GravePixelPainter(
+                stone: t.textTertiary,
+                base: t.border,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Tombstone',
+                  style: t.body.copyWith(
+                    color: t.textTertiary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'LANE #$slot RETIRED',
+                  style: t.dataMono.copyWith(
+                    color: t.textTertiary,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.8,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // "All byte offset used" — the whole lane was burned, nothing left.
+          Text(
+            '0 / ${AppState.formatBytes(laneBytes)}',
+            style: t.dataMono.copyWith(
+              color: t.budgetWilted,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -2909,3 +2995,42 @@ class _GroupChatScreenState extends State<GroupChatScreen>
 }
 
 
+
+/// Tiny pixel-art grave for retired (tombstoned) group lanes. Drawn on a
+/// 7x7 grid with anti-aliasing off for the crisp pixel look; stone grey with
+/// a cross cut-out and a darker base mound.
+class _GravePixelPainter extends CustomPainter {
+  final Color stone;
+  final Color base;
+
+  const _GravePixelPainter({required this.stone, required this.base});
+
+  static const List<String> _rows = [
+    '..XXX..',
+    '.XXXXX.',
+    '.XX.XX.',
+    '.X...X.',
+    '.XX.XX.',
+    '.XXXXX.',
+    'XXXXXXX',
+  ];
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final double px = size.width / 7;
+    final double py = size.height / 7;
+    final paint = Paint()..isAntiAlias = false;
+    for (var y = 0; y < _rows.length; y++) {
+      final row = _rows[y];
+      for (var x = 0; x < row.length; x++) {
+        if (row[x] != 'X') continue;
+        paint.color = y == _rows.length - 1 ? base : stone;
+        canvas.drawRect(Rect.fromLTWH(x * px, y * py, px, py), paint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _GravePixelPainter oldDelegate) =>
+      oldDelegate.stone != stone || oldDelegate.base != base;
+}

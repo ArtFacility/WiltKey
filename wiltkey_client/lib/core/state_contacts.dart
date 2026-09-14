@@ -339,14 +339,16 @@ extension AppStateContacts on AppState {
       await _insertContactRequestReceivedCard(cardChat, payload, senderId);
 
       // Surface in the activity feed so it's not missed when the user is in
-      // other chats. Deep-links to this chat (the card lives in it). The event
-      // id is the request id, so a redelivered frame can't double-log.
+      // other chats. Deep-links to the chat THE CARD LIVES IN: the direct
+      // chat for 1:1 requests, the GROUP chat for group-member requests
+      // (chatKey = senderId would resolve no contact there, which is what
+      // hid the approve/deny buttons — caught 2026-09-13).
       await logEvent(
         id: 'contact_request_${payload.requestId}',
         type: 'contact_request',
         title: payload.requesterName,
         body: 'sent you a contact request',
-        chatKey: senderId,
+        chatKey: cardChat.keyHash,
       );
     } catch (e) {
       log('[ContactRequest Error] $e');
