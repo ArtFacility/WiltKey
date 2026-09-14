@@ -421,6 +421,10 @@ class AppLocalizationsPl extends AppLocalizations {
   String get notificationEmergencyChatBody => 'Prośba o czat awaryjny';
 
   @override
+  String get notificationNewActivityBody =>
+      'Nowa aktywność — sprawdź powiadomienia';
+
+  @override
   String get notificationSecureLinkActive =>
       'Synchronizowanie bezpiecznych wiadomości';
 
@@ -2327,6 +2331,78 @@ class AppLocalizationsPl extends AppLocalizations {
   String get qrConnectManualPin => 'Wpisz PIN ręcznie';
 
   @override
+  String get qrConnectShowYourCode =>
+      'Skanowanie zakończone! Teraz pokaż im swój kod QR.';
+
+  @override
+  String get qrConnectFinishPairing => 'Zakończ parowanie';
+
+  @override
+  String get qrConnectOutdatedCode =>
+      'Ten kod QR pochodzi ze starszej wersji aplikacji. Oboje musicie mieć najnowszą aktualizację, aby połączyć się w ten sposób.';
+
+  @override
+  String get qrConnectOwnCode =>
+      'To twój własny kod QR — skieruj aparat na ich kod.';
+
+  @override
+  String get qrConnectAlreadyPaired =>
+      'Masz już czat z tą osobą. Odświeżenie istniejącego czatu wymaga osobistego parowania.';
+
+  @override
+  String get testRelayBanner => 'SERWER TESTOWY — NIEPRODUKCYJNY';
+
+  @override
+  String get securingTitle => 'Zabezpieczanie połączenia';
+
+  @override
+  String get securingBody =>
+      'Twoje urządzenie weryfikuje się na przekaźniku przed połączeniem. Ten jednorazowy proof-of-work chroni wszystkich przed spamem i nadużyciami — bez numeru telefonu, bez e-maila, bez konta.';
+
+  @override
+  String get securingWorking => 'WERYFIKACJA URZĄDZENIA — TRWA…';
+
+  @override
+  String get securingOnceNote =>
+      'Dzieje się to tylko przy pierwszym połączeniu. Późniejsze ponowne połączenia są natychmiastowe.';
+
+  @override
+  String get puzzleInstruction => 'Przesuń, aż pixel art będzie symetryczny.';
+
+  @override
+  String get puzzleLockIn => 'Zatwierdź';
+
+  @override
+  String get puzzleFailedRetry =>
+      'Nie udało się dopasować — zaczynamy nową weryfikację…';
+
+  @override
+  String get reauthenticatingBanner =>
+      'PONOWNE UWIERZYTELNIANIE — PROSZĘ CZEKAĆ…';
+
+  @override
+  String get connectionLostBanner =>
+      'POŁĄCZENIE WEBSOCKET NIEUDANE — PONAWIANIE PRÓBY…';
+
+  @override
+  String get commonOk => 'OK';
+
+  @override
+  String get connectionIssueTitle => 'Brak połączenia z przekaźnikiem';
+
+  @override
+  String get connectionIssueGeneric =>
+      'Albo ten przekaźnik ma chwilowe problemy, albo Twoja sieć nie może się z nim teraz połączyć. Parowanie urządzeń w pobliżu nadal działa — wiadomości wymagają przekaźnika. Aplikacja automatycznie ponawia próby.';
+
+  @override
+  String get connectionIssueCooldown =>
+      'Ta sieć została tymczasowo ograniczona przez ochronę antyspamową przekaźnika — z tego adresu przyszło zbyt wiele nieudanych weryfikacji. Wszystko automatycznie ponawia próby; zazwyczaj ustępuje to w ciągu kilku minut.';
+
+  @override
+  String get connectionIssueRateLimit =>
+      'Ta sieć wykorzystała dziś limit urządzeń (zbyt wiele nowych urządzeń połączyło się z tego samego adresu). Nadal możesz rozmawiać z urządzeniem już zweryfikowanym w tej sieci — lub spróbować ponownie po codziennym resecie.';
+
+  @override
   String get badgePlayPlus => 'Sklep Play · Plus';
 
   @override
@@ -2516,4 +2592,102 @@ class AppLocalizationsPl extends AppLocalizations {
 
   @override
   String get forcedUpdateWhatsNew => 'Co nowego w tej aktualizacji';
+
+  @override
+  String get settingsSwipeGesturesTitle => 'Gesty przesuwania czatu';
+
+  @override
+  String get settingsSwipeGesturesSubtitle =>
+      'Dostosuj akcje przesuwania w prawo i w lewo na liście czatów';
+
+  @override
+  String get settingsSwipeRight => 'Przesunięcie w prawo';
+
+  @override
+  String get settingsSwipeLeft => 'Przesunięcie w lewo';
+
+  @override
+  String get swipeActionMarkRead => 'Przeczytane / Nieprzeczytane';
+
+  @override
+  String get swipeActionMute => 'Wycisz / Wyłącz wyciszenie';
+
+  @override
+  String get swipeActionPin => 'Przypnij / Odepnij';
+
+  @override
+  String get swipeActionArchive => 'Archiwizuj';
+
+  @override
+  String get swipeActionNone => 'Wyłączone';
+
+  @override
+  String get chatSwipeMarkRead => 'Przeczytane';
+
+  @override
+  String get chatSwipeMarkUnread => 'Nieprzeczytane';
+
+  @override
+  String get chatSwipePin => 'Przypnij';
+
+  @override
+  String get chatSwipeUnpin => 'Odepnij';
+
+  @override
+  String get chatSwipeMute => 'Wycisz';
+
+  @override
+  String get chatSwipeUnmute => 'Wyłącz wyciszenie';
+
+  @override
+  String get chatSwipeArchive => 'Archiwizuj';
+
+  @override
+  String get chatAttachVideoSubtitleEnabled =>
+      'Nagraj do 15 s lub wybierz z galerii';
+
+  @override
+  String get chatVideoSelectSourceTitle => 'Wyślij wideo';
+
+  @override
+  String get chatVideoQualityLabel => 'Jakość';
+
+  @override
+  String get chatVideoQualityLow => 'Niska';
+
+  @override
+  String get chatVideoQualityMedium => 'Średnia';
+
+  @override
+  String get chatVideoQualityHigh => 'Wysoka';
+
+  @override
+  String get chatVideoCompressionFailed =>
+      'Nie udało się skompresować tego klipu. Spróbuj wybrać krótszy klip lub niższą jakość.';
+
+  @override
+  String get chatVideoRecordCamera => 'Nagraj wideo (Aparat)';
+
+  @override
+  String get chatVideoPickGallery => 'Wybierz wideo z galerii';
+
+  @override
+  String get chatVideoCompressing => 'Kompresowanie wideo...';
+
+  @override
+  String chatVideoTooLarge(String size) {
+    return 'Wideo przekracza limit rozmiaru ($size)';
+  }
+
+  @override
+  String get chatVideoTooLong => 'Wideo przekracza limit długości 15 sekund';
+
+  @override
+  String get chatVideoSaveGallery => 'Zapisz wideo w galerii';
+
+  @override
+  String get chatVideoSavedGallery => 'Wideo zapisano w galerii';
+
+  @override
+  String get chatVideoError => 'Nie można odtworzyć klipu wideo';
 }

@@ -1,4 +1,4 @@
-part of 'state.dart';
+﻿part of 'state.dart';
 
 /// Pure budget math for a group's flower/readout (no AppState needed, so it's
 /// directly unit-testable).
@@ -678,12 +678,13 @@ extension AppStateGroups on AppState {
       }
     }
 
-    // maxMessageSize is a TEXT policy; images, voice notes and emoji defs are
+    // maxMessageSize is a TEXT policy; images, voice notes, video clips and emoji defs are
     // bounded by lane space + the sender's own pre-send size checks, so don't
     // reject them here.
     final bool isImage =
         contentType == 'image' || contentType == 'image_hidden';
     final bool isVoice = contentType == 'voice';
+    final bool isVideo = contentType == 'video';
     final bool isEmojiCtl =
         contentType == 'emoji_def' || contentType == 'emoji_delete';
     // Replies embed the parent id in the OTP body (hidden from the relay), so the
@@ -693,6 +694,7 @@ extension AppStateGroups on AppState {
     final payloadBytes = utf8.encode(wireText).length;
     if (!isImage &&
         !isVoice &&
+        !isVideo &&
         !isEmojiCtl &&
         contact.maxMessageSize != null &&
         payloadBytes > contact.maxMessageSize!) {
@@ -916,6 +918,16 @@ extension AppStateGroups on AppState {
     return null;
   }
 
+  /// Cancels every in-flight group metadata retry timer. Called on wipe/reset —
+  /// the retry loop otherwise keeps pinging stale member hashes for ~10 minutes
+  /// after the group (and its contacts) no longer exist.
+  void cancelAllGroupMetaSyncTimers() {
+    for (final t in groupMetaSyncTimers.values) {
+      t.cancel();
+    }
+    groupMetaSyncTimers.clear();
+  }
+
   void requestLaneRefill(Contact group) {
     if (group.isGroup && !group.isHost && group.hostKeyHash != null) {
       log(
@@ -1075,7 +1087,9 @@ extension AppStateGroups on AppState {
     for (final lane in lanes) {
       final slot = lane['slot_index'] as int;
       if (slot <= 1) continue; // keep info lane + host's fresh lane
-      await GroupDatabase.instance.freeLane(groupId, slot);
+      // Safe reset: the seed was just rotated, so these offset ranges are
+      // unburned and the slots are freely assignable again.
+      await GroupDatabase.instance.resetLane(groupId, slot);
     }
 
     // 4. Update the in-memory Contact: new seed, host is the only active member
@@ -1170,9 +1184,12 @@ extension AppStateGroups on AppState {
       final Set<String> assignedHashes = {};
 
       int assignedSlots = 0;
+      final List<int> tombstonedSlots = [];
       for (final lane in lanes) {
+        final slotIdx = lane['slot_index'] as int? ?? 0;
         final memberHash = lane['member_key_hash'] as String?;
-        if (memberHash != null) {
+        // slot_index == 0 is the reserved group metadata info lane; only slots > 0 are message lanes.
+        if (slotIdx > 0 && memberHash != null) {
           final start = lane['start_offset'] as int;
           final max = lane['max_offset'] as int;
           final current = lane['current_write_offset'] as int;
@@ -1180,14 +1197,23 @@ extension AppStateGroups on AppState {
           memberRemainingBytes[memberHash] =
               (memberRemainingBytes[memberHash] ?? 0) + remaining;
 
-          if ((lane['slot_index'] as int) > 0) {
-            assignedSlots++;
-            assignedHashes.add(memberHash);
-          }
+          assignedSlots++;
+          assignedHashes.add(memberHash);
+        } else if (slotIdx > 0 && (lane['tombstoned'] as int? ?? 0) == 1) {
+          // Retired (keystream-burned) lane: never assignable again on this
+          // seed. Tracked separately so the UI can render it as a Tombstone
+          // pseudo-member rather than a deceptively-available empty slot.
+          tombstonedSlots.add(slotIdx);
         }
       }
 
-      groupSlotsInfo[group.id] = {'used': assignedSlots, 'total': totalSlots};
+      groupSlotsInfo[group.id] = {
+        'used': assignedSlots,
+        'total': totalSlots,
+        'tombstoned': tombstonedSlots.length,
+      };
+      tombstonedSlots.sort();
+      groupTombstoneSlots[group.id] = tombstonedSlots;
 
       final Map<String, Map<String, String>> cachedGroupProfiles = {};
       // Host-stamped per-member Time Wilt expiry (ISO8601), keyed by member hash.
@@ -1262,17 +1288,34 @@ extension AppStateGroups on AppState {
 
       groupMembersMetadata[group.id] = list;
 
-      // Keep the dashboard's member count in sync with the actual roster (host +
-      // every known member). It was previously only set at join/registration
-      // time, so a host that learned members through metadata/lane-headers could
-      // under-report — e.g. show 3 for a 6-person group while the members sheet
-      // (built from this same roster) showed 6. Deriving it here makes the two
-      // agree and self-heals on every refresh. Idempotent via the guard.
+      // Keep the dashboard's member count and memberKeyHashes in sync with the
+      // actual roster (host + every known member). It was previously only set at
+      // join/registration time, so a host or member that learned members through
+      // metadata/lane-headers could under-report or miss hashes needed for contact requests.
       final gi = contacts.indexWhere((c) => c.keyHash == groupId);
-      if (gi != -1 && contacts[gi].memberCount != list.length) {
-        contacts[gi] = contacts[gi].copyWith(memberCount: list.length);
-        if (activeContact?.keyHash == groupId) activeContact = contacts[gi];
-        await WiltkeyDatabase.instance.upsertContact(contacts[gi]);
+      if (gi != -1) {
+        final existing = contacts[gi];
+        final allKnownHashes = <String>{
+          userId,
+          if (group.hostKeyHash != null && group.hostKeyHash!.isNotEmpty)
+            group.hostKeyHash!,
+          ...profiles.map((p) => p['member_key_hash'] as String),
+          ...existing.memberKeyHashes,
+        }.toList();
+
+        final bool hashesChanged =
+            allKnownHashes.length != existing.memberKeyHashes.length ||
+                !allKnownHashes.every(existing.memberKeyHashes.contains);
+        final bool countChanged = existing.memberCount != list.length;
+
+        if (hashesChanged || countChanged) {
+          contacts[gi] = contacts[gi].copyWith(
+            memberCount: list.length,
+            memberKeyHashes: allKnownHashes,
+          );
+          if (activeContact?.keyHash == groupId) activeContact = contacts[gi];
+          await WiltkeyDatabase.instance.upsertContact(contacts[gi]);
+        }
       }
 
       notifyListeners();
@@ -1352,7 +1395,7 @@ extension AppStateGroups on AppState {
     );
 
     final newGroup = Contact(
-      id: 'g${contacts.length + 1}',
+      id: _nextContactId(isGroup: true),
       name: name,
       keyHash: groupId,
       relayUrl: relayUrl,
@@ -1515,7 +1558,7 @@ extension AppStateGroups on AppState {
       await WiltkeyDatabase.instance.upsertContact(updatedContact);
     } else {
       final newContact = Contact(
-        id: 'g${contacts.length + 1}',
+        id: _nextContactId(isGroup: true),
         name: name,
         keyHash: groupId,
         relayUrl: relayUrl,
@@ -1660,12 +1703,84 @@ extension AppStateGroups on AppState {
     if (memberKeyHash == userId) return; // never kick yourself (the host)
     final groupId = group.keyHash;
 
+    final seed = group.groupSeed ?? '';
     final lane = await GroupDatabase.instance.getLaneByMember(
       groupId,
       memberKeyHash,
     );
+    int? kickedSlot;
     if (lane != null) {
-      await GroupDatabase.instance.freeLane(groupId, lane['slot_index'] as int);
+      kickedSlot = lane['slot_index'] as int;
+      await GroupDatabase.instance.freeLane(groupId, kickedSlot);
+    }
+
+    // Singled-out kick notice (owner design, 2026-09-10): a group_kick frame
+    // addressed ONLY to the kicked device. It wipes their local copy (data
+    // destroyed instead of lingering as a stale readable snapshot) and stops
+    // them burning relay bandwidth on a tombstoned lane — without propagating
+    // to anyone else. Slot-attested: a replay after they later rejoin into a
+    // fresh slot mismatches and is ignored.
+    if (seed.isNotEmpty && kickedSlot != null) {
+      try {
+        final keyHex = sha256.convert(utf8.encode(seed)).toString();
+        final enc = WiltkeyPersistence().encryptString(
+          jsonEncode({
+            'v': 1,
+            'kicked': memberKeyHash,
+            'slot': kickedSlot,
+          }),
+          keyHex,
+        );
+        await ensureWebSocketConnected();
+        WebSocketClient().sendWSMessage({
+          'type': 'SEND_MESSAGE',
+          'recipient_id': memberKeyHash,
+          'envelope': jsonEncode({
+            'group_id': groupId,
+            'sender_id': userId,
+            'd': enc,
+            't': 'group_kick',
+          }),
+          'content_type': 'group_kick',
+        });
+      } catch (e) {
+        // Best-effort: the kick proceeds even if the notice can't go out.
+        log('[Group Host] kick notice failed for $memberKeyHash: $e');
+      }
+
+      // Separate notice to the REMAINING members (device-testing feedback
+      // 2026-09-12: only the host knew someone was removed). They tombstone
+      // the kicked lane and get a system note; the kicked device itself never
+      // receives this one. Same replay posture as group_leave.
+      final remainingPeers = group.memberKeyHashes
+          .where((h) => h != userId && h != memberKeyHash)
+          .toList();
+      if (remainingPeers.isNotEmpty) {
+        try {
+          final keyHex = sha256.convert(utf8.encode(seed)).toString();
+          final enc = WiltkeyPersistence().encryptString(
+            jsonEncode({'v': 1, 'kicked': memberKeyHash, 'slot': kickedSlot}),
+            keyHex,
+          );
+          final envelope = jsonEncode({
+            'group_id': groupId,
+            'sender_id': userId,
+            'd': enc,
+            't': 'group_kick_notice',
+          });
+          await ensureWebSocketConnected();
+          for (final memberHash in remainingPeers) {
+            WebSocketClient().sendWSMessage({
+              'type': 'SEND_MESSAGE',
+              'recipient_id': memberHash,
+              'envelope': envelope,
+              'content_type': 'group_kick_notice',
+            });
+          }
+        } catch (e) {
+          log('[Group Host] kick roster notice failed (continuing): $e');
+        }
+      }
     }
 
     final idx = contacts.indexWhere((c) => c.isGroup && c.keyHash == groupId);
@@ -1683,6 +1798,27 @@ extension AppStateGroups on AppState {
       await WiltkeyDatabase.instance.upsertContact(updated);
       // NB: profile row is intentionally NOT deleted (attribution is preserved).
       updateGroupMembersMetadata(updated);
+
+      // System note on the host's own chat (mirrors the leave note style).
+      final removedProfile = groupProfilesCache[groupId]?[memberKeyHash];
+      final removedNameRaw = removedProfile?['name'] as String?;
+      final removedName =
+          (removedNameRaw?.isNotEmpty ?? false) ? removedNameRaw! : 'A member';
+      final note = ChatMessage(
+        id:
+            'system_kick_${memberKeyHash.substring(0, 8)}_${DateTime.now().millisecondsSinceEpoch}',
+        senderId: 'system',
+        text: '',
+        decryptedText: '$removedName was removed by the host',
+        timestamp: DateTime.now(),
+        isSentByMe: false,
+      );
+      appendLoadedMessage(existing.id, note);
+      await WiltkeyDatabase.instance.saveMessage(
+        note,
+        existing.id,
+        masterKeyHex: masterKeyHex,
+      );
     }
 
     notifyListeners();
@@ -1693,7 +1829,299 @@ extension AppStateGroups on AppState {
         contacts.firstWhere((c) => c.keyHash == groupId),
       );
     }
-    log('[Group Host] Kicked $memberKeyHash (lane freed, profile kept).');
+    log('[Group Host] Kicked $memberKeyHash (lane tombstoned, profile kept).');
+  }
+
+  /// Announce a voluntary leave to the other members, then wipe the group
+  /// locally. The announcement rides the group's AES meta channel; receivers
+  /// tombstone the leaver's lane (retired forever — its offset range was
+  /// burned, so re-assignment on this seed would reuse keystream) and note
+  /// the departure in the chat.
+  Future<void> leaveGroup(Contact group) async {
+    if (!group.isGroup) return;
+    final groupId = group.keyHash;
+    final seed = group.groupSeed ?? '';
+    final peers = group.memberKeyHashes.where((h) => h != userId).toList();
+
+    if (seed.isNotEmpty && peers.isNotEmpty) {
+      try {
+        final keyHex = sha256.convert(utf8.encode(seed)).toString();
+        // Attest OUR slot(s) in the payload: a replayed leave after we later
+        // rejoined (fresh slot) must only ever retire the slot generation it
+        // was issued from, never the new one.
+        final myLanes = await GroupDatabase.instance.getAllLanes(groupId);
+        final mySlots = myLanes
+            .where((l) => l['member_key_hash'] == userId)
+            .map((l) => l['slot_index'] as int)
+            .toList();
+        final enc = WiltkeyPersistence().encryptString(
+          jsonEncode({'v': 1, 'leaver': userId, 'slots': mySlots}),
+          keyHex,
+        );
+        final envelope = jsonEncode({
+          'group_id': groupId,
+          'sender_id': userId,
+          'd': enc,
+          't': 'group_leave',
+        });
+        await ensureWebSocketConnected();
+        for (final memberHash in peers) {
+          WebSocketClient().sendWSMessage({
+            'type': 'SEND_MESSAGE',
+            'recipient_id': memberHash,
+            'envelope': envelope,
+            'content_type': 'group_leave',
+          });
+        }
+      } catch (e) {
+        log('[Group] leave announcement failed (continuing): $e');
+      }
+    }
+
+    await nukeContact(groupId, receivedFromPeer: false);
+  }
+
+  /// Another member announced their departure. Tombstone their lane (the
+  /// offset range is burned — never re-assignable on this seed), drop them
+  /// from the delivery roster, and note it in the chat.
+  Future<void> _handleGroupLeave(
+    Contact group,
+    String senderId,
+    Map<String, dynamic> envelopeJson,
+  ) async {
+    if (senderId == userId) return;
+    final seed = group.groupSeed ?? '';
+    if (seed.isEmpty) return;
+    if (!group.memberKeyHashes.contains(senderId)) return; // not a member
+    try {
+      final keyHex = sha256.convert(utf8.encode(seed)).toString();
+      final dec = WiltkeyPersistence().decryptString(
+        envelopeJson['d'] as String,
+        keyHex,
+      );
+      final p = jsonDecode(dec) as Map<String, dynamic>;
+      if (p['leaver'] != senderId) return; // payload must self-identify
+      // Scope the tombstone to the slots the leaver attested. A replayed
+      // leave after the leaver rejoined (fresh slot) only re-retires the OLD
+      // slot generation — the new one is untouched.
+      final attestedSlots = ((p['slots'] as List<dynamic>?) ?? [])
+          .map((s) => (s as num).toInt())
+          .toSet();
+      if (attestedSlots.isEmpty) {
+        // Older-format leave (no slot attestation): fall back to the lanes
+        // currently owned by the leaver.
+        attestedSlots.addAll(
+          (await GroupDatabase.instance.getAllLanes(group.keyHash))
+              .where((l) => l['member_key_hash'] == senderId)
+              .map((l) => l['slot_index'] as int),
+        );
+      }
+      for (final slot in attestedSlots) {
+        await GroupDatabase.instance.tombstoneLane(group.keyHash, slot);
+      }
+    } catch (e) {
+      log('[Group] group_leave failed to authenticate: $e');
+      return;
+    }
+
+    // Drop from the delivery roster (profile row kept for attribution).
+    final idx = contacts.indexWhere((c) => c.isGroup && c.keyHash == group.keyHash);
+    if (idx != -1) {
+      final existing = contacts[idx];
+      final newHashes = existing.memberKeyHashes
+          .where((h) => h != senderId)
+          .toList();
+      final updated = existing.copyWith(
+        memberKeyHashes: newHashes,
+        memberCount: newHashes.length,
+      );
+      contacts[idx] = updated;
+      if (activeContact?.keyHash == group.keyHash) activeContact = updated;
+      await WiltkeyDatabase.instance.upsertContact(updated);
+      updateGroupMembersMetadata(updated);
+
+      // System note in the chat (plain-English like all system notes).
+      final leaverProfile =
+          groupProfilesCache[group.keyHash]?[senderId];
+      final leaverNameRaw = leaverProfile?['name'] as String?;
+      final leaverName =
+          (leaverNameRaw?.isNotEmpty ?? false) ? leaverNameRaw! : 'A member';
+      final note = ChatMessage(
+        id: 'system_leave_${senderId.substring(0, 8)}_${DateTime.now().millisecondsSinceEpoch}',
+        senderId: 'system',
+        text: '',
+        decryptedText: '$leaverName left the group',
+        timestamp: DateTime.now(),
+        isSentByMe: false,
+      );
+      appendLoadedMessage(group.id, note);
+      await WiltkeyDatabase.instance.saveMessage(
+        note,
+        group.id,
+        masterKeyHex: masterKeyHex,
+      );
+    }
+
+    notifyListeners();
+    _persistence.saveState(this);
+    log('[Group] $senderId left the group (lane tombstoned).');
+  }
+
+  /// We were KICKED: the host sent us a singled-out group_kick frame. Wipe the
+  /// group locally (keys + data destroyed — a stale readable copy of a group
+  /// we no longer belong to serves nobody), which also exits the chat via the
+  /// nuke-while-open guard if we were looking at it.
+  ///
+  /// Authentication: the relay-authenticated sender must be our CURRENT host
+  /// (only the host kicks), the payload must self-identify us, and the
+  /// attested slot must still be OURS — a replayed kick after we re-joined
+  /// into a fresh slot (or after a recharge rotated everything) mismatches
+  /// and is ignored.
+  Future<void> _handleGroupKick(
+    Contact group,
+    String senderId,
+    Map<String, dynamic> envelopeJson,
+  ) async {
+    if (group.isHost) return; // the host never kicks themselves
+    // Authority gate FAILS CLOSED (review 2026-09-10 HIGH): any member can
+    // ENCRYPT a kick payload (shared group seed), so sender==host is the only
+    // authority check — it must never be skipped when the host is unknown.
+    if (group.hostKeyHash == null || senderId != group.hostKeyHash) return;
+    final seed = group.groupSeed ?? '';
+    if (seed.isEmpty) return;
+    try {
+      final keyHex = sha256.convert(utf8.encode(seed)).toString();
+      final dec = WiltkeyPersistence().decryptString(
+        envelopeJson['d'] as String,
+        keyHex,
+      );
+      final p = jsonDecode(dec) as Map<String, dynamic>;
+      if (p['kicked'] != userId) return; // must self-identify the victim
+      final attestedSlot = (p['slot'] as num?)?.toInt();
+      if (attestedSlot == null) return;
+
+      // The attested slot must still be the one we currently hold.
+      final myLane = await GroupDatabase.instance.getLaneByMember(
+        group.keyHash,
+        userId,
+      );
+      if (myLane == null) return; // already gone (idempotent)
+      if ((myLane['slot_index'] as int) != attestedSlot) {
+        log('[Group] Ignoring stale group_kick (slot ${p['slot']} ≠ our slot '
+            '${myLane['slot_index']}) — likely a replay after a rejoin.');
+        return;
+      }
+    } catch (e) {
+      log('[Group] group_kick failed to authenticate: $e');
+      return;
+    }
+
+    log('[Group] Kicked from group by host — wiping local copy.');
+    await nukeContact(
+      group.keyHash,
+      receivedFromPeer: true,
+      eventOverrideType: 'group_kicked',
+      eventOverrideTitle: 'Removed from a group',
+      eventOverrideBody: 'The group host removed you from a secure group.',
+    );
+  }
+
+  /// Remaining members' side of a host kick: tombstone the kicked member's
+  /// lane and note it in the chat. Device-testing feedback 2026-09-12: without
+  /// this only the host (and the kicked device) knew about the removal, and
+  /// spokes never tombstoned the kicked lane locally.
+  ///
+  /// Authentication: the relay-authenticated sender must be our CURRENT host
+  /// (only the host kicks — gate fails closed); the payload must identify the
+  /// kicked member; the attested slot must NOT be our own current lane
+  /// (a legit kick never attests our slot; a forged/hostile one must not be
+  /// able to burn our lane). Replay posture: tombstoned slots are never
+  /// re-assigned within a seed generation, and after a recharge the old
+  /// notices fail decryption under the new seed.
+  Future<void> _handleGroupKickNotice(
+    Contact group,
+    String senderId,
+    Map<String, dynamic> envelopeJson,
+  ) async {
+    if (group.isHost) return; // the host already did this locally
+    if (group.hostKeyHash == null || senderId != group.hostKeyHash) return;
+    final seed = group.groupSeed ?? '';
+    if (seed.isEmpty) return;
+    String kickedHash;
+    int? attestedSlot;
+    try {
+      final keyHex = sha256.convert(utf8.encode(seed)).toString();
+      final dec = WiltkeyPersistence().decryptString(
+        envelopeJson['d'] as String,
+        keyHex,
+      );
+      final p = jsonDecode(dec) as Map<String, dynamic>;
+      kickedHash = p['kicked'] as String;
+      attestedSlot = (p['slot'] as num?)?.toInt();
+    } catch (e) {
+      log('[Group] group_kick_notice failed to authenticate: $e');
+      return;
+    }
+    if (kickedHash.isEmpty || kickedHash == userId) return;
+
+    // Tombstone the kicked lane — unless it is OUR slot (defensive: a legit
+    // host never attests our slot here).
+    if (attestedSlot != null) {
+      final myLane = await GroupDatabase.instance.getLaneByMember(
+        group.keyHash,
+        userId,
+      );
+      final mySlot = myLane?['slot_index'] as int?;
+      if (mySlot == attestedSlot) {
+        log('[Group] kick_notice attested OUR slot $mySlot — ignoring '
+            'tombstone (defensive).');
+      } else {
+        await GroupDatabase.instance.tombstoneLane(group.keyHash, attestedSlot);
+      }
+    }
+
+    // Drop from the delivery roster (profile row kept for attribution).
+    final idx = contacts.indexWhere(
+      (c) => c.isGroup && c.keyHash == group.keyHash,
+    );
+    if (idx != -1) {
+      final existing = contacts[idx];
+      final newHashes = existing.memberKeyHashes
+          .where((h) => h != kickedHash)
+          .toList();
+      final updated = existing.copyWith(
+        memberKeyHashes: newHashes,
+        memberCount: newHashes.length,
+      );
+      contacts[idx] = updated;
+      if (activeContact?.keyHash == group.keyHash) activeContact = updated;
+      await WiltkeyDatabase.instance.upsertContact(updated);
+      updateGroupMembersMetadata(updated);
+
+      final kickedProfile = groupProfilesCache[group.keyHash]?[kickedHash];
+      final kickedNameRaw = kickedProfile?['name'] as String?;
+      final kickedName =
+          (kickedNameRaw?.isNotEmpty ?? false) ? kickedNameRaw! : 'A member';
+      final note = ChatMessage(
+        id:
+            'system_kick_${kickedHash.substring(0, 8)}_${DateTime.now().millisecondsSinceEpoch}',
+        senderId: 'system',
+        text: '',
+        decryptedText: '$kickedName was removed by the host',
+        timestamp: DateTime.now(),
+        isSentByMe: false,
+      );
+      appendLoadedMessage(existing.id, note);
+      await WiltkeyDatabase.instance.saveMessage(
+        note,
+        existing.id,
+        masterKeyHex: masterKeyHex,
+      );
+    }
+
+    notifyListeners();
+    _persistence.saveState(this);
+    log('[Group] Host kicked $kickedHash (lane tombstoned).');
   }
 
   /// Member side of a host recharge: the group's seed was reset, so our lane is
@@ -1706,9 +2134,10 @@ extension AppStateGroups on AppState {
     Map<String, dynamic> envelopeJson,
   ) async {
     // Only the host may recharge; ignore a frame not from our host, and ignore
-    // it on the host's own device (we never lock ourselves out).
+    // it on the host's own device (we never lock ourselves out). Authority
+    // gate FAILS CLOSED (same latent pattern as group_kick — review 2026-09-10).
     if (group.isHost) return;
-    if (group.hostKeyHash != null && senderId != group.hostKeyHash) return;
+    if (group.hostKeyHash == null || senderId != group.hostKeyHash) return;
     try {
       final seed = group.groupSeed ?? '';
       if (seed.isEmpty) return;

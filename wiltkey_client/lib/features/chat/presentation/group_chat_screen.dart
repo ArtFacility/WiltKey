@@ -16,9 +16,11 @@ import 'widgets/image_source_sheet.dart';
 import 'widgets/content_attachment_sheet.dart';
 import 'widgets/chat_search_bar.dart';
 import '../../../core/theme/wk.dart';
+import '../../../core/theme/nuke_capture.dart';
 import '../../../core/theme/wiltkey_tokens.dart';
 import '../../../core/theme/wiltkey_components.dart';
 import 'widgets/compression_dialog.dart';
+import 'widgets/video_send_dialog.dart';
 import 'widgets/emoji_autocomplete_bar.dart';
 import 'widgets/mention_autocomplete_bar.dart';
 import 'widgets/emoji_picker_panel.dart';
@@ -103,6 +105,14 @@ class _GroupChatScreenState extends State<GroupChatScreen>
   // Wraps the message list so a consented screenshot can render it to an image.
   final GlobalKey _captureBoundaryKey = GlobalKey();
 
+  // Nuke handling: when THIS group is destroyed while the chat is on screen
+  // (vote-nuke / peer wipe), the contact disappears and [activeContact] goes
+  // null — which used to render an empty shell until back-press. Instead:
+  // capture the chat as the animation base, play the theme's nuke overlay,
+  // then drop back to the main screen automatically.
+  String? _nukeWatchedContactId;
+  bool _nukePlaying = false;
+
   // Local keyword search
   bool _isSearching = false;
   final TextEditingController _searchController = TextEditingController();
@@ -128,6 +138,7 @@ class _GroupChatScreenState extends State<GroupChatScreen>
     final contact = _appState.activeContact;
     if (contact != null) {
       _openChatId = contact.id;
+      _nukeWatchedContactId = contact.id;
       _appState.visibleChatId = contact.id; // now on screen → mute its own alerts
       _appState.loadInitialMessages(contact).then((_) async {
         if (!mounted) return;
@@ -260,6 +271,13 @@ class _GroupChatScreenState extends State<GroupChatScreen>
     return (_appState.messages[contact.id] ?? []).where((m) {
       if (m.contentType == 'emoji_def' || m.contentType == 'emoji_delete')
         return false;
+      // Contact-request control cards never render in GROUP chats (user
+      // decision 2026-09-14): the arrival popup + activity event carry them.
+      // The DB rows stay — they're the respond/status source of truth.
+      if (m.contentType == 'contact_request_sent' ||
+          m.contentType == 'contact_request_received') {
+        return false;
+      }
       if (m.isSystem) return true;
       if (contact.joinedAt != null && m.timestamp.isBefore(contact.joinedAt!)) {
         return false;
@@ -276,6 +294,7 @@ class _GroupChatScreenState extends State<GroupChatScreen>
         return;
       }
 
+      _checkNukedWhileOpen();
       final contact = _appState.activeContact;
       if (contact != null) {
         final messages = _visibleMessages(contact);
@@ -716,7 +735,71 @@ class _GroupChatScreenState extends State<GroupChatScreen>
         res.hexString,
         contentType: 'pixel_art',
       );
+    } else if (res is VideoAttachmentResult) {
+      await _pickAndSendGroupVideo(contact, res.source);
     }
+  }
+
+  Future<void> _pickAndSendGroupVideo(
+    Contact contact,
+    ImageSource source,
+  ) async {
+    final picker = ImagePicker();
+    XFile? video;
+    try {
+      _appState.isPickingMedia = true;
+      video = await picker.pickVideo(
+        source: source,
+      );
+    } finally {
+      _appState.isPickingMedia = false;
+    }
+    if (video == null || !mounted) return;
+
+    final VideoSendResult? choice = await VideoSendDialog.show(
+      context,
+      sourcePath: video.path,
+      contact: contact,
+    );
+    if (choice == null || !mounted) return;
+
+    final jsonStr = choice.payload.toJsonString();
+    final byteCost = jsonStr.length + 73;
+    final l10n = AppLocalizations.of(context)!;
+
+    if (byteCost > contact.remainingBufferBytes) {
+      _errorSnack(
+        l10n.chatImageTooLargeSnackBar(
+          AppState.formatBytes(byteCost),
+          AppState.formatBytes(contact.remainingBufferBytes),
+        ),
+      );
+      return;
+    }
+
+    if (WkPayloadLimits.exceedsOutgoing(jsonStr.length)) {
+      _errorSnack(
+        WkPayloadLimits.blockedByFreeTier(jsonStr.length)
+            ? l10n.chatImageNeedsPlusSnackBar
+            : l10n.chatImageExceedsMaxSizeSnackBar,
+      );
+      return;
+    }
+
+    final error = await _appState.sendGroupMessage(
+      jsonStr,
+      contentType: 'video',
+      allowSave: choice.allowSave,
+      ephemeral: choice.ephemeral,
+      ttlSeconds: choice.ttlSeconds,
+    );
+    try {
+      await choice.file.delete();
+    } catch (_) {}
+    if (error != null) {
+      _errorSnack(error);
+    }
+    _scrollToBottom();
   }
 
   Future<void> _pickAndSendGroupImage(
@@ -2112,10 +2195,9 @@ class _GroupChatScreenState extends State<GroupChatScreen>
             ElevatedButton(
               onPressed: () async {
                 Navigator.pop(context);
-                await _appState.nukeContact(
-                  contact.keyHash,
-                  receivedFromPeer: false,
-                );
+                // Announce the departure to the other members FIRST (they
+                // tombstone our lane + note it in the chat), then wipe locally.
+                await _appState.leaveGroup(contact);
                 if (mounted) {
                   Navigator.pop(context);
                 }
@@ -2157,7 +2239,15 @@ class _GroupChatScreenState extends State<GroupChatScreen>
                 final slotsInfo = _appState.groupSlotsInfo[contact.id];
                 final usedSlots = slotsInfo?['used'] ?? 0;
                 final totalSlots = slotsInfo?['total'] ?? 0;
-                final emptySlots = max(0, totalSlots - usedSlots);
+                // Retired (tombstoned) lanes render as pseudo-members below and
+                // must NOT count as available — otherwise a departed member's
+                // burned slot looks like a fresh empty one (user feedback
+                // 2026-09-13).
+                final tombstoneSlots =
+                    _appState.groupTombstoneSlots[contact.id] ?? const <int>[];
+                final tombstoned =
+                    slotsInfo?['tombstoned'] ?? tombstoneSlots.length;
+                final emptySlots = max(0, totalSlots - usedSlots - tombstoned);
 
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -2196,12 +2286,30 @@ class _GroupChatScreenState extends State<GroupChatScreen>
                     ),
                     // Per-member byte gauges are meaningless for a Time Wilt group
                     // (unbounded budget), so the members sheet skips them there.
+                    // The indicator is capped and scrollable: with a full roster
+                    // it would otherwise grow tall enough to push the action
+                    // buttons off the sheet (device-testing feedback 2026-09-12).
                     if (memberList.isNotEmpty && !contact.isTimeWilt)
                       Padding(
                         padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                        child: context.wkc.groupBudgetIndicator(
-                          members: _memberBudgets(memberList),
-                          emptySlots: emptySlots,
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxHeight: 96),
+                          child: SingleChildScrollView(
+                            child: context.wkc.groupBudgetIndicator(
+                              members: [
+                                ..._memberBudgets(memberList),
+                                // Tombstones render as wilted/grey markers —
+                                // visibly distinct from an AVAILABLE empty slot.
+                                for (final s in tombstoneSlots)
+                                  MemberBudget(
+                                    fraction: 0,
+                                    keyHash: 'tombstone_$s',
+                                    isWilted: true,
+                                  ),
+                              ],
+                              emptySlots: emptySlots,
+                            ),
+                          ),
                         ),
                       ),
                     Padding(
@@ -2227,16 +2335,21 @@ class _GroupChatScreenState extends State<GroupChatScreen>
                     Expanded(
                       child: ListView(
                         padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
-                        children: memberList
-                            .map(
-                              (m) => _buildMemberSheetCard(
-                                t,
-                                m,
-                                contact,
-                                sheetContext,
-                              ),
-                            )
-                            .toList(),
+                        children: [
+                          ...memberList.map(
+                            (m) => _buildMemberSheetCard(
+                              t,
+                              m,
+                              contact,
+                              sheetContext,
+                            ),
+                          ),
+                          // Retired lanes: visible "Tombstone" pseudo-members
+                          // (user request 2026-09-13) so a departed/kicked
+                          // member's burned slot is clearly gone for good.
+                          for (final s in tombstoneSlots)
+                            _buildTombstoneCard(t, contact, s),
+                        ],
                       ),
                     ),
                     Padding(
@@ -2441,6 +2554,69 @@ class _GroupChatScreenState extends State<GroupChatScreen>
     );
   }
 
+  /// Pseudo-member card for a retired (tombstoned) lane. User request
+  /// 2026-09-13: a departed/kicked member's slot must be VISIBLE as gone for
+  /// good — full byte offset consumed, grave pixel art — not an anonymous
+  /// empty slot that looks assignable.
+  Widget _buildTombstoneCard(WiltkeyTokens t, Contact contact, int slot) {
+    final int laneBytes = contact.laneSize ?? 0;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: t.surface.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(t.radiusCard),
+        border: Border.all(color: t.border, width: t.borderWidth),
+      ),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 40,
+            height: 40,
+            child: CustomPaint(
+              painter: _GravePixelPainter(
+                stone: t.textTertiary,
+                base: t.border,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Tombstone',
+                  style: t.body.copyWith(
+                    color: t.textTertiary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'LANE #$slot RETIRED',
+                  style: t.dataMono.copyWith(
+                    color: t.textTertiary,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.8,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // "All byte offset used" — the whole lane was burned, nothing left.
+          Text(
+            '0 / ${AppState.formatBytes(laneBytes)}',
+            style: t.dataMono.copyWith(
+              color: t.budgetWilted,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildMemberSheetCard(
     WiltkeyTokens t,
     Map<String, dynamic> m,
@@ -2629,30 +2805,51 @@ class _GroupChatScreenState extends State<GroupChatScreen>
                       ),
                     ),
                   )
-                else if (!notYetMet)
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        _appState.syncGroupFromMember(contact, keyHash);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(l10n.groupSyncingFromMember(name)),
-                            backgroundColor: t.identity,
+                else if (!notYetMet) ...[
+                  // Lead action: adding a non-contact as a contact (the whole
+                  // point of tapping a member). Sync got demoted to a compact
+                  // icon — auto-sync made the full-width button rare.
+                  if (!_appState.socialContacts
+                      .any((c) => c.keyHash == keyHash))
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.pop(sheetContext);
+                          _promptAddContactFor(keyHash, name);
+                        },
+                        icon: const Icon(Icons.person_add_alt, size: 16),
+                        label: Text(l10n.contactAddTitle),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: t.positive,
+                          foregroundColor: Colors.white,
+                          minimumSize: const Size.fromHeight(42),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(t.radiusControl),
                           ),
-                        );
-                      },
-                      icon: const Icon(Icons.sync, size: 16),
-                      label: Text(l10n.groupSyncStepText),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: t.positive,
-                        foregroundColor: Colors.white,
-                        minimumSize: const Size.fromHeight(42),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(t.radiusControl),
                         ),
                       ),
                     ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    tooltip: l10n.groupSyncStepText,
+                    onPressed: () {
+                      Navigator.pop(sheetContext);
+                      _appState.syncGroupFromMember(contact, keyHash);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(l10n.groupSyncingFromMember(name)),
+                          backgroundColor: t.identity,
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.sync, size: 18),
+                    style: IconButton.styleFrom(
+                      foregroundColor: t.textSecondary,
+                      side: BorderSide(color: t.border),
+                      minimumSize: const Size(42, 42),
+                    ),
                   ),
+                ],
                 if (contact.isHost && !isMemberHost) ...[
                   const SizedBox(width: 10),
                   Expanded(
@@ -2680,6 +2877,49 @@ class _GroupChatScreenState extends State<GroupChatScreen>
     );
   }
 
+  /// This group was destroyed while we're looking at it (vote reached
+  /// majority, or the host wiped it): play the theme's nuke animation over the
+  /// captured chat, then auto-drop back to the main screen. Only fires when
+  /// this route is actually on top (the user is HERE, not elsewhere).
+  Future<void> _checkNukedWhileOpen() async {
+    if (!mounted || _nukePlaying) return;
+    // PIN gate still up: the overlay would play OVER the lock screen (caught
+    // 2026-09-14 — minimize while in a chat, reopen). The listener re-fires
+    // after unlock, so the animation plays right after the PIN instead.
+    if (_appState.isLocked) return;
+    final id = _nukeWatchedContactId;
+    if (id == null) return;
+    if (_appState.contacts.any((c) => c.id == id)) return; // still alive
+    final route = ModalRoute.of(context);
+    if (route != null && !route.isCurrent) return;
+    _nukePlaying = true;
+
+    final screen = await captureNukeScreen(_captureBoundaryKey);
+    if (!mounted) return;
+    final t = context.wk;
+    late final OverlayEntry entry;
+    entry = OverlayEntry(
+      builder: (overlayContext) => context.wkc.nukeOverlay(
+        onDone: () {
+          entry.remove();
+          if (mounted) {
+            Navigator.of(context, rootNavigator: true)
+                .popUntil((route) => route.isFirst);
+          }
+        },
+        screen: screen,
+      ),
+    );
+    Overlay.of(context, rootOverlay: true).insert(entry);
+    // Safety: if a theme's overlay never calls onDone (or the app was
+    // backgrounded mid-animation), still exit after a generous window.
+    Future.delayed(const Duration(seconds: 6), () {
+      if (!mounted) return;
+      Navigator.of(context, rootNavigator: true)
+          .popUntil((route) => route.isFirst);
+    });
+  }
+
   /// Tapping a member row offers to add them as a contact. The request is sent
   /// directly to that one member over the AES meta channel (never fanned to the
   /// rest of the group). If a direct 1:1 chat with them already exists, the sent
@@ -2699,6 +2939,7 @@ class _GroupChatScreenState extends State<GroupChatScreen>
       keyHash: keyHash,
       name: name,
       chatContact: direct,
+      groupContact: _appState.activeContact,
     );
   }
 
@@ -2766,3 +3007,42 @@ class _GroupChatScreenState extends State<GroupChatScreen>
 }
 
 
+
+/// Tiny pixel-art grave for retired (tombstoned) group lanes. Drawn on a
+/// 7x7 grid with anti-aliasing off for the crisp pixel look; stone grey with
+/// a cross cut-out and a darker base mound.
+class _GravePixelPainter extends CustomPainter {
+  final Color stone;
+  final Color base;
+
+  const _GravePixelPainter({required this.stone, required this.base});
+
+  static const List<String> _rows = [
+    '..XXX..',
+    '.XXXXX.',
+    '.XX.XX.',
+    '.X...X.',
+    '.XX.XX.',
+    '.XXXXX.',
+    'XXXXXXX',
+  ];
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final double px = size.width / 7;
+    final double py = size.height / 7;
+    final paint = Paint()..isAntiAlias = false;
+    for (var y = 0; y < _rows.length; y++) {
+      final row = _rows[y];
+      for (var x = 0; x < row.length; x++) {
+        if (row[x] != 'X') continue;
+        paint.color = y == _rows.length - 1 ? base : stone;
+        canvas.drawRect(Rect.fromLTWH(x * px, y * py, px, py), paint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _GravePixelPainter oldDelegate) =>
+      oldDelegate.stone != stone || oldDelegate.base != base;
+}

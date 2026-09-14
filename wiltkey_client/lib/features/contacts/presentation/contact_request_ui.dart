@@ -59,6 +59,7 @@ Future<void> showAddContactFlow(
   String? keyHash,
   String? name,
   Contact? chatContact,
+  Contact? groupContact,
 }) async {
   final l10n = AppLocalizations.of(context)!;
   final String targetKey = contact?.keyHash ?? keyHash!;
@@ -78,14 +79,17 @@ Future<void> showAddContactFlow(
           keyHash: targetKey,
           name: targetName,
           chatContact: chatContact,
+          groupContact: groupContact,
         );
   if (err != null) {
     if (!context.mounted) return;
     _toast(context, err);
     return;
   }
-  if (!context.mounted) return;
-  _toast(context, l10n.contactAddSent);
+
+  if (context.mounted) {
+    _toast(context, l10n.contactRequestSent(targetName));
+  }
 }
 void _toast(BuildContext context, String text) {
   if (!context.mounted) return;

@@ -60,6 +60,9 @@ type RedisClient struct {
 	memoryNukes       map[string]ipFail
 	memoryPushTokens  map[string]string
 	memoryEntitlements map[string]string
+	memoryIssuance    map[string]int64
+	memoryChStrikes   map[string]int64
+	memoryChCooldown  map[string]time.Time
 	mu                sync.RWMutex
 }
 
@@ -96,6 +99,9 @@ func NewRedisClient(addr string) (*RedisClient, error) {
 			memoryNukes:       make(map[string]ipFail),
 			memoryPushTokens:  make(map[string]string),
 			memoryEntitlements: make(map[string]string),
+			memoryIssuance:    make(map[string]int64),
+	memoryChStrikes:   make(map[string]int64),
+	memoryChCooldown:  make(map[string]time.Time),
 		}, nil
 	}
 	return &RedisClient{rdb: rdb}, nil
@@ -123,6 +129,9 @@ func (r *RedisClient) FlushAll() error {
 		r.memoryTunnelBytes = make(map[string]int64)
 		r.memoryPushTokens = make(map[string]string)
 		r.memoryEntitlements = make(map[string]string)
+		r.memoryIssuance = make(map[string]int64)
+		r.memoryChStrikes = make(map[string]int64)
+		r.memoryChCooldown = make(map[string]time.Time)
 		return nil
 	}
 	return r.rdb.FlushAll(ctx).Err()
@@ -582,6 +591,27 @@ func (r *RedisClient) AllowLargeUpload(senderID string, cooldown time.Duration) 
 	return ok, nil
 }
 
+// AllowAction is the generic SetNX cooldown gate (same semantics as
+// AllowLargeUpload, arbitrary caller-chosen key). Returns false while the key is
+// still cooling down. Callers decide their own fail-open/fail-closed policy.
+func (r *RedisClient) AllowAction(key string, cooldown time.Duration) (bool, error) {
+	if r.isMemory {
+		r.mu.Lock()
+		defer r.mu.Unlock()
+		if exp, ok := r.memoryBlocks[key]; ok && exp.After(time.Now()) {
+			return false, nil
+		}
+		r.memoryBlocks[key] = time.Now().Add(cooldown)
+		return true, nil
+	}
+
+	ok, err := r.rdb.SetNX(ctx, key, 1, cooldown).Result()
+	if err != nil {
+		return false, err
+	}
+	return ok, nil
+}
+
 // ConsumeVoucher atomically marks a voucher (keyed by its signature) as spent so a
 // valid voucher can't be replayed to post unlimited messages. Returns false if the
 // voucher was already used or is already expired. The marker lives until the
@@ -718,6 +748,133 @@ func (r *RedisClient) CheckIPRateLimit(ip string, limit int64) (bool, error) {
 		return false, err
 	}
 	return incr.Val() <= limit, nil
+}
+
+// AllowIssuance enforces a per-IP DAILY cap on device-token issuance (a
+// solved PoW still must not let one machine mint unlimited identities).
+// Day-keyed counter with a 24h+ TTL; fails CLOSED on Redis error — issuance
+// is a security gate, and an infra blip must not open the minting floodgates.
+// (Clients that legitimately need a token can retry; the cap refills daily.)
+func (r *RedisClient) AllowIssuance(ip string, maxPerDay int64) (bool, error) {
+	day := time.Now().Format("20060102")
+
+	if r.isMemory {
+		r.mu.Lock()
+		defer r.mu.Unlock()
+		key := "issuance:" + ip + ":" + day
+		r.memoryIssuance[key]++
+		// Trim stale day keys to prevent unbounded growth.
+		if len(r.memoryIssuance) > 4096 {
+			for k := range r.memoryIssuance {
+				if !strings.HasSuffix(k, ":"+day) {
+					delete(r.memoryIssuance, k)
+				}
+			}
+		}
+		return r.memoryIssuance[key] <= maxPerDay, nil
+	}
+
+	key := fmt.Sprintf("issuance:%s:%s", ip, day)
+	pipe := r.rdb.TxPipeline()
+	incr := pipe.Incr(ctx, key)
+	pipe.ExpireNX(ctx, key, 48*time.Hour)
+	_, err := pipe.Exec(ctx)
+	if err != nil {
+		return false, err
+	}
+	return incr.Val() <= maxPerDay, nil
+}
+
+// IssuanceCountToday peeks (WITHOUT incrementing) today's per-IP issuance
+// counter. The adaptive human-challenge mode uses it to keep the FIRST
+// issuance of each IP-day PoW-only. Zero on Redis error paths is NOT
+// special-cased here — callers decide their own fail-open/closed posture.
+func (r *RedisClient) IssuanceCountToday(ip string) (int64, error) {
+	day := time.Now().Format("20060102")
+
+	if r.isMemory {
+		r.mu.RLock()
+		defer r.mu.RUnlock()
+		return r.memoryIssuance["issuance:"+ip+":"+day], nil
+	}
+
+	return r.rdb.Get(ctx, fmt.Sprintf("issuance:%s:%s", ip, day)).Int64()
+}
+
+// RegisterChallengeStrike counts a wrong human-challenge answer for this IP
+// within the current hour. Returns the strike total so the caller can arm the
+// cooldown at 3.
+func (r *RedisClient) RegisterChallengeStrike(ip string) (int64, error) {
+	hour := time.Now().Format("2006010215")
+
+	if r.isMemory {
+		r.mu.Lock()
+		defer r.mu.Unlock()
+		key := "chstrike:" + ip + ":" + hour
+		r.memoryChStrikes[key]++
+		// Trim stale hour keys to prevent unbounded growth.
+		if len(r.memoryChStrikes) > 4096 {
+			for k := range r.memoryChStrikes {
+				if !strings.HasSuffix(k, ":"+hour) {
+					delete(r.memoryChStrikes, k)
+				}
+			}
+		}
+		return r.memoryChStrikes[key], nil
+	}
+
+	key := fmt.Sprintf("chstrike:%s:%s", ip, hour)
+	pipe := r.rdb.TxPipeline()
+	incr := pipe.Incr(ctx, key)
+	pipe.ExpireNX(ctx, key, 2*time.Hour)
+	_, err := pipe.Exec(ctx)
+	if err != nil {
+		return 0, err
+	}
+	return incr.Val(), nil
+}
+
+// CheckChallengeCooldown reports whether this IP is currently serving a
+// wrong-answer cooldown (no puzzles, issuance refused until it lapses).
+// Lazily prunes expired entries so the in-memory fallback can't grow
+// unbounded (review 2026-09-06).
+func (r *RedisClient) CheckChallengeCooldown(ip string) (bool, error) {
+	if r.isMemory {
+		r.mu.Lock()
+		defer r.mu.Unlock()
+		now := time.Now()
+		for k, until := range r.memoryChCooldown {
+			if until.Before(now) {
+				delete(r.memoryChCooldown, k)
+			}
+		}
+		until, ok := r.memoryChCooldown[ip]
+		return ok && until.After(now), nil
+	}
+
+	v, err := r.rdb.Exists(ctx, "chcooldown:"+ip).Result()
+	return v > 0, err
+}
+
+// SetChallengeCooldown arms the wrong-answer cooldown for [ip]. Bounds the
+// in-memory fallback at 4096 entries like the other challenge counters.
+func (r *RedisClient) SetChallengeCooldown(ip string, duration time.Duration) error {
+	if r.isMemory {
+		r.mu.Lock()
+		defer r.mu.Unlock()
+		if len(r.memoryChCooldown) > 4096 {
+			now := time.Now()
+			for k, until := range r.memoryChCooldown {
+				if until.Before(now) {
+					delete(r.memoryChCooldown, k)
+				}
+			}
+		}
+		r.memoryChCooldown[ip] = time.Now().Add(duration)
+		return nil
+	}
+
+	return r.rdb.Set(ctx, "chcooldown:"+ip, 1, duration).Err()
 }
 
 // StorePairing stores pairing data mapped to a PIN code.

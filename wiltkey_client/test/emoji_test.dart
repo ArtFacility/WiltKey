@@ -1,4 +1,4 @@
-// Custom emoji harness.
+﻿// Custom emoji harness.
 //
 // Covers the shared per-chat emoji pool end to end:
 //   * activeEmojiQuery — the pure autocomplete parser
@@ -221,7 +221,21 @@ void main() {
       });
     }
 
+    Future<void> deleteStalePads() async {
+      final dir = Directory('.');
+      await for (final e in dir.list()) {
+        if (e is File &&
+            e.uri.pathSegments.last.startsWith('keystream_') &&
+            e.uri.pathSegments.last.endsWith('.pad')) {
+          try {
+            await e.delete();
+          } catch (_) {}
+        }
+      }
+    }
+
     setUpAll(() async {
+      await deleteStalePads();
       await startFakeRelay();
       appState = AppState();
       appState.useLocalDevRelay = true;
@@ -243,6 +257,7 @@ void main() {
     });
 
     tearDownAll(() async {
+    await deleteStalePads();
       appState.stopConnectionWatchdog();
       WebSocketClient().disconnect();
       await server.close(force: true);
@@ -260,6 +275,7 @@ void main() {
           100000,
           keyHash,
           seed,
+          freshSeedHex: seed,
         );
         final contact = appState.contacts.firstWhere(
           (c) => c.keyHash == keyHash,
@@ -301,6 +317,7 @@ void main() {
           100000,
           keyHash,
           seed,
+          freshSeedHex: seed,
         );
         final contact = appState.contacts.firstWhere(
           (c) => c.keyHash == keyHash,
@@ -397,6 +414,7 @@ void main() {
         100000,
         keyHash,
         seed,
+        freshSeedHex: seed,
       );
       final contact = appState.contacts.firstWhere((c) => c.keyHash == keyHash);
       await CustomEmojiStore.clear(keyHash);

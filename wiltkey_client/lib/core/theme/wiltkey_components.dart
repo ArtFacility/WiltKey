@@ -286,6 +286,7 @@ abstract class WiltkeyComponents {
     int seed = 0,
     ValueChanged<double>? onSeek,
     Color? accent,
+    List<int>? waveform,
   });
 }
 
@@ -303,12 +304,14 @@ mixin VoiceScrubberDefaults {
     int seed = 0,
     ValueChanged<double>? onSeek,
     Color? accent,
+    List<int>? waveform,
   }) => DefaultVoiceScrubber(
     progress: progress,
     isPlaying: isPlaying,
     seed: seed,
     onSeek: onSeek,
     accent: accent,
+    waveform: waveform,
   );
 }
 

@@ -1,4 +1,4 @@
-﻿import 'dart:ui' as ui;
+import 'dart:ui' as ui;
 
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
@@ -196,6 +196,7 @@ class PaperinkComponents
     int seed = 0,
     ValueChanged<double>? onSeek,
     Color? accent,
+    List<int>? waveform,
   }) => PaperinkVoicePlayback(
     progress: progress,
     isPlaying: isPlaying,

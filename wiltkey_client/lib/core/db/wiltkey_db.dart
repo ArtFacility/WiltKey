@@ -3,8 +3,10 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 import '../models.dart';
 import '../persistence.dart';
+import '../video/video_message_service.dart';
 
 class WiltkeyDatabase {
   static final WiltkeyDatabase instance = WiltkeyDatabase._();
@@ -43,7 +45,7 @@ class WiltkeyDatabase {
     } catch (_) {}
     _db = await openDatabase(
       path,
-      version: 27,
+      version: 29,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -239,6 +241,24 @@ class WiltkeyDatabase {
         await db.execute('CREATE INDEX IF NOT EXISTS idx_stories_expiry ON stories(expires_at)');
       } catch (_) {}
     }
+
+    // v28: tombstoned group lanes. A lane whose member left (or was kicked)
+    // is RETIRED, never freed for re-assignment: its offset range was already
+    // burned into the shared group keystream, so handing the same range to a
+    // new member on the same seed would XOR fresh messages with used
+    // keystream (stream-cipher reuse). Tombstoned lanes stay out of
+    // getEmptyLanes forever, and inbound frames from them are dropped.
+    if (oldVersion < 28) {
+      await _safeAddColumn(db, 'group_lanes', 'tombstoned', 'INTEGER DEFAULT 0');
+    }
+
+    // v29: events.data — opaque JSON payload for events that need actionable
+    // context beyond title/body (contact-request events carry requester key/
+    // name/image so the approve/deny popup + event-row buttons work even when
+    // no card was inserted into a chat).
+    if (oldVersion < 29) {
+      await _safeAddColumn(db, 'events', 'data', 'TEXT');
+    }
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -269,6 +289,7 @@ class WiltkeyDatabase {
         max_offset INTEGER,
         current_write_offset INTEGER DEFAULT 0,
         header_written INTEGER DEFAULT 0,
+        tombstoned INTEGER DEFAULT 0,
         UNIQUE(group_id, slot_index),
         FOREIGN KEY (group_id) REFERENCES group_info(group_id) ON DELETE CASCADE
       )
@@ -425,6 +446,7 @@ class WiltkeyDatabase {
         title TEXT,
         body TEXT,
         chat_key TEXT,
+        data TEXT,
         timestamp INTEGER,
         read INTEGER DEFAULT 0
       )
@@ -475,6 +497,24 @@ class WiltkeyDatabase {
 
   Future<void> upsertContact(Contact contact) async {
     final db = await _database;
+    String? customNick = contact.customNickname;
+    String? privateNotes = contact.privateNotes;
+    if (customNick == null || privateNotes == null) {
+      final existing = await db.query(
+        'contacts',
+        columns: ['custom_nickname', 'private_notes'],
+        where: 'key_hash = ?',
+        whereArgs: [contact.keyHash],
+        limit: 1,
+      );
+      if (existing.isNotEmpty) {
+        customNick ??= existing.first['custom_nickname'] as String?;
+        privateNotes ??= existing.first['private_notes'] as String?;
+        contact.customNickname ??= customNick;
+        contact.privateNotes ??= privateNotes;
+      }
+    }
+
     await db.insert('contacts', {
       'id': contact.id,
       'name': contact.name,
@@ -507,8 +547,8 @@ class WiltkeyDatabase {
       'avatar_border': contact.avatarBorderId,
       'client_attestation': contact.clientAttestation,
       'attestation_expires_at': contact.attestationExpiresAt,
-      'custom_nickname': contact.customNickname,
-      'private_notes': contact.privateNotes,
+      'custom_nickname': customNick,
+      'private_notes': privateNotes,
       'outgoing_offset': contact.outgoingOffset,
       'outgoing_max_offset': contact.outgoingMaxOffset,
       'incoming_offset': contact.incomingOffset,
@@ -535,8 +575,12 @@ class WiltkeyDatabase {
   }) async {
     final db = await _database;
     final Map<String, Object?> values = {};
-    if (customNickname != null) values['custom_nickname'] = customNickname;
-    if (privateNotes != null) values['private_notes'] = privateNotes;
+    if (customNickname != null) {
+      values['custom_nickname'] = customNickname.trim().isEmpty ? null : customNickname.trim();
+    }
+    if (privateNotes != null) {
+      values['private_notes'] = privateNotes.trim().isEmpty ? null : privateNotes.trim();
+    }
     if (values.isNotEmpty) {
       await db.update(
         'contacts',
@@ -770,6 +814,43 @@ class WiltkeyDatabase {
     }
   }
 
+  /// Reads and decrypts the stored payload string (from sidecar or DB) using the
+  /// master key. Works for any content type (video JSON, text, etc).
+  Future<String?> loadMessagePayloadString(
+    String chatId,
+    String messageId, {
+    String? masterKeyHex,
+  }) async {
+    if (masterKeyHex == null) return null;
+    String? master;
+    final loaded = await _readMediaFilesAsync(_mediaBase(chatId, messageId));
+    if (loaded != null) {
+      master = loaded.$2;
+    } else {
+      try {
+        final db = await _database;
+        final rows = await db.query(
+          'messages',
+          columns: ['text_encrypted_master', 'wilted'],
+          where: 'chat_id = ? AND id = ?',
+          whereArgs: [chatId, messageId],
+          limit: 1,
+        );
+        if (rows.isEmpty) return null;
+        if ((rows.first['wilted'] as int? ?? 0) == 1) return null;
+        master = rows.first['text_encrypted_master'] as String?;
+      } catch (_) {
+        return null;
+      }
+    }
+    if (master == null) return null;
+    try {
+      return WiltkeyPersistence().decryptString(master, masterKeyHex);
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<void> _deleteMediaFiles(String base) async {
     try {
       final dir = _mediaDir;
@@ -785,15 +866,30 @@ class WiltkeyDatabase {
   Future<void> _deleteMediaForChat(String chatId) async {
     try {
       final dir = _mediaDir;
-      if (dir == null) return;
-      final prefix = '${chatId.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_')}__';
-      final d = Directory(dir);
-      if (!await d.exists()) return;
-      await for (final e in d.list()) {
-        if (e is File && p.basename(e.path).startsWith(prefix)) {
-          try {
-            await e.delete();
-          } catch (_) {}
+      if (dir != null) {
+        final prefix = '${chatId.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_')}__';
+        final d = Directory(dir);
+        if (await d.exists()) {
+          await for (final e in d.list()) {
+            if (e is File && p.basename(e.path).startsWith(prefix)) {
+              try {
+                await e.delete();
+              } catch (_) {}
+            }
+          }
+        }
+      }
+    } catch (_) {}
+    try {
+      final tempDir = await getTemporaryDirectory();
+      final d = Directory(tempDir.path);
+      if (await d.exists()) {
+        await for (final e in d.list()) {
+          if (e is File && p.basename(e.path).startsWith('wk_video_')) {
+            try {
+              await e.delete();
+            } catch (_) {}
+          }
         }
       }
     } catch (_) {}
@@ -987,6 +1083,7 @@ class WiltkeyDatabase {
     );
     final base = existing.isNotEmpty ? existing.first['media_path'] as String? : null;
     if (base != null && base.isNotEmpty) await _deleteMediaFiles(base);
+    await VideoMessageService.cleanupVideoFile(messageId);
     await db.update(
       'messages',
       {
@@ -1128,7 +1225,7 @@ class WiltkeyDatabase {
     final bool shouldDefer = deferImage ?? (
       !eagerOtp &&
       !wilted &&
-      contentType == 'image' &&
+      (contentType == 'image' || contentType == 'video') &&
       (row['ephemeral'] as int? ?? 0) == 0
     );
 
@@ -1295,6 +1392,7 @@ class WiltkeyDatabase {
     if (base != null && base.isNotEmpty) {
       await _deleteMediaFiles(base);
     }
+    await VideoMessageService.cleanupVideoFile(messageId);
     await db.update(
       'messages',
       {
@@ -1767,6 +1865,7 @@ class WiltkeyDatabase {
         existing.isNotEmpty ? existing.first['media_path'] as String? : null;
     await db.delete('messages', where: 'id = ?', whereArgs: [id]);
     if (base != null && base.isNotEmpty) await _deleteMediaFiles(base);
+    await VideoMessageService.cleanupVideoFile(id);
   }
 
   // ---------------------------------------------------------------------------
@@ -1848,6 +1947,11 @@ class WiltkeyDatabase {
   // Lane CRUD
   // ---------------------------------------------------------------------------
 
+  /// Insert-or-update a lane row. PRESERVES the tombstone: an upsert that
+  /// silently cleared `tombstoned` would make a retired (keystream-burned)
+  /// slot assignable again on a live seed — stream-cipher reuse. Callers
+  /// must never pass [forceClearTombstone] except on seed rotation
+  /// (recharge), where resetLane/upsert with clear is safe.
   Future<void> upsertLane({
     required String groupId,
     required int slotIndex,
@@ -1856,8 +1960,14 @@ class WiltkeyDatabase {
     required int maxOffset,
     int currentWriteOffset = 0,
     bool headerWritten = false,
+    bool forceClearTombstone = false,
   }) async {
     final db = await _database;
+    // Read the existing tombstone so REPLACE can re-assert it verbatim.
+    final existing = await getLane(groupId, slotIndex);
+    final preservedTombstoned = forceClearTombstone
+        ? 0
+        : (existing?['tombstoned'] as int? ?? 0);
     await db.insert('group_lanes', {
       'group_id': groupId,
       'slot_index': slotIndex,
@@ -1866,6 +1976,7 @@ class WiltkeyDatabase {
       'max_offset': maxOffset,
       'current_write_offset': currentWriteOffset,
       'header_written': headerWritten ? 1 : 0,
+      'tombstoned': preservedTombstoned,
     }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
@@ -1908,7 +2019,7 @@ class WiltkeyDatabase {
     final db = await _database;
     return db.query(
       'group_lanes',
-      where: 'group_id = ? AND member_key_hash IS NULL',
+      where: 'group_id = ? AND member_key_hash IS NULL AND (tombstoned = 0 OR tombstoned IS NULL)',
       whereArgs: [groupId],
       orderBy: 'slot_index ASC',
     );
@@ -1934,6 +2045,17 @@ class WiltkeyDatabase {
     String memberKeyHash,
   ) async {
     final db = await _database;
+    // NEVER assign a tombstoned slot on a live seed: its offset range was
+    // burned by the departing member and re-using it would XOR fresh
+    // messages with already-consumed keystream. Callers must pick a fresh
+    // slot from [getEmptyLanes] instead (refills already do).
+    final lane = await getLane(groupId, slotIndex);
+    if (lane != null && (lane['tombstoned'] as int? ?? 0) == 1) {
+      throw StateError(
+        'Refusing to assign tombstoned slot $slotIndex in $groupId '
+        '(keystream-reuse guard) — allocate a fresh slot.',
+      );
+    }
     await db.update(
       'group_lanes',
       {'member_key_hash': memberKeyHash},
@@ -1942,11 +2064,94 @@ class WiltkeyDatabase {
     );
   }
 
+  /// RETIRES a lane permanently: its offset range was already burned into
+  /// the shared group keystream by the leaving/kicked member, so it must
+  /// never be handed to a new member on the same seed (keystream reuse).
+  /// Keeps member + offsets intact for history attribution; [getEmptyLanes]
+  /// filters tombstoned lanes out forever.
+  Future<void> tombstoneLane(String groupId, int slotIndex) async {
+    final db = await _database;
+    // Also detach the member: retired slots drop out of used-capacity
+    // accounting, and re-invites allocate a fresh slot via getEmptyLanes
+    // (tombstoned lanes are filtered forever) instead of silently reusing
+    // the retired one.
+    await db.update(
+      'group_lanes',
+      {'tombstoned': 1, 'member_key_hash': null},
+      where: 'group_id = ? AND slot_index = ?',
+      whereArgs: [groupId, slotIndex],
+    );
+  }
+
+  /// Compute the slot a joiner should get. Re-meet reuse (returning the
+  /// joiner's existing lane) is ONLY allowed when [allowReMeetReuse] — i.e.
+  /// Time Wilt time-refresh, where the same identity continues and offsets
+  /// only advance. On a BYTE-BUDGET group a rejoin must NEVER reuse the old
+  /// lane: the previous device generation already burned that offset range,
+  /// and if the rejoin beats a queued leave/kick frame the late frame would
+  /// otherwise retire the rejoined member's NEW lane too (device-tested race
+  /// 2026-09-13). So on byte groups we tombstone the old lane HERE and hand
+  /// out a fresh slot; the late control frame then harmlessly re-retires the
+  /// old slot. Returns null when no fresh slot is available.
+  Future<int?> slotForJoiner(
+    String groupId,
+    String joinerId, {
+    required bool allowReMeetReuse,
+  }) async {
+    final existing = await getLaneByMember(groupId, joinerId);
+    if (existing != null) {
+      final isTombstoned = (existing['tombstoned'] as int? ?? 0) == 1;
+      final slot = existing['slot_index'] as int;
+      if (!isTombstoned) {
+        if (allowReMeetReuse) return slot;
+        await tombstoneLane(groupId, slot);
+      }
+      // Tombstoned (or just retired above) → fall through to a fresh slot.
+    }
+    final empty = await getEmptyLanes(groupId);
+    if (empty.isEmpty) return null;
+    return empty.first['slot_index'] as int;
+  }
+
+  Future<bool> isLaneTombstoned(String groupId, int slotIndex) async {
+    final db = await _database;
+    final rows = await db.query(
+      'group_lanes',
+      columns: ['tombstoned'],
+      where: 'group_id = ? AND slot_index = ?',
+      whereArgs: [groupId, slotIndex],
+      limit: 1,
+    );
+    if (rows.isEmpty) return false;
+    return (rows.first['tombstoned'] as int? ?? 0) == 1;
+  }
+
   Future<void> freeLane(String groupId, int slotIndex) async {
+    // Legacy free = tombstone: resetting a lane for re-assignment on the same
+    // seed would reuse burned keystream. (Kept for callers we haven't
+    // migrated; new code should call [tombstoneLane] directly.)
     final db = await _database;
     await db.update(
       'group_lanes',
-      {'member_key_hash': null, 'current_write_offset': 0, 'header_written': 0},
+      {'member_key_hash': null, 'tombstoned': 1},
+      where: 'group_id = ? AND slot_index = ?',
+      whereArgs: [groupId, slotIndex],
+    );
+  }
+
+  /// Full lane reset back to assignable. ONLY safe when the group's seed was
+  /// rotated (recharge): fresh seed means the offset range was never burned.
+  /// Never call this on a live seed — use [tombstoneLane].
+  Future<void> resetLane(String groupId, int slotIndex) async {
+    final db = await _database;
+    await db.update(
+      'group_lanes',
+      {
+        'member_key_hash': null,
+        'current_write_offset': 0,
+        'header_written': 0,
+        'tombstoned': 0,
+      },
       where: 'group_id = ? AND slot_index = ?',
       whereArgs: [groupId, slotIndex],
     );
@@ -2073,6 +2278,22 @@ class WiltkeyDatabase {
     await db.update('events', {'read': 1}, where: 'read = 0');
   }
 
+  /// Patch one event (e.g. record a contact request's accepted/declined
+  /// outcome on its data payload, or flip it read).
+  Future<void> updateEvent(
+    String id, {
+    String? data,
+    bool? read,
+  }) async {
+    final db = await _database;
+    final values = <String, Object?>{
+      if (data != null) 'data': data,
+      if (read != null) 'read': read ? 1 : 0,
+    };
+    if (values.isEmpty) return;
+    await db.update('events', values, where: 'id = ?', whereArgs: [id]);
+  }
+
   Future<void> deleteEventsForChat(String chatKey) async {
     final db = await _database;
     await db.delete('events', where: 'chat_key = ?', whereArgs: [chatKey]);
@@ -2108,9 +2329,27 @@ class WiltkeyDatabase {
 
   Future<void> upsertSocialContact(SocialContact contact) async {
     final db = await _database;
+    String? customNick = contact.customNickname;
+    String? privateNotes = contact.privateNotes;
+    if (customNick == null || privateNotes == null) {
+      final existing = await db.query(
+        'social_contacts',
+        columns: ['custom_nickname', 'private_notes'],
+        where: 'key_hash = ?',
+        whereArgs: [contact.keyHash],
+        limit: 1,
+      );
+      if (existing.isNotEmpty) {
+        customNick ??= existing.first['custom_nickname'] as String?;
+        privateNotes ??= existing.first['private_notes'] as String?;
+      }
+    }
+    final row = contact.toRow();
+    if (customNick != null) row['custom_nickname'] = customNick;
+    if (privateNotes != null) row['private_notes'] = privateNotes;
     await db.insert(
       'social_contacts',
-      contact.toRow(),
+      row,
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
   }

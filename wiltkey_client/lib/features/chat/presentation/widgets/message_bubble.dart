@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'contact_request_card.dart';
 import '../../../../core/state.dart';
 import '../../../../core/models.dart';
 import '../../../../core/custom_emoji.dart';
@@ -17,6 +18,7 @@ import 'chat_markdown.dart';
 import 'reply_preview.dart';
 import 'wilt_widgets.dart';
 import 'pixel_art_message_bubble.dart';
+import 'video_message_bubble.dart';
 
 class MessageBubble extends StatelessWidget {
   final ChatMessage message;
@@ -70,7 +72,11 @@ class MessageBubble extends StatelessWidget {
     // — see state_contacts.dart.
     if (message.contentType == 'contact_request_sent' ||
         message.contentType == 'contact_request_received') {
-      return _buildContactRequestCard(t, l10n);
+      return ContactRequestCard(
+        message: message,
+        contact: contact,
+        appState: appState,
+      );
     }
 
     if (message.isSystem) {
@@ -366,6 +372,19 @@ class MessageBubble extends StatelessWidget {
         message: message,
         isMe: isMe,
         content: ChatImageThumbnail(
+          appState: appState,
+          contact: contact,
+          message: message,
+        ),
+      );
+    }
+
+    if (message.contentType == 'video') {
+      return wrapWiltingContent(
+        context: context,
+        message: message,
+        isMe: isMe,
+        content: VideoMessageBubble(
           appState: appState,
           contact: contact,
           message: message,
@@ -693,115 +712,5 @@ class MessageBubble extends StatelessWidget {
     );
   }
 
-  // --- Contact-request card ------------------------------------------------
-
-  Widget _buildContactRequestCard(WiltkeyTokens t, AppLocalizations l10n) {
-    Map<String, dynamic> p = {};
-    try {
-      p = jsonDecode(message.text) as Map<String, dynamic>;
-    } catch (_) {}
-    final String? reqId = p['req_id'] as String?;
-    final String status = p['status'] as String? ?? 'pending';
-    final bool received = message.contentType == 'contact_request_received';
-    final String peerName = received
-        ? (p['requester_name'] as String? ?? contact.name)
-        : (p['target_name'] as String? ?? contact.name);
-    final bool pending = status == 'pending';
-
-    final String title;
-    switch (status) {
-      case 'accepted':
-        title = l10n.contactRequestApproved;
-        break;
-      case 'declined':
-        title = l10n.contactRequestDeclined;
-        break;
-      default:
-        title = received
-            ? l10n.contactRequestReceived(peerName)
-            : l10n.contactRequestSent(peerName);
-    }
-    final Color accent = status == 'declined' ? t.textTertiary : t.action;
-
-    return Center(
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 16, top: 4),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        constraints: const BoxConstraints(maxWidth: 320),
-        decoration: BoxDecoration(
-          color: t.surface,
-          border: Border.all(color: accent.withValues(alpha: 0.35), width: 1),
-          borderRadius: BorderRadius.circular(t.radiusCard),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  received ? Icons.person_add_alt : Icons.person_add,
-                  size: 16,
-                  color: accent,
-                ),
-                const SizedBox(width: 8),
-                Flexible(
-                  child: Text(
-                    title,
-                    textAlign: TextAlign.center,
-                    style: t.body.copyWith(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            if (pending && received && reqId != null) ...[
-              const SizedBox(height: 10),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  OutlinedButton(
-                    onPressed: () =>
-                        appState.respondToContactRequest(contact, reqId, false),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: t.textSecondary,
-                      side: BorderSide(color: t.border),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 4,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(t.radiusControl),
-                      ),
-                    ),
-                    child: Text(l10n.contactRequestDeny),
-                  ),
-                  const SizedBox(width: 8),
-                  ElevatedButton(
-                    onPressed: () =>
-                        appState.respondToContactRequest(contact, reqId, true),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: t.action,
-                      foregroundColor: t.onAction,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 4,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(t.radiusControl),
-                      ),
-                    ),
-                    child: Text(l10n.contactRequestApprove),
-                  ),
-                ],
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
 }
 

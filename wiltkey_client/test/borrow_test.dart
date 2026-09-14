@@ -1,4 +1,4 @@
-// 1-on-1 BYTE-BORROWING (disjoint multi-range keystream) harness.
+﻿// 1-on-1 BYTE-BORROWING (disjoint multi-range keystream) harness.
 //
 // Verifies the borrow_request / borrow_grant flow that replaced the old
 // boundary-move resplit. The key win: it works EVEN AFTER BOTH SIDES HAVE SENT
@@ -65,6 +65,12 @@ void main() {
   const String seed =
       '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
 
+  // Distinct fresh seed per enrollment: a recharge under the SAME seed now
+  // throws (replay guard), and tests re-enroll the same peers across cases.
+  int _enrollCounter = 0;
+  String nextFreshSeed() =>
+      (_enrollCounter++).toRadixString(16).padLeft(2, '0') * 32;
+
   Future<void> startFakeRelay() async {
     server = await HttpServer.bind('127.0.0.1', 0);
     server.listen((HttpRequest req) async {
@@ -89,17 +95,32 @@ void main() {
   }
 
   Future<Contact> enroll(String keyHash) async {
+    final fresh = nextFreshSeed();
     await appState.addOrRechargeContact(
       'Peer',
       appState.localDevRelayUrl,
       buffer,
       keyHash,
       seed,
+      freshSeedHex: fresh,
     );
     return appState.contacts.firstWhere((c) => c.keyHash == keyHash);
   }
 
+  Future<void> deleteStalePads() async {
+    final dir = Directory('.');
+    await for (final e in dir.list()) {
+      if (e is File &&
+          e.uri.pathSegments.last.startsWith('keystream_') &&
+          e.uri.pathSegments.last.endsWith('.pad')) {
+        try {
+          await e.delete();
+        } catch (_) {}
+      }
+    }
+  }
   setUpAll(() async {
+    await deleteStalePads();
     await startFakeRelay();
     appState = AppState();
     appState.useLocalDevRelay = true;
@@ -126,6 +147,7 @@ void main() {
   });
 
   tearDownAll(() async {
+    await deleteStalePads();
     appState.stopConnectionWatchdog();
     WebSocketClient().disconnect();
     await server.close(force: true);

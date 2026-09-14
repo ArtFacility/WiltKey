@@ -36,8 +36,6 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
 
   // Host-editable policy state.
   late bool _imagesAllowed;
-  late int _maxMembers;
-  late double _maxMessageSizeKb;
 
   List<CustomEmoji> _emojis = [];
 
@@ -45,8 +43,6 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
   void initState() {
     super.initState();
     _imagesAllowed = widget.group.imagesAllowed ?? true;
-    _maxMembers = widget.group.maxMembers ?? 20;
-    _maxMessageSizeKb = (widget.group.maxMessageSize ?? 2048) / 1024.0;
     _appState.addListener(_updateState);
     _loadEmojis();
   }
@@ -79,8 +75,6 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
         // copyWith (not a manual rebuild) so fields the policy editor doesn't
         // touch — Time Wilt lifetime/expiry, recharge-pending, etc. — survive.
         _appState.contacts[idx] = existing.copyWith(
-          maxMembers: _maxMembers,
-          maxMessageSize: (_maxMessageSizeKb * 1024).toInt(),
           imagesAllowed: _imagesAllowed,
         );
         _appState.notifyMessageReceived();
@@ -202,11 +196,11 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(context);
-              await CustomEmojiStore.clear(widget.group.keyHash);
-              await _appState.nukeContact(
-                widget.group.keyHash,
-                receivedFromPeer: false,
-              );
+              // Announce the departure FIRST (members tombstone our lane +
+              // note it in the chat), then wipe locally — see leaveGroup.
+              // (This used to call nukeContact directly, silently skipping
+              // the announcement — caught in device testing 2026-09-12.)
+              await _appState.leaveGroup(widget.group);
               if (!mounted) return;
               Navigator.pop(context); // details
               Navigator.pop(context); // chat
@@ -537,54 +531,6 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
                         ),
                       ],
                     ),
-                    Divider(color: t.border, height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          l10n.groupCreatePolicyMaxMembersLabel,
-                          style: t.bodySecondary,
-                        ),
-                        Text(
-                          l10n.chatsMemberCount(_maxMembers),
-                          style: t.dataMono.copyWith(color: t.action),
-                        ),
-                      ],
-                    ),
-                    Slider(
-                      value: _maxMembers.toDouble(),
-                      min: 2,
-                      max: 100,
-                      divisions: 98,
-                      activeColor: t.action,
-                      inactiveColor: t.budgetEmpty,
-                      onChanged: (val) =>
-                          setState(() => _maxMembers = val.round()),
-                    ),
-                    Divider(color: t.border, height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          l10n.groupCreatePolicyPayloadSize,
-                          style: t.bodySecondary,
-                        ),
-                        Text(
-                          '${_maxMessageSizeKb.toStringAsFixed(1)} KB',
-                          style: t.dataMono.copyWith(color: t.action),
-                        ),
-                      ],
-                    ),
-                    Slider(
-                      value: _maxMessageSizeKb,
-                      min: 0.5,
-                      max: 10.0,
-                      divisions: 19,
-                      activeColor: t.action,
-                      inactiveColor: t.budgetEmpty,
-                      onChanged: (val) =>
-                          setState(() => _maxMessageSizeKb = val),
-                    ),
                   ],
                 ),
               ),
@@ -776,15 +722,20 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
               t.action,
             ),
             const SizedBox(height: 10),
-            Container(
-              decoration: _panelDeco(t),
-              child: ListView.separated(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                itemCount: allHashes.length,
-                separatorBuilder: (_, _) => Divider(color: t.border, height: 1),
-                itemBuilder: (context, idx) {
+            // Capped + scrollable: a 20-member group used to grow the section
+            // unbounded inside the page scroll, pushing every other setting
+            // off-screen.
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 320),
+              child: Container(
+                decoration: _panelDeco(t),
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  itemCount: allHashes.length,
+                  separatorBuilder: (_, _) => Divider(color: t.border, height: 1),
+                  itemBuilder: (context, idx) {
                   final hash = allHashes[idx];
                   final isMe = hash == myUserId;
                   final isHost = hash == group.hostKeyHash;
@@ -886,14 +837,15 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
                       ],
                     ),
                   );
-                },
-              ),
+                 },
+               ),
+             ),
             ),
-          ],
-        );
-      },
-    );
-  }
+           ],
+         );
+       },
+     );
+   }
 
   Widget _buildEmojiSection(WiltkeyTokens t) {
     final l10n = AppLocalizations.of(context)!;

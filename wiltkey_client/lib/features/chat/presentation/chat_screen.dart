@@ -8,7 +8,6 @@ import '../../../core/state.dart';
 import '../../../core/payload_limits.dart';
 import '../../../core/models.dart';
 import '../../../core/custom_emoji.dart';
-import '../../contacts/presentation/contact_request_ui.dart';
 import 'widgets/image_source_sheet.dart';
 import 'widgets/content_attachment_sheet.dart';
 import 'widgets/chat_search_bar.dart';
@@ -28,10 +27,12 @@ import 'widgets/diagnostics_dialog.dart';
 import 'widgets/nuke_confirm_dialog.dart';
 import 'widgets/failed_actions_dialog.dart';
 import 'widgets/compression_dialog.dart';
+import 'widgets/video_send_dialog.dart';
 import 'widgets/debug_console_sheet.dart';
 import 'widgets/voice_recording_mixin.dart';
 import 'widgets/highlight_flash.dart';
 import 'widgets/scroll_to_message.dart';
+import '../../../core/theme/nuke_capture.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -74,6 +75,12 @@ class _ChatScreenState extends State<ChatScreen>
 
   // Wraps the message list so a consented screenshot can render it to an image.
   final GlobalKey _captureBoundaryKey = GlobalKey();
+
+  // Nuke handling: when this chat is destroyed while on screen (peer wipe),
+  // play the theme's nuke overlay over the captured chat and auto-drop back
+  // to the main screen instead of stranding the user on an empty shell.
+  String? _nukeWatchedContactId;
+  bool _nukePlaying = false;
 
   // Local keyword search
   bool _isSearching = false;
@@ -130,6 +137,7 @@ class _ChatScreenState extends State<ChatScreen>
     final contact = _appState.activeContact;
     if (contact != null) {
       _openChatId = contact.id;
+      _nukeWatchedContactId = contact.id;
       _appState.visibleChatId = contact.id; // now on screen → mute its own alerts
       // Load the most-recent page (windowed), then decrypt any OTP-only ones.
       _appState.loadInitialMessages(contact).then((_) async {
@@ -264,7 +272,10 @@ class _ChatScreenState extends State<ChatScreen>
     return (_appState.messages[contact.id] ?? [])
         .where(
           (m) =>
-              m.contentType != 'emoji_def' && m.contentType != 'emoji_delete',
+              m.contentType != 'emoji_def' &&
+              m.contentType != 'emoji_delete' &&
+              m.contentType != 'contact_request_sent' &&
+              m.contentType != 'contact_request_received',
         )
         .toList();
   }
@@ -305,6 +316,45 @@ class _ChatScreenState extends State<ChatScreen>
     _loadingOlder = false;
   }
 
+  /// This chat was destroyed while we're looking at it (peer nuke): play the
+  /// theme's nuke animation, then auto-drop back to the main screen. Only
+  /// fires when this route is actually on top.
+  Future<void> _checkNukedWhileOpen() async {
+    if (!mounted || _nukePlaying) return;
+    // PIN gate still up: the overlay would play OVER the lock screen (caught
+    // 2026-09-14 — minimize while in a chat, reopen). The listener re-fires
+    // after unlock, so the animation plays right after the PIN instead.
+    if (_appState.isLocked) return;
+    final id = _nukeWatchedContactId;
+    if (id == null) return;
+    if (_appState.contacts.any((c) => c.id == id)) return; // still alive
+    final route = ModalRoute.of(context);
+    if (route != null && !route.isCurrent) return;
+    _nukePlaying = true;
+
+    final screen = await captureNukeScreen(_captureBoundaryKey);
+    if (!mounted) return;
+    late final OverlayEntry entry;
+    entry = OverlayEntry(
+      builder: (overlayContext) => context.wkc.nukeOverlay(
+        onDone: () {
+          entry.remove();
+          if (mounted) {
+            Navigator.of(context, rootNavigator: true)
+                .popUntil((route) => route.isFirst);
+          }
+        },
+        screen: screen,
+      ),
+    );
+    Overlay.of(context, rootOverlay: true).insert(entry);
+    Future.delayed(const Duration(seconds: 6), () {
+      if (!mounted) return;
+      Navigator.of(context, rootNavigator: true)
+          .popUntil((route) => route.isFirst);
+    });
+  }
+
   void _updateState() {
     if (mounted) {
       setState(() {});
@@ -313,6 +363,7 @@ class _ChatScreenState extends State<ChatScreen>
         return;
       }
 
+      _checkNukedWhileOpen();
       final contact = _appState.activeContact;
       if (contact != null) {
         final messages = _visibleMessages(contact);
@@ -448,7 +499,72 @@ class _ChatScreenState extends State<ChatScreen>
       await _pickAndSendImage(res.source);
     } else if (res is PixelArtAttachmentResult) {
       await _sendPixelArt(res.hexString);
+    } else if (res is VideoAttachmentResult) {
+      await _pickAndSendVideo(res.source);
     }
+  }
+
+  Future<void> _pickAndSendVideo(ImageSource source) async {
+    final contact = _appState.activeContact;
+    if (contact == null) return;
+
+    final picker = ImagePicker();
+    XFile? video;
+    try {
+      _appState.isPickingMedia = true;
+      video = await picker.pickVideo(
+        source: source,
+      );
+    } finally {
+      _appState.isPickingMedia = false;
+    }
+    if (video == null || !mounted) return;
+
+    final VideoSendResult? choice = await VideoSendDialog.show(
+      context,
+      sourcePath: video.path,
+      contact: contact,
+    );
+    if (choice == null || !mounted) return;
+
+    final jsonStr = choice.payload.toJsonString();
+    final byteCost = jsonStr.length + 73;
+    final l10n = AppLocalizations.of(context)!;
+
+    if (!contact.isTimeWilt && byteCost > contact.remainingBufferBytes) {
+      _errorSnack(
+        l10n.chatImageTooLargeSnackBar(
+          AppState.formatBytes(byteCost),
+          AppState.formatBytes(contact.remainingBufferBytes),
+        ),
+      );
+      return;
+    }
+
+    if (WkPayloadLimits.exceedsOutgoing(jsonStr.length)) {
+      _errorSnack(
+        WkPayloadLimits.blockedByFreeTier(jsonStr.length)
+            ? l10n.chatImageNeedsPlusSnackBar
+            : l10n.chatImageExceedsMaxSizeSnackBar,
+      );
+      return;
+    }
+
+    final error = await _appState.sendMessage(
+      jsonStr,
+      contentType: 'video',
+      mimeType: 'video/mp4',
+      allowSave: choice.allowSave,
+      ephemeral: choice.ephemeral,
+      ttlSeconds: choice.ttlSeconds,
+    );
+    try {
+      await choice.file.delete();
+    } catch (_) {}
+    if (error != null) {
+      _errorSnack(error);
+    }
+    _scrollToBottom();
   }
 
   Future<void> _sendPixelArt(String hexString) async {
@@ -901,7 +1017,7 @@ class _ChatScreenState extends State<ChatScreen>
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                            contact.name,
+                            contact.displayName,
                             style: t.body.copyWith(fontWeight: FontWeight.w600),
                             overflow: TextOverflow.ellipsis,
                           ),

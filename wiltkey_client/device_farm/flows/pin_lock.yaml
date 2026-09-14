@@ -1,0 +1,20 @@
+# PIN LOCK — wrong PIN rejected, correct PIN unlocks.
+
+appId: ${APP_ID}
+---
+- launchApp
+- assertVisible: "Enter PIN to unlock"
+
+# Wrong PIN → still locked
+- tapOn:
+    point: "50%, 45%"
+- inputText: "0000"
+- tapOn: "Unlock"
+- assertVisible: "Enter PIN to unlock"
+
+# Correct PIN → shell
+- tapOn:
+    point: "50%, 45%"
+- inputText: ${PIN}
+- tapOn: "Unlock"
+- assertVisible: "Chats"

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'custom_emoji.dart' show stickerPayload;
@@ -435,6 +436,10 @@ class AppEvent {
   final String title;
   final String body;
   final String? chatKey; // deep-link target keyHash, if the chat still exists
+  // Opaque JSON payload for events that need actionable context beyond
+  // title/body — e.g. contact-request events carry requester key/name/image so
+  // the approve/deny popup and event-row buttons work with no chat card.
+  String? data;
   final DateTime timestamp;
   bool read;
 
@@ -444,6 +449,7 @@ class AppEvent {
     required this.title,
     required this.body,
     this.chatKey,
+    this.data,
     required this.timestamp,
     this.read = false,
   });
@@ -454,6 +460,7 @@ class AppEvent {
     'title': title,
     'body': body,
     'chat_key': chatKey,
+    'data': data,
     'timestamp': timestamp.millisecondsSinceEpoch,
     'read': read ? 1 : 0,
   };
@@ -464,11 +471,30 @@ class AppEvent {
     title: r['title'] as String? ?? '',
     body: r['body'] as String? ?? '',
     chatKey: r['chat_key'] as String?,
+    data: r['data'] as String?,
     timestamp: DateTime.fromMillisecondsSinceEpoch(
       (r['timestamp'] as int?) ?? 0,
     ),
     read: (r['read'] as int? ?? 0) == 1,
   );
+
+  /// Parsed [data] payload, or {} when absent/unparseable.
+  Map<String, dynamic> dataMap() {
+    if (data == null || data!.isEmpty) return {};
+    try {
+      final v = jsonDecode(data!);
+      return v is Map<String, dynamic> ? v : {};
+    } catch (_) {
+      return {};
+    }
+  }
+
+  /// Update the 'status' key inside [data] in-memory (e.g. 'accepted', 'declined').
+  void updateStatus(String status) {
+    final m = dataMap();
+    m['status'] = status;
+    data = jsonEncode(m);
+  }
 }
 
 class ChatMessage {
@@ -501,6 +527,9 @@ class ChatMessage {
   // 'voice' message is sent or its ciphertext is decrypted. Never persisted (the
   // DB keeps the base64 ciphertext in `text`, like images).
   Uint8List? decodedAudioBytes;
+  // In-memory decoded thumbnail and local playback path for 'video' messages.
+  Uint8List? decodedVideoThumbnail;
+  String? cachedVideoPath;
   String? decryptedText; // In-memory cached decrypted plaintext
 
   // Emoji reactions: token -> set of reactor identity ids (userId for us, the
@@ -563,6 +592,8 @@ class ChatMessage {
     this.isDelivered = false,
     this.isPending = false,
     this.decodedImageBytes,
+    this.decodedVideoThumbnail,
+    this.cachedVideoPath,
     this.allowSave = false,
     this.replyToId,
     this.decodedAudioBytes,
@@ -672,6 +703,14 @@ class ChatMessage {
     decryptedText = null;
     decodedImageBytes = null;
     decodedAudioBytes = null;
+    decodedVideoThumbnail = null;
+    if (cachedVideoPath != null) {
+      try {
+        final f = File(cachedVideoPath!);
+        if (f.existsSync()) f.deleteSync();
+      } catch (_) {}
+      cachedVideoPath = null;
+    }
     offset = -1;
   }
 
@@ -682,6 +721,14 @@ class ChatMessage {
     decryptedText = '[Message deleted]';
     decodedImageBytes = null;
     decodedAudioBytes = null;
+    decodedVideoThumbnail = null;
+    if (cachedVideoPath != null) {
+      try {
+        final f = File(cachedVideoPath!);
+        if (f.existsSync()) f.deleteSync();
+      } catch (_) {}
+      cachedVideoPath = null;
+    }
   }
 
   /// Serialise [reactions] (sets → lists) to a JSON string, or null if empty.

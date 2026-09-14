@@ -19,9 +19,15 @@ class PixelArtAttachmentResult extends ContentAttachmentResult {
   const PixelArtAttachmentResult(this.hexString);
 }
 
+class VideoAttachmentResult extends ContentAttachmentResult {
+  final ImageSource source;
+  const VideoAttachmentResult(this.source);
+}
+
 enum _AttachmentCategory {
   photo,
   pixelArt,
+  video,
 }
 
 /// Unified attachment sheet letting the user pick between Photos/Camera,
@@ -107,41 +113,23 @@ Future<ContentAttachmentResult?> showContentAttachmentSheet(BuildContext context
             leading: Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: t.textTertiary.withValues(alpha: 0.10),
+                color: t.warning.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(t.radiusControl),
               ),
-              child: Icon(Icons.videocam_outlined, color: t.textTertiary, size: 22),
+              child: Icon(Icons.videocam_outlined, color: t.warning, size: 22),
             ),
-            title: Row(
-              children: [
-                Text(
-                  l10n.chatAttachVideo ?? 'Video',
-                  style: t.body.copyWith(color: t.textSecondary),
-                ),
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: t.warning.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(t.radiusPill),
-                    border: Border.all(color: t.warning.withValues(alpha: 0.4)),
-                  ),
-                  child: Text(
-                    l10n.chatAttachComingSoon ?? 'COMING SOON',
-                    style: t.badgeLabel.copyWith(
-                      color: t.warning,
-                      fontSize: 8,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ],
+            title: Text(
+              l10n.chatAttachVideo ?? 'Video',
+              style: t.body.copyWith(fontWeight: FontWeight.w600),
             ),
             subtitle: Text(
-              l10n.chatAttachVideoSubtitle ?? 'Encrypted video clips in a future update',
-              style: t.bodySecondary.copyWith(fontSize: 12, color: t.textTertiary),
+              l10n.chatAttachVideoSubtitleEnabled ?? 'Record up to 15s or pick from gallery',
+              style: t.bodySecondary.copyWith(fontSize: 12),
             ),
-            onTap: null,
+            trailing: Icon(Icons.chevron_right, color: t.textTertiary, size: 18),
+            onTap: () {
+              Navigator.pop(sheetCtx, _AttachmentCategory.video);
+            },
           ),
           const SizedBox(height: 12),
         ],
@@ -160,6 +148,11 @@ Future<ContentAttachmentResult?> showContentAttachmentSheet(BuildContext context
     final hex = await showPixelArtAttachmentSheet(context);
     if (hex != null && hex.isNotEmpty) {
       return PixelArtAttachmentResult(hex);
+    }
+  } else if (category == _AttachmentCategory.video) {
+    final src = await _showVideoSourceSubSheet(context);
+    if (src != null) {
+      return VideoAttachmentResult(src);
     }
   }
 
@@ -200,6 +193,49 @@ Future<ImageSource?> _showPhotoSourceSubSheet(BuildContext context) {
           ListTile(
             leading: Icon(Icons.photo_library_outlined, color: t.action),
             title: Text(l10n.chatImageSourceGallery, style: t.body),
+            onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+          ),
+          const SizedBox(height: 8),
+        ],
+      ),
+    ),
+  );
+}
+
+Future<ImageSource?> _showVideoSourceSubSheet(BuildContext context) {
+  final t = context.wk;
+  final l10n = AppLocalizations.of(context)!;
+  return showModalBottomSheet<ImageSource>(
+    context: context,
+    backgroundColor: t.surface,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(t.radiusCard)),
+      side: BorderSide(color: t.border),
+    ),
+    builder: (ctx) => SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 16, 18, 8),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                t.uppercaseLabels
+                    ? (l10n.chatVideoSelectSourceTitle ?? 'Send Video').toUpperCase()
+                    : (l10n.chatVideoSelectSourceTitle ?? 'Send Video'),
+                style: t.screenTitle.copyWith(fontSize: 15),
+              ),
+            ),
+          ),
+          ListTile(
+            leading: Icon(Icons.videocam_outlined, color: t.warning),
+            title: Text(l10n.chatVideoRecordCamera ?? 'Record Video (Camera)', style: t.body),
+            onTap: () => Navigator.pop(ctx, ImageSource.camera),
+          ),
+          ListTile(
+            leading: Icon(Icons.video_library_outlined, color: t.warning),
+            title: Text(l10n.chatVideoPickGallery ?? 'Choose Video from Gallery', style: t.body),
             onTap: () => Navigator.pop(ctx, ImageSource.gallery),
           ),
           const SizedBox(height: 8),

@@ -189,6 +189,8 @@ extension AppStateChatMeta on AppState {
           statusExpiresAt: sc.statusExpiresAt,
           clientAttestation: clientAttestation ?? sc.clientAttestation,
           attestationExpiresAt: attestationExpiresAt ?? sc.attestationExpiresAt,
+          customNickname: sc.customNickname ?? updated.customNickname,
+          privateNotes: sc.privateNotes ?? updated.privateNotes,
         );
         socialContacts[scIdx] = updatedSc;
         await WiltkeyDatabase.instance.upsertSocialContact(updatedSc);

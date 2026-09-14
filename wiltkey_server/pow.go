@@ -2,10 +2,9 @@ package main
 
 import (
 	"crypto/rand"
-	"crypto/sha256"
 	"encoding/hex"
-	"fmt"
-	"strings"
+
+	"wiltkey_server/internal/cryptoops"
 )
 
 // GenerateChallenge creates a random hex string to be used as a PoW challenge.
@@ -17,12 +16,10 @@ func GenerateChallenge() (string, error) {
 	return hex.EncodeToString(bytes), nil
 }
 
-// VerifyPoW checks if SHA256(challenge + nonce_str + payload) has the required number of leading hex zeros.
+// VerifyPoW checks if SHA256(challenge + nonce_str + payload) has the required
+// number of leading hex zeros. Thin wrapper — the canonical implementation
+// lives in internal/cryptoops so the local puzzle tester (cmd/puzzleplay)
+// shares the exact math.
 func VerifyPoW(challenge string, nonce int64, payload string, difficulty int) bool {
-	data := fmt.Sprintf("%s%d%s", challenge, nonce, payload)
-	hash := sha256.Sum256([]byte(data))
-	hashHex := hex.EncodeToString(hash[:])
-
-	prefix := strings.Repeat("0", difficulty)
-	return strings.HasPrefix(hashHex, prefix)
+	return cryptoops.VerifyPoW(challenge, nonce, payload, difficulty)
 }

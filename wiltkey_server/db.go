@@ -1,13 +1,27 @@
 package main
 
 import (
+	"crypto/sha256"
+	"crypto/subtle"
 	"database/sql"
+	"encoding/hex"
 	"fmt"
 	"log"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/lib/pq"
+)
+
+// Device-token lifecycle. The token is a random 256-bit secret the client
+// presents at WS connect to skip the PoW issuance gate; the server stores ONLY
+// its SHA-256. TTLs: 60-day sliding token, refreshed proactively inside the
+// final 7 days; a rotated-out token stays valid for a 24h overlap so a client
+// that crashes before persisting the refresh isn't locked out.
+const (
+	deviceTokenTTL           = 60 * 24 * time.Hour
+	deviceTokenRefreshWindow = 7 * 24 * time.Hour
+	deviceTokenOverlap       = 24 * time.Hour
 )
 
 type PGMessage struct {
@@ -192,9 +206,24 @@ func (p *PostgresClient) runMigrations() error {
 			week_start TIMESTAMP NOT NULL,
 			updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 		);
+
+		CREATE TABLE IF NOT EXISTS device_tokens (
+			user_id VARCHAR(64) PRIMARY KEY,
+			-- SHA-256 of the raw token. The raw token NEVER touches the DB.
+			token_hash VARCHAR(64) NOT NULL,
+			-- Previous token after a rotation, honored for a short overlap so a
+			-- client that crashes before persisting the refreshed token isn't
+			-- locked out. Only valid while its own TTL would not have expired.
+			prev_token_hash VARCHAR(64) NOT NULL DEFAULT '',
+			token_expires_at TIMESTAMP NOT NULL,
+			prev_expires_at TIMESTAMP NOT NULL DEFAULT NOW(),
+			created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+			last_seen_at TIMESTAMP NOT NULL DEFAULT NOW(),
+			revoked_at TIMESTAMP
+		);
 	`)
 	if err != nil {
-		return fmt.Errorf("error creating stories and social tables: %v", err)
+		return fmt.Errorf("error creating stories, social, and device token tables: %v", err)
 	}
 
 	return nil
@@ -511,6 +540,7 @@ func (p *PostgresClient) GetStoriesFeed(senders []string) ([]PGStory, error) {
 		FROM stories
 		WHERE sender_id = ANY($1) AND expires_at > NOW()
 		ORDER BY created_at ASC
+		LIMIT 500
 	`
 	rows, err := p.db.Query(query, pq.Array(senders))
 	if err != nil {
@@ -638,4 +668,87 @@ func (p *PostgresClient) PruneExpiredStories() ([]string, error) {
 		}
 	}
 	return deletedURLs, nil
+}
+
+// MintDeviceToken stores (or rotates) the device token for userID. On a
+// rotation the previous token moves into the overlap slot — honored only
+// while its own TTL would not already have expired (a long-offline token is
+// NOT resurrected by a mint).
+func (p *PostgresClient) MintDeviceToken(userID string, token string) (time.Time, error) {
+	sum := sha256.Sum256([]byte(token))
+	tokenHash := hex.EncodeToString(sum[:])
+	expiresAt := time.Now().Add(deviceTokenTTL)
+	_, err := p.db.Exec(`
+		INSERT INTO device_tokens (user_id, token_hash, token_expires_at, created_at, last_seen_at)
+		VALUES ($1, $2, $3, NOW(), NOW())
+		ON CONFLICT (user_id) DO UPDATE SET
+			prev_token_hash = device_tokens.token_hash,
+			prev_expires_at = LEAST(NOW() + make_interval(hours => 24),
+			                         GREATEST(device_tokens.token_expires_at, NOW())),
+			token_hash = EXCLUDED.token_hash,
+			token_expires_at = EXCLUDED.token_expires_at,
+			last_seen_at = NOW(),
+			revoked_at = NULL
+	`, userID, tokenHash, expiresAt)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return expiresAt, nil
+}
+
+// VerifyDeviceToken checks a presented raw token for userID. Returns whether
+// it is valid (current or within the rotation overlap) and whether the
+// current token is near expiry (or the presented one is the overlap token),
+// in which case the server should mint and hand back a fresh token.
+func (p *PostgresClient) VerifyDeviceToken(userID string, token string) (bool, bool, error) {
+	sum := sha256.Sum256([]byte(token))
+	tokenHash := hex.EncodeToString(sum[:])
+
+	var th, pth string
+	var te, pe time.Time
+	var revoked sql.NullTime
+	err := p.db.QueryRow(`
+		SELECT token_hash, prev_token_hash, token_expires_at, prev_expires_at, revoked_at
+		FROM device_tokens WHERE user_id = $1
+	`, userID).Scan(&th, &pth, &te, &pe, &revoked)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return false, false, nil
+		}
+		return false, false, err
+	}
+	if revoked.Valid {
+		return false, false, nil
+	}
+
+	now := time.Now()
+	if subtle.ConstantTimeCompare([]byte(th), []byte(tokenHash)) == 1 {
+		if now.Before(te) {
+			return true, te.Sub(now) < deviceTokenRefreshWindow, nil
+		}
+		return false, false, nil
+	}
+	if pth != "" && subtle.ConstantTimeCompare([]byte(pth), []byte(tokenHash)) == 1 && now.Before(pe) {
+		// Overlap token: accept. Force a refresh only once the overlap window
+		// is half consumed — otherwise two holders of the same identity (main
+		// isolate + background service) would demote each other's token on
+		// every connect (a mint per reconnect).
+		return true, pe.Sub(now) < deviceTokenOverlap/2, nil
+	}
+	return false, false, nil
+}
+
+// TouchDeviceToken updates last_seen_at (called on successful auth).
+func (p *PostgresClient) TouchDeviceToken(userID string) {
+	_, _ = p.db.Exec(`UPDATE device_tokens SET last_seen_at = NOW() WHERE user_id = $1`, userID)
+}
+
+// RevokeDeviceToken kills the token (strike system / user-initiated device
+// removal). NOTE: revocation alone is a speed bump — the holder can re-arm
+// with one PoW + one issuance-cap unit. When an abuse-strike system gets
+// wired up, enforce STRIKES in their own table checked on the ISSUANCE path
+// (before mintDeviceToken), not solely via this flag.
+func (p *PostgresClient) RevokeDeviceToken(userID string) error {
+	_, err := p.db.Exec(`UPDATE device_tokens SET revoked_at = NOW() WHERE user_id = $1`, userID)
+	return err
 }

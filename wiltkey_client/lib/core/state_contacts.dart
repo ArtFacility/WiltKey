@@ -103,6 +103,10 @@ class PendingContactRequest {
   final String targetName;
   final DateTime sentAt;
   String status; // 'pending' | 'accepted' | 'declined'
+  /// When the request rode a shared GROUP's meta channel (no 1:1 chat with
+  /// the target exists), this is that group's keyHash — the sent card lives
+  /// in the group chat and the response resolution needs it.
+  final String? viaGroupId;
 
   PendingContactRequest({
     required this.requestId,
@@ -110,6 +114,7 @@ class PendingContactRequest {
     required this.targetName,
     required this.sentAt,
     this.status = 'pending',
+    this.viaGroupId,
   });
 }
 
@@ -137,6 +142,10 @@ extension AppStateContacts on AppState {
     try {
       contacts = await WiltkeyDatabase.instance.getAllContacts();
       await loadSocialContacts();
+      if (activeContact != null) {
+        final idx = contacts.indexWhere((c) => c.keyHash == activeContact!.keyHash);
+        if (idx != -1) activeContact = contacts[idx];
+      }
       notifyListeners();
     } catch (e) {
       log('[Contacts] reloadAllContacts failed: $e');
@@ -173,14 +182,12 @@ extension AppStateContacts on AppState {
 
   /// Send a contact request targeting [keyHash] (a 1:1 peer OR a group member)
   /// over the AES meta channel. The request is addressed to exactly one peer —
-  /// it is never fanned out to the rest of a group. When [chatContact] is a
-  /// direct 1:1 chat, a sent control card is inserted there so the sender can
-  /// watch the request resolve; without one the request still goes out but has
-  /// no in-chat card to live in.
+  /// it is never fanned out to the rest of a group.
   Future<String?> sendContactRequestToKey({
     required String keyHash,
     required String name,
     Contact? chatContact,
+    Contact? groupContact,
   }) async {
     if (keyHash == userId) {
       return 'You cannot add yourself';
@@ -195,9 +202,41 @@ extension AppStateContacts on AppState {
     }
 
     final metaKeyHex = await ChatMetaStore.keyFor(keyHash);
-    if (metaKeyHex == null) {
-      return 'This chat predates the metadata channel — re-pair to enable contact requests';
+    // No 1:1 meta channel (e.g. a group member we never paired with)? Fall
+    // back to a shared GROUP's meta channel — both members hold
+    // sha256(groupSeed), so the request rides the group channel addressed to
+    // exactly this member (envelope carries group_id for receiver context).
+    String? viaGroupId;
+    Contact? viaGroup;
+    if (groupContact != null &&
+        groupContact.isGroup &&
+        (groupContact.groupSeed ?? '').isNotEmpty) {
+      viaGroup = groupContact;
+      viaGroupId = groupContact.keyHash;
+    } else if (chatContact != null &&
+        chatContact.isGroup &&
+        (chatContact.groupSeed ?? '').isNotEmpty) {
+      viaGroup = chatContact;
+      viaGroupId = chatContact.keyHash;
+    } else if (metaKeyHex == null) {
+      for (final c in contacts) {
+        if (c.isGroup && (c.groupSeed ?? '').isNotEmpty) {
+          final isMember = c.memberKeyHashes.contains(keyHash) ||
+              c.hostKeyHash == keyHash ||
+              groupProfilesCache[c.id]?.containsKey(keyHash) == true;
+          if (isMember) {
+            viaGroup = c;
+            viaGroupId = c.keyHash;
+            break;
+          }
+        }
+      }
+      if (viaGroupId == null) {
+        return 'No direct chat or shared group to reach this person';
+      }
     }
+    final effectiveMetaKey = metaKeyHex ??
+        sha256.convert(utf8.encode(viaGroup!.groupSeed!)).toString();
 
     final requestId = _newContactRequestId();
     final sharedSecretSeed = _deriveSharedSecretSeed(keyHash);
@@ -216,13 +255,15 @@ extension AppStateContacts on AppState {
 
     final enc = WiltkeyPersistence().encryptString(
       jsonEncode(payload.toJson()),
-      metaKeyHex,
+      effectiveMetaKey,
     );
 
     WebSocketClient().sendWSMessage({
       'type': 'SEND_MESSAGE',
       'recipient_id': keyHash,
-      'envelope': jsonEncode({'d': enc}),
+      'envelope': viaGroupId != null
+          ? jsonEncode({'group_id': viaGroupId, 'd': enc})
+          : jsonEncode({'d': enc}),
       'content_type': 'contact_request',
     });
 
@@ -232,34 +273,57 @@ extension AppStateContacts on AppState {
       targetKeyHash: keyHash,
       targetName: name,
       sentAt: DateTime.now(),
+      viaGroupId: viaGroupId,
     );
-
-    // Insert a local system message card in the direct chat (sent by us)
-    if (chatContact != null) {
-      await _insertContactRequestSentCard(chatContact, requestId, keyHash, name);
-    }
 
     notifyListeners();
     return null;
   }
 
   /// Handle inbound contact request (receiver side).
+  ///
+  /// Two transports: the 1:1 AES meta channel (existing contact) or, for
+  /// group members we never paired with, the shared GROUP's meta channel —
+  /// the envelope carries group_id, the sender must be a member of that
+  /// group, and the Approve/Deny card is inserted into the group chat.
   Future<void> _handleContactRequest(
     String senderId,
     String envelopeStr,
   ) async {
-    final idx = contacts.indexWhere((c) => c.keyHash == senderId);
-    if (idx == -1) return;
-    final contact = contacts[idx];
-    if (contact.isGroup) return; // 1-on-1 only
-
     // Check if blocked
     if (await WiltkeyDatabase.instance.isContactBlocked(senderId)) {
       return; // Silently drop
     }
 
-    final metaKeyHex = await ChatMetaStore.keyFor(senderId);
-    if (metaKeyHex == null) return;
+    final idx = contacts.indexWhere((c) => c.keyHash == senderId);
+    final direct = (idx != -1 && !contacts[idx].isGroup) ? contacts[idx] : null;
+
+    String metaKeyHex;
+    Contact cardChat;
+    if (direct != null) {
+      final k = await ChatMetaStore.keyFor(senderId);
+      if (k == null) return;
+      metaKeyHex = k;
+      cardChat = direct;
+    } else {
+      // Group-member path: envelope carries group_id.
+      String? groupId;
+      try {
+        groupId =
+            (jsonDecode(envelopeStr) as Map<String, dynamic>)['group_id'] as String?;
+      } catch (_) {}
+      if (groupId == null) return; // not a 1:1 contact, no group context
+      final gi = contacts.indexWhere((c) => c.isGroup && c.keyHash == groupId);
+      if (gi == -1) return;
+      final group = contacts[gi];
+      if ((group.groupSeed ?? '').isEmpty) return;
+      final isMember = group.memberKeyHashes.contains(senderId) ||
+          group.hostKeyHash == senderId ||
+          groupProfilesCache[group.id]?.containsKey(senderId) == true;
+      if (!isMember) return;
+      metaKeyHex = sha256.convert(utf8.encode(group.groupSeed!)).toString();
+      cardChat = group;
+    }
 
     try {
       final outer = jsonDecode(envelopeStr) as Map<String, dynamic>;
@@ -277,19 +341,38 @@ extension AppStateContacts on AppState {
         return;
       }
 
-      // Insert a system message card in the chat with Approve/Deny buttons
-      await _insertContactRequestReceivedCard(contact, payload, senderId);
+      // If already a contact, ignore duplicate requests
+      if (socialContacts.any((c) => c.keyHash == senderId)) {
+        return;
+      }
 
       // Surface in the activity feed so it's not missed when the user is in
-      // other chats. Deep-links to this chat (the card lives in it). The event
-      // id is the request id, so a redelivered frame can't double-log.
-      await logEvent(
+      // other chats. The data payload carries the requester context so the
+      // approve/deny popup + event-row buttons work with no chat card. The
+      // event id is the request id, so a redelivered frame can't double-log.
+      final ev = await logEvent(
         id: 'contact_request_${payload.requestId}',
         type: 'contact_request',
         title: payload.requesterName,
         body: 'sent you a contact request',
-        chatKey: senderId,
+        chatKey: cardChat.keyHash,
+        data: jsonEncode({
+          'requester_key': senderId,
+          'requester_name': payload.requesterName,
+          'requester_image': payload.requesterProfileImageB64,
+          'requester_border': payload.requesterAvatarBorderId,
+          'status': 'pending',
+        }),
       );
+
+      if (ev != null) {
+        // First arrival → popup (shell shows the Approve/Deny dialog) + a
+        // content-free OS alert when we're not on screen.
+        contactRequestPopup.value = ev;
+        if (!isAppForeground) {
+          WiltkeyNotifications.showActivityNotification();
+        }
+      }
     } catch (e) {
       log('[ContactRequest Error] $e');
     }
@@ -300,8 +383,34 @@ extension AppStateContacts on AppState {
     String senderId,
     String envelopeStr,
   ) async {
-    final metaKeyHex = await ChatMetaStore.keyFor(senderId);
-    if (metaKeyHex == null) return;
+    // Two transports, mirroring the request side: the 1:1 meta channel when a
+    // direct chat exists, otherwise the shared group's meta channel (the
+    // envelope carries group_id and the responder is a verified member).
+    final directIdx = contacts.indexWhere(
+      (c) => c.keyHash == senderId && !c.isGroup,
+    );
+    String metaKeyHex;
+    if (directIdx != -1) {
+      final k = await ChatMetaStore.keyFor(senderId);
+      if (k == null) return;
+      metaKeyHex = k;
+    } else {
+      String? groupId;
+      try {
+        groupId =
+            (jsonDecode(envelopeStr) as Map<String, dynamic>)['group_id'] as String?;
+      } catch (_) {}
+      if (groupId == null) return;
+      final gi = contacts.indexWhere((c) => c.isGroup && c.keyHash == groupId);
+      if (gi == -1) return;
+      final group = contacts[gi];
+      if ((group.groupSeed ?? '').isEmpty) return;
+      final isMember = group.memberKeyHashes.contains(senderId) ||
+          group.hostKeyHash == senderId ||
+          groupProfilesCache[group.id]?.containsKey(senderId) == true;
+      if (!isMember) return;
+      metaKeyHex = sha256.convert(utf8.encode(group.groupSeed!)).toString();
+    }
 
     try {
       final outer = jsonDecode(envelopeStr) as Map<String, dynamic>;
@@ -323,7 +432,7 @@ extension AppStateContacts on AppState {
           final sc = SocialContact(
             id: 0, // DB assigns
             keyHash: senderId,
-            name: payload.responderName ?? 'Contact',
+            name: payload.responderName ?? pending.targetName,
             shortNick: payload.responderShortNick,
             profileImageB64: payload.responderProfileImageB64,
             avatarBorderId: payload.responderAvatarBorderId,
@@ -353,15 +462,24 @@ extension AppStateContacts on AppState {
 
         // Send our own full profile snapshot back immediately
         sendProfileUpdateTo(senderId);
+
+        // Notify user via activity event
+        await logEvent(
+          type: 'contact_response',
+          title: payload.responderName ?? pending.targetName,
+          body: 'accepted your contact request',
+          chatKey: senderId,
+        );
       } else {
         pending.status = 'declined';
+        await logEvent(
+          type: 'contact_response',
+          title: pending.targetName,
+          body: 'declined your contact request',
+          chatKey: senderId,
+        );
       }
 
-      // Update the local sent card (it lives in our direct chat with the peer)
-      final idx = contacts.indexWhere((c) => c.keyHash == senderId && !c.isGroup);
-      if (idx != -1) {
-        await _updateContactRequestSentCard(contacts[idx], requestId, pending.status);
-      }
       _pendingContactRequests.remove(requestId);
       notifyListeners();
     } catch (e) {
@@ -370,13 +488,156 @@ extension AppStateContacts on AppState {
   }
 
   /// Respond to a contact request (receiver taps Approve/Deny).
+  ///
+  /// [contact] is the chat the request card lives in — the direct 1:1 chat,
+  /// or the shared group chat for group-member requests (the card payload
+  /// carries the requester's identity in that case).
   Future<void> respondToContactRequest(
     Contact contact,
     String requestId,
     bool accept,
   ) async {
-    final metaKeyHex = await ChatMetaStore.keyFor(contact.keyHash);
-    if (metaKeyHex == null) return;
+    String peerKey;
+    String metaKeyHex;
+    String? viaGroupId;
+    String peerName;
+    String? peerImage;
+    if (contact.isGroup) {
+      // Group-member request: read the card for the requester context.
+      viaGroupId = contact.keyHash;
+      if ((contact.groupSeed ?? '').isEmpty) return;
+      ChatMessage? card;
+      for (final m in messages[contact.id] ?? const <ChatMessage>[]) {
+        if (m.id == 'contact_req_recv_$requestId') {
+          card = m;
+          break;
+        }
+      }
+      if (card == null) return;
+      Map<String, dynamic> cardPayload;
+      try {
+        cardPayload = jsonDecode(card.text) as Map<String, dynamic>;
+      } catch (_) {
+        return;
+      }
+      peerKey = cardPayload['requester_key'] as String? ?? '';
+      if (peerKey.isEmpty) return;
+      if (await WiltkeyDatabase.instance.isContactBlocked(peerKey)) return;
+      peerName = cardPayload['requester_name'] as String? ?? 'Contact';
+      peerImage = cardPayload['requester_image'] as String?;
+      metaKeyHex =
+          sha256.convert(utf8.encode(contact.groupSeed!)).toString();
+    } else {
+      peerKey = contact.keyHash;
+      peerName = contact.name;
+      peerImage = contact.profileImageB64;
+      final k = await ChatMetaStore.keyFor(contact.keyHash);
+      if (k == null) return;
+      metaKeyHex = k;
+    }
+    await _sendContactResponse(
+      requestId: requestId,
+      peerKey: peerKey,
+      metaKeyHex: metaKeyHex,
+      viaGroupId: viaGroupId,
+      peerName: peerName,
+      peerImage: peerImage,
+      accept: accept,
+      cardChat: contact,
+    );
+  }
+
+  /// Approve/deny straight from the activity event (arrival popup or the
+  /// event-row buttons). Works with NO chat card: the requester context comes
+  /// from the event's data payload, and the response rides the shared group's
+  /// meta channel (the group the request arrived through — [AppEvent.chatKey]).
+  Future<void> respondToContactRequestEvent(AppEvent ev, bool accept) async {
+    final d = ev.dataMap();
+    final requestId = ev.id.startsWith('contact_request_')
+        ? ev.id.substring('contact_request_'.length)
+        : ev.id;
+
+    // Legacy event (pre-data payload): fall back to the chat-card path —
+    // the card (if any) carries the requester context.
+    final legacyPeerKey = d['requester_key'] as String?;
+    if (legacyPeerKey == null || legacyPeerKey.isEmpty) {
+      final ci = contacts.indexWhere((c) => c.keyHash == ev.chatKey);
+      if (ci == -1) return;
+      await respondToContactRequest(contacts[ci], requestId, accept);
+      advanceContactRequestPopup();
+      return;
+    }
+    final peerKey = legacyPeerKey;
+    if (await WiltkeyDatabase.instance.isContactBlocked(peerKey)) return;
+
+    String metaKeyHex;
+    String? viaGroupId;
+    final gi = contacts.indexWhere(
+      (c) => c.isGroup && c.keyHash == ev.chatKey,
+    );
+    if (gi != -1) {
+      final g = contacts[gi];
+      final seed = g.groupSeed ?? '';
+      if (seed.isEmpty) return;
+      metaKeyHex = sha256.convert(utf8.encode(seed)).toString();
+      viaGroupId = g.keyHash;
+    } else {
+      // Direct-chat request (no group context): respond over the 1:1 channel.
+      final k = await ChatMetaStore.keyFor(peerKey);
+      if (k == null) return;
+      metaKeyHex = k;
+    }
+
+    await _sendContactResponse(
+      requestId: requestId,
+      peerKey: peerKey,
+      metaKeyHex: metaKeyHex,
+      viaGroupId: viaGroupId,
+      peerName: d['requester_name'] as String? ?? 'Contact',
+      peerImage: d['requester_image'] as String?,
+      accept: accept,
+    );
+
+    // Record the outcome on the event so the feed stops offering stale
+    // Approve/Deny buttons, and stop popping it up.
+    ev.read = true;
+    ev.updateStatus(accept ? 'accepted' : 'declined');
+
+    for (final e in events) {
+      if (e.id == ev.id) {
+        e.read = true;
+        e.updateStatus(accept ? 'accepted' : 'declined');
+      }
+    }
+
+    try {
+      await WiltkeyDatabase.instance.updateEvent(
+        ev.id,
+        data: ev.data,
+        read: true,
+      );
+    } catch (e) {
+      log('[ContactRequest] event status update failed: $e');
+    }
+    advanceContactRequestPopup();
+    notifyListeners();
+  }
+
+  /// Shared respond core: send the contact_response frame, add the social
+  /// contact on accept, update any chat card, and push our profile snapshot.
+  Future<void> _sendContactResponse({
+    required String requestId,
+    required String peerKey,
+    required String metaKeyHex,
+    String? viaGroupId,
+    required String peerName,
+    String? peerImage,
+    required bool accept,
+    Contact? cardChat,
+  }) async {
+    if (socialContacts.any((c) => c.keyHash == peerKey)) {
+      return; // already added meanwhile
+    }
 
     final payload = ContactResponsePayload(
       requestId: requestId,
@@ -386,7 +647,7 @@ extension AppStateContacts on AppState {
       responderProfileImageB64: accept && profileImageB64.isNotEmpty ? profileImageB64 : null,
       responderAvatarBorderId: accept ? equippedAvatarBorderId : null,
       responderPubkey: accept ? publicKeyHex : null,
-      sharedSecretSeed: accept ? _deriveSharedSecretSeed(contact.keyHash) : null,
+      sharedSecretSeed: accept ? _deriveSharedSecretSeed(peerKey) : null,
     );
 
     await ensureWebSocketConnected();
@@ -398,24 +659,26 @@ extension AppStateContacts on AppState {
 
     WebSocketClient().sendWSMessage({
       'type': 'SEND_MESSAGE',
-      'recipient_id': contact.keyHash,
-      'envelope': jsonEncode({'d': enc}),
+      'recipient_id': peerKey,
+      'envelope': viaGroupId != null
+          ? jsonEncode({'group_id': viaGroupId, 'd': enc})
+          : jsonEncode({'d': enc}),
       'content_type': 'contact_response',
     });
 
     if (accept) {
       // Create social contact locally
-      if (!socialContacts.any((c) => c.keyHash == contact.keyHash)) {
+      if (!socialContacts.any((c) => c.keyHash == peerKey)) {
         final sc = SocialContact(
           id: 0,
-          keyHash: contact.keyHash,
-          name: contact.name,
-          shortNick: contact.shortNick,
-          profileImageB64: contact.profileImageB64,
-          avatarBorderId: contact.avatarBorderId,
-          sharedSecretSeed: _deriveSharedSecretSeed(contact.keyHash),
+          keyHash: peerKey,
+          name: peerName,
+          shortNick: '',
+          profileImageB64: peerImage,
+          avatarBorderId: null,
+          sharedSecretSeed: _deriveSharedSecretSeed(peerKey),
           myPubkey: publicKeyHex,
-          peerPubkey: contact.keyHash,
+          peerPubkey: peerKey,
           addedAt: DateTime.now().millisecondsSinceEpoch,
           isBlocked: false,
           lastSyncedAt: DateTime.now().millisecondsSinceEpoch,
@@ -423,17 +686,52 @@ extension AppStateContacts on AppState {
         await WiltkeyDatabase.instance.insertSocialContact(sc);
         socialContacts.insert(0, sc);
       }
-      // Update the received card to "accepted"
-      await _updateContactRequestReceivedCard(contact, requestId, 'accepted');
-
-      // Send our full profile snapshot to them immediately
-      sendProfileUpdateTo(contact.keyHash);
-    } else {
+      if (cardChat != null) {
+        // Update the received card to "accepted"
+        await _updateContactRequestReceivedCard(cardChat, requestId, 'accepted');
+      }
+      // Send our full profile snapshot to the REQUESTER (not the group id —
+      // the group-card path used to send it to the group's keyHash, which
+      // resolves to no peer).
+      sendProfileUpdateTo(peerKey);
+    } else if (cardChat != null) {
       // Update the received card to "declined"
-      await _updateContactRequestReceivedCard(contact, requestId, 'declined');
+      await _updateContactRequestReceivedCard(cardChat, requestId, 'declined');
     }
 
     notifyListeners();
+  }
+
+  /// Surface the oldest unanswered (unread) contact-request event in the
+  /// approve/deny popup. Called after unlock; live arrivals feed the same
+  /// notifier directly.
+  void surfacePendingContactRequests() {
+    if (contactRequestPopup.value != null) return;
+    AppEvent? next;
+    for (final e in events) {
+      if (e.type == 'contact_request' &&
+          !e.read &&
+          e.data != null &&
+          e.dataMap()['status'] == 'pending') {
+        next = e; // events are newest-first — keep the OLDEST unanswered
+      }
+    }
+    if (next != null) contactRequestPopup.value = next;
+  }
+
+  /// After a popup request is resolved, chain to the next unanswered one
+  /// (or clear the notifier).
+  void advanceContactRequestPopup() {
+    AppEvent? next;
+    for (final e in events) {
+      if (e.type == 'contact_request' &&
+          !e.read &&
+          e.data != null &&
+          e.dataMap()['status'] == 'pending') {
+        next = e;
+      }
+    }
+    contactRequestPopup.value = next;
   }
 
   /// Remove a social contact (and notify peer? — for now local only).

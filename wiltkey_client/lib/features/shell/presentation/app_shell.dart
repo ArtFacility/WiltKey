@@ -11,6 +11,7 @@ import '../../../core/theme/wk.dart';
 import '../../dashboard/presentation/chats_tab.dart';
 import '../../chat/presentation/chat_screen.dart';
 import '../../chat/presentation/group_chat_screen.dart';
+import '../../chat/presentation/widgets/contact_request_dialog.dart';
 import '../../chat/presentation/widgets/screenshot_ui.dart';
 import '../../proximity/presentation/connect_hub_screen.dart';
 import '../../settings/presentation/settings_screen.dart';
@@ -88,6 +89,9 @@ class _AppShellState extends State<AppShell>
     // A peer asking to screenshot a chat with us → show the Allow/Deny prompt
     // here (works regardless of which tab/screen is on top).
     _appState.incomingScreenshotRequest.addListener(_onScreenshotRequest);
+    // A contact request arrived → Approve/Deny popup (also covers requests
+    // that arrived while the app was closed, surfaced after unlock).
+    _appState.contactRequestPopup.addListener(_onContactRequestPopup);
     // Archive Time Wilt chats that expired while the app was closed.
     WidgetsBinding.instance
         .addPostFrameCallback((_) => _appState.sweepTimeWiltChats());
@@ -101,12 +105,46 @@ class _AppShellState extends State<AppShell>
     showScreenshotConsentDialog(context, req);
   }
 
+  // Guards against the listener firing twice for one event (ValueNotifier
+  // listener + a re-entrant advance) stacking two dialogs.
+  bool _contactRequestDialogOpen = false;
+
+  /// Contact request arrived (or was surfaced post-unlock) → Approve/Deny
+  /// dialog. Resolving marks the event read and chains to the next unanswered
+  /// request, if any — including one that arrived while a dialog was open
+  /// (its value sits set until here, since the listener is guarded).
+  Future<void> _onContactRequestPopup() async {
+    if (_contactRequestDialogOpen) return;
+    final ev = _appState.contactRequestPopup.value;
+    if (ev == null || !mounted) return;
+    _appState.contactRequestPopup.value = null; // consume; re-set to chain
+    _contactRequestDialogOpen = true;
+    try {
+      await showContactRequestDialog(context, ev, _appState);
+    } finally {
+      _contactRequestDialogOpen = false;
+    }
+    if (!mounted) return;
+    if (_appState.contactRequestPopup.value != null) {
+      await _onContactRequestPopup(); // arrived while this dialog was open
+    } else {
+      _appState.surfacePendingContactRequests(); // older unanswered, if any
+    }
+  }
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     // A notification tapped while the app was already running (warm) doesn't
     // re-run initState, so the deep-link would otherwise be missed — the stashed
     // target chat sits unopened and its unread badge lingers. Re-check on resume.
     if (state == AppLifecycleState.resumed) {
+      // Opening the app lands on the Chats tab — unless the user is mid-
+      // activity (a pushed screen: chat, editor, composer…). Tabs alone are
+      // not "mid-activity": whatever tab was left showing (e.g. Connect) used
+      // to greet every app reopen.
+      if (mounted && !Navigator.of(context).canPop()) {
+        selectTab(ShellTab.chats);
+      }
       WidgetsBinding.instance.addPostFrameCallback((_) => _openPendingChat());
       // The user may have enabled an accessibility service while away.
       WidgetsBinding.instance
@@ -196,6 +234,7 @@ class _AppShellState extends State<AppShell>
   void dispose() {
     _appState.removeListener(_onState);
     _appState.incomingScreenshotRequest.removeListener(_onScreenshotRequest);
+    _appState.contactRequestPopup.removeListener(_onContactRequestPopup);
     WidgetsBinding.instance.removeObserver(this);
     _slide.dispose();
     super.dispose();
@@ -268,40 +307,60 @@ class _AppShellState extends State<AppShell>
     return _ShellScope(
       navigator: this,
       child: Scaffold(
-        body: context.wkc.ambientBackground(
-          child: SafeArea(
-            bottom: false,
-            child: Stack(
-              children: [
-                AnimatedBuilder(
-                  animation: _slide,
-                  builder: (context, _) {
-                    final double width = MediaQuery.sizeOf(context).width;
-                    final bool animating = _fromIndex >= 0;
-                    final int from = _fromIndex;
-                    final double t =
-                        Curves.easeOutCubic.transform(_slide.value);
-                    final double dir =
-                        animating ? (_index - from).sign.toDouble() : 0;
-                    return Stack(
-                      children: [
-                        for (int i = 0; i < _tabs.length; i++)
-                          _buildSlideableTab(i, width, animating, from, t, dir),
-                      ],
-                    );
-                  },
+        body: Column(
+          children: [
+            // Unmistakable marker when connected to a WK_TEST_MODE relay:
+            // test data lives in an isolated DB, but it must never be
+            // mistaken for production activity.
+            if (_appState.relayIsTest) const _TestRelayBanner(),
+            // A live session lost its device token and is re-issuing (PoW,
+            // seconds-long). Explain it instead of silently stalling chat.
+            if (_appState.showReauthenticatingBanner)
+              const _ReauthenticatingBanner(),
+            // Relay unreachable while the app is open: pairing still works,
+            // but messaging/stories are down. Grace-delayed so a normal
+            // 1-2s connect never flashes it.
+            const _ConnectionLostBannerHost(),
+            Expanded(
+              child: context.wkc.ambientBackground(
+                child: SafeArea(
+                  bottom: false,
+                  child: Stack(
+                    children: [
+                      AnimatedBuilder(
+                        animation: _slide,
+                        builder: (context, _) {
+                          final double width =
+                              MediaQuery.sizeOf(context).width;
+                          final bool animating = _fromIndex >= 0;
+                          final int from = _fromIndex;
+                          final double t =
+                              Curves.easeOutCubic.transform(_slide.value);
+                          final double dir =
+                              animating ? (_index - from).sign.toDouble() : 0;
+                          return Stack(
+                            children: [
+                              for (int i = 0; i < _tabs.length; i++)
+                                _buildSlideableTab(
+                                    i, width, animating, from, t, dir),
+                            ],
+                          );
+                        },
+                      ),
+                      // In-app heads-up for messages that land while the app is open and
+                      // you're not in that chat (so busy users aren't blind to them).
+                      const Positioned(
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        child: _MessageBannerHost(),
+                      ),
+                    ],
+                  ),
                 ),
-                // In-app heads-up for messages that land while the app is open and
-                // you're not in that chat (so busy users aren't blind to them).
-                const Positioned(
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  child: _MessageBannerHost(),
-                ),
-              ],
+              ),
             ),
-          ),
+          ],
         ),
         bottomNavigationBar: WkBottomNavBar(
           currentIndex: _index,
@@ -333,6 +392,215 @@ class _ShellScope extends InheritedWidget {
 
   @override
   bool updateShouldNotify(_ShellScope old) => navigator != old.navigator;
+}
+
+/// Slim persistent strip shown while connected to a WK_TEST_MODE relay.
+class _TestRelayBanner extends StatelessWidget {
+  const _TestRelayBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.amber.shade700,
+      child: SafeArea(
+        bottom: false,
+        child: SizedBox(
+          height: 26,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.science, size: 15, color: Colors.black87),
+              const SizedBox(width: 6),
+              Text(
+                AppLocalizations.of(context)!.testRelayBanner,
+                style: const TextStyle(
+                  color: Colors.black87,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.6,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Slim strip while a previously-authenticated session re-issues its device
+/// token (PoW runs for seconds). Normal token reconnects never show this.
+class _ReauthenticatingBanner extends StatelessWidget {
+  const _ReauthenticatingBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.wk;
+    return Material(
+      color: t.action,
+      child: SafeArea(
+        bottom: false,
+        child: SizedBox(
+          height: 26,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              SizedBox(
+                width: 12,
+                height: 12,
+                child: CircularProgressIndicator(
+                  strokeWidth: 1.6,
+                  valueColor: AlwaysStoppedAnimation(t.onAction),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                AppLocalizations.of(context)!.reauthenticatingBanner,
+                style: TextStyle(
+                  color: t.onAction,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.6,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Persistent strip while the relay is unreachable and no reconnect dance is
+/// even running (network down / relay dead). Stays up until a connection
+/// succeeds — pairing remains usable, messaging does not. Deliberately
+/// grace-delayed (~2.5s) so ordinary sub-second connects never flash it.
+class _ConnectionLostBannerHost extends StatefulWidget {
+  const _ConnectionLostBannerHost();
+
+  @override
+  State<_ConnectionLostBannerHost> createState() =>
+      _ConnectionLostBannerHostState();
+}
+
+class _ConnectionLostBannerHostState extends State<_ConnectionLostBannerHost> {
+  final AppState _appState = AppState();
+  Timer? _graceTimer;
+  bool _visible = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _appState.addListener(_onState);
+    if (_appState.showConnectionLostBanner) {
+      _startGrace();
+    }
+  }
+
+  @override
+  void dispose() {
+    _appState.removeListener(_onState);
+    _graceTimer?.cancel();
+    super.dispose();
+  }
+
+  void _onState() {
+    if (!mounted) return;
+    if (_appState.showConnectionLostBanner) {
+      if (!_visible && _graceTimer == null) _startGrace();
+    } else {
+      _graceTimer?.cancel();
+      _graceTimer = null;
+      if (_visible) setState(() => _visible = false);
+    }
+  }
+
+  void _startGrace() {
+    _graceTimer = Timer(const Duration(milliseconds: 2500), () {
+      _graceTimer = null;
+      if (mounted && _appState.showConnectionLostBanner && !_visible) {
+        setState(() => _visible = true);
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_visible) return const SizedBox(width: 0, height: 0);
+    final t = context.wk;
+    return GestureDetector(
+      // Tapping the banner explains the situation: relay-side trouble vs this
+      // network tripping the relay's spam protection (cooldown / daily cap).
+      onTap: () => _showConnectionIssueDialog(context),
+      child: Material(
+        color: t.danger,
+        child: SafeArea(
+          bottom: false,
+          child: SizedBox(
+            height: 26,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.wifi_off, size: 14, color: Colors.white),
+                const SizedBox(width: 6),
+                Text(
+                  AppLocalizations.of(context)!.connectionLostBanner,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.6,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showConnectionIssueDialog(BuildContext context) {
+    final t = context.wk;
+    final l10n = AppLocalizations.of(context)!;
+    final appState = AppState();
+    final reason = appState.relayIssueReason;
+    final String body;
+    if (reason == 'challenge_cooldown') {
+      body = l10n.connectionIssueCooldown;
+    } else if (reason == 'issuance_rate_limited') {
+      body = l10n.connectionIssueRateLimit;
+    } else {
+      body = l10n.connectionIssueGeneric;
+    }
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: t.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(t.radiusCard),
+          side: BorderSide(color: t.border),
+        ),
+        title: Text(
+          l10n.connectionIssueTitle,
+          style: t.screenTitle.copyWith(fontSize: 17),
+        ),
+        content: Text(
+          body,
+          style: t.bodySecondary.copyWith(height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text(
+              l10n.commonOk,
+              style: t.body.copyWith(color: t.action, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 /// Top heads-up banner for messages arriving while the app is open. Listens to

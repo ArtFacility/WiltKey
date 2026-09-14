@@ -26,6 +26,7 @@ extension AppStatePush on AppState {
       'timestamp': ts,
       'sig': sig,
       'token': token,
+      'device_token': await getDeviceToken(),
     });
   }
 
@@ -40,6 +41,7 @@ extension AppStatePush on AppState {
       'pubkey': publicKeyHex,
       'timestamp': ts,
       'sig': sig,
+      'device_token': await getDeviceToken(),
     });
     await PushChannel.deleteToken();
   }

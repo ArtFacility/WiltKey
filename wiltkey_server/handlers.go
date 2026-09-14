@@ -9,6 +9,7 @@ import (
 	"log"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 )
@@ -586,3 +587,197 @@ func (c *Client) handleFileReceived(msg WSMessage) {
 // closed-channel client behind that crashed the whole relay on the next send.
 // The underlying Redis tunnel helpers in redis.go are now dead code (only the
 // mock test references them) and can be deleted in a later cleanup.
+
+// handlePostStoryWS handles publishing a 24-hour story over an authenticated WebSocket.
+func (c *Client) handlePostStoryWS(msg WSMessage) {
+	const maxMediaMetaBytes = 2048
+	if msg.StoryType == "" || msg.CiphertextB64 == "" {
+		c.SendJSON(WSMessage{Type: "POST_STORY_ERROR", Message: "Missing story_type or ciphertext_b64"})
+		return
+	}
+	if len(msg.MediaMeta) > maxMediaMetaBytes {
+		c.SendJSON(WSMessage{Type: "POST_STORY_ERROR", Message: "Media metadata too large"})
+		return
+	}
+
+	if pg == nil {
+		c.SendJSON(WSMessage{Type: "POST_STORY_ERROR", Message: "PostgreSQL storage unavailable"})
+		return
+	}
+
+	isPlus, err := checkPremiumSubscription(c.id)
+	if err != nil {
+		log.Printf("[Social WS] Failed to check premium subscription for %s: %v", c.id, err)
+		isPlus = false
+	}
+
+	// Charge media_meta too — it is stored server-side and re-served inside
+	// every feed row, so leaving it free would let clients stuff unbudgeted
+	// bytes into storage and every contact's feed download.
+	bytesUsed := int64(len(msg.CiphertextB64) + len(msg.MediaMeta))
+	allowed, used, maxBytes, err := pg.ConsumeSocialBudget(c.id, bytesUsed, isPlus)
+	if err != nil {
+		log.Printf("[Social WS] Failed to check/consume budget for %s: %v", c.id, err)
+		c.SendJSON(WSMessage{Type: "POST_STORY_ERROR", Message: "Database error checking weekly budget"})
+		return
+	}
+
+	if !allowed {
+		c.SendJSON(WSMessage{
+			Type:      "POST_STORY_ERROR",
+			Message:   "Weekly social budget quota exceeded",
+			BytesUsed: used,
+			MaxBytes:  maxBytes,
+		})
+		return
+	}
+
+	ttl := 24 * time.Hour
+	storyID, err := pg.PostStory(c.id, msg.StoryType, msg.CiphertextB64, nil, msg.MediaMeta, bytesUsed, ttl)
+	if err != nil {
+		log.Printf("[Social WS] Failed to insert story for %s: %v", c.id, err)
+		c.SendJSON(WSMessage{Type: "POST_STORY_ERROR", Message: "Failed to store story"})
+		return
+	}
+
+	log.Printf("[Social WS] User %s posted story %s (%s, %d bytes)", c.id, storyID, msg.StoryType, bytesUsed)
+	c.SendJSON(WSMessage{
+		Type:      "POST_STORY_OK",
+		StoryID:   storyID,
+		BytesUsed: used,
+		MaxBytes:  maxBytes,
+		ExpiresAt: time.Now().Add(ttl).Unix(),
+	})
+}
+
+// handleFetchStoriesWS returns the caller's 24h stories plus stories from the
+// contacts it listed. The contact list is a query filter only — the caller is
+// authenticated by the WS handshake (c.id), and everything returned is an
+// encrypted envelope the relay cannot read. Replaces HTTP /api/v1/stories/feed.
+func (c *Client) handleFetchStoriesWS(msg WSMessage) {
+	const maxFeedContacts = 500
+	if len(msg.Contacts) > maxFeedContacts {
+		c.SendJSON(WSMessage{Type: "STORIES_ERROR", Message: "Too many contacts"})
+		return
+	}
+
+	// This frame triggers a full Postgres query per call — throttle it per
+	// sender (not per socket: reconnecting must not reset the gate). Fail OPEN
+	// on Redis trouble; infra issues must not break feed reads.
+	if allowed, err := c.hub.rdb.AllowAction("storyfeed:"+c.id, 2*time.Second); err == nil && !allowed {
+		c.SendJSON(WSMessage{Type: "STORIES_ERROR", Message: "Fetching too fast — slow down"})
+		return
+	}
+
+	if pg == nil {
+		c.SendJSON(WSMessage{Type: "STORIES_ERROR", Message: "PostgreSQL storage unavailable"})
+		return
+	}
+
+	senders := append([]string{c.id}, msg.Contacts...)
+	stories, err := pg.GetStoriesFeed(senders)
+	if err != nil {
+		log.Printf("[Social WS] Failed to query stories feed for %s: %v", c.id, err)
+		c.SendJSON(WSMessage{Type: "STORIES_ERROR", Message: "Failed to fetch feed"})
+		return
+	}
+	if stories == nil {
+		stories = []PGStory{}
+	}
+
+	c.SendJSON(WSMessage{Type: "STORIES_FEED", Stories: stories})
+}
+
+// handleStoryReactWS records/updates the caller's emoji on a story.
+// Replaces HTTP /api/v1/stories/react.
+func (c *Client) handleStoryReactWS(msg WSMessage) {
+	const maxEmojiRunes = 16
+	if msg.StoryID == "" || msg.Emoji == "" {
+		c.SendJSON(WSMessage{Type: "STORY_REACT_ERROR", Message: "Missing story_id or emoji"})
+		return
+	}
+	if utf8.RuneCountInString(msg.Emoji) > maxEmojiRunes {
+		c.SendJSON(WSMessage{Type: "STORY_REACT_ERROR", Message: "Emoji too long"})
+		return
+	}
+	if pg == nil {
+		c.SendJSON(WSMessage{Type: "STORY_REACT_ERROR", Message: "PostgreSQL storage unavailable"})
+		return
+	}
+
+	// Per-sender-per-story throttle so one client can't hammer reaction writes
+	// at token-bucket speed. Fail OPEN on Redis trouble.
+	if allowed, err := c.hub.rdb.AllowAction("storyreact:"+c.id+":"+msg.StoryID, 2*time.Second); err == nil && !allowed {
+		c.SendJSON(WSMessage{Type: "STORY_REACT_ERROR", Message: "Reacting too fast — slow down"})
+		return
+	}
+
+	story, err := pg.GetStory(msg.StoryID)
+	if err != nil || story == nil {
+		c.SendJSON(WSMessage{Type: "STORY_REACT_ERROR", Message: "Story not found or expired"})
+		return
+	}
+
+	if err := pg.AddOrUpdateStoryReaction(msg.StoryID, c.id, msg.Emoji); err != nil {
+		log.Printf("[Social WS] Failed to record reaction on story %s for %s: %v", msg.StoryID, c.id, err)
+		c.SendJSON(WSMessage{Type: "STORY_REACT_ERROR", Message: "Failed to record reaction"})
+		return
+	}
+
+	c.SendJSON(WSMessage{Type: "STORY_REACT_OK"})
+}
+
+// handleStoryReactionsWS lets a story's author inspect its reactions.
+// Replaces HTTP /api/v1/stories/{id}/reactions.
+func (c *Client) handleStoryReactionsWS(msg WSMessage) {
+	if msg.StoryID == "" {
+		c.SendJSON(WSMessage{Type: "STORY_REACTIONS_ERROR", Message: "Missing story_id"})
+		return
+	}
+	if pg == nil {
+		c.SendJSON(WSMessage{Type: "STORY_REACTIONS_ERROR", Message: "PostgreSQL unavailable"})
+		return
+	}
+
+	story, err := pg.GetStory(msg.StoryID)
+	if err != nil || story == nil {
+		c.SendJSON(WSMessage{Type: "STORY_REACTIONS_ERROR", Message: "Story not found or expired"})
+		return
+	}
+	if story.SenderID != c.id {
+		c.SendJSON(WSMessage{Type: "STORY_REACTIONS_ERROR", Message: "Only story author can inspect reactions"})
+		return
+	}
+
+	reactions, err := pg.GetStoryReactions(msg.StoryID)
+	if err != nil {
+		c.SendJSON(WSMessage{Type: "STORY_REACTIONS_ERROR", Message: "Failed to query reactions"})
+		return
+	}
+	if reactions == nil {
+		reactions = []PGStoryReaction{}
+	}
+
+	c.SendJSON(WSMessage{Type: "STORY_REACTIONS", StoryID: msg.StoryID, Reactions: reactions})
+}
+
+// handleDeleteStoryWS removes the caller's own story. Replaces the HTTP
+// /api/v1/stories/{id} DELETE endpoint.
+func (c *Client) handleDeleteStoryWS(msg WSMessage) {
+	if msg.StoryID == "" {
+		c.SendJSON(WSMessage{Type: "DELETE_STORY_ERROR", Message: "Missing story_id"})
+		return
+	}
+	if pg == nil {
+		c.SendJSON(WSMessage{Type: "DELETE_STORY_ERROR", Message: "PostgreSQL unavailable"})
+		return
+	}
+
+	if err := pg.DeleteStory(msg.StoryID, c.id); err != nil {
+		log.Printf("[Social WS] Failed to delete story %s for %s: %v", msg.StoryID, c.id, err)
+		c.SendJSON(WSMessage{Type: "DELETE_STORY_ERROR", Message: "Failed to delete story"})
+		return
+	}
+
+	c.SendJSON(WSMessage{Type: "DELETE_STORY_OK", StoryID: msg.StoryID})
+}

@@ -285,6 +285,30 @@ class WiltkeyPersistence {
     await prefs.setString(_keyLocale, localeCode);
   }
 
+  // --- Chat list swipe actions (UX preference) ---
+  static const String _keySwipeRightAction = 'wk_swipe_right_action';
+  static const String _keySwipeLeftAction = 'wk_swipe_left_action';
+
+  Future<String> loadSwipeRightAction() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_keySwipeRightAction) ?? 'mark_read';
+  }
+
+  Future<void> saveSwipeRightAction(String action) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keySwipeRightAction, action);
+  }
+
+  Future<String> loadSwipeLeftAction() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_keySwipeLeftAction) ?? 'mute';
+  }
+
+  Future<void> saveSwipeLeftAction(String action) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keySwipeLeftAction, action);
+  }
+
   Future<void> clearAll() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_keyPublicKey);

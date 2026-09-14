@@ -10,6 +10,24 @@ extension AppStateChats on AppState {
     notifyListeners();
   }
 
+  /// Manually marks a chat unread (clears lastReadMs and sets unread badge).
+  void markChatUnread(Contact contact) {
+    lastReadMs[contact.id] = 0;
+    unreadCounts[contact.id] =
+        (unreadCounts[contact.id] ?? 0) > 0 ? unreadCounts[contact.id]! : 1;
+    _persistence.saveState(this);
+    notifyListeners();
+  }
+
+  /// Toggles read/unread status for a chat card swipe gesture.
+  void toggleChatReadUnread(Contact contact) {
+    if (unreadCount(contact) > 0) {
+      markChatRead(contact);
+    } else {
+      markChatUnread(contact);
+    }
+  }
+
   /// Unread badge count for a chat (DB-derived; kept live as messages arrive).
   int unreadCount(Contact contact) => unreadCounts[contact.id] ?? 0;
 

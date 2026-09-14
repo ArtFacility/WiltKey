@@ -418,6 +418,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get notificationEmergencyChatBody => 'Emergency chat request';
 
   @override
+  String get notificationNewActivityBody =>
+      'New activity — check your notifications';
+
+  @override
   String get notificationSecureLinkActive => 'Syncing secure messages';
 
   @override
@@ -2295,6 +2299,76 @@ class AppLocalizationsEn extends AppLocalizations {
   String get qrConnectManualPin => 'Enter PIN manually';
 
   @override
+  String get qrConnectShowYourCode =>
+      'Scan complete! Now show your QR code to them too.';
+
+  @override
+  String get qrConnectFinishPairing => 'Finish pairing';
+
+  @override
+  String get qrConnectOutdatedCode =>
+      'This QR code is from an older app version. Both of you need the latest update to connect this way.';
+
+  @override
+  String get qrConnectOwnCode =>
+      'That\'s your own QR code — point the camera at theirs instead.';
+
+  @override
+  String get qrConnectAlreadyPaired =>
+      'You already have a chat with this person. Refreshing an existing chat requires an in-person pairing.';
+
+  @override
+  String get testRelayBanner => 'TEST SERVER — NOT PRODUCTION';
+
+  @override
+  String get securingTitle => 'Securing your connection';
+
+  @override
+  String get securingBody =>
+      'Your device is verifying itself with the relay before connecting. This one-time proof-of-work protects everyone from spam and abuse — no phone number, no email, no account.';
+
+  @override
+  String get securingWorking => 'PROVING DEVICE — WORKING…';
+
+  @override
+  String get securingOnceNote =>
+      'This happens only on your first connection. Reconnecting afterwards is instant.';
+
+  @override
+  String get puzzleInstruction => 'Slide until the pixel art is symmetrical.';
+
+  @override
+  String get puzzleLockIn => 'Lock in';
+
+  @override
+  String get puzzleFailedRetry =>
+      'That didn\'t line up — starting a fresh check…';
+
+  @override
+  String get reauthenticatingBanner => 'REAUTHENTICATING — PLEASE WAIT…';
+
+  @override
+  String get connectionLostBanner => 'WEBSOCKET CONNECTION FAILED — RETRYING…';
+
+  @override
+  String get commonOk => 'OK';
+
+  @override
+  String get connectionIssueTitle => 'Can\'t reach the relay';
+
+  @override
+  String get connectionIssueGeneric =>
+      'Either this relay is having problems, or your network can\'t reach it right now. Pairing devices nearby still works — messaging needs the relay. The app keeps retrying automatically.';
+
+  @override
+  String get connectionIssueCooldown =>
+      'This network is temporarily limited by the relay\'s spam protection — too many failed verifications came from its address. Everything keeps retrying automatically; this usually clears within minutes.';
+
+  @override
+  String get connectionIssueRateLimit =>
+      'This network has used up its device limit for today (too many new devices connected from the same address). You can still chat with an already-verified device on this network — or try again after the daily reset.';
+
+  @override
   String get badgePlayPlus => 'Play Store · Plus';
 
   @override
@@ -2483,4 +2557,102 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get forcedUpdateWhatsNew => 'What\'s in this update';
+
+  @override
+  String get settingsSwipeGesturesTitle => 'Chat Swipe Gestures';
+
+  @override
+  String get settingsSwipeGesturesSubtitle =>
+      'Customize swipe right and swipe left actions in the chats list';
+
+  @override
+  String get settingsSwipeRight => 'Swipe Right';
+
+  @override
+  String get settingsSwipeLeft => 'Swipe Left';
+
+  @override
+  String get swipeActionMarkRead => 'Mark Read / Unread';
+
+  @override
+  String get swipeActionMute => 'Mute / Unmute';
+
+  @override
+  String get swipeActionPin => 'Pin / Unpin';
+
+  @override
+  String get swipeActionArchive => 'Archive';
+
+  @override
+  String get swipeActionNone => 'Disabled';
+
+  @override
+  String get chatSwipeMarkRead => 'Mark Read';
+
+  @override
+  String get chatSwipeMarkUnread => 'Mark Unread';
+
+  @override
+  String get chatSwipePin => 'Pin';
+
+  @override
+  String get chatSwipeUnpin => 'Unpin';
+
+  @override
+  String get chatSwipeMute => 'Mute';
+
+  @override
+  String get chatSwipeUnmute => 'Unmute';
+
+  @override
+  String get chatSwipeArchive => 'Archive';
+
+  @override
+  String get chatAttachVideoSubtitleEnabled =>
+      'Record up to 15s or pick from gallery';
+
+  @override
+  String get chatVideoSelectSourceTitle => 'Send Video';
+
+  @override
+  String get chatVideoQualityLabel => 'Quality';
+
+  @override
+  String get chatVideoQualityLow => 'Low';
+
+  @override
+  String get chatVideoQualityMedium => 'Medium';
+
+  @override
+  String get chatVideoQualityHigh => 'High';
+
+  @override
+  String get chatVideoCompressionFailed =>
+      'Couldn\'t compress this clip. Try a shorter or lower-quality selection.';
+
+  @override
+  String get chatVideoRecordCamera => 'Record Video (Camera)';
+
+  @override
+  String get chatVideoPickGallery => 'Choose Video from Gallery';
+
+  @override
+  String get chatVideoCompressing => 'Compressing video...';
+
+  @override
+  String chatVideoTooLarge(String size) {
+    return 'Video exceeds size limit ($size)';
+  }
+
+  @override
+  String get chatVideoTooLong => 'Video exceeds 15-second duration limit';
+
+  @override
+  String get chatVideoSaveGallery => 'Save Video to Gallery';
+
+  @override
+  String get chatVideoSavedGallery => 'Video saved to gallery';
+
+  @override
+  String get chatVideoError => 'Unable to play video clip';
 }

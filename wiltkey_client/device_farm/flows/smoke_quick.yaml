@@ -1,0 +1,19 @@
+# QUICK SMOKE — the "just rebuilt the APKs, is it alive?" check. Fastest
+# possible end-to-end: install → unlock → all tabs render.
+#
+#   .\run_farm.ps1 -Mode quick
+
+appId: ${APP_ID}
+---
+- launchApp
+- assertVisible: "Enter PIN to unlock"
+- tapOn:
+    point: "50%, 45%"
+- inputText: ${PIN}
+- tapOn: "Unlock"
+- assertVisible: "Chats"
+- tapOn: "Contacts"
+- tapOn: "Connect"
+- tapOn: "Settings"
+- tapOn: "Chats"
+- assertVisible: "Chats"

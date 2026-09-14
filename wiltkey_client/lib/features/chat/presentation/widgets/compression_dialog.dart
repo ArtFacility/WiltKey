@@ -64,7 +64,9 @@ class _CompressionDialogState extends State<CompressionDialog> {
   bool get _uncompressed => _step >= _webpSteps;
   double get quality => _uncompressed ? 1.0 : (_step + 1) / 10.0;
   bool hidden = false;
-  bool allowSave = false;
+  // Owner call 2026-09-06: download consent defaults ON — the toggle is for
+  // opting OUT of saving, not in.
+  bool allowSave = true;
   bool ephemeral = false;
   double ttl = 5; // wilting lifetime in seconds (1–60), once opened
 

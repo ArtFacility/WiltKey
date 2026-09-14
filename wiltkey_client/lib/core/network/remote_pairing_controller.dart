@@ -308,29 +308,27 @@ class RemotePairingController extends ChangeNotifier {
     final pairwise = _pairwiseSeed(joinerPub);
 
     try {
-      // Re-meet reuses the joiner's existing slot (Time Wilt time-refresh), so a
-      // full group only blocks brand-new joiners.
-      final existingLane = await GroupDatabase.instance.getLaneByMember(
+      // Slot allocation rules (device-tested race, 2026-09-13): Time Wilt
+      // re-meet reuses the joiner's existing lane (time-refresh — offsets only
+      // advance). Byte-budget rejoin NEVER reuses: the old lane's offset range
+      // is burned, so it is tombstoned HERE and a fresh slot is allocated —
+      // a queued leave/kick frame landing late then harmlessly re-retires the
+      // old slot instead of the rejoined member's new one.
+      final int? slot = await GroupDatabase.instance.slotForJoiner(
         group.keyHash,
         joinerId,
+        allowReMeetReuse: group.isTimeWilt,
       );
-      int? slot = existingLane?['slot_index'] as int?;
       if (slot == null) {
-        final emptyLanes = await GroupDatabase.instance.getEmptyLanes(
-          group.keyHash,
+        // Tell the joiner rather than leaving them polling: post an error blob.
+        await PairingService.pairInviteUpload(
+          _relay,
+          pin: pin!,
+          initiatorId: appState.userId,
+          blob: jsonEncode({'error': 'group_full'}),
         );
-        if (emptyLanes.isEmpty) {
-          // Tell the joiner rather than leaving them polling: post an error blob.
-          await PairingService.pairInviteUpload(
-            _relay,
-            pin: pin!,
-            initiatorId: appState.userId,
-            blob: jsonEncode({'error': 'group_full'}),
-          );
-          _fail('Group is full — no free slots.');
-          return;
-        }
-        slot = emptyLanes.first['slot_index'] as int;
+        _fail('Group is full — no free slots.');
+        return;
       }
 
       final blob = jsonEncode({

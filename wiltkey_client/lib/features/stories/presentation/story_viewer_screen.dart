@@ -11,6 +11,8 @@ import 'package:wiltkey_client/core/theme/theme_registry.dart';
 import '../../../core/theme/wk.dart';
 import '../../../core/theme/wiltkey_tokens.dart';
 import 'widgets/themed_story_text_tag.dart';
+import 'package:video_player/video_player.dart';
+import '../../../core/video/video_message_service.dart';
 
 /// Full-screen interactive story player with 24h countdown bar, floating reactions,
 /// author theme reproduction, and themed borders.
@@ -672,6 +674,13 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
           ],
         );
 
+      case 'video':
+        return _StoryVideoPlayer(
+          story: s,
+          tokens: st,
+          isPaused: _isPaused,
+        );
+
       case 'text':
       default:
         return Center(
@@ -702,5 +711,143 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
           ),
         );
     }
+  }
+}
+
+class _StoryVideoPlayer extends StatefulWidget {
+  final Story story;
+  final WiltkeyTokens tokens;
+  final bool isPaused;
+
+  const _StoryVideoPlayer({
+    required this.story,
+    required this.tokens,
+    required this.isPaused,
+  });
+
+  @override
+  State<_StoryVideoPlayer> createState() => _StoryVideoPlayerState();
+}
+
+class _StoryVideoPlayerState extends State<_StoryVideoPlayer> {
+  VideoPlayerController? _controller;
+  Uint8List? _thumbBytes;
+  bool _initialized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAndPlay();
+  }
+
+  @override
+  void didUpdateWidget(_StoryVideoPlayer old) {
+    super.didUpdateWidget(old);
+    if (old.isPaused != widget.isPaused && _controller != null) {
+      if (widget.isPaused) {
+        _controller!.pause();
+      } else {
+        _controller!.play();
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadAndPlay() async {
+    final payload = VideoMessagePayload.tryParse(widget.story.content);
+    if (payload == null) return;
+
+    if (mounted) {
+      setState(() => _thumbBytes = payload.thumbnailBytes);
+    }
+
+    final file = await VideoMessageService.getOrWriteVideoFile(
+      messageId: widget.story.id,
+      payload: payload,
+    );
+
+    if (file == null || !mounted) return;
+
+    final c = VideoPlayerController.file(file);
+    try {
+      await c.initialize();
+      await c.setLooping(true);
+      if (!widget.isPaused) {
+        await c.play();
+      }
+
+      if (mounted) {
+        setState(() {
+          _controller = c;
+          _initialized = true;
+        });
+      }
+    } catch (_) {
+      c.dispose();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        if (_initialized && _controller != null && !_controller!.value.hasError)
+          Center(
+            child: AspectRatio(
+              aspectRatio: (_controller!.value.aspectRatio > 0 &&
+                      _controller!.value.aspectRatio.isFinite)
+                  ? _controller!.value.aspectRatio
+                  : 16 / 9,
+              child: VideoPlayer(_controller!),
+            ),
+          )
+        else if (_thumbBytes != null && _thumbBytes!.isNotEmpty)
+          Center(
+            child: Image.memory(
+              _thumbBytes!,
+              fit: BoxFit.contain,
+              gaplessPlayback: true,
+            ),
+          )
+        else
+          const Center(
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+
+        if (widget.story.caption != null && widget.story.caption!.isNotEmpty)
+          Positioned(
+            bottom: 120,
+            left: 24,
+            right: 24,
+            child: Center(
+              child: CustomPaint(
+                painter: ThemedTagBackgroundPainter(
+                  styleId: widget.story.textBorderId ?? StoryTextStyles.cyberpunk,
+                  primaryAccent: widget.tokens.action,
+                  tokens: widget.tokens,
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  child: Text(
+                    widget.story.caption!,
+                    textAlign: TextAlign.center,
+                    style: widget.tokens.body.copyWith(
+                      fontSize: 16,
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
   }
 }

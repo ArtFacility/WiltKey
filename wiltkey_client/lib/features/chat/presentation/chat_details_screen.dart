@@ -299,7 +299,7 @@ class _ChatDetailsScreenState extends State<ChatDetailsScreen> {
                     children: [
                       Flexible(
                         child: Text(
-                          contact.name,
+                          contact.displayName,
                           style: t.body.copyWith(
                             fontSize: 18,
                             fontWeight: FontWeight.w600,

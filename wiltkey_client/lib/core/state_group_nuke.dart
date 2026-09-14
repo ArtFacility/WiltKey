@@ -66,13 +66,15 @@ extension AppStateGroupNuke on AppState {
   }
 
   /// Propose destroying [group] for everyone. A solo group (no other members)
-  /// is destroyed immediately; otherwise a majority of the other members must
-  /// approve before the wipe fans out.
+  /// — or a 2-member group (one peer; owner call 2026-09-06: a vote of one is
+  /// a rubber stamp) — is destroyed immediately; larger groups need a majority
+  /// of the other members before the wipe fans out.
   Future<void> proposeGroupNuke(Contact group) async {
     if (!group.isGroup) return;
     final peers = group.memberKeyHashes.where((h) => h != userId).toList();
-    if (peers.isEmpty) {
-      // No one else to ask — just destroy locally (+ fan-out is a no-op).
+    if (peers.length <= 1) {
+      // No one (or only one member) to ask — destroy now; the group_nuke
+      // fan-out inside [nukeGroup] still reaches every peer.
       await nukeGroup(group);
       return;
     }
@@ -80,7 +82,12 @@ extension AppStateGroupNuke on AppState {
     if (keyHex == null) return;
 
     final requestId = _newGroupNukeRequestId();
-    final needed = (peers.length ~/ 2) + 1;
+    // Majority of the WHOLE group, proposer included (the proposer's intent
+    // is an implicit yes). owner call 2026-09-08: on a 3-member group one
+    // agreeing peer is enough (2 of 3); the old rule (majority of the OTHER
+    // members only) demanded unanimous peers and stalled every vote.
+    final totalMembers = peers.length + 1;
+    final needed = totalMembers ~/ 2;
     final session = GroupNukeSession(
       requestId: requestId,
       contactId: group.id,

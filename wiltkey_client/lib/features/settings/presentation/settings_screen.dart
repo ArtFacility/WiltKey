@@ -851,11 +851,211 @@ class _SettingsScreenState extends State<SettingsScreen>
               ],
             ),
           ),
+          const SizedBox(height: 16),
+
+          // Chat swipe gestures
+          Text(
+            l10n.settingsSwipeGesturesTitle,
+            style: t.dataMono.copyWith(
+              color: t.textSecondary,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          InkWell(
+            onTap: () => _showSwipeGesturesSheet(t, l10n),
+            borderRadius: BorderRadius.circular(t.radiusControl),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: t.surface,
+                border: Border.all(color: t.border),
+                borderRadius: BorderRadius.circular(t.radiusControl),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.swipe, color: t.action, size: 22),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          l10n.settingsSwipeGesturesTitle,
+                          style: t.body.copyWith(fontWeight: FontWeight.w600),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${l10n.settingsSwipeRight}: ${_swipeActionLabel(_appState.swipeRightAction, l10n)} · '
+                          '${l10n.settingsSwipeLeft}: ${_swipeActionLabel(_appState.swipeLeftAction, l10n)}',
+                          style: t.bodySecondary.copyWith(fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(Icons.chevron_right, color: t.textTertiary, size: 18),
+                ],
+              ),
+            ),
+          ),
           const SizedBox(height: 28),
           _buildAboutFooter(t, l10n),
           const SizedBox(height: 12),
         ],
       ),
+    );
+  }
+
+  String _swipeActionLabel(String action, AppLocalizations l10n) {
+    switch (action) {
+      case 'mark_read':
+        return l10n.swipeActionMarkRead;
+      case 'mute':
+        return l10n.swipeActionMute;
+      case 'pin':
+        return l10n.swipeActionPin;
+      case 'archive':
+        return l10n.swipeActionArchive;
+      case 'none':
+      default:
+        return l10n.swipeActionNone;
+    }
+  }
+
+  void _showSwipeGesturesSheet(WiltkeyTokens t, AppLocalizations l10n) {
+    const availableActions = ['mark_read', 'mute', 'pin', 'archive', 'none'];
+
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: t.surface,
+      isScrollControlled: true,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(t.radiusCard)),
+        side: BorderSide(color: t.border),
+      ),
+      builder: (sheetCtx) {
+        return StatefulBuilder(
+          builder: (ctx, setModalState) {
+            return SafeArea(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(18, 16, 18, 24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          t.uppercaseLabels
+                              ? l10n.settingsSwipeGesturesTitle.toUpperCase()
+                              : l10n.settingsSwipeGesturesTitle,
+                          style: t.screenTitle.copyWith(fontSize: 16),
+                        ),
+                        IconButton(
+                          icon: Icon(Icons.close, size: 20, color: t.textSecondary),
+                          onPressed: () => Navigator.pop(sheetCtx),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      l10n.settingsSwipeGesturesSubtitle,
+                      style: t.bodySecondary.copyWith(fontSize: 12),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Swipe Right Section
+                    Text(
+                      l10n.settingsSwipeRight,
+                      style: t.dataMono.copyWith(
+                        color: t.action,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: t.bg,
+                        border: Border.all(color: t.border),
+                        borderRadius: BorderRadius.circular(t.radiusControl),
+                      ),
+                      child: Column(
+                        children: availableActions.map((act) {
+                          final selected = _appState.swipeRightAction == act;
+                          return ListTile(
+                            dense: true,
+                            title: Text(
+                              _swipeActionLabel(act, l10n),
+                              style: t.body.copyWith(
+                                fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+                                color: selected ? t.action : t.textPrimary,
+                              ),
+                            ),
+                            trailing: selected
+                                ? Icon(Icons.check, color: t.action, size: 18)
+                                : null,
+                            onTap: () {
+                              HapticFeedback.selectionClick();
+                              _appState.setSwipeRightAction(act);
+                              setModalState(() {});
+                              if (mounted) setState(() {});
+                            },
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Swipe Left Section
+                    Text(
+                      l10n.settingsSwipeLeft,
+                      style: t.dataMono.copyWith(
+                        color: t.action,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: t.bg,
+                        border: Border.all(color: t.border),
+                        borderRadius: BorderRadius.circular(t.radiusControl),
+                      ),
+                      child: Column(
+                        children: availableActions.map((act) {
+                          final selected = _appState.swipeLeftAction == act;
+                          return ListTile(
+                            dense: true,
+                            title: Text(
+                              _swipeActionLabel(act, l10n),
+                              style: t.body.copyWith(
+                                fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+                                color: selected ? t.action : t.textPrimary,
+                              ),
+                            ),
+                            trailing: selected
+                                ? Icon(Icons.check, color: t.action, size: 18)
+                                : null,
+                            onTap: () {
+                              HapticFeedback.selectionClick();
+                              _appState.setSwipeLeftAction(act);
+                              setModalState(() {});
+                              if (mounted) setState(() {});
+                            },
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 

@@ -42,6 +42,7 @@ class _ContactProfileScreenState extends State<ContactProfileScreen> {
   @override
   void initState() {
     super.initState();
+    _appState.addListener(_onState);
     _statusController = TextEditingController(
       text: widget.isSelf ? _appState.effectiveStatusMessage : '',
     );
@@ -69,8 +70,13 @@ class _ContactProfileScreenState extends State<ContactProfileScreen> {
     }
   }
 
+  void _onState() {
+    if (mounted) setState(() {});
+  }
+
   @override
   void dispose() {
+    _appState.removeListener(_onState);
     _statusController.dispose();
     _nicknameController.dispose();
     _notesController.dispose();
@@ -118,6 +124,10 @@ class _ContactProfileScreenState extends State<ContactProfileScreen> {
       if (_appState.profileImageB64.isNotEmpty) return _appState.profileImageB64;
       return PixelArtAvatar.generateIdenticon(_appState.userId);
     }
+    final c = _currentContact();
+    if (c?.profileImageB64 != null && c!.profileImageB64!.isNotEmpty) {
+      return c.profileImageB64!;
+    }
     if (widget.contact!.profileImageB64 != null &&
         widget.contact!.profileImageB64!.isNotEmpty) {
       return widget.contact!.profileImageB64!;
@@ -126,15 +136,21 @@ class _ContactProfileScreenState extends State<ContactProfileScreen> {
   }
 
   String _name() {
-    return widget.isSelf ? _appState.effectiveDeviceName : widget.contact!.name;
+    if (widget.isSelf) return _appState.effectiveDeviceName;
+    final c = _currentContact();
+    return c?.displayName ?? widget.contact!.displayName;
   }
 
   String _shortNick() {
-    return widget.isSelf ? _appState.effectiveShortNick : (widget.contact!.shortNick ?? '');
+    if (widget.isSelf) return _appState.effectiveShortNick;
+    final c = _currentContact();
+    return c?.shortNick ?? (widget.contact!.shortNick ?? '');
   }
 
   String? _avatarBorderId() {
-    return widget.isSelf ? _appState.equippedAvatarBorderId : widget.contact!.avatarBorderId;
+    if (widget.isSelf) return _appState.equippedAvatarBorderId;
+    final c = _currentContact();
+    return c?.avatarBorderId ?? widget.contact!.avatarBorderId;
   }
 
   void _openChat() {
@@ -707,23 +723,51 @@ class _ContactProfileScreenState extends State<ContactProfileScreen> {
               onPressed: () async {
                 HapticFeedback.lightImpact();
                 final keyHash = widget.contact!.keyHash;
+                final nick = _nicknameController.text.trim();
+                final notes = _notesController.text.trim();
                 await WiltkeyDatabase.instance.updateContactNotes(
                   keyHash,
-                  customNickname: _nicknameController.text.trim(),
-                  privateNotes: _notesController.text.trim(),
+                  customNickname: nick,
+                  privateNotes: notes,
                 );
-                await _appState.reloadAllContacts();
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      backgroundColor: t.surface,
-                      content: Text(
-                        l10n.contactNotesSaved ?? 'Contact details saved',
-                        style: t.body.copyWith(color: t.positive),
-                      ),
-                    ),
-                  );
+                // Also update in-memory contacts immediately
+                for (final c in _appState.contacts) {
+                  if (c.keyHash == keyHash) {
+                    c.customNickname = nick.isEmpty ? null : nick;
+                    c.privateNotes = notes.isEmpty ? null : notes;
+                  }
                 }
+                for (int i = 0; i < _appState.socialContacts.length; i++) {
+                  if (_appState.socialContacts[i].keyHash == keyHash) {
+                    final sc = _appState.socialContacts[i];
+                    _appState.socialContacts[i] = SocialContact(
+                      id: sc.id,
+                      keyHash: sc.keyHash,
+                      name: sc.name,
+                      shortNick: sc.shortNick,
+                      profileImageB64: sc.profileImageB64,
+                      avatarBorderId: sc.avatarBorderId,
+                      themeId: sc.themeId,
+                      sharedSecretSeed: sc.sharedSecretSeed,
+                      myPubkey: sc.myPubkey,
+                      peerPubkey: sc.peerPubkey,
+                      addedAt: sc.addedAt,
+                      isBlocked: sc.isBlocked,
+                      themeSeed: sc.themeSeed,
+                      lastSyncedAt: sc.lastSyncedAt,
+                      isPinned: sc.isPinned,
+                      status: sc.status,
+                      statusEmoji: sc.statusEmoji,
+                      statusExpiresAt: sc.statusExpiresAt,
+                      clientAttestation: sc.clientAttestation,
+                      attestationExpiresAt: sc.attestationExpiresAt,
+                      customNickname: nick.isEmpty ? null : nick,
+                      privateNotes: notes.isEmpty ? null : notes,
+                    );
+                  }
+                }
+                await _appState.reloadAllContacts();
+                if (mounted) setState(() {});
               },
             ),
           ),

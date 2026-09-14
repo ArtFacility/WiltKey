@@ -171,6 +171,8 @@ extension AppStateAuth on AppState {
     await loadEvents(); // hydrate the activity feed + its unread badge
     await loadSocialContacts(); // hydrate the friends list (persisted between launches)
     await loadNotificationPreferences(); // hydrate notification category preferences & muted list
+    swipeRightAction = await _persistence.loadSwipeRightAction();
+    swipeLeftAction = await _persistence.loadSwipeLeftAction();
     log(
       '[Load] ${contacts.length} contact(s): '
       '${contacts.map((c) => "${c.id}:${c.keyHash.substring(0, c.keyHash.length >= 8 ? 8 : c.keyHash.length)}").join(", ")}',
@@ -246,6 +248,11 @@ extension AppStateAuth on AppState {
     // Decrypt + store anything the background socket buffered while we were
     // locked, then re-run the normal inbound path for it.
     await processPendingInbox();
+
+    // Contact requests that arrived (and were logged) while the app was fully
+    // closed get their approve/deny popup now — replayed frames already fired
+    // theirs through the normal inbound path above.
+    surfacePendingContactRequests();
 
     // Stamp the unlock so the biometric 4h idle window resets.
     await _touchUnlock();

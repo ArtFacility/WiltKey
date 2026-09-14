@@ -1,4 +1,4 @@
-﻿import 'dart:ui' as ui;
+import 'dart:ui' as ui;
 
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
@@ -198,6 +198,7 @@ class CyberpunkComponents
     int seed = 0,
     ValueChanged<double>? onSeek,
     Color? accent,
+    List<int>? waveform,
   }) => CyberpunkVoicePlayback(
     progress: progress,
     isPlaying: isPlaying,

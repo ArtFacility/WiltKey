@@ -1,0 +1,27 @@
+{
+  "_comment": "Map adb device serials to app flavors + roles. Unknown serials default to 'foss'. Get serials: adb devices -l. Assign 'play' only to devices WITH Google services (never the old Huawei).",
+  "relayUrl": "http://192.168.1.234:8000",
+  "pin": "1234",
+  "devices": [
+    {
+      "serial": "REPLACE_ME_SERIAL_1",
+      "name": "samsung-a10",
+      "flavor": "foss"
+    },
+    {
+      "serial": "REPLACE_ME_SERIAL_2",
+      "name": "xiaomi-a12",
+      "flavor": "foss"
+    },
+    {
+      "serial": "REPLACE_ME_SERIAL_3",
+      "name": "huawei-a11",
+      "flavor": "foss"
+    },
+    {
+      "serial": "REPLACE_ME_SERIAL_4",
+      "name": "samsung-a13",
+      "flavor": "play"
+    }
+  ]
+}

@@ -425,6 +425,10 @@ class AppLocalizationsHu extends AppLocalizations {
   String get notificationEmergencyChatBody => 'Vészhelyzeti chat kérés';
 
   @override
+  String get notificationNewActivityBody =>
+      'Új aktivitás — nézd meg az értesítéseidet';
+
+  @override
   String get notificationSecureLinkActive =>
       'Biztonságos üzenetek szinkronizálása';
 
@@ -2326,6 +2330,78 @@ class AppLocalizationsHu extends AppLocalizations {
   String get qrConnectManualPin => 'PIN megadása manuálisan';
 
   @override
+  String get qrConnectShowYourCode =>
+      'Beolvasás kész! Most mutasd meg te is a QR-kódodat.';
+
+  @override
+  String get qrConnectFinishPairing => 'Párosítás befejezése';
+
+  @override
+  String get qrConnectOutdatedCode =>
+      'Ez a QR-kód egy régebbi appverzióból van. Mindkettőtöknek a legújabb verzió kell az ilyen kapcsolódáshoz.';
+
+  @override
+  String get qrConnectOwnCode =>
+      'Ez a saját QR-kódod — inkább az övékére irányítsd a kamerát.';
+
+  @override
+  String get qrConnectAlreadyPaired =>
+      'Már van csevegésed ezzel a személlyel. Egy meglévő csevegés frissítéséhez személyes párosítás szükséges.';
+
+  @override
+  String get testRelayBanner => 'TESZTSZERVER — NEM ÉLES RENDSZER';
+
+  @override
+  String get securingTitle => 'Kapcsolat biztosítása';
+
+  @override
+  String get securingBody =>
+      'Az eszközöd a csatlakozás előtt hitelesíti magát a relénél. Ez az egyszeri proof-of-work mindenkit véd a spamtől és a visszaélésektől — telefonszám, e-mail és fiók nélkül.';
+
+  @override
+  String get securingWorking => 'ESZKÖZ HITELESÍTÉSE — FOLYAMATBAN…';
+
+  @override
+  String get securingOnceNote =>
+      'Ez csak az első csatlakozáskor történik. Az újracsatlakozás utána azonnali.';
+
+  @override
+  String get puzzleInstruction =>
+      'Csúsztasd, amíg a pixel art szimmetrikus nem lesz.';
+
+  @override
+  String get puzzleLockIn => 'Rögzítés';
+
+  @override
+  String get puzzleFailedRetry =>
+      'Ez nem illeszkedett — új ellenőrzést indítunk…';
+
+  @override
+  String get reauthenticatingBanner => 'ÚJRAHITELESÍTÉS — KÉRJÜK, VÁRJ…';
+
+  @override
+  String get connectionLostBanner =>
+      'WEBSOCKET-KAPCSOLAT SIKERTELEN — ÚJRAPRÓBÁLKOZÁS…';
+
+  @override
+  String get commonOk => 'Rendben';
+
+  @override
+  String get connectionIssueTitle => 'A relé nem elérhető';
+
+  @override
+  String get connectionIssueGeneric =>
+      'Vagy a relének van pillanatnyi problémája, vagy a hálózatod most nem éri el. A közeli eszközök párosítása továbbra is működik — az üzenetküldéshez a relé kell. Az alkalmazás automatikusan újrapróbálkozik.';
+
+  @override
+  String get connectionIssueCooldown =>
+      'Ezt a hálózatot ideiglenesen korlátozza a relé spamszűrése — túl sok sikertelen hitelesítés érkezett erről a címről. Minden automatikusan újrapróbálkozik; ez általában néhány percen belül megszűnik.';
+
+  @override
+  String get connectionIssueRateLimit =>
+      'Ez a hálózat mára elérte a napi eszközlimitet (túl sok új eszköz csatlakozott ugyanarról a címről). A hálózaton már hitelesített eszközzel továbbra is cseveghetsz — vagy próbáld újra a napi visszaállítás után.';
+
+  @override
   String get badgePlayPlus => 'Play Áruház · Plus';
 
   @override
@@ -2517,4 +2593,103 @@ class AppLocalizationsHu extends AppLocalizations {
 
   @override
   String get forcedUpdateWhatsNew => 'Újdonságok ebben a frissítésben';
+
+  @override
+  String get settingsSwipeGesturesTitle => 'Csevegési húzási gesztusok';
+
+  @override
+  String get settingsSwipeGesturesSubtitle =>
+      'A jobbra és balra húzási műveletek testreszabása a csevegéslistában';
+
+  @override
+  String get settingsSwipeRight => 'Húzás jobbra';
+
+  @override
+  String get settingsSwipeLeft => 'Húzás balra';
+
+  @override
+  String get swipeActionMarkRead => 'Olvasott / Olvasatlan';
+
+  @override
+  String get swipeActionMute => 'Némítás / Feloldás';
+
+  @override
+  String get swipeActionPin => 'Rögzítés / Feloldás';
+
+  @override
+  String get swipeActionArchive => 'Archiválás';
+
+  @override
+  String get swipeActionNone => 'Letiltva';
+
+  @override
+  String get chatSwipeMarkRead => 'Olvasott';
+
+  @override
+  String get chatSwipeMarkUnread => 'Olvasatlan';
+
+  @override
+  String get chatSwipePin => 'Rögzítés';
+
+  @override
+  String get chatSwipeUnpin => 'Rögzítés feloldása';
+
+  @override
+  String get chatSwipeMute => 'Némítás';
+
+  @override
+  String get chatSwipeUnmute => 'Némítás feloldása';
+
+  @override
+  String get chatSwipeArchive => 'Archiválás';
+
+  @override
+  String get chatAttachVideoSubtitleEnabled =>
+      'Legfeljebb 15 mp rögzítése vagy választás a galériából';
+
+  @override
+  String get chatVideoSelectSourceTitle => 'Videó küldése';
+
+  @override
+  String get chatVideoQualityLabel => 'Minőség';
+
+  @override
+  String get chatVideoQualityLow => 'Alacsony';
+
+  @override
+  String get chatVideoQualityMedium => 'Közepes';
+
+  @override
+  String get chatVideoQualityHigh => 'Magas';
+
+  @override
+  String get chatVideoCompressionFailed =>
+      'Nem sikerült tömöríteni a klipet. Próbálj rövidebb klipet vagy alacsonyabb minőséget választani.';
+
+  @override
+  String get chatVideoRecordCamera => 'Videó rögzítése (Kamera)';
+
+  @override
+  String get chatVideoPickGallery => 'Videó választása a galériából';
+
+  @override
+  String get chatVideoCompressing => 'Videó tömörítése...';
+
+  @override
+  String chatVideoTooLarge(String size) {
+    return 'A videó meghaladja a méretkorlátot ($size)';
+  }
+
+  @override
+  String get chatVideoTooLong =>
+      'A videó meghaladja a 15 másodperces időkorlátot';
+
+  @override
+  String get chatVideoSaveGallery => 'Videó mentése a galériába';
+
+  @override
+  String get chatVideoSavedGallery => 'Videó elmentve a galériába';
+
+  @override
+  String get chatVideoError => 'A videoklip nem játszható le';
 }

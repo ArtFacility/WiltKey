@@ -35,6 +35,7 @@ class _VoiceMessagePlayerState extends State<VoiceMessagePlayer> {
 
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
+  List<int>? _waveform;
   bool _playing = false;
   bool _headerOk = false; // parsed a valid header (can render controls)
   bool _loading = false; // audio source being set up
@@ -78,6 +79,7 @@ class _VoiceMessagePlayerState extends State<VoiceMessagePlayer> {
     if (mounted) {
       setState(() {
         _duration = parsed.header.duration;
+        _waveform = parsed.header.waveform;
         _headerOk = true;
       });
     }
@@ -100,6 +102,7 @@ class _VoiceMessagePlayerState extends State<VoiceMessagePlayer> {
       if (mounted) setState(() => _error = true);
       return false;
     }
+    _waveform = parsed.header.waveform;
     setState(() => _loading = true);
     try {
       final dir = await getTemporaryDirectory();
@@ -241,6 +244,7 @@ class _VoiceMessagePlayerState extends State<VoiceMessagePlayer> {
                   isPlaying: _playing,
                   seed: widget.message.id.hashCode,
                   accent: accent,
+                  waveform: _waveform,
                   onSeek: _seekFraction,
                 ),
                 const SizedBox(height: 2),

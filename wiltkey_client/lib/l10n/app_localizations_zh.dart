@@ -407,6 +407,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get notificationEmergencyChatBody => '紧急聊天请求';
 
   @override
+  String get notificationNewActivityBody => '有新动态 — 查看通知';
+
+  @override
   String get notificationSecureLinkActive => '正在同步安全消息';
 
   @override
@@ -2183,6 +2186,70 @@ class AppLocalizationsZh extends AppLocalizations {
   String get qrConnectManualPin => '手动输入 PIN';
 
   @override
+  String get qrConnectShowYourCode => '扫描完成！现在也向对方出示你的二维码。';
+
+  @override
+  String get qrConnectFinishPairing => '完成配对';
+
+  @override
+  String get qrConnectOutdatedCode => '此二维码来自旧版本应用。双方都需要更新到最新版本才能以此方式连接。';
+
+  @override
+  String get qrConnectOwnCode => '这是你自己的二维码——请将摄像头对准对方的二维码。';
+
+  @override
+  String get qrConnectAlreadyPaired => '你已经与此人有聊天。刷新现有聊天需要面对面配对。';
+
+  @override
+  String get testRelayBanner => '测试服务器 — 非生产环境';
+
+  @override
+  String get securingTitle => '正在建立安全连接';
+
+  @override
+  String get securingBody =>
+      '你的设备会在连接前向中继服务器验证自身。这是一次性的工作量证明，可保护大家免受垃圾信息和滥用困扰——无需手机号，无需邮箱，无需账号。';
+
+  @override
+  String get securingWorking => '正在验证设备 — 处理中…';
+
+  @override
+  String get securingOnceNote => '这仅在首次连接时发生，之后重新连接将瞬间完成。';
+
+  @override
+  String get puzzleInstruction => '滑动直到像素画对称。';
+
+  @override
+  String get puzzleLockIn => '确认';
+
+  @override
+  String get puzzleFailedRetry => '好像没对上——正在开始新的验证…';
+
+  @override
+  String get reauthenticatingBanner => '正在重新验证 — 请稍候…';
+
+  @override
+  String get connectionLostBanner => 'WEBSOCKET 连接失败 — 正在重试…';
+
+  @override
+  String get commonOk => '确定';
+
+  @override
+  String get connectionIssueTitle => '无法连接到中继';
+
+  @override
+  String get connectionIssueGeneric =>
+      '可能是此中继暂时出现问题，也可能是你当前的网络暂时无法连接。附近设备配对仍可正常使用——收发消息则需要中继，应用会自动持续重试。';
+
+  @override
+  String get connectionIssueCooldown =>
+      '此网络暂时受到中继垃圾防护的限制——该地址发送了过多验证失败的请求。应用会自动持续重试，通常几分钟内就会恢复。';
+
+  @override
+  String get connectionIssueRateLimit =>
+      '此网络今日的新设备数量已达到上限（同一地址连接了过多新设备）。你仍可与此网络中已验证的设备聊天——或等待每日重置后再试。';
+
+  @override
   String get badgePlayPlus => 'Play 商店 · Plus';
 
   @override
@@ -2358,4 +2425,99 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get forcedUpdateWhatsNew => '本次更新内容';
+
+  @override
+  String get settingsSwipeGesturesTitle => '聊天滑动手势';
+
+  @override
+  String get settingsSwipeGesturesSubtitle => '自定义聊天列表中的向右滑动和向左滑动操作';
+
+  @override
+  String get settingsSwipeRight => '向右滑动';
+
+  @override
+  String get settingsSwipeLeft => '向左滑动';
+
+  @override
+  String get swipeActionMarkRead => '标记已读 / 未读';
+
+  @override
+  String get swipeActionMute => '静音 / 取消静音';
+
+  @override
+  String get swipeActionPin => '置顶 / 取消置顶';
+
+  @override
+  String get swipeActionArchive => '归档';
+
+  @override
+  String get swipeActionNone => '已禁用';
+
+  @override
+  String get chatSwipeMarkRead => '已读';
+
+  @override
+  String get chatSwipeMarkUnread => '未读';
+
+  @override
+  String get chatSwipePin => '置顶';
+
+  @override
+  String get chatSwipeUnpin => '取消置顶';
+
+  @override
+  String get chatSwipeMute => '静音';
+
+  @override
+  String get chatSwipeUnmute => '取消静音';
+
+  @override
+  String get chatSwipeArchive => '归档';
+
+  @override
+  String get chatAttachVideoSubtitleEnabled => '录制最多 15 秒或从相册选择';
+
+  @override
+  String get chatVideoSelectSourceTitle => '发送视频';
+
+  @override
+  String get chatVideoQualityLabel => '画质';
+
+  @override
+  String get chatVideoQualityLow => '低';
+
+  @override
+  String get chatVideoQualityMedium => '中';
+
+  @override
+  String get chatVideoQualityHigh => '高';
+
+  @override
+  String get chatVideoCompressionFailed => '无法压缩此片段。请尝试选择更短的片段或更低的画质。';
+
+  @override
+  String get chatVideoRecordCamera => '录制视频（相机）';
+
+  @override
+  String get chatVideoPickGallery => '从相册中选择视频';
+
+  @override
+  String get chatVideoCompressing => '正在压缩视频...';
+
+  @override
+  String chatVideoTooLarge(String size) {
+    return '视频超出大小限制 ($size)';
+  }
+
+  @override
+  String get chatVideoTooLong => '视频超出 15 秒时长限制';
+
+  @override
+  String get chatVideoSaveGallery => '保存视频到相册';
+
+  @override
+  String get chatVideoSavedGallery => '视频已保存到相册';
+
+  @override
+  String get chatVideoError => '无法播放视频片段';
 }

@@ -10,6 +10,7 @@ import '../../../../core/state.dart';
 import '../../../../core/theme/wk.dart';
 import '../../../../core/theme/wiltkey_tokens.dart';
 import 'chat_image_thumbnail.dart';
+import 'contact_request_card.dart';
 import 'chat_markdown.dart';
 import 'download_bubble.dart';
 import 'image_viewer.dart';
@@ -19,6 +20,7 @@ import 'reply_preview.dart';
 import 'voice_message_player.dart';
 import 'wilt_widgets.dart';
 import 'pixel_art_message_bubble.dart';
+import 'video_message_bubble.dart';
 
 /// A complete message bubble for group chats.
 ///
@@ -62,6 +64,19 @@ class GroupMessageBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.wk;
     final l10n = AppLocalizations.of(context)!;
+
+    // Contact-request control cards render before the generic system pill:
+    // group-member requests (AES meta over the shared group channel) host
+    // their card in the GROUP chat. Without this branch the pill renders the
+    // raw JSON payload (caught 2026-09-13).
+    if (message.contentType == 'contact_request_sent' ||
+        message.contentType == 'contact_request_received') {
+      return ContactRequestCard(
+        message: message,
+        contact: group,
+        appState: appState,
+      );
+    }
 
     if (message.isSystem) {
       return _buildSystemPill(t, l10n);
@@ -352,6 +367,13 @@ class GroupMessageBubble extends StatelessWidget {
     }
     if (ct == 'image' || ct == 'image_hidden') {
       return _buildImageContent(context, t, l10n);
+    }
+    if (ct == 'video') {
+      return VideoMessageBubble(
+        appState: appState,
+        contact: group,
+        message: message,
+      );
     }
     if (ct == 'voice') {
       if (message.decodedAudioBytes == null) {

@@ -4,6 +4,7 @@ import 'package:workmanager/workmanager.dart';
 import 'package:wiltkey_client/l10n/app_localizations.dart';
 import 'features/shell/presentation/app_shell.dart';
 import 'features/onboarding/presentation/onboarding_screen.dart';
+import 'features/onboarding/presentation/securing_connection_screen.dart';
 import 'features/auth/presentation/pin_lock_screen.dart';
 import 'core/state.dart';
 import 'core/theme/theme_controller.dart';
@@ -113,6 +114,12 @@ class _WiltkeyAppState extends State<WiltkeyApp> {
                       }
                       if (state.isLocked) {
                         return const PinLockScreen();
+                      }
+                      // First-ever device-token issuance (right after
+                      // onboarding): a legible full-screen step instead of a
+                      // silent shell while the proof-of-work runs.
+                      if (state.showSecuringConnection) {
+                        return const SecuringConnectionScreen();
                       }
                       return const AppShell();
                     },

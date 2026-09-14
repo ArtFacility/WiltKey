@@ -328,6 +328,29 @@ class WiltkeyOtpService {
     }
   }
 
+  /// True when the existing pad file for [contactId] was generated from
+  /// [seedHex] (compares the first keystream block against the file's head).
+  /// Cheap replay detector: a recharge that would regenerate the SAME pad
+  /// (same seed) and reset offsets would re-encrypt into already-burned
+  /// keystream — callers must refuse instead. No file → false (fresh pair).
+  static Future<bool> padMatchesSeed(String contactId, String seedHex) async {
+    final directory = await getApplicationDocumentsDirectory();
+    final file = File('${directory.path}/keystream_$contactId.pad');
+    if (!await file.exists()) return false;
+
+    final raf = await file.open();
+    try {
+      final head = await raf.read(32);
+      final expected = keystreamRange(seedHex, 0, 32);
+      for (int i = 0; i < 32; i++) {
+        if (head[i] != expected[i]) return false;
+      }
+      return true;
+    } finally {
+      await raf.close();
+    }
+  }
+
   // Returns the contactId of every keystream pad currently on disk. 1-on-1 pads
   // are 'keystream_<id>.pad'; group pads are 'keystream_group_<groupId>.pad', so
   // those come back as 'group_<groupId>' — exactly the id form that

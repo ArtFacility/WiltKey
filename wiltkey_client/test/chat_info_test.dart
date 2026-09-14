@@ -1,4 +1,4 @@
-// 1-on-1 chat_info_update (profile + permission sync) harness.
+﻿// 1-on-1 chat_info_update (profile + permission sync) harness.
 //
 // Verifies the AES metadata channel that mirrors the group group_info_update:
 // the key is the one-way SHA256(seed + ":meta") provisioned at enrol, profiles
@@ -88,11 +88,25 @@ void main() {
       100000,
       keyHash,
       seed,
+      freshSeedHex: seed,
     );
     return appState.contacts.firstWhere((c) => c.keyHash == keyHash);
   }
 
+  Future<void> deleteStalePads() async {
+    final dir = Directory('.');
+    await for (final e in dir.list()) {
+      if (e is File &&
+          e.uri.pathSegments.last.startsWith('keystream_') &&
+          e.uri.pathSegments.last.endsWith('.pad')) {
+        try {
+          await e.delete();
+        } catch (_) {}
+      }
+    }
+  }
   setUpAll(() async {
+    await deleteStalePads();
     await startFakeRelay();
     appState = AppState();
     appState.useLocalDevRelay = true;
@@ -114,6 +128,7 @@ void main() {
   });
 
   tearDownAll(() async {
+    await deleteStalePads();
     appState.stopConnectionWatchdog();
     WebSocketClient().disconnect();
     await server.close(force: true);

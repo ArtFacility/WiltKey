@@ -35,7 +35,26 @@ class _GroupInviteScreenState extends State<GroupInviteScreen> {
     _manager = BlePairingManager();
     _manager.groupToInvite = widget.group;
     _manager.addListener(_onManagerUpdate);
-    _manager.onIncomingRequest = _showIncomingJoinDialog;
+    _manager.onIncomingRequest = ({
+      required peerId,
+      required peerPubKey,
+      required bufferBytes,
+      required peerName,
+      required peerShortNick,
+      required peerProfileImage,
+      wiltExpiresMillis,
+      wiltFreshSeedHex,
+    }) =>
+        _showIncomingJoinDialog(
+          peerId: peerId,
+          peerPubKey: peerPubKey,
+          bufferBytes: bufferBytes,
+          peerName: peerName,
+          peerShortNick: peerShortNick,
+          peerProfileImage: peerProfileImage,
+          wiltExpiresMillis: wiltExpiresMillis,
+          wiltFreshSeedHex: wiltFreshSeedHex,
+        );
     _manager.onAlert = _showErrorSnackBar;
 
     _manager.initializeBle();
@@ -89,6 +108,11 @@ class _GroupInviteScreenState extends State<GroupInviteScreen> {
     // Group invites never carry a Time Wilt expiry — accepted for signature
     // compatibility with the shared onIncomingRequest callback, then ignored.
     int? wiltExpiresMillis,
+    // The joiner's fresh pairing seed ('tws') — MUST be echoed into
+    // respondToPairRequest: the group-seed blob is encrypted with it, so
+    // dropping it here would break the join (and downgrade the blob key to
+    // the publicly-recomputable pubkey derivation).
+    String? wiltFreshSeedHex,
   }) {
     final t = context.wk;
     showDialog(
@@ -151,6 +175,7 @@ class _GroupInviteScreenState extends State<GroupInviteScreen> {
                   peerName,
                   peerShortNick,
                   peerProfileImage,
+                  wiltFreshSeedHex: wiltFreshSeedHex,
                 );
               },
               child: Text('Accept & add', style: TextStyle(color: t.action)),

@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wiltkey_client/core/audio/voice_codec.dart';
+import 'package:wiltkey_client/core/audio/voice_recorder.dart';
 
 void main() {
   group('VoiceHeader wire format', () {
@@ -50,6 +51,34 @@ void main() {
 
     test('fromId falls back to AAC-LC for an unknown id', () {
       expect(VoiceCodec.fromId(99), VoiceCodec.aacLc);
+    });
+
+    test('round-trips v2 header with waveform amplitude samples', () {
+      final audio = Uint8List.fromList([1, 2, 3, 4, 5]);
+      final waveform = List<int>.generate(28, (i) => (i * 9) % 256);
+      final wrapped = VoiceHeader(
+        codec: VoiceCodec.opus,
+        duration: const Duration(seconds: 5),
+        waveform: waveform,
+      ).wrap(audio);
+
+      expect(wrapped[0], VoiceHeader.v2Version);
+      expect(wrapped.length, 5 + waveform.length + audio.length);
+
+      final parsed = VoiceHeader.unwrap(wrapped);
+      expect(parsed, isNotNull);
+      expect(parsed!.header.codec, VoiceCodec.opus);
+      expect(parsed.header.duration.inSeconds, 5);
+      expect(parsed.header.waveform, equals(waveform));
+      expect(parsed.audio, equals(audio));
+    });
+
+    test('downsamples amplitude dBFS to normalized byte samples', () {
+      final raw = List<double>.generate(100, (i) => -50.0 + i * 0.5); // -50 dBFS to -0.5 dBFS
+      final sampled = VoiceRecorder.downsampleAmplitudes(raw, targetCount: 28);
+      expect(sampled.length, 28);
+      expect(sampled.first, lessThan(20)); // close to silence (-50dB)
+      expect(sampled.last, greaterThan(240)); // high loudness (-0.5dB)
     });
   });
 

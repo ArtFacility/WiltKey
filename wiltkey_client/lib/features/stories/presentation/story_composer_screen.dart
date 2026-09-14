@@ -1,12 +1,14 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math';
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:video_compress/video_compress.dart';
+import 'package:video_player/video_player.dart';
 import 'package:wiltkey_client/core/persistence.dart';
 import 'package:wiltkey_client/core/pixel_art_avatar.dart';
 import 'package:wiltkey_client/core/pixel_art_editor.dart';
@@ -14,6 +16,8 @@ import 'package:wiltkey_client/core/pixel_palette.dart';
 import 'package:wiltkey_client/core/state.dart';
 import 'package:wiltkey_client/core/stories/story_model.dart';
 import 'package:wiltkey_client/core/theme/theme_controller.dart';
+import 'package:wiltkey_client/core/video/video_message_service.dart';
+import 'package:wiltkey_client/l10n/app_localizations.dart';
 import '../../../core/theme/wk.dart';
 import '../../../core/theme/wiltkey_tokens.dart';
 import 'widgets/themed_story_text_tag.dart';
@@ -164,6 +168,16 @@ class _StoryComposerScreenState extends State<StoryComposerScreen> {
   final List<DrawingStroke> _strokes = [];
   DrawingStroke? _activeStroke;
 
+  // Video State
+  VideoPrepareResult? _videoResult;
+  VideoPlayerController? _videoPlayerController;
+  bool _isVideoCompressing = false;
+  bool _isVideoSeeking = false;
+  String? _videoSourcePath;
+  double _videoDurationSecs = 0.0;
+  double _videoTrimStart = 0.0;
+  double _videoTrimEnd = 0.0;
+
   // Text Tags State & In-Place Selection
   final List<StoryTextTag> _textTags = [];
   String? _selectedTagId;
@@ -211,6 +225,10 @@ class _StoryComposerScreenState extends State<StoryComposerScreen> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _pickPhoto(ImageSource.gallery);
       });
+    } else if (_mode == 'video' && _videoSourcePath == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _showVideoSourceSheet();
+      });
     }
   }
 
@@ -220,6 +238,11 @@ class _StoryComposerScreenState extends State<StoryComposerScreen> {
     for (final tag in _textTags) {
       tag.dispose();
     }
+    _videoPlayerController?.removeListener(_onVideoPlayerTick);
+    _videoPlayerController?.dispose();
+    try {
+      _videoResult?.file.delete();
+    } catch (_) {}
     super.dispose();
   }
 
@@ -232,6 +255,7 @@ class _StoryComposerScreenState extends State<StoryComposerScreen> {
 
   Future<void> _pickPhoto(ImageSource source) async {
     try {
+      _appState.isPickingMedia = true;
       final file = await _picker.pickImage(source: source, maxWidth: 1400, maxHeight: 2000);
       if (file == null) return;
 
@@ -250,7 +274,169 @@ class _StoryComposerScreenState extends State<StoryComposerScreen> {
       });
     } catch (e) {
       setState(() => _errorMessage = 'Failed to load photo: $e');
+    } finally {
+      _appState.isPickingMedia = false;
     }
+  }
+
+  void _showVideoSourceSheet() {
+    final t = context.wk;
+    final l10n = AppLocalizations.of(context)!;
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: t.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(t.radiusCard)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: Icon(Icons.videocam_outlined, color: t.action),
+                title: Text(l10n.chatVideoRecordCamera, style: t.body),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _pickVideo(ImageSource.camera);
+                },
+              ),
+              ListTile(
+                leading: Icon(Icons.video_library_outlined, color: t.action),
+                title: Text(l10n.chatVideoPickGallery, style: t.body),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _pickVideo(ImageSource.gallery);
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickVideo(ImageSource source) async {
+    try {
+      _appState.isPickingMedia = true;
+      final file = await _picker.pickVideo(
+        source: source,
+      );
+      if (file == null || !mounted) return;
+
+      setState(() {
+        _mode = 'video';
+        _videoSourcePath = file.path;
+        _isVideoCompressing = false;
+        _errorMessage = null;
+        _deselectActiveTag();
+      });
+
+      _videoPlayerController?.removeListener(_onVideoPlayerTick);
+      _videoPlayerController?.dispose();
+      final controller = VideoPlayerController.file(File(file.path));
+      try {
+        await controller.initialize();
+      } catch (e) {
+        if (mounted) {
+          setState(() => _errorMessage = 'Failed to load video: $e');
+        }
+        controller.dispose();
+        return;
+      }
+
+      if (!mounted) {
+        controller.dispose();
+        return;
+      }
+
+      final totalSecs = max(0.0, controller.value.duration.inMilliseconds / 1000.0);
+      final trimEnd = (totalSecs > 0) ? min(15.0, totalSecs) : 15.0;
+      setState(() {
+        _videoPlayerController = controller;
+        _videoDurationSecs = totalSecs;
+        _videoTrimStart = 0.0;
+        _videoTrimEnd = trimEnd;
+        _videoResult = null;
+      });
+
+      controller.setLooping(false);
+      controller.addListener(_onVideoPlayerTick);
+      controller.play();
+
+      if (totalSecs > 15.0 && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: context.wk.surface,
+            duration: const Duration(seconds: 4),
+            content: Text(
+              'Video is ${totalSecs.toStringAsFixed(0)}s long. Trimmed to 15s max — drag slider below to adjust.',
+              style: context.wk.body,
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Failed to pick video: $e';
+      });
+    } finally {
+      _appState.isPickingMedia = false;
+    }
+  }
+
+  void _onVideoPlayerTick() async {
+    final controller = _videoPlayerController;
+    if (controller == null || !controller.value.isInitialized || _isVideoSeeking) return;
+    final posSecs = controller.value.position.inMilliseconds / 1000.0;
+    if (posSecs >= _videoTrimEnd || posSecs < _videoTrimStart - 0.2) {
+      _isVideoSeeking = true;
+      try {
+        await controller.seekTo(Duration(milliseconds: (_videoTrimStart * 1000).round()));
+        if (mounted && !controller.value.isPlaying) {
+          await controller.play();
+        }
+      } catch (_) {} finally {
+        _isVideoSeeking = false;
+      }
+    }
+  }
+
+  void _onVideoTrimChanged(RangeValues values) {
+    final maxLimit = max(1.5, _videoDurationSecs);
+    double start = values.start.clamp(0.0, maxLimit);
+    double end = values.end.clamp(0.0, maxLimit);
+
+    if (end - start > 15.0) {
+      if ((start - _videoTrimStart).abs() > (end - _videoTrimEnd).abs()) {
+        end = min(maxLimit, start + 15.0);
+      } else {
+        start = max(0.0, end - 15.0);
+      }
+    }
+    if (end - start < 1.0) {
+      if (start + 1.0 <= maxLimit) {
+        end = start + 1.0;
+      } else {
+        start = max(0.0, end - 1.0);
+      }
+    }
+
+    start = start.clamp(0.0, maxLimit);
+    end = end.clamp(start, maxLimit);
+
+    setState(() {
+      _videoTrimStart = start;
+      _videoTrimEnd = end;
+      if (_videoResult != null) {
+        try {
+          _videoResult?.file.delete();
+        } catch (_) {}
+        _videoResult = null;
+      }
+    });
+    _videoPlayerController?.seekTo(Duration(milliseconds: (start * 1000).round()));
   }
 
   Future<void> _openPixelArtPicker() async {
@@ -425,6 +611,11 @@ class _StoryComposerScreenState extends State<StoryComposerScreen> {
 
   int get _estimatedBytes {
     switch (_mode) {
+      case 'video':
+        final trimmedSecs = (_videoTrimEnd - _videoTrimStart).clamp(1.0, 15.0);
+        return (_videoResult != null)
+            ? (_videoResult!.sizeBytes + 5000)
+            : ((trimmedSecs * 75 * 1024).round() + 5000);
       case 'text':
         return _textTags.isNotEmpty ? 45000 : utf8.encode(_mainTextController.text).length + 400;
       case 'photo':
@@ -439,7 +630,8 @@ class _StoryComposerScreenState extends State<StoryComposerScreen> {
   Future<void> _publishStory() async {
     final budget = _appState.socialBudget;
     if (budget != null && budget.remainingBytes < _estimatedBytes) {
-      setState(() => _errorMessage = 'Weekly social budget quota exceeded (${AppState.formatBytes(budget.remainingBytes)} left)');
+      final hint = _mode == 'video' ? ' — Drag trimmer below to shorten clip and fit quota.' : '';
+      setState(() => _errorMessage = 'Weekly social budget quota exceeded (${AppState.formatBytes(budget.remainingBytes)} left)$hint');
       return;
     }
 
@@ -456,31 +648,62 @@ class _StoryComposerScreenState extends State<StoryComposerScreen> {
       String finalContent = '';
       String? finalCaption;
 
-      // Flatten entire 9:16 canvas if photo, pixel art with decorations, or styled text
-      final boundary = _canvasKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
-      if (boundary != null) {
-        await Future<void>.delayed(const Duration(milliseconds: 60));
-        final image = await boundary.toImage(pixelRatio: 2.0);
-        final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
-        if (byteData != null) {
-          final pngBytes = byteData.buffer.asUint8List();
-          final webpBytes = await FlutterImageCompress.compressWithList(
-            pngBytes,
-            format: CompressFormat.webp,
-            quality: 85,
-          );
-          finalContent = base64Encode(webpBytes);
-          finalStoryType = 'photo';
+      if (_mode == 'video') {
+        if (_videoSourcePath == null) {
+          throw Exception('No video clip recorded or selected');
         }
-      }
+        _videoPlayerController?.pause();
 
-      if (finalContent.isEmpty) {
-        if (_mode == 'text') {
-          finalContent = _mainTextController.text.trim();
-        } else if (_mode == 'pixel_art') {
-          finalContent = _pixelArtHex;
-        } else if (_mode == 'photo' && _photoBytes != null) {
-          finalContent = base64Encode(_photoBytes!);
+        VideoPrepareResult? res = _videoResult;
+        if (res == null) {
+          final durSecs = max(1, (_videoTrimEnd - _videoTrimStart).round());
+          final startSecs = _videoTrimStart.round();
+          res = await VideoMessageService.prepareVideo(
+            _videoSourcePath!,
+            startTime: startSecs,
+            duration: durSecs,
+            quality: VideoQuality.LowQuality,
+          );
+          if (res == null) {
+            throw Exception('Failed to compress video clip');
+          }
+          _videoResult = res;
+        }
+
+        finalStoryType = 'video';
+        finalContent = res.payload.toJsonString();
+        if (_textTags.isNotEmpty) {
+          finalCaption = _textTags.first.textController.text.trim();
+        } else if (_mainTextController.text.trim().isNotEmpty) {
+          finalCaption = _mainTextController.text.trim();
+        }
+      } else {
+        // Flatten entire 9:16 canvas if photo, pixel art with decorations, or styled text
+        final boundary = _canvasKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+        if (boundary != null) {
+          await Future<void>.delayed(const Duration(milliseconds: 60));
+          final image = await boundary.toImage(pixelRatio: 2.0);
+          final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+          if (byteData != null) {
+            final pngBytes = byteData.buffer.asUint8List();
+            final webpBytes = await FlutterImageCompress.compressWithList(
+              pngBytes,
+              format: CompressFormat.webp,
+              quality: 85,
+            );
+            finalContent = base64Encode(webpBytes);
+            finalStoryType = 'photo';
+          }
+        }
+
+        if (finalContent.isEmpty) {
+          if (_mode == 'text') {
+            finalContent = _mainTextController.text.trim();
+          } else if (_mode == 'pixel_art') {
+            finalContent = _pixelArtHex;
+          } else if (_mode == 'photo' && _photoBytes != null) {
+            finalContent = base64Encode(_photoBytes!);
+          }
         }
       }
 
@@ -495,6 +718,12 @@ class _StoryComposerScreenState extends State<StoryComposerScreen> {
         caption: finalCaption,
         textBorderId: _selectedTag?.borderStyleId ?? StoryTextStyles.cyberpunk,
       );
+
+      if (_videoResult != null) {
+        try {
+          await _videoResult!.file.delete();
+        } catch (_) {}
+      }
 
       HapticFeedback.mediumImpact();
       if (mounted) {
@@ -732,18 +961,19 @@ class _StoryComposerScreenState extends State<StoryComposerScreen> {
                         onPressed: _rotate90,
                       ),
                     // Drawing Brush Toggle
-                    IconButton(
-                      icon: Icon(
-                        Icons.brush,
-                        color: _isDrawingMode ? t.action : Colors.white,
-                        size: 24,
+                    if (_mode != 'video')
+                      IconButton(
+                        icon: Icon(
+                          Icons.brush,
+                          color: _isDrawingMode ? t.action : Colors.white,
+                          size: 24,
+                        ),
+                        tooltip: 'Freehand Draw',
+                        onPressed: () {
+                          _deselectActiveTag();
+                          setState(() => _isDrawingMode = !_isDrawingMode);
+                        },
                       ),
-                      tooltip: 'Freehand Draw',
-                      onPressed: () {
-                        _deselectActiveTag();
-                        setState(() => _isDrawingMode = !_isDrawingMode);
-                      },
-                    ),
                     // Add Text Sticker Tag
                     IconButton(
                       icon: Icon(
@@ -782,12 +1012,38 @@ class _StoryComposerScreenState extends State<StoryComposerScreen> {
               if (_errorMessage != null)
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  color: t.danger.withValues(alpha: 0.25),
-                  child: Text(
-                    _errorMessage!,
-                    style: t.dataMono.copyWith(color: t.danger, fontSize: 11),
-                    textAlign: TextAlign.center,
+                  margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: t.danger.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(t.radiusControl),
+                    border: Border.all(color: t.danger.withValues(alpha: 0.5)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.error_outline, color: t.danger, size: 16),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: SelectableText(
+                          _errorMessage!,
+                          style: t.dataMono.copyWith(color: t.danger, fontSize: 11),
+                        ),
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.copy_rounded, color: t.danger, size: 16),
+                        tooltip: 'Copy Error Details',
+                        onPressed: () {
+                          Clipboard.setData(ClipboardData(text: _errorMessage!));
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              backgroundColor: t.surface,
+                              content: Text('Error copied to clipboard', style: t.body),
+                              duration: const Duration(seconds: 2),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
                   ),
                 ),
 
@@ -814,8 +1070,41 @@ class _StoryComposerScreenState extends State<StoryComposerScreen> {
                             child: Stack(
                               fit: StackFit.expand,
                               children: [
-                                // 1. Layer 0: Background (Photo, Pixel Art, or Text Backdrop)
-                                if (_mode == 'photo' && _photoBytes != null)
+                                // 1. Layer 0: Background (Video, Photo, Pixel Art, or Text Backdrop)
+                                if (_mode == 'video')
+                                  if (_isVideoCompressing)
+                                    Center(
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          CircularProgressIndicator(
+                                            valueColor: AlwaysStoppedAnimation<Color>(t.action),
+                                          ),
+                                          const SizedBox(height: 12),
+                                          Text(
+                                            'Compressing video...',
+                                            style: t.bodySecondary.copyWith(color: Colors.white70),
+                                          ),
+                                        ],
+                                      ),
+                                    )
+                                  else if (_videoPlayerController != null &&
+                                      _videoPlayerController!.value.isInitialized &&
+                                      !_videoPlayerController!.value.hasError)
+                                    Center(
+                                      child: AspectRatio(
+                                        aspectRatio: (_videoPlayerController!.value.aspectRatio > 0 &&
+                                                _videoPlayerController!.value.aspectRatio.isFinite)
+                                            ? _videoPlayerController!.value.aspectRatio
+                                            : 9 / 16,
+                                        child: VideoPlayer(_videoPlayerController!),
+                                      ),
+                                    )
+                                  else
+                                    const Center(
+                                      child: Icon(Icons.videocam_outlined, size: 64, color: Colors.white24),
+                                    )
+                                else if (_mode == 'photo' && _photoBytes != null)
                                   Transform.rotate(
                                     angle: _rotationSteps * (pi / 2),
                                     child: InteractiveViewer(
@@ -1276,6 +1565,43 @@ class _StoryComposerScreenState extends State<StoryComposerScreen> {
   }
 
   Widget _buildMediaPickerControls(WiltkeyTokens t, SocialBudgetInfo? budget) {
+    if (_mode == 'video') {
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _buildStoryVideoTrimmer(t),
+          const SizedBox(height: 4),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              TextButton.icon(
+                icon: const Icon(Icons.refresh_rounded, size: 16),
+                label: const Text('Change Video'),
+                style: TextButton.styleFrom(
+                  foregroundColor: Colors.white70,
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                ),
+                onPressed: _showVideoSourceSheet,
+              ),
+              Row(
+                children: [
+                  Text(
+                    'Est: ~${AppState.formatBytes(_estimatedBytes)}',
+                    style: t.dataMono.copyWith(fontSize: 10, color: t.textTertiary),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Quota: ${AppState.formatBytes(budget?.remainingBytes ?? (10 * 1024 * 1024))}',
+                    style: t.dataMono.copyWith(fontSize: 10, color: t.textTertiary),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ],
+      );
+    }
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -1287,7 +1613,10 @@ class _StoryComposerScreenState extends State<StoryComposerScreen> {
               icon: Icons.photo_library_outlined,
               label: 'Gallery',
               active: _mode == 'photo',
-              onTap: () => _pickPhoto(ImageSource.gallery),
+              onTap: () {
+                _videoPlayerController?.pause();
+                _pickPhoto(ImageSource.gallery);
+              },
               t: t,
             ),
             // Camera
@@ -1295,7 +1624,18 @@ class _StoryComposerScreenState extends State<StoryComposerScreen> {
               icon: Icons.camera_alt_outlined,
               label: 'Camera',
               active: false,
-              onTap: () => _pickPhoto(ImageSource.camera),
+              onTap: () {
+                _videoPlayerController?.pause();
+                _pickPhoto(ImageSource.camera);
+              },
+              t: t,
+            ),
+            // Video
+            _studioActionButton(
+              icon: Icons.videocam_outlined,
+              label: 'Video',
+              active: _mode == 'video',
+              onTap: _showVideoSourceSheet,
               t: t,
             ),
             // Pixel Art
@@ -1303,7 +1643,10 @@ class _StoryComposerScreenState extends State<StoryComposerScreen> {
               icon: Icons.grid_on,
               label: 'Pixel Art',
               active: _mode == 'pixel_art',
-              onTap: _openPixelArtPicker,
+              onTap: () {
+                _videoPlayerController?.pause();
+                _openPixelArtPicker();
+              },
               t: t,
             ),
             // Typography / Background
@@ -1312,6 +1655,7 @@ class _StoryComposerScreenState extends State<StoryComposerScreen> {
               label: 'Text',
               active: _mode == 'text',
               onTap: () {
+                _videoPlayerController?.pause();
                 setState(() {
                   _mode = 'text';
                   _textBackdropIndex = (_textBackdropIndex + 1) % _backdropGradients.length;
@@ -1338,6 +1682,80 @@ class _StoryComposerScreenState extends State<StoryComposerScreen> {
         ),
       ],
     );
+  }
+
+  Widget _buildStoryVideoTrimmer(WiltkeyTokens t) {
+    final safeMax = max(1.5, _videoDurationSecs);
+    final safeStart = _videoTrimStart.clamp(0.0, safeMax - 0.1);
+    final safeEnd = _videoTrimEnd.clamp(safeStart + 0.1, safeMax);
+    final selectedSecs = (safeEnd - safeStart).clamp(0.0, 15.0);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6, left: 8, right: 8),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.content_cut_rounded, size: 14, color: t.action),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Trim Story Clip',
+                    style: t.bodySecondary.copyWith(fontSize: 11, color: Colors.white70),
+                  ),
+                ],
+              ),
+              Text(
+                '${selectedSecs.toStringAsFixed(1)}s / 15s max',
+                style: t.dataMono.copyWith(
+                  fontSize: 11,
+                  color: selectedSecs > 14.5 ? t.warning : t.action,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              activeTrackColor: t.action,
+              inactiveTrackColor: Colors.white24,
+              thumbColor: t.action,
+              overlayColor: t.action.withValues(alpha: 0.2),
+              trackHeight: 3,
+              rangeThumbShape: const RoundRangeSliderThumbShape(enabledThumbRadius: 6),
+            ),
+            child: RangeSlider(
+              values: RangeValues(safeStart, safeEnd),
+              min: 0.0,
+              max: safeMax,
+              onChanged: _onVideoTrimChanged,
+            ),
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                _formatSecs(safeStart),
+                style: t.dataMono.copyWith(fontSize: 9, color: Colors.white54),
+              ),
+              Text(
+                _formatSecs(safeEnd),
+                style: t.dataMono.copyWith(fontSize: 9, color: Colors.white54),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatSecs(double secs) {
+    final m = (secs / 60).floor();
+    final s = secs % 60;
+    return '$m:${s.toStringAsFixed(1).padLeft(4, '0')}';
   }
 
   Widget _studioActionButton({

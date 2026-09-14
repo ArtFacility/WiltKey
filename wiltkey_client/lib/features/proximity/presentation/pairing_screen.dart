@@ -148,6 +148,7 @@ class _PairingScreenState extends State<PairingScreen>
     required String peerShortNick,
     required String peerProfileImage,
     int? wiltExpiresMillis,
+    String? wiltFreshSeedHex,
   }) async {
     // Check we can actually fit the pad BEFORE offering Accept. Generating a pad
     // that runs out of disk fails mid-write, after the initiator has already
@@ -263,16 +264,17 @@ class _PairingScreenState extends State<PairingScreen>
                   ? null
                   : () {
                       Navigator.pop(context);
-                      _manager.respondToPairRequest(
-                        peerId,
-                        peerPubKey,
-                        bufferBytes,
-                        true,
-                        peerName,
-                        peerShortNick,
-                        peerProfileImage,
-                        wiltExpiresMillis: wiltExpiresMillis,
-                      );
+                       _manager.respondToPairRequest(
+                         peerId,
+                         peerPubKey,
+                         bufferBytes,
+                         true,
+                         peerName,
+                         peerShortNick,
+                         peerProfileImage,
+                         wiltExpiresMillis: wiltExpiresMillis,
+                         wiltFreshSeedHex: wiltFreshSeedHex,
+                       );
                     },
               child: Text(
                 l10n.pairRequestAccept,
