@@ -1,4 +1,4 @@
-part of 'state.dart';
+﻿part of 'state.dart';
 
 /// Pure budget math for a group's flower/readout (no AppState needed, so it's
 /// directly unit-testable).
@@ -1288,17 +1288,34 @@ extension AppStateGroups on AppState {
 
       groupMembersMetadata[group.id] = list;
 
-      // Keep the dashboard's member count in sync with the actual roster (host +
-      // every known member). It was previously only set at join/registration
-      // time, so a host that learned members through metadata/lane-headers could
-      // under-report — e.g. show 3 for a 6-person group while the members sheet
-      // (built from this same roster) showed 6. Deriving it here makes the two
-      // agree and self-heals on every refresh. Idempotent via the guard.
+      // Keep the dashboard's member count and memberKeyHashes in sync with the
+      // actual roster (host + every known member). It was previously only set at
+      // join/registration time, so a host or member that learned members through
+      // metadata/lane-headers could under-report or miss hashes needed for contact requests.
       final gi = contacts.indexWhere((c) => c.keyHash == groupId);
-      if (gi != -1 && contacts[gi].memberCount != list.length) {
-        contacts[gi] = contacts[gi].copyWith(memberCount: list.length);
-        if (activeContact?.keyHash == groupId) activeContact = contacts[gi];
-        await WiltkeyDatabase.instance.upsertContact(contacts[gi]);
+      if (gi != -1) {
+        final existing = contacts[gi];
+        final allKnownHashes = <String>{
+          userId,
+          if (group.hostKeyHash != null && group.hostKeyHash!.isNotEmpty)
+            group.hostKeyHash!,
+          ...profiles.map((p) => p['member_key_hash'] as String),
+          ...existing.memberKeyHashes,
+        }.toList();
+
+        final bool hashesChanged =
+            allKnownHashes.length != existing.memberKeyHashes.length ||
+                !allKnownHashes.every(existing.memberKeyHashes.contains);
+        final bool countChanged = existing.memberCount != list.length;
+
+        if (hashesChanged || countChanged) {
+          contacts[gi] = contacts[gi].copyWith(
+            memberCount: list.length,
+            memberKeyHashes: allKnownHashes,
+          );
+          if (activeContact?.keyHash == groupId) activeContact = contacts[gi];
+          await WiltkeyDatabase.instance.upsertContact(contacts[gi]);
+        }
       }
 
       notifyListeners();
@@ -1378,7 +1395,7 @@ extension AppStateGroups on AppState {
     );
 
     final newGroup = Contact(
-      id: 'g${contacts.length + 1}',
+      id: _nextContactId(isGroup: true),
       name: name,
       keyHash: groupId,
       relayUrl: relayUrl,
@@ -1541,7 +1558,7 @@ extension AppStateGroups on AppState {
       await WiltkeyDatabase.instance.upsertContact(updatedContact);
     } else {
       final newContact = Contact(
-        id: 'g${contacts.length + 1}',
+        id: _nextContactId(isGroup: true),
         name: name,
         keyHash: groupId,
         relayUrl: relayUrl,

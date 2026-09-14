@@ -182,14 +182,12 @@ extension AppStateContacts on AppState {
 
   /// Send a contact request targeting [keyHash] (a 1:1 peer OR a group member)
   /// over the AES meta channel. The request is addressed to exactly one peer —
-  /// it is never fanned out to the rest of a group. When [chatContact] is a
-  /// direct 1:1 chat, a sent control card is inserted there so the sender can
-  /// watch the request resolve; without one the request still goes out but has
-  /// no in-chat card to live in.
+  /// it is never fanned out to the rest of a group.
   Future<String?> sendContactRequestToKey({
     required String keyHash,
     required String name,
     Contact? chatContact,
+    Contact? groupContact,
   }) async {
     if (keyHash == userId) {
       return 'You cannot add yourself';
@@ -210,14 +208,27 @@ extension AppStateContacts on AppState {
     // exactly this member (envelope carries group_id for receiver context).
     String? viaGroupId;
     Contact? viaGroup;
-    if (metaKeyHex == null) {
+    if (groupContact != null &&
+        groupContact.isGroup &&
+        (groupContact.groupSeed ?? '').isNotEmpty) {
+      viaGroup = groupContact;
+      viaGroupId = groupContact.keyHash;
+    } else if (chatContact != null &&
+        chatContact.isGroup &&
+        (chatContact.groupSeed ?? '').isNotEmpty) {
+      viaGroup = chatContact;
+      viaGroupId = chatContact.keyHash;
+    } else if (metaKeyHex == null) {
       for (final c in contacts) {
-        if (c.isGroup &&
-            (c.groupSeed ?? '').isNotEmpty &&
-            c.memberKeyHashes.contains(keyHash)) {
-          viaGroup = c;
-          viaGroupId = c.keyHash;
-          break;
+        if (c.isGroup && (c.groupSeed ?? '').isNotEmpty) {
+          final isMember = c.memberKeyHashes.contains(keyHash) ||
+              c.hostKeyHash == keyHash ||
+              groupProfilesCache[c.id]?.containsKey(keyHash) == true;
+          if (isMember) {
+            viaGroup = c;
+            viaGroupId = c.keyHash;
+            break;
+          }
         }
       }
       if (viaGroupId == null) {
@@ -265,13 +276,6 @@ extension AppStateContacts on AppState {
       viaGroupId: viaGroupId,
     );
 
-    // Insert a local system message card where the user can watch the request
-    // resolve: the direct chat when one exists, else the shared group chat.
-    final cardChat = chatContact ?? viaGroup;
-    if (cardChat != null) {
-      await _insertContactRequestSentCard(cardChat, requestId, keyHash, name);
-    }
-
     notifyListeners();
     return null;
   }
@@ -313,7 +317,10 @@ extension AppStateContacts on AppState {
       if (gi == -1) return;
       final group = contacts[gi];
       if ((group.groupSeed ?? '').isEmpty) return;
-      if (!group.memberKeyHashes.contains(senderId)) return;
+      final isMember = group.memberKeyHashes.contains(senderId) ||
+          group.hostKeyHash == senderId ||
+          groupProfilesCache[group.id]?.containsKey(senderId) == true;
+      if (!isMember) return;
       metaKeyHex = sha256.convert(utf8.encode(group.groupSeed!)).toString();
       cardChat = group;
     }
@@ -334,12 +341,9 @@ extension AppStateContacts on AppState {
         return;
       }
 
-      // Insert a system message card with Approve/Deny buttons ONLY in the
-      // direct chat. Group-member requests live in the ACTIVITY FEED (user
-      // decision 2026-09-14): a card in the shared group chat rendered as raw
-      // JSON and only ever concerned the one targeted member anyway.
-      if (!cardChat.isGroup) {
-        await _insertContactRequestReceivedCard(cardChat, payload, senderId);
+      // If already a contact, ignore duplicate requests
+      if (socialContacts.any((c) => c.keyHash == senderId)) {
+        return;
       }
 
       // Surface in the activity feed so it's not missed when the user is in
@@ -401,7 +405,10 @@ extension AppStateContacts on AppState {
       if (gi == -1) return;
       final group = contacts[gi];
       if ((group.groupSeed ?? '').isEmpty) return;
-      if (!group.memberKeyHashes.contains(senderId)) return;
+      final isMember = group.memberKeyHashes.contains(senderId) ||
+          group.hostKeyHash == senderId ||
+          groupProfilesCache[group.id]?.containsKey(senderId) == true;
+      if (!isMember) return;
       metaKeyHex = sha256.convert(utf8.encode(group.groupSeed!)).toString();
     }
 
@@ -425,7 +432,7 @@ extension AppStateContacts on AppState {
           final sc = SocialContact(
             id: 0, // DB assigns
             keyHash: senderId,
-            name: payload.responderName ?? 'Contact',
+            name: payload.responderName ?? pending.targetName,
             shortNick: payload.responderShortNick,
             profileImageB64: payload.responderProfileImageB64,
             avatarBorderId: payload.responderAvatarBorderId,
@@ -455,21 +462,24 @@ extension AppStateContacts on AppState {
 
         // Send our own full profile snapshot back immediately
         sendProfileUpdateTo(senderId);
+
+        // Notify user via activity event
+        await logEvent(
+          type: 'contact_response',
+          title: payload.responderName ?? pending.targetName,
+          body: 'accepted your contact request',
+          chatKey: senderId,
+        );
       } else {
         pending.status = 'declined';
+        await logEvent(
+          type: 'contact_response',
+          title: pending.targetName,
+          body: 'declined your contact request',
+          chatKey: senderId,
+        );
       }
 
-      // Update the local sent card: it lives in our direct chat with the
-      // peer, or in the shared group chat when the request rode the group
-      // channel.
-      final idx = pending.viaGroupId != null
-          ? contacts.indexWhere(
-              (c) => c.isGroup && c.keyHash == pending.viaGroupId,
-            )
-          : contacts.indexWhere((c) => c.keyHash == senderId && !c.isGroup);
-      if (idx != -1) {
-        await _updateContactRequestSentCard(contacts[idx], requestId, pending.status);
-      }
       _pendingContactRequests.remove(requestId);
       notifyListeners();
     } catch (e) {
@@ -591,10 +601,19 @@ extension AppStateContacts on AppState {
     // Record the outcome on the event so the feed stops offering stale
     // Approve/Deny buttons, and stop popping it up.
     ev.read = true;
+    ev.updateStatus(accept ? 'accepted' : 'declined');
+
+    for (final e in events) {
+      if (e.id == ev.id) {
+        e.read = true;
+        e.updateStatus(accept ? 'accepted' : 'declined');
+      }
+    }
+
     try {
       await WiltkeyDatabase.instance.updateEvent(
         ev.id,
-        data: jsonEncode({...d, 'status': accept ? 'accepted' : 'declined'}),
+        data: ev.data,
         read: true,
       );
     } catch (e) {
@@ -690,7 +709,10 @@ extension AppStateContacts on AppState {
     if (contactRequestPopup.value != null) return;
     AppEvent? next;
     for (final e in events) {
-      if (e.type == 'contact_request' && !e.read && e.data != null) {
+      if (e.type == 'contact_request' &&
+          !e.read &&
+          e.data != null &&
+          e.dataMap()['status'] == 'pending') {
         next = e; // events are newest-first — keep the OLDEST unanswered
       }
     }
@@ -702,7 +724,10 @@ extension AppStateContacts on AppState {
   void advanceContactRequestPopup() {
     AppEvent? next;
     for (final e in events) {
-      if (e.type == 'contact_request' && !e.read && e.data != null) {
+      if (e.type == 'contact_request' &&
+          !e.read &&
+          e.data != null &&
+          e.dataMap()['status'] == 'pending') {
         next = e;
       }
     }

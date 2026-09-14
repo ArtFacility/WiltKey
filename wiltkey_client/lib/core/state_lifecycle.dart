@@ -360,8 +360,14 @@ extension AppStateLifecycle on AppState {
       final n = int.tryParse(c.id.replaceFirst(RegExp(r'^g'), '')) ?? 0;
       if (n > maxN) maxN = n;
     }
-    final next = maxN + 1;
-    return isGroup ? 'g$next' : '$next';
+    var id = isGroup ? 'g${maxN + 1}' : '${maxN + 1}';
+    // Defensive: never return an id a live contact already owns (a collision
+    // here would make INSERT OR REPLACE silently overwrite that chat's row).
+    while (contacts.any((c) => c.id == id)) {
+      final n = (int.tryParse(id.replaceFirst(RegExp(r'^g'), '')) ?? 0) + 1;
+      id = isGroup ? 'g$n' : '$n';
+    }
+    return id;
   }
 
   // Used by BLE Sync to register/recharge contacts

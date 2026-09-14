@@ -8,7 +8,6 @@ import '../../../core/state.dart';
 import '../../../core/payload_limits.dart';
 import '../../../core/models.dart';
 import '../../../core/custom_emoji.dart';
-import '../../contacts/presentation/contact_request_ui.dart';
 import 'widgets/image_source_sheet.dart';
 import 'widgets/content_attachment_sheet.dart';
 import 'widgets/chat_search_bar.dart';
@@ -273,7 +272,10 @@ class _ChatScreenState extends State<ChatScreen>
     return (_appState.messages[contact.id] ?? [])
         .where(
           (m) =>
-              m.contentType != 'emoji_def' && m.contentType != 'emoji_delete',
+              m.contentType != 'emoji_def' &&
+              m.contentType != 'emoji_delete' &&
+              m.contentType != 'contact_request_sent' &&
+              m.contentType != 'contact_request_received',
         )
         .toList();
   }

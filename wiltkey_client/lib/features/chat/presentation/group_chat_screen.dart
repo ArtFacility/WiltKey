@@ -2939,6 +2939,7 @@ class _GroupChatScreenState extends State<GroupChatScreen>
       keyHash: keyHash,
       name: name,
       chatContact: direct,
+      groupContact: _appState.activeContact,
     );
   }
 

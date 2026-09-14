@@ -439,7 +439,7 @@ class AppEvent {
   // Opaque JSON payload for events that need actionable context beyond
   // title/body — e.g. contact-request events carry requester key/name/image so
   // the approve/deny popup and event-row buttons work with no chat card.
-  final String? data;
+  String? data;
   final DateTime timestamp;
   bool read;
 
@@ -487,6 +487,13 @@ class AppEvent {
     } catch (_) {
       return {};
     }
+  }
+
+  /// Update the 'status' key inside [data] in-memory (e.g. 'accepted', 'declined').
+  void updateStatus(String status) {
+    final m = dataMap();
+    m['status'] = status;
+    data = jsonEncode(m);
   }
 }
 

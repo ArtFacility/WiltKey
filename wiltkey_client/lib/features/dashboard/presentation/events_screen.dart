@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:wiltkey_client/l10n/app_localizations.dart';
 import '../../../core/state.dart';
@@ -125,46 +124,28 @@ class _EventsScreenState extends State<EventsScreen> {
         (e.chatKey != null &&
             _appState.contacts.any((c) => c.keyHash == e.chatKey));
 
-    Contact? contact;
     String? reqId;
     String? requestStatus;
 
     if (isContactRequest) {
-      if (e.chatKey != null) {
-        for (final c in _appState.contacts) {
-          if (c.keyHash == e.chatKey) {
-            contact = c;
-            break;
-          }
-        }
-      }
       reqId = e.id.startsWith('contact_request_')
           ? e.id.substring('contact_request_'.length)
           : e.id;
 
+      final d = e.dataMap();
+      final requesterKey = d['requester_key'] as String?;
+
       requestStatus = _actionStatus[reqId];
       if (requestStatus == null) {
         // Recorded outcome on the event itself (responded via popup/row).
-        requestStatus = e.dataMap()['status'] as String?;
+        requestStatus = d['status'] as String?;
       }
-      if (requestStatus == null) {
-        if (e.chatKey != null &&
-            _appState.socialContacts.any((sc) => sc.keyHash == e.chatKey)) {
+      if (requestStatus == null || requestStatus == 'pending') {
+        if ((requesterKey != null &&
+                _appState.socialContacts.any((sc) => sc.keyHash == requesterKey)) ||
+            (e.chatKey != null &&
+                _appState.socialContacts.any((sc) => sc.keyHash == e.chatKey))) {
           requestStatus = 'accepted';
-        } else if (contact != null) {
-          final list = _appState.messages[contact.id];
-          if (list != null) {
-            final msg = list.cast<ChatMessage?>().firstWhere(
-                  (m) => m?.id == 'contact_req_recv_$reqId',
-                  orElse: () => null,
-                );
-            if (msg != null) {
-              try {
-                final p = jsonDecode(msg.text) as Map<String, dynamic>;
-                requestStatus = p['status'] as String?;
-              } catch (_) {}
-            }
-          }
         }
       }
     }
@@ -234,7 +215,7 @@ class _EventsScreenState extends State<EventsScreen> {
                   ],
                 ),
               )
-            else if (contact != null)
+            else
               Padding(
                 padding: const EdgeInsets.only(left: 16, right: 16, bottom: 12),
                 child: Row(
