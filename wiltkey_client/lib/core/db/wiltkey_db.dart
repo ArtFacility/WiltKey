@@ -45,7 +45,7 @@ class WiltkeyDatabase {
     } catch (_) {}
     _db = await openDatabase(
       path,
-      version: 28,
+      version: 29,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -251,6 +251,14 @@ class WiltkeyDatabase {
     if (oldVersion < 28) {
       await _safeAddColumn(db, 'group_lanes', 'tombstoned', 'INTEGER DEFAULT 0');
     }
+
+    // v29: events.data — opaque JSON payload for events that need actionable
+    // context beyond title/body (contact-request events carry requester key/
+    // name/image so the approve/deny popup + event-row buttons work even when
+    // no card was inserted into a chat).
+    if (oldVersion < 29) {
+      await _safeAddColumn(db, 'events', 'data', 'TEXT');
+    }
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -438,6 +446,7 @@ class WiltkeyDatabase {
         title TEXT,
         body TEXT,
         chat_key TEXT,
+        data TEXT,
         timestamp INTEGER,
         read INTEGER DEFAULT 0
       )
@@ -2267,6 +2276,22 @@ class WiltkeyDatabase {
   Future<void> markAllEventsRead() async {
     final db = await _database;
     await db.update('events', {'read': 1}, where: 'read = 0');
+  }
+
+  /// Patch one event (e.g. record a contact request's accepted/declined
+  /// outcome on its data payload, or flip it read).
+  Future<void> updateEvent(
+    String id, {
+    String? data,
+    bool? read,
+  }) async {
+    final db = await _database;
+    final values = <String, Object?>{
+      if (data != null) 'data': data,
+      if (read != null) 'read': read ? 1 : 0,
+    };
+    if (values.isEmpty) return;
+    await db.update('events', values, where: 'id = ?', whereArgs: [id]);
   }
 
   Future<void> deleteEventsForChat(String chatKey) async {

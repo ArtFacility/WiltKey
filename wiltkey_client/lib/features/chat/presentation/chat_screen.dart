@@ -319,6 +319,10 @@ class _ChatScreenState extends State<ChatScreen>
   /// fires when this route is actually on top.
   Future<void> _checkNukedWhileOpen() async {
     if (!mounted || _nukePlaying) return;
+    // PIN gate still up: the overlay would play OVER the lock screen (caught
+    // 2026-09-14 — minimize while in a chat, reopen). The listener re-fires
+    // after unlock, so the animation plays right after the PIN instead.
+    if (_appState.isLocked) return;
     final id = _nukeWatchedContactId;
     if (id == null) return;
     if (_appState.contacts.any((c) => c.id == id)) return; // still alive

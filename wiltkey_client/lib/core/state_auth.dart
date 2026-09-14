@@ -249,6 +249,11 @@ extension AppStateAuth on AppState {
     // locked, then re-run the normal inbound path for it.
     await processPendingInbox();
 
+    // Contact requests that arrived (and were logged) while the app was fully
+    // closed get their approve/deny popup now — replayed frames already fired
+    // theirs through the normal inbound path above.
+    surfacePendingContactRequests();
+
     // Stamp the unlock so the biometric 4h idle window resets.
     await _touchUnlock();
 

@@ -144,6 +144,10 @@ class _EventsScreenState extends State<EventsScreen> {
 
       requestStatus = _actionStatus[reqId];
       if (requestStatus == null) {
+        // Recorded outcome on the event itself (responded via popup/row).
+        requestStatus = e.dataMap()['status'] as String?;
+      }
+      if (requestStatus == null) {
         if (e.chatKey != null &&
             _appState.socialContacts.any((sc) => sc.keyHash == e.chatKey)) {
           requestStatus = 'accepted';
@@ -239,9 +243,10 @@ class _EventsScreenState extends State<EventsScreen> {
                     OutlinedButton(
                       onPressed: () async {
                         setState(() => _actionStatus[reqId!] = 'declined');
-                        await _appState.respondToContactRequest(
-                          contact!,
-                          reqId!,
+                        // Event-based respond works with or without a chat
+                        // card (group-member requests have none).
+                        await _appState.respondToContactRequestEvent(
+                          e,
                           false,
                         );
                         if (mounted) setState(() {});
@@ -264,9 +269,8 @@ class _EventsScreenState extends State<EventsScreen> {
                     ElevatedButton(
                       onPressed: () async {
                         setState(() => _actionStatus[reqId!] = 'accepted');
-                        await _appState.respondToContactRequest(
-                          contact!,
-                          reqId!,
+                        await _appState.respondToContactRequestEvent(
+                          e,
                           true,
                         );
                         if (mounted) setState(() {});

@@ -28,13 +28,17 @@ extension AppStateEvents on AppState {
   }
 
   /// Append an activity event (persist + surface). [chatKey] deep-links to a
-  /// chat when it still exists. Idempotent per [id] so a redelivered signal
-  /// doesn't spawn a duplicate row.
-  Future<void> logEvent({
+  /// chat when it still exists. [data] carries an opaque JSON payload for
+  /// events that need actionable context (contact requests). Idempotent per
+  /// [id] so a redelivered signal doesn't spawn a duplicate row. Returns the
+  /// event when a NEW row was created (null when deduped) — callers use that
+  /// to fire one-shot popups only on first arrival.
+  Future<AppEvent?> logEvent({
     required String type,
     required String title,
     required String body,
     String? chatKey,
+    String? data,
     String? id,
   }) async {
     final ev = AppEvent(
@@ -43,10 +47,11 @@ extension AppStateEvents on AppState {
       title: title,
       body: body,
       chatKey: chatKey,
+      data: data,
       timestamp: DateTime.now(),
     );
     // De-dupe in memory (idempotent redelivery).
-    if (events.any((e) => e.id == ev.id)) return;
+    if (events.any((e) => e.id == ev.id)) return null;
     events.insert(0, ev);
     try {
       await WiltkeyDatabase.instance.insertEvent(ev.toRow());
@@ -54,6 +59,7 @@ extension AppStateEvents on AppState {
       log('[Events] persist failed: $e');
     }
     notifyListeners();
+    return ev;
   }
 
   /// Mark the whole feed read (called when the user opens the events screen).

@@ -121,6 +121,7 @@
   "notificationModeInstantDesc": "Opcionális. A háttérben nyitva tart egy végpontok közötti titkosított kapcsolatot, hogy valós időben szinkronizálja a bejövő üzeneteket, amit egy állandó értesítés jelez. A Wiltkey adatvédelmi okokból ezt használja a Google vagy az Apple push-szolgáltatásai helyett, így Google Play-szolgáltatások nélkül is működik – nagyobb akkumulátor-fogyasztás árán.",
   "notificationNewMessageBody": "Új üzeneted érkezett",
   "notificationEmergencyChatBody": "Vészhelyzeti chat kérés",
+  "notificationNewActivityBody": "Új aktivitás — nézd meg az értesítéseidet",
   "notificationSecureLinkActive": "Biztonságos üzenetek szinkronizálása",
   "onboardingNotificationsTitle": "Értesítések",
   "onboardingNotificationsExplanation": "A Wiltkey nem használ Google vagy Apple push-értesítéseket – az üzeneteidről semmi nem kerül a szervereikre. Válaszd ki, hogyan szeretnél értesítést kapni. Ezt bármikor módosíthatod a Beállításokban.",

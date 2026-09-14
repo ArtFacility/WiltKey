@@ -271,6 +271,13 @@ class _GroupChatScreenState extends State<GroupChatScreen>
     return (_appState.messages[contact.id] ?? []).where((m) {
       if (m.contentType == 'emoji_def' || m.contentType == 'emoji_delete')
         return false;
+      // Contact-request control cards never render in GROUP chats (user
+      // decision 2026-09-14): the arrival popup + activity event carry them.
+      // The DB rows stay — they're the respond/status source of truth.
+      if (m.contentType == 'contact_request_sent' ||
+          m.contentType == 'contact_request_received') {
+        return false;
+      }
       if (m.isSystem) return true;
       if (contact.joinedAt != null && m.timestamp.isBefore(contact.joinedAt!)) {
         return false;
@@ -2876,6 +2883,10 @@ class _GroupChatScreenState extends State<GroupChatScreen>
   /// this route is actually on top (the user is HERE, not elsewhere).
   Future<void> _checkNukedWhileOpen() async {
     if (!mounted || _nukePlaying) return;
+    // PIN gate still up: the overlay would play OVER the lock screen (caught
+    // 2026-09-14 — minimize while in a chat, reopen). The listener re-fires
+    // after unlock, so the animation plays right after the PIN instead.
+    if (_appState.isLocked) return;
     final id = _nukeWatchedContactId;
     if (id == null) return;
     if (_appState.contacts.any((c) => c.id == id)) return; // still alive

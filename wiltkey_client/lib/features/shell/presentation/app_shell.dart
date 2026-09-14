@@ -11,6 +11,7 @@ import '../../../core/theme/wk.dart';
 import '../../dashboard/presentation/chats_tab.dart';
 import '../../chat/presentation/chat_screen.dart';
 import '../../chat/presentation/group_chat_screen.dart';
+import '../../chat/presentation/widgets/contact_request_dialog.dart';
 import '../../chat/presentation/widgets/screenshot_ui.dart';
 import '../../proximity/presentation/connect_hub_screen.dart';
 import '../../settings/presentation/settings_screen.dart';
@@ -88,6 +89,9 @@ class _AppShellState extends State<AppShell>
     // A peer asking to screenshot a chat with us → show the Allow/Deny prompt
     // here (works regardless of which tab/screen is on top).
     _appState.incomingScreenshotRequest.addListener(_onScreenshotRequest);
+    // A contact request arrived → Approve/Deny popup (also covers requests
+    // that arrived while the app was closed, surfaced after unlock).
+    _appState.contactRequestPopup.addListener(_onContactRequestPopup);
     // Archive Time Wilt chats that expired while the app was closed.
     WidgetsBinding.instance
         .addPostFrameCallback((_) => _appState.sweepTimeWiltChats());
@@ -99,6 +103,33 @@ class _AppShellState extends State<AppShell>
     if (req == null || !mounted) return;
     _appState.incomingScreenshotRequest.value = null;
     showScreenshotConsentDialog(context, req);
+  }
+
+  // Guards against the listener firing twice for one event (ValueNotifier
+  // listener + a re-entrant advance) stacking two dialogs.
+  bool _contactRequestDialogOpen = false;
+
+  /// Contact request arrived (or was surfaced post-unlock) → Approve/Deny
+  /// dialog. Resolving marks the event read and chains to the next unanswered
+  /// request, if any — including one that arrived while a dialog was open
+  /// (its value sits set until here, since the listener is guarded).
+  Future<void> _onContactRequestPopup() async {
+    if (_contactRequestDialogOpen) return;
+    final ev = _appState.contactRequestPopup.value;
+    if (ev == null || !mounted) return;
+    _appState.contactRequestPopup.value = null; // consume; re-set to chain
+    _contactRequestDialogOpen = true;
+    try {
+      await showContactRequestDialog(context, ev, _appState);
+    } finally {
+      _contactRequestDialogOpen = false;
+    }
+    if (!mounted) return;
+    if (_appState.contactRequestPopup.value != null) {
+      await _onContactRequestPopup(); // arrived while this dialog was open
+    } else {
+      _appState.surfacePendingContactRequests(); // older unanswered, if any
+    }
   }
 
   @override
@@ -203,6 +234,7 @@ class _AppShellState extends State<AppShell>
   void dispose() {
     _appState.removeListener(_onState);
     _appState.incomingScreenshotRequest.removeListener(_onScreenshotRequest);
+    _appState.contactRequestPopup.removeListener(_onContactRequestPopup);
     WidgetsBinding.instance.removeObserver(this);
     _slide.dispose();
     super.dispose();

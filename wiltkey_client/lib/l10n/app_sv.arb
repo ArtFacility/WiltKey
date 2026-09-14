@@ -121,6 +121,7 @@
   "notificationModeInstantDesc": "Valfritt. Håller en totalsträckskrypterad anslutning öppen i bakgrunden för att synkronisera dina inkommande meddelanden i realtid, vilket visas med en pågående avisering. Wiltkey använder detta i stället för push-tjänster från Google eller Apple av integritetsskäl, så att det fungerar även utan Google Play-tjänster – på bekostnad av mer batteri.",
   "notificationNewMessageBody": "Du har fått ett meddelande",
   "notificationEmergencyChatBody": "Begäran om nödchatt",
+  "notificationNewActivityBody": "Ny aktivitet — kolla dina aviseringar",
   "notificationSecureLinkActive": "Synkroniserar säkra meddelanden",
   "onboardingNotificationsTitle": "Aviseringar",
   "onboardingNotificationsExplanation": "Wiltkey använder inte push-aviseringar från Google eller Apple – ingenting om dina meddelanden når deras servrar. Välj hur du vill bli aviserad. Du kan ändra detta när som helst i Inställningar.",

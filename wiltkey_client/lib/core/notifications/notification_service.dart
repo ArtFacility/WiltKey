@@ -245,6 +245,34 @@ class WiltkeyNotifications {
     }
   }
 
+  /// Content-free alert for a new ACTIVITY-feed event (e.g. a contact request
+  /// that arrived while the app was backgrounded — its content lives in the
+  /// feed and stays unexplained until unlock, like message alerts).
+  static Future<void> showActivityNotification() async {
+    try {
+      await initLocalNotifications();
+      final l10n = await _strings();
+      const details = NotificationDetails(
+        android: AndroidNotificationDetails(
+          kMsgChannelId,
+          kMsgChannelName,
+          channelDescription: 'New secure message alerts',
+          importance: Importance.high,
+          priority: Priority.high,
+          icon: '@drawable/ic_stat_notif',
+        ),
+      );
+      await plugin.show(
+        kMsgNotificationId,
+        'Wiltkey',
+        l10n.notificationNewActivityBody,
+        details,
+      );
+    } catch (e) {
+      debugPrint('[Notifications] Error showing activity notification: $e');
+    }
+  }
+
   /// Dismiss the "you got a message" alert(s). Called when the app returns to the
   /// foreground and when a chat is opened, so a message the user has now seen
   /// doesn't linger in the tray. Safe to call when nothing is showing.

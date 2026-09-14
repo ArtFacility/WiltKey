@@ -424,6 +424,10 @@ class AppLocalizationsSv extends AppLocalizations {
   String get notificationEmergencyChatBody => 'Begäran om nödchatt';
 
   @override
+  String get notificationNewActivityBody =>
+      'Ny aktivitet — kolla dina aviseringar';
+
+  @override
   String get notificationSecureLinkActive => 'Synkroniserar säkra meddelanden';
 
   @override

@@ -407,6 +407,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get notificationEmergencyChatBody => '紧急聊天请求';
 
   @override
+  String get notificationNewActivityBody => '有新动态 — 查看通知';
+
+  @override
   String get notificationSecureLinkActive => '正在同步安全消息';
 
   @override

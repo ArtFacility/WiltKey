@@ -876,6 +876,12 @@ abstract class AppLocalizations {
   /// **'Emergency chat request'**
   String get notificationEmergencyChatBody;
 
+  /// No description provided for @notificationNewActivityBody.
+  ///
+  /// In en, this message translates to:
+  /// **'New activity — check your notifications'**
+  String get notificationNewActivityBody;
+
   /// No description provided for @notificationSecureLinkActive.
   ///
   /// In en, this message translates to:

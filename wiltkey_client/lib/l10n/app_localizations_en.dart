@@ -418,6 +418,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get notificationEmergencyChatBody => 'Emergency chat request';
 
   @override
+  String get notificationNewActivityBody =>
+      'New activity — check your notifications';
+
+  @override
   String get notificationSecureLinkActive => 'Syncing secure messages';
 
   @override

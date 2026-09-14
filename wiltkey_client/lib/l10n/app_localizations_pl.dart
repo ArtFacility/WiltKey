@@ -421,6 +421,10 @@ class AppLocalizationsPl extends AppLocalizations {
   String get notificationEmergencyChatBody => 'Prośba o czat awaryjny';
 
   @override
+  String get notificationNewActivityBody =>
+      'Nowa aktywność — sprawdź powiadomienia';
+
+  @override
   String get notificationSecureLinkActive =>
       'Synchronizowanie bezpiecznych wiadomości';
 

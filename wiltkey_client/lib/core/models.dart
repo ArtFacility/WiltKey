@@ -436,6 +436,10 @@ class AppEvent {
   final String title;
   final String body;
   final String? chatKey; // deep-link target keyHash, if the chat still exists
+  // Opaque JSON payload for events that need actionable context beyond
+  // title/body — e.g. contact-request events carry requester key/name/image so
+  // the approve/deny popup and event-row buttons work with no chat card.
+  final String? data;
   final DateTime timestamp;
   bool read;
 
@@ -445,6 +449,7 @@ class AppEvent {
     required this.title,
     required this.body,
     this.chatKey,
+    this.data,
     required this.timestamp,
     this.read = false,
   });
@@ -455,6 +460,7 @@ class AppEvent {
     'title': title,
     'body': body,
     'chat_key': chatKey,
+    'data': data,
     'timestamp': timestamp.millisecondsSinceEpoch,
     'read': read ? 1 : 0,
   };
@@ -465,11 +471,23 @@ class AppEvent {
     title: r['title'] as String? ?? '',
     body: r['body'] as String? ?? '',
     chatKey: r['chat_key'] as String?,
+    data: r['data'] as String?,
     timestamp: DateTime.fromMillisecondsSinceEpoch(
       (r['timestamp'] as int?) ?? 0,
     ),
     read: (r['read'] as int? ?? 0) == 1,
   );
+
+  /// Parsed [data] payload, or {} when absent/unparseable.
+  Map<String, dynamic> dataMap() {
+    if (data == null || data!.isEmpty) return {};
+    try {
+      final v = jsonDecode(data!);
+      return v is Map<String, dynamic> ? v : {};
+    } catch (_) {
+      return {};
+    }
+  }
 }
 
 class ChatMessage {

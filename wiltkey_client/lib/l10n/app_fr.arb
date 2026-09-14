@@ -121,6 +121,7 @@
   "notificationModeInstantDesc": "Optionnel. Maintient une connexion chiffrée de bout en bout en arrière-plan pour synchroniser tes messages entrants en temps réel, signalée par une notification permanente. Wiltkey utilise ceci au lieu des services de notifications push de Google ou Apple pour la confidentialité, ce qui lui permet de fonctionner même sans les services Google Play – au prix d'une consommation de batterie plus élevée.",
   "notificationNewMessageBody": "Tu as un message",
   "notificationEmergencyChatBody": "Demande de chat d'urgence",
+  "notificationNewActivityBody": "Nouvelle activité — consulte tes notifications",
   "notificationSecureLinkActive": "Synchronisation des messages sécurisés",
   "onboardingNotificationsTitle": "Alertes",
   "onboardingNotificationsExplanation": "Wiltkey n'utilise pas les notifications push de Google ou d'Apple — rien concernant vos messages ne transite par leurs serveurs. Choisissez comment vous souhaitez être alerté. Vous pourrez modifier ce choix à tout moment dans les Paramètres.",

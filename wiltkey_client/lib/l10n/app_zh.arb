@@ -128,6 +128,7 @@
   "notificationModeInstantDesc": "可选。在后台保持一条端到端加密连接，实时同步收到的消息，并通过一条常驻通知显示。出于隐私考虑，Wiltkey 使用此方式而非 Google 或 Apple 的推送服务，因此即使没有 Google Play 服务也能正常工作——代价是更耗电。",
   "notificationNewMessageBody": "你收到一条消息",
   "notificationEmergencyChatBody": "紧急聊天请求",
+  "notificationNewActivityBody": "有新动态 — 查看通知",
   "notificationSecureLinkActive": "正在同步安全消息",
   "onboardingNotificationsTitle": "通知",
   "onboardingNotificationsExplanation": "Wiltkey 不使用 Google 或 Apple 的推送通知——你的消息不会以任何形式经过它们的服务器。请选择你希望的提醒方式。你随时可以在“设置”中更改。",

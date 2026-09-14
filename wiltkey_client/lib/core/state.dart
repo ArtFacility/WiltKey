@@ -407,6 +407,13 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   // A peer asked us to consent → the shell shows an Allow/Deny dialog.
   final ValueNotifier<ScreenshotRequestEvent?> incomingScreenshotRequest =
       ValueNotifier(null);
+
+  // --- Contact-request arrival popup (see state_contacts.dart) ---
+  // A contact request arrived → the shell shows an Approve/Deny dialog that
+  // works regardless of which screen is on top. Carries the NEW event (its
+  // data payload has the requester context); null between popups. The shell
+  // chains to the next unread request after each dialog resolves.
+  final ValueNotifier<AppEvent?> contactRequestPopup = ValueNotifier(null);
   // Enough peers approved OUR request → carries the Contact.id whose chat screen
   // should now render itself to an image and open it in the viewer.
   final ValueNotifier<String?> screenshotCaptureSignal = ValueNotifier(null);

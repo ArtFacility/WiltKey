@@ -425,6 +425,10 @@ class AppLocalizationsHu extends AppLocalizations {
   String get notificationEmergencyChatBody => 'Vészhelyzeti chat kérés';
 
   @override
+  String get notificationNewActivityBody =>
+      'Új aktivitás — nézd meg az értesítéseidet';
+
+  @override
   String get notificationSecureLinkActive =>
       'Biztonságos üzenetek szinkronizálása';
 
